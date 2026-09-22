@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import {
@@ -135,7 +136,10 @@ export async function desactiverOptionIAAction() {
       redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Désactivation impossible")}`);
     }
   }
-  await supabase.from("entreprises").update({ option_ia_statut: "annule", option_ia_stripe_item_id: null }).eq("id", ctx.entrepriseId);
+  // option_ia_* est une colonne commerciale (RLS réservée au service_role, cf.
+  // migration 20260922000184) : l'appel Stripe ci-dessus a déjà eu lieu côté
+  // serveur, seule l'écriture de confirmation passe par le client admin.
+  await createAdminClient().from("entreprises").update({ option_ia_statut: "annule", option_ia_stripe_item_id: null }).eq("id", ctx.entrepriseId);
   revalidatePath("/abonnement");
   redirect(`/abonnement?succes=1`);
 }
@@ -160,7 +164,7 @@ export async function reactiverOptionIAAction() {
   const palier = estPalierOptionIA(palierBrute) ? palierBrute : "300";
   try {
     const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palier, periodicite);
-    await supabase.from("entreprises").update({ option_ia_statut: "actif", option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
+    await createAdminClient().from("entreprises").update({ option_ia_statut: "actif", option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
     redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Réactivation impossible")}`);
   }
@@ -191,7 +195,7 @@ export async function choisirPalierOptionIAAction(formData: FormData) {
   }
 
   if (entreprise.option_ia_statut === "essai") {
-    await supabase.from("entreprises").update({ option_ia_palier: palierBrut }).eq("id", ctx.entrepriseId);
+    await createAdminClient().from("entreprises").update({ option_ia_palier: palierBrut }).eq("id", ctx.entrepriseId);
     revalidatePath("/abonnement");
     redirect(`/abonnement?succes=1`);
   }
@@ -205,7 +209,7 @@ export async function choisirPalierOptionIAAction(formData: FormData) {
     const item = entreprise.option_ia_stripe_item_id
       ? await modifierOptionIAAbonnement(entreprise.option_ia_stripe_item_id, palierBrut, periodicite)
       : await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palierBrut, periodicite);
-    await supabase.from("entreprises").update({ option_ia_palier: palierBrut, option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
+    await createAdminClient().from("entreprises").update({ option_ia_palier: palierBrut, option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
     redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Changement de palier impossible")}`);
   }
