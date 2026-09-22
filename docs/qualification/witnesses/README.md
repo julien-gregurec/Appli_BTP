@@ -15,7 +15,7 @@ Ordre d'exécution, sur une base neuve où `supabase/migrations/*.sql` (+ la mig
    le rejeu des migrations).
 2. `10_seed_tenants.sql` — fixture : 2 entreprises isolées, utilisateurs, postes/permissions,
    clients, employé avec documents sensibles.
-3. `20_witnesses_core.sql` à `24_witnesses_devis_essai.sql` — batteries de witnesses
+3. `20_witnesses_core.sql` à `25_witnesses_idempotence.sql` — batteries de witnesses
    positifs/négatifs, à exécuter dans cet ordre après le seed. Chaque `DO $$ ... $$` imprime
    `NOTICE: PASS ...` en cas de succès ou lève une exception `FAIL ...` sinon (le script s'arrête
    au premier échec réel si lancé avec `ON_ERROR_STOP`).

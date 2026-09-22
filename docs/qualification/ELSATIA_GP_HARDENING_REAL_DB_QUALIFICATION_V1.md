@@ -197,10 +197,11 @@ revue de code uniquement pour ce volet précis.
   `authenticated` réel avec witnesses positif/négatif comportementaux ; les 21 autres sont des
   vérifications **structurelles** (existence de colonne/table/fonction, RLS activée) — exactement
   le type de couverture que cette mission qualifie de « jamais qualifié ensemble sur une vraie
-  base ». C'est pourquoi 33 witnesses comportementaux réels et nouveaux (fichiers
-  `20_witnesses_core.sql` à `24_witnesses_devis_essai.sql`) ont été écrits et exécutés cette
-  session pour combler cet écart sur les correctifs à plus haut risque (§4 à §10) — **33/33
-  passent**, 0 échec, après correction du bootstrap de rôles.
+  base ». C'est pourquoi 39 witnesses comportementaux réels et nouveaux (fichiers
+  `20_witnesses_core.sql` à `25_witnesses_idempotence.sql`) ont été écrits et exécutés cette
+  session pour combler cet écart sur les correctifs à plus haut risque (§4 à §10, plus
+  l'idempotence paiement/avoir) — **39/39 passent**, 0 échec, après correction du bootstrap de
+  rôles.
 
 ---
 
@@ -237,7 +238,7 @@ revue de code uniquement pour ce volet précis.
 | 23 | `d46f7f1f` immutabilité facture émise | Oui, y compris `service_role` | 9a/9b/9c: modif/brouillon/suppr refusés | 9d: champ libre OK | Aucune | **QUALIFIÉ** |
 | 24 | `14694edf` tarification Mini | Vitest (`tarification.test.ts`) | inclus | inclus | Aucune | **QUALIFIÉ (app)** |
 | 25 | `845eb4c4` session support sans persistance | Oui, session support réelle ouverte | 7a/7b: appartenance/permission permanentes refusées | 7c: accès lecture normal pendant session | Aucune | **QUALIFIÉ** — 1er test réel (commit notait pgTAP jamais exécuté) |
-| 26 | `ef49ef51` idempotence factures + gel échéance | pgTAP structurel (idempotence + gel) | — | fonctions/triggers présents | Aucune | **PARTIEL** |
+| 26 | `ef49ef51` idempotence factures + gel échéance | Oui | 11a: paiement>reste dû refusé; 11c: 2e règlement excédentaire refusé; 11e: 2e avoir identique refusé | 11b: 1er règlement partiel OK; 11d: 1er avoir créé; 11f: exactement 1 avoir en base | Aucune | **QUALIFIÉ** |
 | 27 | `3bc6a5c6` masque erreurs SQL clients/chantiers/devis/factures | Revue de code | — | pattern helper conforme | Aucune | **QUALIFIÉ (code)** |
 | 28 | `af9374e6` ferme INSERT direct paiements | Oui | 8a: INSERT direct refusé | 8b: SELECT non régressé | Aucune | **QUALIFIÉ** |
 | 29 | `3bc642b4` plafond nom coupon Stripe 40 car | Vitest (`plateforme-remises.test.ts`) | inclus | inclus | Aucune | **QUALIFIÉ (app)** |
@@ -249,11 +250,11 @@ revue de code uniquement pour ce volet précis.
 | 35 | `1b7590c7` route erreurs CORE P1-1 | Couvert par typecheck/lint/vitest/build | — | — | Aucune | **PARTIEL** |
 | — | *(hors 35)* `20260922000201` grant EXECUTE est_membre_actif/entreprise_sans_membres | Oui | avant: tables core illisibles par authenticated | après: toutes lisibles, 33/33 witnesses inchangés | **Régression préexistante trouvée et corrigée — voir §0** | **QUALIFIÉ** |
 
-**Compte** : 24 `QUALIFIÉ` (DB réelle ou app/vitest complet) + 6 `QUALIFIÉ (code)`/`(app)` bornés à
-la revue + tests automatisés déjà existants + 8 `PARTIEL` (limités par l'indisponibilité de
-Docker/Supabase dans cet environnement, ou par manque de temps pour un witness DB dédié sur des
-correctifs déjà couverts par la suite automatisée) + 1 régression préexistante indépendante,
-prouvée et corrigée.
+**Compte** : 25 `QUALIFIÉ` (DB réelle ou app/vitest complet) + 6 `QUALIFIÉ (code)`/`(app)` bornés à
+la revue + tests automatisés déjà existants + 7 `PARTIEL` (limités par l'indisponibilité de
+Docker/Supabase dans cet environnement : `0edaa3a1`, `a45f7b51`, `97e3aff0`, et les 4 derniers
+correctifs `masque erreurs SQL` §11 couverts par typecheck/lint/vitest/build mais sans witness DB
+dédié faute de temps) + 1 régression préexistante indépendante, prouvée et corrigée.
 
 ---
 
@@ -265,11 +266,11 @@ prouvée et corrigée.
 
 - La couche base de données (RLS, FK, triggers, privilèges — la majorité des 35 correctifs) est
   **qualifiée solidement et réellement** : 195/195 migrations rejouées sans erreur, upgrade
-  réaliste avec checksums métier identiques, 22/22 pgTAP existants verts, **33/33 witnesses
+  réaliste avec checksums métier identiques, 22/22 pgTAP existants verts, **39/39 witnesses
   comportementaux positifs/négatifs nouveaux verts** couvrant tous les correctifs à plus haut
   risque (élévation de privilège, contournement de paiement, isolation cross-tenant ×3, RLS
   chantiers, documents RH/paie, session support, immutabilité facture, verrou devis, essai
-  gratuit, insert paiements).
+  gratuit, insert paiements, idempotence encaissement/avoir).
 - La couche application (Next.js) est **qualifiée par les outils automatisés réels** :
   typecheck/lint/vitest(189/189)/build tous verts, Next 16.3.5 confirmé sans avisory.
 - **Une régression réelle, sévère et préexistante** (indépendante des 34/35 correctifs) a été
