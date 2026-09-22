@@ -46,16 +46,67 @@
 -- boucle) hors heures ouvrées ; CREATE INDEX CONCURRENTLY (hors transaction) ;
 -- puis SET NOT NULL + ADD CONSTRAINT (validation rapide une fois l'index en
 -- place). Non nécessaire ici : le volume RC est encore modeste.
+--
+-- Sécurité upgrade sur base réelle (durci suite à l'échec exact-tip constaté
+-- lors de la qualification historique — cf. docs/qualification/
+-- ELSATIA_HISTORICAL_DATA_UPGRADE_HARDENING_V1.md) :
+--
+-- 1. Le bloc entier est enveloppé dans une transaction explicite (BEGIN/
+--    COMMIT). psql applique par défaut chaque instruction d'un fichier de
+--    migration en autocommit : sans BEGIN explicite, un échec en milieu de
+--    fichier laisse les instructions déjà exécutées committées (schéma
+--    "lignes_devis" migré, "lignes_factures" avec colonne ajoutée mais non
+--    peuplée/indexée) — reproduit et confirmé. L'enveloppe transactionnelle
+--    rend la migration atomique : soit elle s'applique intégralement, soit
+--    elle ne modifie rien, quel que soit l'outil qui l'exécute.
+-- 2. Le trigger `lignes_factures_brouillon_only` (migration 7) interdit
+--    inconditionnellement toute écriture sur `lignes_factures` dès que la
+--    facture parente n'est plus au statut 'brouillon' — y compris cette
+--    UPDATE de backfill technique, qui ne touche aucune donnée contractuelle
+--    (montants, désignations, TVA). Dès qu'un tenant réel a au moins une
+--    facture déjà émise, le backfill échouait. Correctif : désactiver ce
+--    seul trigger pour la durée de l'UPDATE de backfill, à l'intérieur de la
+--    même transaction (donc jamais persistant si la migration échoue), puis
+--    le réactiver immédiatement après. Le comportement applicatif du
+--    trigger (immuabilité des lignes d'une facture émise pour toute écriture
+--    utilisateur/RPC) reste strictement inchangé après cette migration.
+-- 3. Une vérification explicite précède le SET NOT NULL : si des lignes
+--    restaient malgré tout sans entreprise_id (cas ambigu — ne devrait pas
+--    se produire, la FK garantit l'existence du devis/facture parent), la
+--    migration échoue avec un diagnostic exploitable plutôt que le message
+--    générique de contrainte NOT NULL.
+
+begin;
 
 -- ---------------------------------------------------------------------
 -- lignes_devis
 -- ---------------------------------------------------------------------
 alter table public.lignes_devis add column if not exists entreprise_id uuid;
 
+-- Même raison de performance que pour lignes_factures plus bas : ce backfill
+-- ne touche à aucune colonne dont dépendent ces deux triggers AFTER (totaux
+-- du devis ; synchronisation des tâches issues des lignes d'un devis
+-- accepté), donc les désactiver pour la durée de l'UPDATE ne change aucun
+-- résultat mais évite un recalcul/upsert par ligne à l'échelle.
+alter table public.lignes_devis disable trigger recalc_devis_apres_ligne;
+alter table public.lignes_devis disable trigger synchroniser_taches_ligne_devis;
+
 update public.lignes_devis ld
 set entreprise_id = d.entreprise_id
 from public.devis d
 where d.id = ld.devis_id and ld.entreprise_id is distinct from d.entreprise_id;
+
+alter table public.lignes_devis enable trigger recalc_devis_apres_ligne;
+alter table public.lignes_devis enable trigger synchroniser_taches_ligne_devis;
+
+do $$
+declare v_orphelines int;
+begin
+  select count(*) into v_orphelines from public.lignes_devis where entreprise_id is null;
+  if v_orphelines > 0 then
+    raise exception 'Backfill lignes_devis.entreprise_id incomplet : % ligne(s) sans devis parent résoluble', v_orphelines;
+  end if;
+end $$;
 
 alter table public.lignes_devis alter column entreprise_id set not null;
 
@@ -111,10 +162,41 @@ create policy role_gestion_delete on public.lignes_devis
 -- ---------------------------------------------------------------------
 alter table public.lignes_factures add column if not exists entreprise_id uuid;
 
+-- Backfill technique uniquement : `entreprise_id` n'est pas une donnée
+-- contractuelle (montants, désignations, TVA restent inchangés). Deux
+-- triggers de ligne sont désactivés pour la seule durée de cette UPDATE,
+-- dans la même transaction que le reste de la migration, puis immédiatement
+-- réactivés :
+--  - `lignes_factures_brouillon_only` (immuabilité) — sinon le backfill
+--    échoue dès qu'une facture est déjà émise (cf. plus haut) ;
+--  - `recalc_facture_apres_ligne` (recalcul des totaux HT/TVA/TTC) — ce
+--    trigger AFTER UPDATE s'exécute par ligne. Aucune colonne dont il
+--    dépend (quantite, prix_unitaire_ht, remise_ligne, taux_tva) n'est
+--    touchée ici, donc le laisser actif ne change aucun résultat mais
+--    recalcule inutilement les totaux de la facture parente à chaque
+--    ligne : mesuré sur fixture ~40 000 lignes/1 900 factures émises,
+--    l'UPDATE de backfill n'avait toujours pas terminé après 1min43 avec
+--    ce trigger actif (verrou ACCESS EXCLUSIVE tenu tout ce temps). Une
+--    fois désactivé pour la durée du backfill : quelques secondes.
+alter table public.lignes_factures disable trigger lignes_factures_brouillon_only;
+alter table public.lignes_factures disable trigger recalc_facture_apres_ligne;
+
 update public.lignes_factures lf
 set entreprise_id = f.entreprise_id
 from public.factures f
 where f.id = lf.facture_id and lf.entreprise_id is distinct from f.entreprise_id;
+
+alter table public.lignes_factures enable trigger lignes_factures_brouillon_only;
+alter table public.lignes_factures enable trigger recalc_facture_apres_ligne;
+
+do $$
+declare v_orphelines int;
+begin
+  select count(*) into v_orphelines from public.lignes_factures where entreprise_id is null;
+  if v_orphelines > 0 then
+    raise exception 'Backfill lignes_factures.entreprise_id incomplet : % ligne(s) sans facture parente résoluble', v_orphelines;
+  end if;
+end $$;
 
 alter table public.lignes_factures alter column entreprise_id set not null;
 
@@ -167,3 +249,5 @@ create policy role_gestion_delete on public.lignes_factures
 
 analyze public.lignes_devis;
 analyze public.lignes_factures;
+
+commit;
