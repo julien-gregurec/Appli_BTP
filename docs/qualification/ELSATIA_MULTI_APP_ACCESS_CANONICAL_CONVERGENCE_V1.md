@@ -46,6 +46,25 @@ verts après coup, ainsi que `npm ci` pour la reproductibilité du lockfile. 1 a
 reste ouverte (Vitest/`@vitest/mocker`, outillage de test uniquement, jamais le code de
 production) — détail en §16. Voir §16 pour le compte-rendu complet.
 
+**Mise à jour du 2026-09-22 (cinquième passe, même session/branche)** : reprend l'audit du tronc
+mono-app GP (§1.6) là où la troisième passe s'était arrêtée (§14, ~12 des 77 commits `fix(...)`
+examinés). Examine 18 commits supplémentaires en détail contre le code actuel de
+`claude/quirky-noether-n8aerc` (fetché au départ de cette passe : la branche était passée à
+`22b32c0` via les passes précédentes + la session `npm audit`) et **porte 11 correctifs
+supplémentaires** (§17.1), dont un bug critique confirmé — l'écriture (création/modification/
+suppression) sur `public.chantiers`, la table cœur du produit, était bloquée par RLS pour toutes
+les entreprises depuis la migration `20260715000081`, sans aucune policy PERMISSIVE pour la
+couvrir — et trois correctifs d'isolation cross-tenant composite-FK (factures, devis, relances
+impayées) accompagnés d'un quatrième correctif compagnon que cette session a dû identifier
+elle-même (non signalé comme nécessaire par le message de commit source) pour ne pas casser
+l'application PostgREST en posant les trois premiers seuls. 4 autres commits sont déclinés avec
+raison documentée (§17.2, dont deux pour un risque de régression de déploiement réel et non
+vérifiable dans ce bac à sable : une variable d'environnement obligatoire non confirmée sur les
+environnements réels, qui ferait échouer fermé — 503 — toute la route concernée si elle est
+absente au déploiement), et 2 sont non applicables car le code/les routes qu'ils corrigent
+n'existent pas sur cette branche (§17.3). **18 correctifs au total ont maintenant été portés dans
+cette mission.** Voir §17 pour le détail complet et §16 pour les décisions ouvertes mises à jour.
+
 **Portée de ce document** : reconstruction d'historique et comparaison de modèles à partir de
 preuves git réelles (SHA cités, contenu lu avec `git show`/`git log -S`, pas de suppositions),
 suivies d'une évaluation honnête de ce qui peut réellement être convergé sur
@@ -969,12 +988,26 @@ suite complète du dépôt (§9bis).
   (`grant ... to authenticated` explicite plutôt qu'un défaut par omission), corrigé par le
   correctif porté en §13 (commit `d357314`). Plus de portage supplémentaire requis pour ce commit
   précis.
-- **DECISION_REQUIRED — reste du tronc GP mono-app (§1.6, §14)** : sur les 77 commits `fix(...)`
-  de `integration/gp-external-pilot-closure-v1`, 6 ont été portés en troisième passe (§14.1-14.6)
-  et 3 examinés-non-portés avec raison documentée (§14.7). Une douzaine au total a donc été
-  examinée en détail ; **~65 commits `fix(...)` restent non examinés** (liste en §1.6). Une future
-  session avec un budget dédié devrait continuer à les relire un par un contre `main` actuel, dans
-  le même esprit que §11/§13/§14 — travail de vérification manuelle, pas de fusion de branche.
+- **DECISION_REQUIRED — reste du tronc GP mono-app (§1.6, §14, §17)** : sur les ~80 commits
+  `fix(...)` de `integration/gp-external-pilot-closure-v1`, ~33 ont désormais été examinés en
+  détail au total (troisième passe : §14.1-14.6 portés, §14.7 examinés-non-portés ; quatrième
+  passe, §17 : 11 portés en §17.1, 4 déclinés en §17.2, 2 non applicables en §17.3). **Il reste
+  environ 47 commits `fix(...)` non examinés.** Une future session avec un budget dédié devrait
+  continuer à les relire un par un contre `claude/quirky-noether-n8aerc` actuel, dans le même
+  esprit que §11/§13/§14/§17 — travail de vérification manuelle, pas de fusion de branche.
+- **DECISION_REQUIRED — cloisonnement des webhooks Stripe par environnement (§17.2, `fcdd4e7`)** :
+  correctif identifié comme réel et bien conçu (empêche un webhook Stripe test d'être traité comme
+  un événement live ou inversement), mais qui introduit une variable d'environnement obligatoire
+  (`STRIPE_WEBHOOK_EXPECTED_MODE`) et échoue fermé (503 sur tout webhook Stripe) si elle est
+  absente. Avant tout portage : positionner cette variable sur les environnements Vercel
+  Production ET Preview réels de ce dépôt, sinon le déploiement du correctif interromprait la
+  synchronisation des abonnements Stripe en production dès sa mise en ligne. Non vérifiable ni
+  actionnable depuis un bac à sable sans accès à cette configuration.
+- **Candidat pour une session dédiée à l'outillage opérationnel (§17.2, `cc4e1a0`)** : garde-fou
+  programmatique contre l'exécution accidentelle des scripts destructifs de
+  `supabase/production/` (existence des scripts confirmée : `supprimer_entreprises_test.sql`
+  notamment) contre le mauvais projet Supabase. Diagnostiqué mais pas porté — protège des
+  opérations manuelles d'un opérateur, hors du périmètre sécurité applicative de cette mission.
 - **RÉSOLU (2026-09-22, session dédiée `npm audit`)** — durcissement des dépendances npm
   (précédemment `DECISION_REQUIRED`, §14.7) : les **2 avisories CRITIQUES confirmées** par la
   session précédente sur `next` (`GHSA-p293-qw3h-jr36` — RCE non authentifiée sur hosts Windows ;
@@ -1024,6 +1057,101 @@ suite complète du dépôt (§9bis).
 
 ---
 
+## 17. CINQUIÈME PASSE (2026-09-22, suite) — 11 correctifs supplémentaires portés
+
+Reprise du tronc mono-app GP (§1.6) là où la troisième passe s'était arrêtée : sur les ~65
+commits `fix(...)` restants d'`integration/gp-external-pilot-closure-v1` (liste en §1.6), cette
+passe en a examiné 18 en détail, contre le SQL/code actuel de `claude/quirky-noether-n8aerc`
+(fetché et rebasé au départ de cette passe : la branche était passée de `4d92ddb` à `22b32c0`
+entre-temps, via les trois passes précédentes plus une session dédiée `npm audit`). **11 portés,
+4 déclinés avec raison, 2 non applicables (le code/les routes qu'ils corrigent n'existent pas sur
+cette branche), 1 différé** (tooling opérationnel, hors du périmètre sécurité applicative de cet
+audit). Chaque correctif ci-dessous a été vérifié par lecture directe du code actuel avant
+portage, pas par confiance dans le message de commit source.
+
+### 17.1 Portés
+
+| # | SHA source | SHA porté | Sujet |
+| - | --- | --- | --- |
+| 1 | `25ae08e` | `a45f7b5` | Aucun en-tête de sécurité HTTP n'existait (CSP à nonce, HSTS, X-Frame-Options, COOP/CORP, Permissions-Policy) — vérifié : `src/lib/security/headers.ts` n'existait pas. Delta : `bodySizeLimit` de `experimental.serverActions` **non** réduit de 15 Mo à 2 Mo comme le fait la source — de nombreuses server actions de ce dépôt (documents.ts, employes.ts…) acceptent des fichiers jusqu'à 15 Mo directement via `FormData`/`File.arrayBuffer()`, un plafond à 2 Mo aurait cassé les téléversements réels. |
+| 2 | `2d91b19` | `6dbc97c` | Ouverture de redirection réelle sur `/auth/callback` et `/auth/confirm` (le contrôle local ne décodait pas le pourcent-encodage ni ne filtrait `\`) ; cookies de session Supabase sans `secure` explicite (`DEFAULT_COOKIE_OPTIONS` de `@supabase/ssr` ne le positionne pas) ; UUID/validation d'entrée sur plusieurs routes ; masquage des messages d'erreur SQL bruts renvoyés au client sur une dizaine de routes. Delta : le plafond générique de 64 Ko sur `POST /api/assistant/chat` **non** porté — vérifié sur l'historique de la branche source elle-même que ce plafond casse les pièces jointes réelles de l'assistant IA (jusqu'à 6 Mo), régression corrigée par un commit distinct et plus large (`78f2a9a`, non porté non plus, voir §17.2). |
+| 3 | `fee8afa` | `12e9104` | **Bug critique confirmé** : aucune policy RLS PERMISSIVE ne couvrait plus INSERT/UPDATE/DELETE sur `public.chantiers` depuis la migration `20260715000081` (recherche exhaustive des 190 migrations) — la création/modification/suppression de chantier était bloquée par RLS pour toutes les entreprises, sans exception, `src/app/actions/chantiers.ts` faisant des `insert`/`update` directs (pas de client admin). Delta : ajoute aussi 3 policies RESTRICTIVE `gerer_chantiers` absentes sur cette branche (présentes côté source), pour ne pas rouvrir un accès en écriture à tout membre actif sans la permission métier. |
+| 4 | `379fd7b` | `1aa1ade` | `factures.{client_id,devis_origine_id,facture_origine_id,facture_parente_id}` sans clé étrangère composite `(colonne, entreprise_id)`, contrairement à `chantier_id` — un appel direct API pouvait créer une facture d'une entreprise pointant vers une ressource d'une autre. Migration additive (FK composites + index uniques), aucune RLS modifiée. |
+| 5 | `2b4af99` | `e3211e0` | Même gap sur `devis.client_id` (atteignable depuis le formulaire normal de devis, pas seulement l'API directe : `creer_devis_brouillon`/`modifier_devis_brouillon` en héritent silencieusement). |
+| 6 | `0747237` | `9c24e87` | Même gap sur `relances_impayes.facture_id` (la seule protection réelle était applicative, `creerRelanceAction`, contournable par API directe). |
+| 7 | `f990240` | `97e3aff` | **Découvert nécessaire par cette session, pas depuis le message source seul** : les 3 correctifs composite-FK ci-dessus (#4-6), une fois posés ensemble, rendent ambigus (PGRST201) une douzaine d'embeds PostgREST non qualifiés dans 12 fichiers applicatifs (dashboard, fiches devis/factures, CRM, exports comptables, impressions, copilote IA) — sans ce correctif compagnon, les 3 précédents auraient cassé ces pages en silence (la plupart des requêtes concernées ne vérifient pas `error`). Qualifie chaque embed avec le nom de FK simple préexistant. Recherche exhaustive complémentaire : les autres embeds `clients()`/`factures()`/`devis()` du dépôt n'ont qu'un seul chemin de jointure, donc non ambigus, volontairement non qualifiés. |
+| 8 | `3b25041` | `e29d702` | `ajouter_audit_note_frais` (security definer, `search_path=public`) appelait `digest()` non qualifié alors que `pgcrypto` est dans `extensions` — toute création de note de frais échouait avec une erreur 500 avant même la création du brouillon, cassé depuis sa création. |
+| 9 | `4f9bc00` | `98bc3bb` | Le token de confirmation à usage unique (`/auth/confirm`) était consommé par un simple GET — préchargement de lien par un client mail ou un scanner de sécurité invalidait le vrai clic de l'utilisateur, cassant systématiquement les liens de confirmation d'inscription et de récupération de mot de passe. Transformé en page à bouton de confirmation explicite ; `verifyOtp` ne s'exécute plus que sur soumission du formulaire. Adapté au branding "Liria Gestion Pro" de cette branche (la source utilise `@/lib/brand`/`BrandWordmark`, absents ici). Tests portés et **réellement exécutés** (`npx vitest run`, 6/6). |
+| 10 | `27a8ea4` | `0d33ffd` | `getContexteEntreprise()` renvoyait tout compte sans `entreprise_active_id` vers `/onboarding`, y compris un admin plateforme (qui n'est par nature rattaché à aucune entreprise cliente) — invite de création d'entreprise absurde à chaque connexion. Contexte neutre + routage direct vers `/plateforme`. Tests adaptés (sans `@/lib/brand`) et réellement exécutés, 6/6. |
+| 11 | `5777abb` | `f630956` | Deux gaps génériques (reformulés depuis le cadrage "dérive Preview/Production" de la source, qui ne s'applique pas tel quel à cette branche, mais vérifiés indépendamment ici comme réels sur le SQL actuel) : (a) aucun verrou DB n'empêchait de modifier/supprimer un devis déjà accepté (protection uniquement applicative, contournable par API directe) ; (b) `abonnement_essai_fin` n'était jamais renseigné à la création d'une entreprise malgré `abonnement_statut` par défaut `'essai'` — un essai gratuit ne s'arrêtait donc jamais tout seul, pour aucune entreprise créée sur cette branche. **Écart volontaire documenté dans la migration** : `chantier_id` exclu du verrou de devis accepté, après avoir trouvé que `associerDevisChantierAction` réassigne légitimement un devis accepté à un autre chantier du même client — un flux existant que le verrou de la source aurait cassé. |
+
+Chaque correctif SQL a été validé par `node scripts/verify-migrations.mjs` et
+`node scripts/verify-secrets.mjs` (aucune base réelle disponible pour rejouer les pgTAP, comme
+pour tout le reste de cette mission). Chaque correctif TypeScript/JS a été validé par la suite
+complète (`npm run typecheck && npm run lint && npm run test && npm run build`), avec `npm ci`
+exécuté en début de passe. Les nouveaux tests vitest (#9, #10) ont en plus été **réellement
+exécutés et vus passer**, contrairement aux tests pgTAP jamais rejouables dans cet environnement.
+
+### 17.2 Déclinés (raison documentée)
+
+- **`4e80156`/`9df5f40` — limitation de débit centralisée (rate limiting)** : conception saine
+  (RPC dédiée, HMAC des identifiants, fenêtres glissantes), mais **risque de régression réel et
+  non vérifiable ici** : le code échoue **fermé** (503 sur toute route protégée, y compris
+  `/login`/`/signup`/toutes les routes `/api/` authentifiées) si `RATE_LIMIT_HMAC_KEY` n'est pas
+  positionnée en production — variable absente de `.env.example` et dont la présence réelle sur
+  Vercel Production/Preview ne peut pas être vérifiée depuis ce bac à sable. Même classe de risque
+  que les correctifs "Publishable key" déjà déclinés en troisième passe (§14.7). Non porté ; le
+  schéma SQL seul (tables + RPC, sans le câblage dans `src/lib/supabase/proxy.ts`) aurait pu être
+  porté mais n'aurait aucune valeur de protection tant qu'il n'est pas activé — écarté pour ne pas
+  laisser un faux sentiment de couverture. `9df5f40` en dépend directement (tests/complément de
+  `4e80156`), décliné pour la même raison.
+- **`fcdd4e7` — cloisonnement des webhooks Stripe par environnement (test/live)** : même classe de
+  risque, en pire : le code introduit une variable d'environnement **obligatoire**
+  (`STRIPE_WEBHOOK_EXPECTED_MODE`) et retourne 503 sur **tout** webhook Stripe entrant si elle est
+  absente — vérifié dans le diff (`if (!configurationMode.valide) { ... return
+  NextResponse.json(..., { status: 503 }); }`). Déployer ce correctif sans avoir d'abord positionné
+  cette variable sur l'environnement réel couperait net la synchronisation des abonnements Stripe
+  en production. Non vérifiable depuis ce bac à sable (pas d'accès à la configuration Vercel
+  réelle). Non porté ; repris en §16 comme action à coordonner avec le propriétaire du dépôt avant
+  tout portage futur.
+- **`d8fa090` — masquage CSS du mode consultation (lecture seule)** : le message de commit source
+  le dit lui-même explicitement : « la sécurité réelle (RLS + permissions) était déjà indépendante
+  de ce masquage… il s'agit d'un correctif d'UX/cohérence, pas d'un correctif de faille ». Conforme
+  au mandat (« skip pure refactors or feature work »), non prioritaire pour cet audit de sécurité,
+  non examiné plus avant.
+- **`cc4e1a0` — verrouillage programmatique des scripts de recette Supabase**
+  (`supabase/production/`) : garde-fou opérationnel réel et plausible (le dépôt a bien des scripts
+  destructifs sous `supabase/production/`, ex. `supprimer_entreprises_test.sql`), mais protège des
+  opérations manuelles d'un opérateur humain, pas une faille exposée à un utilisateur de
+  l'application — hors du périmètre « bugs de sécurité/correction applicative » de ce mandat.
+  Diagnostic (existence des scripts, structure du garde-fou source) fait, portage lui-même non
+  fait faute de temps dans cette passe ; candidat raisonnable pour une session dédiée à l'outillage
+  opérationnel plutôt qu'à l'audit applicatif.
+
+### 17.3 Non applicables (code/routes absents de cette branche)
+
+- **`78f2a9a`** : corrige une régression introduite par un plafond de 64 Ko sur le corps HTTP de
+  `/api/assistant/chat` — plafond que cette session n'a justement pas porté (voir #2 en §17.1,
+  delta documenté). Rien à corriger ici : main n'a jamais eu la régression que `78f2a9a` répare.
+- **`749d6af`** : rend publiques les routes `/document/[token]`, `/imprimer/partage/[token]` et
+  `/api/documents/partage/[token]/pdf` dans le proxy — vérifié qu'**aucune des trois routes
+  n'existe sur cette branche** (`ls` négatif sur les trois chemins) : la fonctionnalité de partage
+  externe de documents (P9) elle-même n'a pas été portée sur `main`. Rien à rendre public tant que
+  cette fonctionnalité n'existe pas ici.
+
+### 17.4 Bilan de cette passe
+
+18 commits examinés en détail sur cette passe (11 portés, 4 déclinés, 2 non applicables, 1
+différé), auxquels s'ajoutent les ~15 déjà examinés lors des passes précédentes (§11, §13, §14) —
+soit environ **33 des ~80 commits `fix(...)` d'`integration/gp-external-pilot-closure-v1`
+examinés au total sur l'ensemble de la mission**. **Il reste environ 47 commits `fix(...)` non
+examinés** (liste complète toujours disponible via `git log --reverse --format='%h %ad %s'
+--date=short 4d92ddb..origin/integration/gp-external-pilot-closure-v1`, filtrée sur les messages
+commençant par `fix`). Cette passe s'arrête ici par budget de session, pas parce que le fond de la
+liste est atteint — repris en §16 (OPEN DECISIONS, mis à jour ci-dessus).
+
+---
+
 ## Pourquoi le monorepo multi-app n'a pas été « intégré » au sens code sur cette branche
 
 Le mandat demande de choisir, en cas d'ambiguïté, l'option la plus conservatrice compatible avec
@@ -1049,23 +1177,27 @@ troisième passe a repris ce même geste à plus grande échelle sur le tronc mo
 §1.6 : vérification complète et fonction-par-fonction de `8caef21` (§13, 20 fonctions déjà sûres
 sur cette branche, 2 avec un gap réel différent du diagnostic source, corrigé), puis scan d'une
 douzaine des 77 commits `fix(...)` restants avec le même niveau de rigueur, aboutissant à 6
-correctifs supplémentaires portés (§14) : une fuite de lecture de documents RH/fournisseurs/
-pointage sensibles, un export comptable sans contrôle d'autorisation, une policy RLS fragile sur
-les documents de paie, un durcissement de privilèges de socle, des privilèges de table rendus
-explicites, et un vrai gap RGPD (fichiers Storage non supprimés par l'anonymisation). **7
-correctifs au total sur l'ensemble de la mission**, tous des commits séparés et minimaux, aucun
-ne touchant à un schéma absent de cette branche ni à la question du monorepo multi-app —
-exactement le type de geste que le mandat autorise sans requérir l'arbitrage du propriétaire du
-dépôt. La valeur ajoutée de cette mission est donc triple : ces 7 correctifs, une revérification
-complète d'un audit de 22 fonctions initialement jugé trop volumineux pour être vérifié à la main,
-et ce document — reconstruction d'historique vérifiée, clarification qu'il s'agit d'une lignée
-d'entitlement unique et non de deux modèles rivaux, identification d'un second tronc mono-app
-jamais fusionné (§1.6), classification d'environ 65 branches au total sur les 255 (trois passes
-cumulées), et un plan d'action concret et non exécuté pour la convergence multi-app (§16) à
-l'attention du propriétaire du dépôt.
+correctifs supplémentaires portés (§14). La cinquième passe (§17) a repris ce même travail sur 18
+commits supplémentaires, portant 11 correctifs de plus — dont un bug critique confirmé (§17.1 #3 :
+toute écriture sur `public.chantiers`, la table cœur du produit, était bloquée par RLS depuis des
+mois, pour toutes les entreprises), trois correctifs d'isolation cross-tenant composite-FK
+accompagnés d'un correctif compagnon découvert nécessaire par cette session elle-même (pas
+signalé par la source) pour ne pas casser l'application en les posant seuls, et un gap métier
+générique (essais gratuits qui ne s'arrêtaient jamais). **18 correctifs au total sur l'ensemble de
+la mission**, tous des commits séparés et minimaux, aucun ne touchant à un schéma absent de cette
+branche ni à la question du monorepo multi-app — exactement le type de geste que le mandat
+autorise sans requérir l'arbitrage du propriétaire du dépôt. La valeur ajoutée de cette mission
+est donc triple : ces 18 correctifs, une revérification complète d'un audit de 22 fonctions
+initialement jugé trop volumineux pour être vérifié à la main, et ce document — reconstruction
+d'historique vérifiée, clarification qu'il s'agit d'une lignée d'entitlement unique et non de deux
+modèles rivaux, identification d'un second tronc mono-app jamais fusionné (§1.6), classification
+d'environ 65 branches au total sur les 255 (trois passes cumulées), et un plan d'action concret et
+non exécuté pour la convergence multi-app (§16) à l'attention du propriétaire du dépôt. Sur le
+tronc mono-app GP lui-même (§1.6), ~33 des ~80 commits `fix(...)` ont maintenant été examinés en
+détail ; ~47 restent ouverts pour une future session (§16).
 
 ---
 
-**CANONICAL MODEL NOT RESOLVED** — les 7 correctifs portés en §11/§13/§14 sont tous indépendants
-de cette question et ne la referment pas : le modèle d'entitlement multi-app reste un candidat
-documenté, non fusionné, en attente d'une décision du propriétaire du dépôt.
+**CANONICAL MODEL NOT RESOLVED** — les 18 correctifs portés en §11/§13/§14/§17 sont tous
+indépendants de cette question et ne la referment pas : le modèle d'entitlement multi-app reste un
+candidat documenté, non fusionné, en attente d'une décision du propriétaire du dépôt.
