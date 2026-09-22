@@ -82,5 +82,17 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  // Matérialise les suspensions dont l'échéance de grâce (signalement manuel
+  // d'impayé, ou délai de grâce Stripe — mission "closure V3", section 6) est
+  // dépassée. La fonction existait déjà (migration 20260714000075) mais
+  // n'était appelée par aucun cron.
+  const { data: suspensionsAppliquees, error: suspensionsErreur } = await admin.rpc("appliquer_suspensions_impayes");
+  return NextResponse.json({
+    traitees: resultats.length,
+    resultats,
+    optionIA,
+    paiePeriodes,
+    alertesPointage,
+    suspensionsImpayes: suspensionsErreur ? { ok: false, raison: suspensionsErreur.message } : { ok: true, nombre: suspensionsAppliquees },
+  });
 }

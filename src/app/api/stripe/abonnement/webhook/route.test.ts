@@ -226,16 +226,17 @@ describe("transitions de statut", () => {
     expect(facture).toMatchObject({ stripe_invoice_id: "in_1", statut: "paid", montant_ht: 249, montant_ttc: 298.8 });
   });
 
-  // Documente un écart de comportement relevé dans le rapport de qualification :
-  // le code suspend l'accès dès le PREMIER `invoice.payment_failed`, sans laisser
-  // les tentatives de relance (dunning) de Stripe s'exécuter d'abord, contrairement
-  // à l'intention décrite dans RELAIS_CODEX_ABONNEMENT.md ("la bascule définitive
-  // vient de subscription.updated→past_due/unpaid"). "Durée exacte de grâce avant
-  // suspension" est listée comme décision non tranchée dans
-  // docs/DECISIONS_TARIFICATION_NON_RECOMMANDEES.md.
-  it("invoice.payment_failed suspend immédiatement l'accès, dès le premier échec (pas de délai de grâce)", async () => {
-    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "actif" }));
+  // Fermeture du gap "closure V3" (rapport V2, §4/§9/§11 point 3) : un échec de
+  // paiement ne coupe plus l'accès de manière synchrone et inconditionnelle. Sans
+  // délai de grâce configuré (STRIPE_DELAI_GRACE_PAIEMENT_JOURS absent → 0 jour,
+  // comportement conservateur par défaut), l'échéance de suspension posée est
+  // immédiate (<= maintenant) mais c'est le cron (appliquer_suspensions_impayes,
+  // câblé dans src/app/api/cron/abonnements/route.ts) qui matérialise la coupure —
+  // jamais le webhook lui-même. abonnement_statut reste donc inchangé ici.
+  it("invoice.payment_failed pose une échéance de suspension (délai de grâce) sans couper l'accès dans le webhook lui-même", async () => {
+    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null }));
 
+    const avant = Date.now();
     const reponse = await envoyerWebhook({
       id: "evt_invoice_failed",
       type: "invoice.payment_failed",
@@ -244,13 +245,56 @@ describe("transitions de statut", () => {
     });
 
     expect(reponse.status).toBe(200);
-    expect(base.entreprises![0].abonnement_statut).toBe("suspendu");
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
+    expect(base.entreprises![0].impaye_signale_at).toBeTruthy();
+    expect(new Date(base.entreprises![0].suspension_prevue_at as string).getTime()).toBeGreaterThanOrEqual(avant);
   });
 
-  // Même écart pour une authentification 3D Secure requise : ce n'est pourtant
-  // pas un échec de paiement, juste une étape supplémentaire pour le client.
-  it("invoice.payment_action_required suspend aussi l'accès, alors que le paiement n'a pas échoué", async () => {
-    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "actif" }));
+  it("invoice.payment_failed respecte un délai de grâce configuré (STRIPE_DELAI_GRACE_PAIEMENT_JOURS)", async () => {
+    vi.stubEnv("STRIPE_DELAI_GRACE_PAIEMENT_JOURS", "5");
+    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null }));
+
+    const avant = Date.now();
+    await envoyerWebhook({
+      id: "evt_invoice_failed_grace",
+      type: "invoice.payment_failed",
+      livemode: false,
+      data: { object: { id: "in_2b", object: "invoice", customer: "cus_1", subscription: "sub_1", status: "open", total: 24_900, currency: "eur" } },
+    });
+
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
+    const echeance = new Date(base.entreprises![0].suspension_prevue_at as string).getTime();
+    expect(echeance).toBeGreaterThan(avant + 4 * 86_400_000);
+    vi.unstubAllEnvs();
+  });
+
+  // Un `invoice.payment_failed` déjà signalé (échéance en cours) n'est pas repoussé
+  // par un second event — l'échéance de grâce ne se prolonge pas indéfiniment tant
+  // que Stripe continue de retenter (dunning) sur la même facture impayée.
+  it("ne repousse pas une échéance de suspension déjà posée", async () => {
+    const echeanceInitiale = new Date(Date.now() + 3_600_000).toISOString();
+    base.entreprises!.push(baseEntreprise({
+      stripe_subscription_id: "sub_1",
+      abonnement_statut: "actif",
+      impaye_signale_at: new Date(Date.now() - 3_600_000).toISOString(),
+      suspension_prevue_at: echeanceInitiale,
+    }));
+
+    await envoyerWebhook({
+      id: "evt_invoice_failed_repete",
+      type: "invoice.payment_failed",
+      livemode: false,
+      data: { object: { id: "in_2c", object: "invoice", customer: "cus_1", subscription: "sub_1", status: "open", total: 24_900, currency: "eur" } },
+    });
+
+    expect(base.entreprises![0].suspension_prevue_at).toBe(echeanceInitiale);
+  });
+
+  // Fermeture du gap "closure V3" : une authentification 3-D Secure requise n'est
+  // PAS un échec de paiement — elle ne doit plus jamais suspendre ni poser
+  // d'échéance de suspension.
+  it("invoice.payment_action_required ne suspend plus et ne pose aucune échéance de suspension", async () => {
+    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null }));
 
     const reponse = await envoyerWebhook({
       id: "evt_invoice_action",
@@ -260,7 +304,29 @@ describe("transitions de statut", () => {
     });
 
     expect(reponse.status).toBe(200);
-    expect(base.entreprises![0].abonnement_statut).toBe("suspendu");
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
+    expect(base.entreprises![0].impaye_signale_at).toBeNull();
+    expect(base.entreprises![0].suspension_prevue_at).toBeNull();
+  });
+
+  it("invoice.paid régularise immédiatement un impayé en cours (pas de délai pour restaurer l'accès)", async () => {
+    base.entreprises!.push(baseEntreprise({
+      stripe_subscription_id: "sub_1",
+      abonnement_statut: "actif",
+      impaye_signale_at: new Date().toISOString(),
+      suspension_prevue_at: new Date(Date.now() + 3_600_000).toISOString(),
+    }));
+
+    await envoyerWebhook({
+      id: "evt_invoice_paid_regularise",
+      type: "invoice.paid",
+      livemode: false,
+      data: { object: { id: "in_4", object: "invoice", customer: "cus_1", subscription: "sub_1", status: "paid", total: 24_900, subtotal_excluding_tax: 24_900, currency: "eur" } },
+    });
+
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
+    expect(base.entreprises![0].impaye_signale_at).toBeNull();
+    expect(base.entreprises![0].suspension_prevue_at).toBeNull();
   });
 });
 
@@ -302,36 +368,59 @@ describe("idempotence et rejeu", () => {
     expect(base.abonnement_evenements).toHaveLength(1);
   });
 
-  // Documente une limite réelle : les événements `customer.subscription.updated`
-  // sont appliqués dans l'ORDRE DE RÉCEPTION HTTP, pas dans l'ordre chronologique
-  // Stripe. Un événement en retard (webhook livré tard, cf. mission section 4)
-  // peut donc écraser un état plus récent avec des données plus anciennes — aucune
-  // protection par timestamp/`current_period_end` monotone n'existe dans
-  // synchroniserAbonnement(). Ce test caractérise le comportement actuel, il ne
-  // prouve pas qu'il soit désirable : voir le rapport de qualification, section
-  // « Webhook hors-ordre / en retard ».
-  it("un webhook en retard (hors-ordre) écrase l'état plus récent — absence de protection connue", async () => {
+  // Fermeture du gap "closure V3" (rapport V2, §4/§11 point 7) : un événement
+  // Stripe livré en retard (webhook réémis après incident réseau, etc.) ne doit
+  // plus écraser un état déjà plus frais. La comparaison se fait sur l'horodatage
+  // de l'*event* Stripe (`created`), pas sur l'ordre d'arrivée HTTP ni sur les
+  // champs de l'objet — voir synchroniserAbonnement() / abonnement_dernier_evenement_at.
+  it("un webhook en retard (hors-ordre, event.created antérieur) est ignoré : le statut reste monotone", async () => {
     base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "essai" }));
 
     const evenementRecent = {
       id: "evt_recent",
       type: "customer.subscription.updated",
       livemode: false,
+      created: 2_000_000_500,
       data: { object: { id: "sub_1", object: "subscription", customer: "cus_1", status: "active", current_period_end: 2_000_000_000 } },
     };
     const evenementEnRetard = {
       id: "evt_en_retard",
       type: "customer.subscription.updated",
       livemode: false,
+      created: 1_000_000_500,
       data: { object: { id: "sub_1", object: "subscription", customer: "cus_1", status: "trialing", current_period_end: 1_000_000_000 } },
     };
 
     await envoyerWebhook(evenementRecent);
     expect(base.entreprises![0].abonnement_statut).toBe("actif");
 
-    await envoyerWebhook(evenementEnRetard);
+    const reponseRetard = await envoyerWebhook(evenementEnRetard);
+    expect(reponseRetard.status).toBe(200);
+    // L'événement en retard n'a rien écrasé : ni le statut, ni l'échéance.
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
+    expect(base.entreprises![0].abonnement_echeance).not.toBe("2001-09-09");
+  });
+
+  it("deux événements livrés dans le bon ordre s'appliquent normalement (la garde hors-ordre ne bloque pas le cas nominal)", async () => {
+    base.entreprises!.push(baseEntreprise({ stripe_subscription_id: "sub_1", abonnement_statut: "essai" }));
+
+    await envoyerWebhook({
+      id: "evt_ancien",
+      type: "customer.subscription.updated",
+      livemode: false,
+      created: 1_000_000_500,
+      data: { object: { id: "sub_1", object: "subscription", customer: "cus_1", status: "trialing", current_period_end: 1_000_000_000 } },
+    });
     expect(base.entreprises![0].abonnement_statut).toBe("essai");
-    expect(base.entreprises![0].abonnement_echeance).toBe("2001-09-09");
+
+    await envoyerWebhook({
+      id: "evt_recent",
+      type: "customer.subscription.updated",
+      livemode: false,
+      created: 2_000_000_500,
+      data: { object: { id: "sub_1", object: "subscription", customer: "cus_1", status: "active", current_period_end: 2_000_000_000 } },
+    });
+    expect(base.entreprises![0].abonnement_statut).toBe("actif");
   });
 
   it("en cas d'échec de traitement, la réservation d'idempotence est retirée pour permettre un nouvel essai Stripe", async () => {

@@ -220,11 +220,79 @@ export async function creerSessionAbonnementStripe(params: {
   });
 }
 
-export async function creerSessionPortailStripe(customerId: string, returnUrl: string) {
+// Contrat retenu pour l'upgrade/downgrade en self-service (mission "closure V3",
+// section 5) : RELAIS_CODEX_ABONNEMENT.md §3.5 documente déjà le Portail Stripe
+// comme le parcours de changement d'offre ("Le portail Stripe gère résiliation,
+// changement de carte, changement d'offre..."). `changerOffreStripe` existe côté
+// lib mais n'est appelée par aucune action serveur ni bouton (cf. §3 du rapport
+// V2) — on ne lui ajoute PAS un second parcours in-app concurrent du Portail :
+// on rend le seul parcours documenté vérifiable et versionné dans le code au
+// lieu de dépendre d'un réglage Dashboard invisible (§7/§11 point 8 du rapport
+// V2 : "REMOTE STRIPE TEST REQUIRED"). `changerOffreStripe` reste disponible
+// (testée, correcte) pour un futur usage admin/API si besoin, sans y brancher
+// de bouton client tant que le Portail reste le contrat officiel.
+export async function creerSessionPortailStripe(customerId: string, returnUrl: string, configurationId?: string | null) {
+  const corps = new URLSearchParams({ customer: customerId, return_url: returnUrl });
+  const configuration = configurationId ?? process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+  if (configuration) corps.set("configuration", configuration);
   return requeteStripe<StripeSession>("billing_portal/sessions", {
-    corps: new URLSearchParams({ customer: customerId, return_url: returnUrl }),
+    corps,
     idempotence: `abonnement-portail-${customerId}-${Date.now()}`,
   });
+}
+
+type StripePrixStripe = { id: string; product: string | { id: string } };
+
+// Construit (ou met à jour) une Configuration de Portail Stripe explicite,
+// limitée aux offres réellement commercialisées (OFFRES_ABONNEMENT_COMMERCIALISEES
+// × mensuel/annuel) plutôt que de dépendre de la configuration par défaut du
+// compte, réglée à la main dans le Dashboard et invérifiable localement.
+// REMOTE STRIPE : cette fonction doit être exécutée une fois avec une vraie clé
+// Stripe (`scripts/configurer-portail-stripe.mjs`) ; son id est ensuite copié
+// dans STRIPE_PORTAL_CONFIGURATION_ID. Aucun appel réseau n'est fait par cette
+// mission (pas de Stripe live) — la fonction est écrite et testée (mock fetch)
+// mais pas exécutée contre un vrai compte.
+export async function creerConfigurationPortailAbonnement(): Promise<string> {
+  const produits = new Map<string, Set<string>>();
+  for (const offre of OFFRES_ABONNEMENT_COMMERCIALISEES) {
+    const prixOffre = (["mensuel", "annuel"] as const)
+      .map((periodicite) => prixStripePour(offre, periodicite))
+      .filter((prix): prix is string => Boolean(prix));
+    if (!prixOffre.length) continue;
+    const { product } = await requeteStripe<StripePrixStripe>(`prices/${encodeURIComponent(prixOffre[0])}`, { methode: "GET" });
+    const productId = typeof product === "string" ? product : product.id;
+    if (!produits.has(productId)) produits.set(productId, new Set());
+    for (const prix of prixOffre) produits.get(productId)!.add(prix);
+  }
+  if (!produits.size) {
+    throw new Error("Aucun prix d'abonnement commercialisé n'est configuré : impossible de créer la configuration du Portail");
+  }
+
+  const corps = new URLSearchParams({
+    "features[subscription_update][enabled]": "true",
+    "features[subscription_update][default_allowed_updates][0]": "price",
+    "features[subscription_update][proration_behavior]": "create_prorations",
+    "features[invoice_history][enabled]": "true",
+    "features[payment_method_update][enabled]": "true",
+    "features[subscription_cancel][enabled]": "true",
+    "features[subscription_cancel][mode]": "at_period_end",
+    "features[subscription_cancel][cancellation_reason][enabled]": "true",
+  });
+  let indexProduit = 0;
+  for (const [product, prix] of produits) {
+    corps.set(`features[subscription_update][products][${indexProduit}][product]`, product);
+    let indexPrix = 0;
+    for (const prixId of prix) {
+      corps.set(`features[subscription_update][products][${indexProduit}][prices][${indexPrix}]`, prixId);
+      indexPrix += 1;
+    }
+    indexProduit += 1;
+  }
+  const configuration = await requeteStripe<{ id: string }>("billing_portal/configurations", {
+    corps,
+    idempotence: `portail-configuration-${OFFRES_ABONNEMENT_COMMERCIALISEES.join("-")}`,
+  });
+  return configuration.id;
 }
 
 export const DUREES_REMISE = ["once", "repeating", "forever"] as const;

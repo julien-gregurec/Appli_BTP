@@ -16,6 +16,8 @@ import {
   variablesStripeBillingManquantes,
   changerOffreStripe,
   reconcilierAbonnementStripe,
+  creerConfigurationPortailAbonnement,
+  creerSessionPortailStripe,
 } from "./stripe-abonnement";
 
 afterEach(() => {
@@ -226,5 +228,69 @@ describe("reconcilierAbonnementStripe (comptes supplémentaires)", () => {
     expect(resultat).toMatchObject({ synchronise: true, quantite: 0 });
     const suppression = appels.find((a) => a.methode === "DELETE");
     expect(suppression?.url).toContain("sit_existant");
+  });
+});
+
+// Contrat retenu pour l'upgrade/downgrade self-service (mission "closure V3",
+// section 5) : le Portail Stripe reste le seul parcours (RELAIS_CODEX_ABONNEMENT.md
+// §3.5), rendu vérifiable en code au lieu de dépendre d'un réglage Dashboard
+// implicite (rapport V2, §7/§11 point 8).
+describe("configuration du Portail Stripe (upgrade/downgrade self-service)", () => {
+  beforeEach(() => vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_xxx"));
+
+  it("regroupe les prix commercialisés par produit et active subscription_update", async () => {
+    vi.stubEnv("STRIPE_PRICE_MINI_MENSUEL", "price_mini_m");
+    vi.stubEnv("STRIPE_PRICE_MINI_ANNUEL", "price_mini_a");
+    vi.stubEnv("STRIPE_PRICE_PRO_MENSUEL", "price_pro_m");
+    vi.stubEnv("STRIPE_PRICE_PRO_ANNUEL", "price_pro_a");
+    vi.stubEnv("STRIPE_PRICE_BUSINESS_MENSUEL", "price_business_m");
+    vi.stubEnv("STRIPE_PRICE_BUSINESS_ANNUEL", "price_business_a");
+    vi.stubEnv("STRIPE_PRICE_ENTREPRISE_MENSUEL", "price_entreprise_m");
+    vi.stubEnv("STRIPE_PRICE_ENTREPRISE_ANNUEL", "price_entreprise_a");
+    const appels = simulerFetchStripe({
+      "GET https://api.stripe.com/v1/prices/price_mini_m": { id: "price_mini_m", product: "prod_mini" },
+      "GET https://api.stripe.com/v1/prices/price_pro_m": { id: "price_pro_m", product: "prod_pro" },
+      "GET https://api.stripe.com/v1/prices/price_business_m": { id: "price_business_m", product: "prod_business" },
+      "GET https://api.stripe.com/v1/prices/price_entreprise_m": { id: "price_entreprise_m", product: "prod_entreprise" },
+      "POST https://api.stripe.com/v1/billing_portal/configurations": { id: "bpc_test" },
+    });
+
+    const id = await creerConfigurationPortailAbonnement();
+
+    expect(id).toBe("bpc_test");
+    const creation = appels.find((a) => a.url.endsWith("/v1/billing_portal/configurations"));
+    const corps = creation!.corps!;
+    expect(corps.get("features[subscription_update][enabled]")).toBe("true");
+    expect(corps.get("features[subscription_update][proration_behavior]")).toBe("create_prorations");
+    // 4 offres commercialisées => 4 groupes produit, chacun avec ses 2 prix (mensuel/annuel).
+    expect(corps.get("features[subscription_update][products][0][product]")).toBe("prod_mini");
+    expect(corps.get("features[subscription_update][products][0][prices][0]")).toBe("price_mini_m");
+    expect(corps.get("features[subscription_update][products][0][prices][1]")).toBe("price_mini_a");
+    expect(corps.get("features[subscription_update][products][3][product]")).toBe("prod_entreprise");
+  });
+
+  it("échoue proprement si aucun prix commercialisé n'est configuré", async () => {
+    await expect(creerConfigurationPortailAbonnement()).rejects.toThrow(/aucun prix/i);
+  });
+
+  it("passe la configuration explicite (env STRIPE_PORTAL_CONFIGURATION_ID) à la session Portail", async () => {
+    vi.stubEnv("STRIPE_PORTAL_CONFIGURATION_ID", "bpc_env");
+    const appels = simulerFetchStripe({
+      "POST https://api.stripe.com/v1/billing_portal/sessions": { id: "bps_1", url: "https://billing.stripe.com/session/bps_1" },
+    });
+
+    await creerSessionPortailStripe("cus_1", "https://app.example.com/abonnement");
+
+    expect(appels[0].corps?.get("configuration")).toBe("bpc_env");
+  });
+
+  it("omet le paramètre configuration quand rien n'est configuré (comportement Portail par défaut, inchangé)", async () => {
+    const appels = simulerFetchStripe({
+      "POST https://api.stripe.com/v1/billing_portal/sessions": { id: "bps_1", url: "https://billing.stripe.com/session/bps_1" },
+    });
+
+    await creerSessionPortailStripe("cus_1", "https://app.example.com/abonnement");
+
+    expect(appels[0].corps?.has("configuration")).toBe(false);
   });
 });
