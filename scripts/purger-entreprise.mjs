@@ -143,7 +143,12 @@ async function executer(runId) {
   if (echecs.size > 0) {
     console.error(`\n${echecs.size} table(s) restent en échec après rattrapage :`);
     for (const [t, e] of echecs) console.error(`  - ${t} : ${e}`);
-    console.error("\nCeci indique une contrainte structurelle non résolue par cette architecture (LEGAL_DECISION_REQUIRED probable).");
+    const pasEchue = [...echecs.values()].every((e) => e.includes("aucune suppression programmee echue"));
+    if (pasEchue) {
+      console.error("\nCette entreprise n'a pas (ou plus) de suppression programmée échue — vérifiez `suppression_prevue_at` avant de relancer. Ce n'est pas un défaut d'architecture.");
+    } else {
+      console.error("\nCeci indique une contrainte structurelle non résolue par cette architecture (LEGAL_DECISION_REQUIRED probable).");
+    }
     console.error(`Reprenez avec : node scripts/purger-entreprise.mjs ${entrepriseId} execute --run-id=${runId}`);
     process.exit(1);
   }

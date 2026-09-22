@@ -46,7 +46,14 @@ function sendJson(res, status, body) {
   res.end(text);
 }
 
+const RPC_DELAY_MS = process.env.MOCK_RPC_DELAY_MS ? Number(process.env.MOCK_RPC_DELAY_MS) : 0;
+
 async function handleRpc(req, res, fn) {
+  if (RPC_DELAY_MS > 0 && (fn === "purger_table_entreprise" || fn === "anonymiser_table_entreprise")) {
+    // Ralentit volontairement les appels de purge pour permettre de forcer une
+    // interruption déterministe à un point précis du run (mission §7).
+    await new Promise((r) => setTimeout(r, RPC_DELAY_MS));
+  }
   const apikey = req.headers.apikey;
   const role = roleForApikey(apikey, req.headers.authorization);
   const args = await readBody(req);
