@@ -7,6 +7,9 @@ insert into auth.users(id,email) values ('51000000-0000-0000-0000-000000000003',
 insert into auth.users(id,email) values ('51000000-0000-0000-0000-000000000004','studio-editor@invalid.local');
 insert into auth.users(id,email) values ('51000000-0000-0000-0000-000000000005','studio-viewer@invalid.local');
 insert into auth.users(id,email) values ('51000000-0000-0000-0000-000000000006','studio-outside@invalid.local');
+-- This suite exercises workspace RBAC, not signup policy (covered by studio_signup_policy.test.sql):
+-- open the gate so studio_create_workspace's fail-closed default doesn't interfere with it here.
+update public.studio_signup_policy set mode = 'open', allowlist = '{}' where singleton;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','51000000-0000-0000-0000-000000000001',true);
