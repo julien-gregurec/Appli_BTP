@@ -415,11 +415,13 @@ begin
     return next; return;
   end if;
 
-  -- F8 : instantané des références SET NULL/SET DEFAULT depuis les tables retenues,
-  -- avant que la suppression ne les vide.
-  perform public._snapshot_avant_purge(p_entreprise_id, p_table, p_run_id);
-
+  -- F8 (instantané) + suppression, dans le MÊME bloc protégé : le garde-fou F8 (colonne
+  -- purge_snapshot manquante) lève une exception volontairement bruyante pour une
+  -- table conservée mal préparée — mais elle doit rester soumise au même contrat F1
+  -- (jamais de raise hors de cette fonction) pour ne pas perdre, elle aussi, son audit
+  -- d'échec par rollback de la transaction PostgREST appelante.
   begin
+    perform public._snapshot_avant_purge(p_entreprise_id, p_table, p_run_id);
     execute format('delete from public.%I where entreprise_id = $1', p_table) using p_entreprise_id;
     get diagnostics v_nb = row_count;
     ok := true; lignes_supprimees := v_nb; erreur := null;
