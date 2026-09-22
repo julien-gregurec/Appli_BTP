@@ -76,15 +76,20 @@ begin
       values (user2, ent, poste_ouvrier, 'actif');
 
     -- Salariés (employés)
-    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, taux_horaire, numero_inscription, utilisateur_id)
-      values (ent, 'Marc', 'Muller', 'marc.muller.dr'||lower(suffixe)||'@dr-drill.invalid', poste_chef, 'Chef d''équipe', 'cdi', '2024-01-15', 22.5, 'DR-'||suffixe||'-EMP-001', user2)
+    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, numero_inscription, utilisateur_id)
+      values (ent, 'Marc', 'Muller', 'marc.muller.dr'||lower(suffixe)||'@dr-drill.invalid', poste_chef, 'Chef d''équipe', 'cdi', '2024-01-15', 'DR-'||suffixe||'-EMP-001', user2)
       returning id into emp1;
-    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, taux_horaire, numero_inscription)
-      values (ent, 'Julie', 'Klein', 'julie.klein.dr'||lower(suffixe)||'@dr-drill.invalid', poste_ouvrier, 'Ouvrier', 'cdi', '2024-03-01', 16.0, 'DR-'||suffixe||'-EMP-002')
+    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, numero_inscription)
+      values (ent, 'Julie', 'Klein', 'julie.klein.dr'||lower(suffixe)||'@dr-drill.invalid', poste_ouvrier, 'Ouvrier', 'cdi', '2024-03-01', 'DR-'||suffixe||'-EMP-002')
       returning id into emp2;
-    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, taux_horaire, numero_inscription)
-      values (ent, 'Ahmed', 'Bensaid', 'ahmed.bensaid.dr'||lower(suffixe)||'@dr-drill.invalid', poste_ouvrier, 'Ouvrier', 'interim', '2025-06-01', 15.0, 'DR-'||suffixe||'-EMP-003')
+    insert into public.employes (entreprise_id, prenom, nom, email, poste_id, poste, type_contrat, date_entree, numero_inscription)
+      values (ent, 'Ahmed', 'Bensaid', 'ahmed.bensaid.dr'||lower(suffixe)||'@dr-drill.invalid', poste_ouvrier, 'Ouvrier', 'interim', '2025-06-01', 'DR-'||suffixe||'-EMP-003')
       returning id into emp3;
+
+    -- Taux facturé (billing rate) : colonne déplacée de employes vers employes_taux_facture
+    -- par 20260922000328_securiser_taux_horaire_facture_employe.sql.
+    insert into public.employes_taux_facture (employe_id, entreprise_id, taux_horaire)
+      values (emp1, ent, 22.5), (emp2, ent, 16.0), (emp3, ent, 15.0);
 
     -- Clients
     insert into public.clients (entreprise_id, reference_interne, type, nom, prenom, adresse_facturation, code_postal, ville, email, telephone, statut)
