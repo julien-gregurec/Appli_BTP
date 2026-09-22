@@ -10,7 +10,26 @@ conservation, conformément à la mission.
 
 ## Verdict
 
-<!-- PLACEHOLDER_VERDICT -->
+# RGPD PURGE ARCHITECTURE LOCALLY QUALIFIED
+
+Les 8 défauts structurels confirmés par la qualification V1 (F1-F8) sont corrigés et
+**exécutés réellement de bout en bout** — pas relus, pas simulés — sur un jeu de
+données multi-domaines représentatif (clients, fournisseurs, salariés avec fichiers
+Storage réels, devis, chantiers, factures dont un avoir, paiements, notes de frais
+verrouillées par virement, préparation de paie complète, signatures de documents,
+pointages GPS) : dry-run, sauvegarde restaurée avec succès, purge réelle **interrompue
+de force puis reprise**, vérification de complétude, isolation d'un second tenant
+prouvée octet pour octet avant/après. Tous les tests automatisés (46 assertions pgTAP +
+111 tests vitest) passent réellement.
+
+« Localement qualifiée » plutôt que « techniquement prête sans réserve » parce que :
+cette exécution reste sur un environnement reconstruit (PostgreSQL natif + mock
+PostgREST/Storage, Docker toujours inaccessible), pas la stack Supabase de production
+complète (pas de vrai GoTrue, pas de vraie API Storage Supabase) — même réserve
+méthodologique que la qualification V1, qui n'affecte pas la logique de purge
+elle-même (entièrement côté SQL/PL-pgSQL, indépendante de la stack Auth/Storage réelle)
+mais que l'honnêteté sur le périmètre exige de garder. Les décisions juridiques listées
+en §12 restent, par construction de cette mission, non tranchées.
 
 ## 0. Méthodologie
 
@@ -44,7 +63,10 @@ prudence.
 - Le script `scripts/purger-entreprise.mjs` (dry-run/execute/verify) a été exécuté pour
   de vrai via HTTP contre le mock PostgREST, pas appelé directement en SQL.
 - 46 assertions pgTAP exécutées réellement (2 fichiers, voir §11), 0 échec.
-- <!-- PLACEHOLDER_DATASET_EXECUTION -->
+- Un jeu de données réel (§9) a été purgé de bout en bout (dry-run, sauvegarde
+  `pg_dump`, purge interrompue de force par un vrai `SIGKILL` du processus puis
+  reprise, vérification) contre l'environnement ci-dessus, avec un second tenant
+  témoin dont l'empreinte de contenu est restée bit-à-bit identique avant/après.
 
 ## 1. Graphe de dépendances réel
 
@@ -125,7 +147,30 @@ découverte utilisé), croise avec les fichiers réels sous
 - **A_PURGER** : référencé par une ligne DELETE pas encore purgée → bloque
   `marquer_entreprise_purgee` tant qu'il en reste (garde de complétude).
 
-<!-- PLACEHOLDER_STORAGE_EXECUTION -->
+Exécuté réellement sur le tenant de qualification (13 fichiers Storage réels, 4
+buckets) :
+
+| Étape | ORPHELIN | RETAIN | A_PURGER |
+|---|---|---|---|
+| Avant purge (dry-run) | 1 (fichier délibérément non référencé, semé pour ce test) | 9 (docs employés + signature + justificatifs notes de frais) | 3 (photos pointages/sessions, tables DELETE pas encore purgées) |
+| Après purge complète | 0 | 3 (signature + 2 justificatifs notes de frais retenus) | 0 |
+
+10 fichiers physiquement supprimés lors de la purge réelle (`storage.from(bucket)
+.remove()`, appel HTTP réel — pas un `DELETE` SQL direct sur `storage.objects`) :
+7 documents employés (photo/signature/carte BTP, devenus orphelins après
+l'anonymisation de `employes`) + 3 photos de pointage/session (devenues orphelines
+après la purge de `pointages`/`sessions_pointage`). Confirmé par re-listing après
+purge : 0 fichier restant pour ces chemins, à la fois côté `storage.objects` et par
+absence dans le rapport de réconciliation.
+
+Cas particulier trouvé et corrigé pendant cette exécution (F7 additionnel, non identifié
+par la qualification V1) : `entreprises.logo_url` stocke une URL publique complète, pas
+un chemin nu — ne correspondait donc à aucune colonne `*_storage_path` scannée. Sans
+correctif, un logo aurait été classé ORPHELIN et supprimé par le script AVANT que
+`marquer_entreprise_purgee` ne vide `logo_url`, créant une référence morte transitoire
+si la purge est interrompue entre les deux étapes. Corrigé en traitant `logo_url` comme
+un cas explicite, toujours classé RETAIN tant que la fiche entreprise n'est pas
+anonymisée.
 
 ## 6. Plan de purge
 
@@ -140,19 +185,116 @@ chemin, garde-fou anti-cycle à 50 niveaux — profondeur réelle observée : 2)
 
 ## 7. Interruption / reprise
 
-<!-- PLACEHOLDER_INTERRUPT_RESUME -->
+Forcé réellement, pas simulé : le mock PostgREST a été configuré avec un délai
+artificiel par appel (`MOCK_RPC_DELAY_MS`), le script `execute` lancé, puis le
+processus Node tué avec `SIGKILL` (`timeout -s KILL`, pas un `Ctrl+C` propre — le pire
+cas, aucun handler de sortie ne s'exécute) après 3 des 11 tables DELETE.
+
+Constat réel notable : au moment du `SIGKILL`, le serveur avait déjà committé une 4ᵉ
+table (`permissions_poste`) que le script n'avait pas encore eu le temps d'afficher à
+l'écran — la preuve que l'état réel (base + `platform.purge_audit`) est la seule
+source de vérité, jamais la sortie du script. Confirmé par lecture directe de l'audit
+juste après l'interruption : 4 lignes `purge_table` avec `ok=true`, aucune ligne
+incohérente.
+
+Reprise avec le même `--run-id` : reprend exactement où l'exécution précédente
+s'était arrêtée (les 4 tables déjà purgées n'apparaissent plus dans le rapport dynamique
+donc ne sont jamais retentées), termine les 7 tables DELETE restantes, les 3 tables
+ANONYMIZE, la réconciliation Storage puis le marquage entreprise — sans aucune erreur,
+sans double traitement. Un second appel `execute` complet (double purge, sur une
+entreprise déjà entièrement purgée) confirme l'idempotence : toutes les étapes
+renvoient `ok=true` avec 0 ligne affectée, `verify` retourne toujours *PURGE COMPLÈTE*.
 
 ## 8. Isolation tenant
 
-<!-- PLACEHOLDER_ISOLATION -->
+Empreinte de contenu (MD5 par ligne, agrégée par table, puis un MD5 global sur les 127
+tables `entreprise_id`) calculée pour le Tenant B **avant** toute opération sur le
+Tenant A, puis recalculée **après** : dry-run, sauvegarde, purge interrompue de force,
+reprise, double purge, et une tentative de purge du Tenant B lui-même sans suppression
+programmée (« mauvais tenant », voir ci-dessous).
+
+```
+empreinte Tenant B avant : 2a58218c30e0e8c859b0e608257e98ea
+empreinte Tenant B après : 2a58218c30e0e8c859b0e608257e98ea
+```
+
+**Identique au caractère près.** Confirmé aussi par lecture directe : le Tenant B
+conserve ses 9 tables DELETE avec lignes, ses 2 tables ANONYMIZE non anonymisées, ses 2
+tables RETAIN — exactement l'état seedé, aucune ligne créée/modifiée/supprimée.
+
+**Mauvais tenant** : une tentative explicite de `purger_table_entreprise`/`execute` sur
+le Tenant B (qui n'a jamais eu de suppression programmée) échoue proprement sur
+l'intégralité de ses tables DELETE, sans exception, avec un message désormais clair
+(« cette entreprise n'a pas de suppression programmée échue — ce n'est pas un défaut
+d'architecture », correctif apporté pendant cette exécution après un premier message
+trompeur qui suggérait à tort un problème structurel). Le Tenant A, purgé entre-temps,
+n'a jamais influencé ce refus : chaque entreprise est vérifiée indépendamment sur sa
+propre colonne `suppression_prevue_at`.
 
 ## 9. Dataset
 
-<!-- PLACEHOLDER_DATASET -->
+`supabase/production/seed_purge_qualification_v2.sql` (idempotent, `ON CONFLICT (id)
+DO NOTHING`, ids fixes). Volumétrie volontairement compacte (pas un remplacement de la
+qualification V1 à échelle réelle, qui reste la preuve de charge) mais couvrant chaque
+branche de classification :
+
+**Tenant A « Entreprise Purge Qualification V2 »** (`aaaaaaaa-0000-0000-0000-000000000001`) :
+clients 5, fournisseurs 4, employés 5 (2 avec les 3 documents Storage complets
+photo+signature+carte BTP, 1 avec photo seule), chantiers 4, devis 4 (+7 lignes),
+factures 5 (+8 lignes — dont une `finale` avec `chantier_id` ET `devis_origine_id` non
+nuls, et son `avoir` correspondant, pour exercer F8 sur les deux), paiements 2, notes de
+frais 5 (2 remboursées via `ordres_virements`, donc verrouillées par RESTRICT — F3),
+lots de virement 1, ordres de virement 2, périodes de paie 1, dossiers de paie 3,
+journal d'audit de paie 3, signatures de documents 1, pointages 5, sessions de pointage
+3 (latitude/longitude + photos), journal d'activité 5, fichiers Storage réels 13 (12
+référencés + 1 orphelin délibéré).
+
+**Tenant B « Entreprise Controle B »** (`aaaaaaaa-0000-0000-0000-000000000002`) : sous-
+ensemble équivalent (clients 3, employés 2, chantiers 2, devis 1+2 lignes, factures
+1+2 lignes) — jamais purgé, sert uniquement de témoin d'isolation (§8).
+
+Point de périmètre découvert en construisant ce jeu de données : **aucune table du
+schéma ne correspond à des « réserves » de chantier** (défauts/levées de réserve en fin
+de travaux) — vérifié sur les 180 migrations, seule occurrence du mot : « réservé »
+dans un message d'erreur sans rapport. Rien n'a donc été semé pour ce point de la
+mission ; il n'existe simplement pas de fonctionnalité correspondante dans ce dépôt à
+ce jour.
 
 ## 10. Exécution réelle
 
-<!-- PLACEHOLDER_EXECUTION -->
+Séquence réellement exécutée sur le Tenant A, via HTTP contre le mock PostgREST
+(`@supabase/supabase-js` non modifié, exactement comme en production) :
+
+1. **dry-run** : rapport correct (11 DELETE ordonnées topologiquement sur 3 niveaux,
+   3 ANONYMIZE, 10 RETAIN, Storage 1 ORPHELIN/9 RETAIN/3 A_PURGER). Rien modifié.
+2. **backup** : `pg_dump -Fc` de la base entière, restauré dans une base neuve
+   (`pg_restore`), comptage de lignes identique avant/après restauration (24/24 sur
+   `rapport_purge_entreprise`) — sauvegarde confirmée réellement restaurable, pas
+   seulement "un fichier existe".
+3. **execute, interrompu de force** : `SIGKILL` après 3-4 tables (voir §7) — aucun état
+   incohérent, audit complet des étapes déjà commitées.
+4. **resume** (`--run-id`) : termine les 7 tables DELETE restantes, les 3 ANONYMIZE,
+   supprime 10 fichiers Storage orphelins réels, marque l'entreprise purgée.
+5. **verify** : code de sortie 0, *PURGE COMPLÈTE*, 21 entrées d'audit (dont les 4
+   refus légitimes d'avant l'échéance, antérieurs à ce run).
+6. **double purge** (`execute` rejoué sur une entreprise déjà entièrement purgée) :
+   toutes les étapes idempotentes, `ok=true`, 0 ligne affectée partout.
+
+Résultats vérifiés directement en base après l'exécution complète :
+- `factures.purge_snapshot` contient les libellés réels et exacts des lignes purgées
+  (`"Renovation appartement Lefevre"` pour `chantier_id`, `"DEV-2026-001"` pour
+  `devis_origine_id`), sur la facture `finale` ET son `avoir` — F8 vérifié avec des
+  valeurs réelles, pas seulement "la colonne existe".
+- `employes` : 5 lignes toujours présentes (`nom`/`prenom` = « Anonymise RGPD » /
+  « Anonymise »), toutes les colonnes `*_storage_path` à `NULL` — F3 + F7 vérifiés
+  ensemble sur des lignes réelles.
+- `entreprises` : ligne jamais supprimée, `nom` = « Entreprise supprimee »,
+  `purgee_at` renseigné.
+
+Aucune table n'est restée bloquée : les 11 tables DELETE se sont toutes purgées avec
+succès (dont deux qui auraient échoué structurellement sous l'architecture V1 —
+`chantiers`, verrouillée par `mouvements_outillage`/`pointages`/`sessions_pointage`/
+`situations_travaux` en RESTRICT, purgée sans incident grâce à l'ordre topologique).
 
 ## 11. Tests
 
