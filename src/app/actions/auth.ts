@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { headers } from "next/headers";
 import { destinationInterneSure } from "@/lib/security/redirects";
+import { estPlateformeAdmin } from "@/lib/plateforme";
 
 export async function origineApplication() {
   const entetes = await headers();
@@ -66,6 +67,9 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
+  // Un admin plateforme n'est rattaché à aucune entreprise cliente : l'envoyer
+  // vers le tableau de bord entreprise n'aurait aucun sens pour lui.
+  if (await estPlateformeAdmin()) redirect("/plateforme");
   redirect("/dashboard");
 }
 
