@@ -33,6 +33,19 @@ seconde passe + 6 en troisième passe), tous additifs, tous revus par `npm run t
 `test`/`build` quand ils touchent du code applicatif (node_modules a pu être installé cette
 fois — voir §9bis) et par les scripts SQL du dépôt sinon.
 
+**Mise à jour du 2026-09-22 (quatrième passe, session dédiée `npm audit`)** : ferme l'item
+`DECISION_REQUIRED — durcissement des dépendances npm` ouvert en troisième passe (§14.7, §16).
+Les 2 avisories **CRITIQUES** confirmées sur `next` (`GHSA-p293-qw3h-jr36`, RCE non authentifiée
+hosts Windows ; `GHSA-2xp9-vwfh-vxw4`, RCE non authentifiée API image AVIF, sans restriction de
+plateforme) sont corrigées par une montée de patch `next` `16.2.12` → `16.3.5`, toujours dans la
+plage semver `^16.2.12` déclarée — pas de saut de version majeure, donc pas le risque de
+régression que la troisième passe redoutait. 7 des 9 autres avisories (haute/modérée) du jour sont
+aussi résolues (`sharp`, `browserslist`, `brace-expansion`, `fast-uri`, `js-yaml`,
+`baseline-browser-mapping`, `nanoid`). `npm run typecheck`/`lint`/`test`/`build` tous vérifiés
+verts après coup, ainsi que `npm ci` pour la reproductibilité du lockfile. 1 avisorie modérée
+reste ouverte (Vitest/`@vitest/mocker`, outillage de test uniquement, jamais le code de
+production) — détail en §16. Voir §16 pour le compte-rendu complet.
+
 **Portée de ce document** : reconstruction d'historique et comparaison de modèles à partir de
 preuves git réelles (SHA cités, contenu lu avec `git show`/`git log -S`, pas de suppositions),
 suivies d'une évaluation honnête de ce qui peut réellement être convergé sur
@@ -962,19 +975,40 @@ suite complète du dépôt (§9bis).
   examinée en détail ; **~65 commits `fix(...)` restent non examinés** (liste en §1.6). Une future
   session avec un budget dédié devrait continuer à les relire un par un contre `main` actuel, dans
   le même esprit que §11/§13/§14 — travail de vérification manuelle, pas de fusion de branche.
-- **DECISION_REQUIRED — durcissement des dépendances npm** (nouveau, §14.7) : `npm audit` exécuté
-  dans cette session (2026-09-22, base d'avisories courante — possible pour la première fois car
-  `npm ci` a fonctionné cette passe, voir §9bis) rapporte **7 vulnérabilités sur
-  `claude/quirky-noether-n8aerc` aujourd'hui : 1 modérée, 5 hautes, et 1 CRITIQUE — RCE non
-  authentifiée sur Next.js** (`GHSA-p293-qw3h-jr36`, hosts Windows ; `GHSA-2xp9-vwfh-vxw4`, API
-  d'optimisation d'image AVIF), plus `sharp`, `browserslist`, `nanoid`, `fast-uri`,
-  `brace-expansion`, `baseline-browser-mapping`. Les correctifs npm trouvés sur
-  `integration/gp-external-pilot-closure-v1` (juillet/août 2026) sont **stales** vis-à-vis de ces
-  avisories actuelles (voir détail en §14.7) — ne pas les porter tels quels. C'est un chantier
-  distinct, non commencé dans cette mission : certains correctifs (Next.js en particulier) sont
-  des montées de version majeure à risque réel de régression, nécessitant des tests (build + e2e)
-  qu'aucune session sans base de données réelle ne peut garantir. À signaler au propriétaire du
-  dépôt comme prioritaire indépendamment de la question multi-app.
+- **RÉSOLU (2026-09-22, session dédiée `npm audit`)** — durcissement des dépendances npm
+  (précédemment `DECISION_REQUIRED`, §14.7) : les **2 avisories CRITIQUES confirmées** par la
+  session précédente sur `next` (`GHSA-p293-qw3h-jr36` — RCE non authentifiée sur hosts Windows ;
+  `GHSA-2xp9-vwfh-vxw4` — RCE non authentifiée dans l'API d'optimisation d'image AVIF, sans
+  restriction de plateforme) sont **corrigées** : `next` `16.2.12` → `16.3.5` (montée de patch au
+  sein de la même plage semver `^16.2.12`, pas de saut de version majeure). `npm audit`
+  post-correctif ne rapporte plus aucune vulnérabilité `next`, ni aucune critique/haute confondue
+  sur `next`. Dans la foulée, 7 des 9 autres avisories (haute/modérée) signalées ce même jour ont
+  aussi été résolues sans rupture : `sharp` `0.35.3` → `^0.35.4`, et par `npm update` ciblé
+  (contournant un crash reproductible d'arborist sur `npm audit fix`/`npm update` global — erreur
+  `Cannot read properties of null (reading 'edgesOut')`, propre à la résolution des pairs
+  optionnels de `vitest` sur cette version de npm) : `browserslist`, `brace-expansion`, `fast-uri`,
+  `js-yaml`, `baseline-browser-mapping`. Le dernier, `nanoid` (< 3.3.18), venait d'un override
+  `postcss@8.5.24` figé sous `next` dans `overrides` — bump ciblé de cet override à `8.5.28`
+  (patch, même ligne 8.5.x) sans toucher au reste. **Validation complète effectuée et vue
+  réellement passer** (pas seulement lancée) : `npm run typecheck` (0 erreur), `npm run lint`
+  (0 erreur, 3 warnings `@next/next/no-img-element` préexistants, non liés), `npm run test`
+  (106/106 tests, 29/29 fichiers), `npm run build` (`next build` réussi sur Next.js 16.3.5,
+  115 routes générées). `npm ci` re-testé après coup pour confirmer que le `package-lock.json`
+  résultant reste installable de façon reproductible (obligatoire, car une tentative initiale de
+  corriger la dernière avisorie via `--legacy-peer-deps` avait produit un lockfile qui faisait
+  échouer `npm ci` — cette tentative a été annulée avant commit).
+  **Encore ouvert, volontairement non forcé** : 1 avisorie modérée residuelle —
+  `GHSA-82fw-gwwq-j7x9` (Vitest, path traversal/lecture de fichier arbitraire via
+  `@vitest/mocker`, plage `2.1.0-4.1.10`). Le correctif (`vitest` `4.1.10` → `4.1.11`, dans la
+  plage `^4.1.10` déclarée) ne s'installe pas proprement sous npm dans cet environnement : même
+  crash arborist que ci-dessus en résolution stricte des pairs, et la seule façon testée de le
+  contourner (`--legacy-peer-deps`) a supprimé 49 paquets optionnels de mode navigateur de Vitest
+  du lockfile et cassé `npm ci` — signe d'un lockfile incohérent, pas d'un correctif propre. Non
+  porté ici plutôt que de committer un lockfile potentiellement cassé pour une CVE modérée
+  touchant uniquement l'outillage de test (jamais le code de production). À reprendre par une
+  session future, idéalement avec une version de npm sans ce bug arborist, ou en régénérant le
+  lockfile depuis zéro (`rm -rf node_modules package-lock.json && npm install`) plutôt qu'un
+  `npm update` incrémental.
 - **DECISION_REQUIRED — RLS sur `compteurs_reference`** (nouveau, §14.1) : gap réel confirmé (la
   table n'a jamais eu la RLS activée, `authenticated` n'a jamais eu ses privilèges de table
   révoqués dessus), mais activer une RLS nue casserait la création d'entreprise directe côté
