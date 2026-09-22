@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -37,7 +38,7 @@ export async function creerClientAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect(`/clients/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/clients/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerClientAction", error, "Impossible d’enregistrer ce client. Vérifiez les informations saisies."))}`);
   }
 
   revalidatePath("/clients");
@@ -86,7 +87,7 @@ export async function creerClientRapideAction(
     .single();
 
   if (error || !cree) {
-    return { error: error?.message ?? "Erreur lors de la création du client." };
+    return { error: messageErreurUtilisateur("creerClientRapideAction", error, "Impossible d’enregistrer ce client. Vérifiez les informations saisies.") };
   }
 
   revalidatePath("/clients");
@@ -121,7 +122,7 @@ export async function modifierClientAction(clientId: string, formData: FormData)
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (error) {
-    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(error.message)}`);
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierClientAction", error, "Impossible d’enregistrer ces modifications. Vérifiez les informations saisies."))}`);
   }
 
   revalidatePath(`/clients/${clientId}`);

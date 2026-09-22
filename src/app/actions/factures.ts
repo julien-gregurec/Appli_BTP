@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { TRANSITIONS_FACTURES } from "@/lib/factures";
 import type { LigneDevis } from "@/lib/devis";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type FacturePayload = {
   client_id: string;
@@ -50,7 +51,7 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
     },
     p_lignes: lignes,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: messageErreurUtilisateur("modifierFactureAction", error, "Impossible d’enregistrer ces modifications. Vérifiez les informations saisies.") };
   revalidatePath("/factures");
   revalidatePath(`/factures/${factureId}`);
   revalidatePath(`/imprimer/factures/${factureId}`);
@@ -71,7 +72,7 @@ export async function creerFactureDepuisDevisAction(devisId: string, type: strin
   });
 
   if (error || !data) {
-    redirect(`/devis/${devisId}?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("creerFactureDepuisDevisAction", error, "Impossible de créer la facture depuis ce devis."))}`);
   }
 
   revalidatePath("/factures");
@@ -166,7 +167,7 @@ export async function modifierEcheanceFactureAction(factureId: string, formData:
     .eq("id", factureId)
     .eq("entreprise_id", ctx.entrepriseId);
 
-  if (error) redirect(`/factures/${factureId}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/factures/${factureId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEcheanceFactureAction", error, "Impossible d’enregistrer cette échéance."))}`);
   revalidatePath(`/factures/${factureId}`);
   revalidatePath("/factures");
   revalidatePath("/dashboard");
