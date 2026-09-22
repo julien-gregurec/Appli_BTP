@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutExporterComptabilite } from "@/lib/permissions-financieres";
 import { periodeDepuisUrl, reponseCsv } from "@/lib/csv";
 import { reponseXlsx } from "@/lib/xlsx";
 const nomClient = (client: { nom: string | null; prenom: string | null; societe: string | null } | null) => client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "";
@@ -10,7 +12,12 @@ const reponseExport = (lignes: unknown[][], nom: string, feuille: string, format
 export async function GET(request: Request) {
   const periode = periodeDepuisUrl(request.url); if (!periode) return Response.json({ error: "Période invalide" }, { status: 400 });
   const url = new URL(request.url); const type = url.searchParams.get("type") ?? "ventes"; const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx"; if (!["ventes", "reglements", "tva", "achats", "tva-achats"].includes(type)) return Response.json({ error: "Export inconnu" }, { status: 400 });
-  const ctx = await getContexteEntreprise(); const supabase = await createClient();
+  const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!peutExporterComptabilite(permissions)) {
+    return Response.json({ error: "Accès aux exports comptables non autorisé" }, { status: 403 });
+  }
+  const supabase = await createClient();
   if (type === "ventes") {
     const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client:clients(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
     if (error) return Response.json({ error: error.message }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Type", "Statut", "Réf. client", "Client", "HT", "TVA", "TTC", "Encaissé", "Reste dû", "Échéance"]];
