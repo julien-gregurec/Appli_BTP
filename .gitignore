@@ -53,3 +53,6 @@ output/video/plans/
 
 # Rapports de vérification automatisée
 output/verification/
+
+# Claude Code local worktrees (agent scratch checkouts)
+.claude/worktrees/
