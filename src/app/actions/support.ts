@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 // Côté entreprise : envoyer un message au support plateforme.
 export async function envoyerMessageSupportAction(formData: FormData) {
@@ -21,7 +22,7 @@ export async function envoyerMessageSupportAction(formData: FormData) {
     auteur_nom: [ctx.prenom, ctx.entrepriseNom].filter(Boolean).join(" · ") || "Entreprise",
     contenu,
   });
-  if (error) redirect(`/aide?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/aide?error=${encodeURIComponent(messageErreurUtilisateur("envoyerMessageSupportAction", error, "Impossible d’envoyer votre message pour le moment."))}`);
 
   revalidatePath("/aide");
   redirect("/aide?envoye=1");
@@ -36,7 +37,7 @@ export async function repondreSupportPlateformeAction(entrepriseId: string, form
     p_entreprise_id: entrepriseId,
     p_contenu: contenu,
   });
-  if (error) redirect(`/plateforme/support?entreprise=${entrepriseId}&error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/plateforme/support?entreprise=${entrepriseId}&error=${encodeURIComponent(messageErreurUtilisateur("repondreSupportPlateformeAction", error, "Impossible d’envoyer la réponse."))}`);
   revalidatePath("/plateforme/support");
   redirect(`/plateforme/support?entreprise=${entrepriseId}&envoye=1`);
 }

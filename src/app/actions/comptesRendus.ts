@@ -6,6 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { structurerCompteRendu } from "@/lib/ai/compteRendu";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function structurerCompteRenduIAAction(transcription: string) {
   const ctx = await getContexteEntreprise();
@@ -23,9 +24,9 @@ export async function structurerCompteRenduIAAction(transcription: string) {
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "succes" });
     return { titre, contenu };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la structuration IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la structuration IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("structurerCompteRenduIAAction", err, "La structuration assistée n’est pas disponible pour le moment.") };
   }
 }
 
@@ -62,7 +63,7 @@ export async function enregistrerCompteRenduAction(
     })
     .select("id")
     .single();
-  if (error || !data) return { error: error?.message ?? "Erreur à l'enregistrement." };
+  if (error || !data) return { error: messageErreurUtilisateur("enregistrerCompteRenduAction", error, "Impossible d’enregistrer le compte-rendu.") };
 
   revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
   return { id: data.id as string };
