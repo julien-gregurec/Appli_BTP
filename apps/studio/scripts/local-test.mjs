@@ -149,6 +149,26 @@ if (action === "setup") {
   );
   if (new URL(status.API_URL).hostname !== "127.0.0.1")
     throw new Error("Non-loopback API rejected.");
+  // studio_signup_policy (supabase/migrations/20260922000323_studio_signup_policy.sql) ships
+  // 'closed' by default: real signup policy must be applied by an explicit, reviewed SQL change,
+  // never picked up silently by db reset (see [db.seed] enabled = false in supabase/config.toml).
+  // This disposable, loopback-only instance is not that boundary: E2E specs sign up fresh users
+  // and expect studio_create_workspace to succeed, so open the gate for this instance alone.
+  if (!status.DB_URL || new URL(status.DB_URL.replace("postgresql", "http")).hostname !== "127.0.0.1")
+    throw new Error("Non-loopback database rejected.");
+  const seed = spawnSync(
+    "psql",
+    [
+      status.DB_URL,
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "update public.studio_signup_policy set mode = 'open', allowlist = '{}', updated_at = now() where singleton;",
+    ],
+    { encoding: "utf8" },
+  );
+  if (seed.status !== 0)
+    throw new Error(`Disposable signup policy seed failed: ${seed.stderr}`);
   writeFileSync(
     join(app, ".env.local"),
     `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\n`,
