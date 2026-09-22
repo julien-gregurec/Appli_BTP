@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const texte = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim() || null;
 // Le GPS reste la preuve par defaut, mais un poste de bureau (pas de puce GPS) ou un
@@ -36,7 +37,7 @@ export async function verifierZonePointageAction(sessionId: string, latitude: nu
     p_longitude: longitude,
     p_precision: precision,
   });
-  if (error) return { ok: false as const, erreur: error.message };
+  if (error) return { ok: false as const, erreur: messageErreurUtilisateur("verifierZonePointageAction", error, "Impossible de vérifier la zone du chantier.") };
   return { ok: true as const, dansZone: data as boolean | null };
 }
 
@@ -61,7 +62,7 @@ export async function enregistrerArriveeAction(formData: FormData) {
     precision_arrivee_metres: preuve.precision, photo_arrivee_storage_path: null,
     tache: texte(formData, "tache"), commentaire,
   });
-  if (error) redirect(`/pointage?error=${encodeURIComponent(error.code === "23505" ? "Cet employé a déjà une arrivée ouverte" : error.message)}`);
+  if (error) redirect(`/pointage?error=${encodeURIComponent(error.code === "23505" ? "Cet employé a déjà une arrivée ouverte" : messageErreurUtilisateur("enregistrerArriveeAction", error, "Impossible d’enregistrer l’arrivée."))}`);
   revalidatePath("/pointage");
   revalidatePath("/dashboard");
   redirect("/pointage?succes=arrivee");
@@ -78,7 +79,7 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
     p_longitude: preuve.longitude, p_precision: preuve.precision, p_photo_path: null,
     p_motif_sans_gps: preuve.motifSansGps,
   });
-  if (error) redirect(`/pointage?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/pointage?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerDepartAction", error, "Impossible d’enregistrer le départ."))}`);
   revalidatePath("/pointage");
   revalidatePath("/dashboard");
   redirect("/pointage?succes=depart");
@@ -90,7 +91,7 @@ export async function declarerPointageOublieAction(formData:FormData){
  // Le motif GPS reprend simplement l'explication deja obligatoire de ce formulaire
  // (voir ForgottenPointageForm) : pas besoin d'un second champ pour la meme raison.
  const{error}=await supabase.rpc("declarer_pointage_oublie",{p_entreprise_id:ctx.entrepriseId,p_chantier_id:texte(formData,"chantier_id"),p_date:texte(formData,"date"),p_arrivee:texte(formData,"heure_arrivee"),p_depart:texte(formData,"heure_depart"),p_pause_minutes:Math.max(0,Number(formData.get("pause_minutes"))||0),p_latitude:preuve.latitude,p_longitude:preuve.longitude,p_precision:preuve.precision,p_commentaire:texte(formData,"commentaire")});
- if(error)redirect(`/pointage?error=${encodeURIComponent(error.message)}`);revalidatePath("/pointage");revalidatePath("/dashboard");redirect(`/pointage?succes=${encodeURIComponent("Pointage oublié enregistré et transmis au responsable")}`);
+ if(error)redirect(`/pointage?error=${encodeURIComponent(messageErreurUtilisateur("declarerPointageOublieAction",error,"Impossible d’enregistrer ce pointage oublié."))}`);revalidatePath("/pointage");revalidatePath("/dashboard");redirect(`/pointage?succes=${encodeURIComponent("Pointage oublié enregistré et transmis au responsable")}`);
 }
 
 export async function supprimerPointageAction(pointageId: string, mois: string) {
@@ -103,19 +104,19 @@ export async function supprimerPointageAction(pointageId: string, mois: string) 
   if (!(permissions === null || permissions.includes("gerer_pointage"))) redirect(`/pointage?mois=${mois}&error=${encodeURIComponent("Suppression non autorisée")}`);
   const{data:p}=await supabase.from("pointages").select("photo_storage_path").eq("id",pointageId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
   const{error}=await supabase.from("pointages").delete().eq("id", pointageId).eq("entreprise_id", ctx.entrepriseId);
-  if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(error.message)}`);
+  if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(messageErreurUtilisateur("supprimerPointageAction",error,"Impossible de supprimer ce pointage."))}`);
   if(p?.photo_storage_path)await supabase.storage.from("pointage-preuves").remove([p.photo_storage_path]);
   revalidatePath("/pointage");
   redirect(`/pointage?mois=${mois}`);
 }
 
-export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(error.message)}`);revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)}
+export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(messageErreurUtilisateur("validerPointageAction",error,"Impossible de valider ce pointage."))}`);revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)}
 
 export async function creerMaFichePointageAdministrateurAction(){
   const ctx=await getContexteEntreprise();
   const supabase=await createClient();
   const{error}=await supabase.rpc("garantir_fiche_pointage_courante",{p_entreprise_id:ctx.entrepriseId});
-  if(error)redirect(`/pointage?error=${encodeURIComponent(error.message)}`);
+  if(error)redirect(`/pointage?error=${encodeURIComponent(messageErreurUtilisateur("creerMaFichePointageAdministrateurAction",error,"Impossible de créer la fiche de pointage."))}`);
   revalidatePath("/pointage");
   revalidatePath("/employes");
   redirect("/pointage?succes=fiche_admin");
