@@ -70,6 +70,9 @@ export async function importerDonneesAction(payload: {
 
   // Construction des enregistrements selon le type.
   const enregistrements: Record<string, unknown>[] = [];
+  // Parallèle à `enregistrements` uniquement pour payload.type === "employes"
+  // (même index, voir plus bas).
+  const tauxHorairesEmployesImportes: (number | null)[] = [];
 
   if (payload.type === "clients") {
     for (const [i, l] of lignes.entries()) {
@@ -89,12 +92,17 @@ export async function importerDonneesAction(payload: {
     for (const l of lignes) {
       const prenom = val(l, "prenom"), nom = val(l, "nom");
       if (!prenom && !nom) { ignores++; continue; }
+      // taux_horaire n'est pas une colonne de `employes` (déplacée vers
+      // `employes_taux_facture`, table dédiée à lecture restreinte par
+      // 20260922000323_securiser_taux_horaire_facture_employe.sql) : conservé
+      // à part, lié aux id générés par lot après l'insertion ci-dessous.
+      tauxHorairesEmployesImportes.push(nombre(val(l, "taux_horaire")));
       enregistrements.push({
         entreprise_id: entrepriseId, prenom: prenom || nom, nom: nom || prenom,
         poste: val(l, "poste") || null,
         type_contrat: dansEnsemble(val(l, "type_contrat"), ["cdi", "cdd", "interim", "apprenti", "stage", "freelance", "autre"], "cdi"),
         email: val(l, "email") || null, telephone: val(l, "telephone") || null,
-        taux_horaire: nombre(val(l, "taux_horaire")), date_entree: dateIso(val(l, "date_entree")), statut: "actif",
+        date_entree: dateIso(val(l, "date_entree")), statut: "actif",
       });
     }
   } else if (payload.type === "catalogue") {
@@ -255,6 +263,26 @@ export async function importerDonneesAction(payload: {
   let inseres = 0;
   for (let i = 0; i < enregistrements.length; i += 200) {
     const lot = enregistrements.slice(i, i + 200);
+    if (payload.type === "employes") {
+      // taux_horaire vit dans employes_taux_facture (lecture restreinte) : il
+      // faut l'id généré par l'insertion pour le lier, dans le même ordre que
+      // `lot` (et donc que `tauxHorairesEmployesImportes`).
+      const { data: employesInseres, error, count } = await supabase.from(conf.table).insert(lot, { count: "exact" }).select("id");
+      if (error) {
+        erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
+      } else {
+        inseres += count ?? lot.length;
+        const tauxDuLot = tauxHorairesEmployesImportes.slice(i, i + 200);
+        const tauxAEnregistrer = (employesInseres ?? [])
+          .map((e, j) => ({ employe_id: e.id, entreprise_id: entrepriseId, taux_horaire: tauxDuLot[j], updated_at: new Date().toISOString() }))
+          .filter((l) => l.taux_horaire !== null && l.taux_horaire !== undefined);
+        if (tauxAEnregistrer.length > 0) {
+          const { error: tauxError } = await supabase.from("employes_taux_facture").insert(tauxAEnregistrer);
+          if (tauxError) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot_taux_horaire", tauxError, "taux horaire facturé non enregistré pour ce lot")}`);
+        }
+      }
+      continue;
+    }
     const requete = payload.type === "tarifs_fournisseurs"
       ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,fournisseur_id,reference_fournisseur", count: "exact" })
       : payload.type === "stock"

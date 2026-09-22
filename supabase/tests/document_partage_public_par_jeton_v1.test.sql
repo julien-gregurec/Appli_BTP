@@ -120,12 +120,20 @@ insert into public.pieces_jointes_devis (
    'b0000000-0000-0000-0000-000000000001/d7000000-0000-0000-0000-000000000002/photo.jpg',
    'PHOTO_ENTREPRISE_B.jpg', 'image/jpeg', 'image', 1000);
 
+-- `trg_lignes_factures_brouillon_only` interdit d'insérer des lignes sur une
+-- facture déjà hors brouillon (peu importe le statut cible, contrairement au
+-- devis ci-dessus qui n'est verrouillé qu'à `accepte`) : la facture A est
+-- donc créée en brouillon, ses lignes insérées, puis son statut relevé à
+-- `envoyee` par un UPDATE séparé — même précaution que
+-- `seed_entreprise_pilote_btp.sql` (défaut #3 documenté dans
+-- ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md) et que les autres suites
+-- pgTAP de ce dossier (voir verrouiller_facture_emise.test.sql).
 insert into public.factures (
   id, entreprise_id, numero, client_id, type, statut,
   montant_ht, montant_tva, montant_ttc, notes_internes
 ) values (
   'f7000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
-  'PART-FAC-001', 'a3000000-0000-0000-0000-000000000001', 'simple', 'envoyee',
+  'PART-FAC-001', 'a3000000-0000-0000-0000-000000000001', 'simple', 'brouillon',
   100, 20, 120, 'NOTE_FACTURE_SECRETE_A'
 ), (
   -- Encore brouillon : même garde que le devis brouillon ci-dessus.
@@ -135,6 +143,7 @@ insert into public.factures (
 );
 insert into public.lignes_factures (facture_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, ordre) values
   ('f7000000-0000-0000-0000-000000000001', 'Ligne facturée', 1, 'u', 100, 20, 1);
+update public.factures set statut = 'envoyee' where id = 'f7000000-0000-0000-0000-000000000001';
 
 -- Seule l'empreinte est stockée, comme obtenirNouveauTokenPartage().
 insert into public.acces_externes_documents (

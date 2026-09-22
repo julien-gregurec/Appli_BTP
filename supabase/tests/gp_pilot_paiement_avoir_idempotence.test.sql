@@ -4,7 +4,7 @@
 -- un second. Voir 20260922000306_gp_pilot_paiement_avoir_idempotence.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(12);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -85,6 +85,16 @@ select is(
   (select count(*)::int from public.factures where facture_origine_id = 'aa000000-0000-0000-0000-000000000001' and type = 'avoir'),
   1,
   'exactement un avoir existe pour cette facture d''origine'
+);
+-- ELSATIA-EXTERNAL-PILOT-FULL-REHEARSAL-V2 : la facture créditée doit passer
+-- en 'avoir_emis' (correctif 20260922000324_correctif_statut_avoir_emis_facture_origine.sql
+-- — creer_facture_avancee créait l'avoir mais ne mettait jamais à jour le
+-- statut de la facture d'origine, contrairement à AV-01 de
+-- ELSATIA_PILOT_ACCEPTANCE_TESTS_V1.md).
+select is(
+  (select statut from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  'avoir_emis',
+  'la facture d''origine passe en avoir_emis dès la création de l''avoir'
 );
 
 select throws_like(
