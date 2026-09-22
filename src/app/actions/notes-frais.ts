@@ -9,6 +9,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { calculerTotauxDepense, verifierTotaux } from "@/lib/expenses/workflow";
 import { ajouterAudit } from "@/lib/expenses/audit";
 import { analyserAffectationDepense } from "@/lib/expenses/affectation";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const TYPES_DOCUMENT = new Set([
   "facture", "ticket_caisse", "recu_paiement", "recu_carte_bancaire",
@@ -174,7 +175,7 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
     description: texte(formData, "commentaire_salarie"),
     type_document_principal: typeDocument,
   }).eq("id", noteId).eq("entreprise_id", ctx.entrepriseId);
-  if (updateError) erreur(updateError.message, noteId);
+  if (updateError) erreur(messageErreurUtilisateur("modifierNoteFraisAction", updateError, "Impossible d’enregistrer cette note de frais."), noteId);
   await ajouterAudit(supabase, {
     entrepriseId: ctx.entrepriseId,
     action: "informations_modifiees",
@@ -202,7 +203,7 @@ export async function transitionNoteFraisAction(noteId: string, nouveauStatut: s
     p_nouveau_statut: nouveauStatut,
     p_message: message,
   });
-  if (transitionError) erreur(transitionError.message, noteId);
+  if (transitionError) erreur(messageErreurUtilisateur("transitionNoteFraisAction", transitionError, "Impossible de mettre à jour le statut de cette note de frais."), noteId);
   await ajouterAudit(supabase, {
     entrepriseId: ctx.entrepriseId,
     action: nouveauStatut === "correction_demandee" ? "correction_demandee" : nouveauStatut,
@@ -228,7 +229,7 @@ export async function enregistrerReferenceComptableAction(noteId: string, formDa
     p_note_id: noteId,
     p_reference: texte(formData, "reference_comptable"),
   });
-  if (rpcError) erreur(rpcError.message, noteId);
+  if (rpcError) erreur(messageErreurUtilisateur("cloturerNoteFraisAction", rpcError, "Impossible de clôturer cette note de frais."), noteId);
   await ajouterAudit(supabase, {
     entrepriseId: ctx.entrepriseId,
     action: "reference_comptable_modifiee",
@@ -256,7 +257,7 @@ export async function supprimerNoteFraisAction(id: string) {
   const { count } = await supabase.from("documents_notes_frais").select("id", { count: "exact", head: true }).eq("note_frais_id", id);
   if (count) erreur("Retirez ce brouillon de la liste sans supprimer son historique documentaire", id);
   const { error: deleteError } = await supabase.from("notes_frais").delete().eq("id", id).eq("entreprise_id", ctx.entrepriseId);
-  if (deleteError) erreur(deleteError.message, id);
+  if (deleteError) erreur(messageErreurUtilisateur("supprimerNoteFraisAction", deleteError, "Impossible de supprimer cette note de frais."), id);
   revalidatePath("/notes-frais");
   if (note.chantier_id) revalidatePath(`/chantiers/${note.chantier_id}`);
   redirect("/notes-frais");

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const champ = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -32,7 +33,7 @@ export async function enregistrerInventaireAction(id: string, formData: FormData
   const comptages = lignes.map((ligne) => ({ ligne_id: ligne.id, quantite: Number(champ(formData, `q_${ligne.id}`)) }));
   const valider = champ(formData, "intention") === "valider";
   const { error } = await supabase.rpc("enregistrer_comptage_inventaire", { p_entreprise_id: contexte.entrepriseId, p_inventaire_id: id, p_comptages: comptages, p_valider: valider });
-  if (error) redirect(`/inventaires/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/inventaires/${id}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerComptageInventaireAction", error, "Impossible d’enregistrer ce comptage."))}`);
   revalidatePath("/inventaires");
   revalidatePath(`/inventaires/${id}`);
   revalidatePath("/stock");
