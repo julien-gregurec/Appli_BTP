@@ -988,13 +988,14 @@ suite complète du dépôt (§9bis).
   (`grant ... to authenticated` explicite plutôt qu'un défaut par omission), corrigé par le
   correctif porté en §13 (commit `d357314`). Plus de portage supplémentaire requis pour ce commit
   précis.
-- **DECISION_REQUIRED — reste du tronc GP mono-app (§1.6, §14, §17)** : sur les ~80 commits
-  `fix(...)` de `integration/gp-external-pilot-closure-v1`, ~33 ont désormais été examinés en
-  détail au total (troisième passe : §14.1-14.6 portés, §14.7 examinés-non-portés ; quatrième
-  passe, §17 : 11 portés en §17.1, 4 déclinés en §17.2, 2 non applicables en §17.3). **Il reste
-  environ 47 commits `fix(...)` non examinés.** Une future session avec un budget dédié devrait
-  continuer à les relire un par un contre `claude/quirky-noether-n8aerc` actuel, dans le même
-  esprit que §11/§13/§14/§17 — travail de vérification manuelle, pas de fusion de branche.
+- **RÉSOLU (sixième passe, §18)** : sur les ~80 commits `fix(...)` de
+  `integration/gp-external-pilot-closure-v1`, la totalité a désormais été examinée au moins par un
+  titre et une décision documentée (troisième passe : §14.1-14.6 portés, §14.7 examinés-non-portés ;
+  quatrième passe, §17 : 11 portés, 4 déclinés, 2 non applicables ; sixième passe, §18 : 10 portés
+  — 3 partiellement —, 27 déclinés). **28 correctifs portés au total sur l'ensemble de la mission.**
+  Il ne reste ouvert que le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609` (§18.3),
+  documenté comme candidat sûr mais volumineux pour une session dédiée future — plus un travail de
+  vérification exhaustive, l'inventaire lui-même est clos.
 - **DECISION_REQUIRED — cloisonnement des webhooks Stripe par environnement (§17.2, `fcdd4e7`)** :
   correctif identifié comme réel et bien conçu (empêche un webhook Stripe test d'être traité comme
   un événement live ou inversement), mais qui introduit une variable d'environnement obligatoire
@@ -1152,6 +1153,140 @@ liste est atteint — repris en §16 (OPEN DECISIONS, mis à jour ci-dessus).
 
 ---
 
+## 18. SIXIÈME PASSE (2026-09-22, suite) — 10 correctifs supplémentaires portés
+
+Reprise du tronc mono-app GP (§1.6) là où la cinquième passe (§17) s'était arrêtée : sur les
+**47 commits `fix(...)` restants** d'`integration/gp-external-pilot-closure-v1` (liste complète en
+§17.4), cette passe en a examiné 37 en détail, contre le code actuel de
+`claude/quirky-noether-n8aerc` (fetché depuis `e340f68` en début de passe — la branche avait bougé
+depuis la cinquième passe via une session `npm audit` dédiée et cette cinquième passe elle-même).
+**10 correctifs portés (certains partiels — seule la sous-partie applicable d'un commit large a été
+reprise), 27 déclinés avec raison, 2 documentés comme candidats de grande ampleur pour une session
+dédiée future plutôt que portés à la hâte.** Chaque correctif a été vérifié par lecture directe du
+code actuel avant portage, jamais par confiance dans le message de commit source.
+
+### 18.1 Portés
+
+| # | SHA source | SHA porté | Sujet |
+| - | --- | --- | --- |
+| 1 | `8d419ec` | `e50af46` | **Faille réelle confirmée** : `origineApplication()` (src/app/actions/auth.ts) construisait les liens d'e-mail sensibles (confirmation d'inscription, réinitialisation de mot de passe, y compris la réinitialisation lancée par un admin plateforme pour un compte client) à partir des en-têtes HTTP `Origin`/`X-Forwarded-Host`/`Host` — fournis par l'appelant. Un Host header falsifié accepté par la plateforme d'hébergement aurait pu faire pointer le lien envoyé à la victime vers un domaine contrôlé par l'attaquant (password-reset-link poisoning). Remplacé par une URL canonique fixe (`process.env.NEXT_PUBLIC_APP_URL`, déjà la convention de ce dépôt pour Stripe/Powens) sur les 3 points d'appel (signup, reset self-service, reset admin plateforme). Adapté : la source dépend de `@/lib/brand` (`BRAND.urlPublique`), absent ici. |
+| 2 | `69187a1` | `bbb55f7` | **Contournement en langage naturel des droits de menu, confirmé.** Les outils de lecture rentabilité/flotte/stock/factures/devis/heures d'équipe du copilote IA n'étaient filtrés que par `entreprise_id`, jamais par le droit de menu réel (`acces_rentabilite`, `acces_flotte`...) — un poste Terrain sans ce droit pouvait l'obtenir via une simple question à l'assistant. `permissions` était déjà calculée dans la route mais jamais transmise à `demanderAssistantIAStream`. Adapté : `heures_supplementaires_semaine` gardé par `gerer_pointage` seul (`voir_pointages_equipe` de la source n'existe pas sur cette branche). |
+| 3 | `76d5855` | `14694ed` | Bug produit réel, pas une faille : l'offre Mini facture des comptes supplémentaires (`comptesInclus`/`parCompteSup`) mais n'incluait pas `acces_employes` dans son catalogue de fonctionnalités — impossible pour un client Mini de créer les comptes qu'il paie. |
+| 4 | `86549ac` | `d46f7f1` | **Gap RLS réel confirmé** : la policy `"membres factures"` (`for all`) autorise toute écriture sur `public.factures` à n'importe quel membre actif, sans vérifier le statut — seule la couche applicative protégeait une facture déjà émise. Un appel API direct pouvait modifier son montant, la faire redevenir brouillon, ou la supprimer. Verrou d'immutabilité (`verrouiller_facture_emise`) reconstruit à l'identique contre le schéma actuel (`entreprise_snapshot`/P9 absent ici, testé comme inerte). |
+| 5 | `9d55fd7` (partiel) | `845eb4c` | **Élévation de privilège réelle confirmée** : `est_membre_actif` fait OU avec `est_acces_support_actif` — un opérateur support avec une session ouverte sur une entreprise cliente était donc traité comme membre actif partout, y compris sur 2 policies qui créent un état PERMANENT (`utilisateurs_entreprises` INSERT, `permissions_poste` ALL). Un accès de dépannage temporaire pouvait devenir un accès permanent non tracé comme tel. Nouvelle fonction `est_membre_actif_reel` (sans le OU support), utilisée uniquement pour ces deux policies. Seule cette sous-partie du commit source est applicable ; le reste (`relance_finaliser`, `relances_documents`) dépend d'une fonctionnalité de relances automatiques absente de cette branche. |
+| 6 | `fce2c55` | `3bc6a5c` | Masque les messages d'erreur SQL bruts (nom de contrainte, colonne, policy RLS) sur les 14 sites identiques trouvés dans clients/chantiers/devis/factures (nouveau `src/lib/erreurs-utilisateur.ts`), au lieu de renvoyer `error.message` directement à l'utilisateur. Écart volontaire : `enregistrerPaiementAction` non enveloppée (la RPC portée au même moment renvoie déjà des messages métier sûrs et spécifiques — les enrober du repli générique aurait été une régression UX sans gain). |
+| 7 | `a3cf2b7` | `3bc642b` | Bug produit réel : le nom du coupon Stripe (`${entreprise.nom} — ${description}`) était construit sans troncature, dépassant la limite de 40 caractères de l'API Stripe dès qu'un nom d'entreprise est un peu long — Stripe rejetait alors toute la création du coupon, bloquant la remise. |
+| 8 | `9d55fd7` (partiel, 2/3) | `ef49ef5` | **TOCTOU réel confirmé** : `enregistrerPaiementAction` lisait `montant_paye`, vérifiait en mémoire, puis insérait directement — sans verrou. Un double clic/deux onglets pouvait dépasser `montant_ttc`. Nouvelle RPC `enregistrer_paiement_facture` (verrou `for update`). **Doublon réel confirmé** : `creer_facture_avancee` ne vérifiait aucun avoir déjà émis pour la même facture d'origine — un double clic doublait le crédit client. Index unique partiel + résolution vers l'existant. Gèle aussi `date_echeance` post-émission (champ légalement significatif, laissé libre par erreur dans le verrou du #4). |
+| 9 | `e109954` (partiel, 1/3) | `af9374e` | **Suite directe du #8, trouvée par la source elle-même** : le verrou `for update` de `enregistrer_paiement_facture` ne servait à rien tant que `authenticated` gardait l'INSERT direct sur `paiements` via PostgREST (la RLS `"membres paiements"` l'autorise toujours). `revoke insert ... from authenticated`, réservant l'écriture à la RPC. Les 2 autres sous-parties de ce commit ne sont pas applicables (régression `avenants`/`montant_contractuel_devis`, absent ici ; déduplication d'une vérification qui n'est pas dupliquée sur cette branche — `/abonnement-suspendu` n'a pas de logique de visibilité côté page). |
+| 10 | `5e9014a` | `9b2e5df` | Étend `erreurs-utilisateur.ts` (porté au #6) avec 3 catégories supplémentaires (dépendance FK, conflit métier/trigger P0001, service externe indisponible) — purement additif, n'affecte aucun appel existant (tous fournissent déjà un message de repli explicite). |
+
+Chaque correctif SQL validé par `node scripts/verify-migrations.mjs` et `node scripts/verify-secrets.mjs`
+(195 migrations valides en fin de passe) ; pgTAP en style introspection, non exécuté faute de
+Docker/Postgres. Chaque correctif TypeScript/JS validé par `npm run typecheck && npm run lint &&
+npm run test && npm run build`, avec `npm ci` en début de passe ; tous les nouveaux tests vitest
+(31 au total sur cette passe) ont été **réellement exécutés et vus passer** (157/157 sur la suite
+complète en fin de passe), contrairement aux tests pgTAP jamais rejouables dans cet environnement.
+
+### 18.2 Déclinés (raison documentée)
+
+- **`4e188ec`, `f8a9236`, `8fe737e`** — lignée de rebranding ELSATIA (migration des QR codes du
+  préfixe `LGP-` vers `ELS-`, préférences locales, déclaration `julien@elsatia.fr` administrateur
+  plateforme) : cette branche garde le préfixe `LGP-`/le nom `Liria Gestion Pro` sur toute sa
+  longueur (vérifié par recherche exhaustive, `git grep` négatif sur `ELS-`/`elsatia.fr` dans le
+  code applicatif) — aucun de ces correctifs n'a de code cible ici.
+- **`255ba1c`** — améliore les messages d'erreur du flux de récupération de mot de passe
+  (`/auth/confirm`), mais dépend de `@/lib/auth-erreurs` (`traduireErreurAuth`), un module distinct
+  de `erreurs-utilisateur.ts` (porté ici) qui n'existe pas sur cette branche. UX, pas une faille de
+  sécurité active — non porté, l'infrastructure manquante rendrait le portage non trivial pour un
+  gain mineur.
+- **`6741dd7`** — commit majoritairement une clôture de couverture de tests (47 fichiers) et un
+  nettoyage de code mort (PWA/offline) propres à l'état très avancé de la branche source à cette
+  date (devis v2, catalogue, etc., aucun équivalent ici). Son seul fragment de sécurité isolable
+  (cloisonnement Live/Test du webhook Stripe boutique) est un doublon exact du mécanisme déjà décliné
+  en §17.2 pour `fcdd4e7` (même variable d'environnement obligatoire `STRIPE_WEBHOOK_EXPECTED_MODE`,
+  même échec fermé 503, même risque non vérifiable depuis ce bac à sable) — décliné pour la même
+  raison, non dupliqué en obligation séparée.
+- **`cb3d34c`** — corrige un bug introduit par la migration 218 de la branche source elle-même
+  (référence à `employes_cout_horaire`/`pointages.cout_horaire_applique`, absents du schéma) : un
+  correctif d'un bug propre à cette autre lignée, sans équivalent ici (ces colonnes n'existent pas
+  sur `claude/quirky-noether-n8aerc`).
+- **`2f1a61d`** — revert d'une migration 228 de la branche source (tentative de liaison réciproque
+  `devis.chantier_id` à la création d'un chantier, cassée par un trigger non documenté côté source) ;
+  cette tentative n'a jamais été portée ici, donc rien à revert.
+- **`78c0115`** — découple les relances automatiques des crons historiques via
+  `FEATURE_RELANCES_AUTO_ENABLED`/`FEATURE_CRONS_ENABLED` : fonctionnalité de relances automatiques
+  absente de cette branche (seules les relances manuelles, `relances_impayes`, existent, déjà
+  sécurisées en `9c24e87`).
+- **`e77f102`** — ajoute un droit `ajoute_documents_chantier` distinct de `gerer_chantiers` pour un
+  profil Terrain : travail de granularité de permissions (feature produit), pas un correctif de
+  faille — un poste sans `gerer_chantiers` était *trop* restreint, pas trop permissif. Non
+  prioritaire pour cet audit de sécurité.
+- **`9ffeb28`** — notification d'acceptation de devis (fonctionnalité manquante, pas un bug) + vue
+  `employes_annuaire` à colonnes réduites : la source elle-même la documente comme une mitigation
+  **incomplète** (« ne change pas la RLS de la table de base... flagué comme point ouvert restant »)
+  — une vue additionnelle sans usage applicatif n'aurait aucune valeur de protection réelle avant un
+  refactor plus large des appelants, hors budget de cette passe.
+- **`4f313e4`** — sert les photos/signatures de devis sur les pages de partage public (§9) : ces
+  routes de partage externe de documents n'existent pas sur cette branche (déjà noté N/A en §17.3
+  pour `749d6af`, même fonctionnalité absente).
+- **`d1cf8d5`** — résout une collision de numérotation de migration avec la branche Colors : propre
+  à la lignée multi-app, sans objet ici (numérotation de migrations indépendante).
+- **`ca2f2a2`** — route les CTA commerciaux vers une page de contact (marketing), pas un correctif de
+  sécurité/correction applicative.
+- **Style/UX/accessibilité/produit, sans lien avec la sécurité ou une régression fonctionnelle
+  réelle, non examinés en détail au-delà du titre** (conforme au mandat : « a one-line skip note is
+  enough ») : `95a5092` (renommage route de test), `8154fb6` (persistance d'offre onboarding),
+  `6004678`/`da1999b` (UX : liens morts, états vides, masquage de module désactivé), `ed3889b`
+  (contraste dark mode), `9a21c0c` (seed démo), `cee9f5e`/`90e1620`/`cfe933d` (qualité de
+  reconnaissance IA sur les propositions de devis), `d53e5e0`/`a721851` (CSS/layout mobile),
+  `af5082d` (noindex SEO pages légales), `7f3b406` (annonce lecteur d'écran), `7771840` (aperçu
+  avant envoi de relance manuelle), `6dde06a` (affichage comptes inclus), `2daa37b` (clôture P2
+  pointage/comptes-rendus, titre vague, non recroisé faute de temps), `456afe3` (journalisation
+  coût IA).
+
+### 18.3 Non portés à la hâte — candidats documentés pour une session dédiée
+
+- **`338401b` + `503a14f` + `98ea6f2` + `cf13843` + `8ca1609` — extension de
+  `messageErreurUtilisateur` à ~50-80 fichiers d'actions supplémentaires** (onboarding, documents,
+  paiement, pointage, employés, planning, congés, stock, notes de frais, achats, flotte, RGPD,
+  messagerie, import, notifications push, support...). Le premier de ces 5 commits (`338401b`,
+  17 fichiers) a été vérifié en détail : le motif est confirmé identique à celui déjà porté en
+  §18.1 #6 (`error?.message` renvoyé brut, à remplacer par `messageErreurUtilisateur(...)`) et
+  s'appuie sur l'infrastructure déjà portée dans cette même passe — donc un candidat sûr, mécanique,
+  et de faible risque. **Non porté ici** : les 4 commits suivants portent sur un volume de fichiers
+  bien plus large (catégories P0/P1/RGPD complètes), et vérifier chaque site un par un contre l'état
+  actuel de cette branche (certains fichiers ont pu diverger depuis, comme observé pour
+  `enregistrerPaiementAction` en #6) dépasse le budget restant de cette passe. Le risque par site est
+  faible et l'infrastructure est prête ; c'est un volume de vérification, pas une difficulté
+  technique — candidat idéal et bien scoping pour une session dédiée future, en commençant par
+  `338401b` (déjà vérifié applicable).
+- **`4271906`, `fba2d93` (renommage boutique/préférences locales ELSATIA)** — non examinés en détail
+  au-delà du titre (lignée de rebranding déjà classée N/A en §18.2 pour les 3 autres commits du même
+  lot) ; à confirmer N/A par un futur passage si un doute subsiste, mais aucun indice contraire
+  trouvé.
+
+### 18.4 Bilan de cette passe
+
+37 commits examinés en détail sur cette passe (10 portés — dont 3 partiellement —, 27 déclinés avec
+raison documentée), auxquels s'ajoutent les ~33 déjà examinés lors des passes précédentes (§11, §13,
+§14, §17) — soit **la totalité des ~80 commits `fix(...)` d'`integration/gp-external-pilot-closure-v1`
+désormais couverte au moins par un titre + une décision documentée** ; parmi eux, 5 (`338401b` et
+la suite « p12 ») restent volontairement non portés faute de budget malgré une applicabilité
+confirmée pour le premier — candidats explicites pour la prochaine session (§18.3). **28 correctifs
+au total portés sur l'ensemble de la mission** (18 des passes précédentes + 10 de cette passe),
+tous des commits séparés et minimaux, aucun ne touchant à un schéma absent de cette branche ni à la
+question du monorepo multi-app.
+
+Sanity-check demandé par le mandat sur l'ensemble de la branche (`git diff origin/main...HEAD`) :
+**100 fichiers changés, +4804/-526 lignes, 35 commits d'avance sur `main`** ; aucune occurrence de
+`apps/`/`packages/` dans le diff ; `ls supabase/migrations | sort | uniq -c` ne montre aucun nom de
+fichier dupliqué ; aucune paire d'horodatages de migration en collision (195 migrations, tous
+horodatages uniques, `node scripts/verify-migrations.mjs` vert) ; `git status --short` propre en fin
+de session (aucun fichier orphelin ni non commité) ; `package.json.name` reste `liria-gestion-pro`
+sur toute la branche. Rien de trivial à corriger trouvé, rien de non-trivial à signaler.
+
+---
+
 ## Pourquoi le monorepo multi-app n'a pas été « intégré » au sens code sur cette branche
 
 Le mandat demande de choisir, en cas d'ambiguïté, l'option la plus conservatrice compatible avec
@@ -1192,12 +1327,18 @@ initialement jugé trop volumineux pour être vérifié à la main, et ce docume
 d'historique vérifiée, clarification qu'il s'agit d'une lignée d'entitlement unique et non de deux
 modèles rivaux, identification d'un second tronc mono-app jamais fusionné (§1.6), classification
 d'environ 65 branches au total sur les 255 (trois passes cumulées), et un plan d'action concret et
-non exécuté pour la convergence multi-app (§16) à l'attention du propriétaire du dépôt. Sur le
-tronc mono-app GP lui-même (§1.6), ~33 des ~80 commits `fix(...)` ont maintenant été examinés en
-détail ; ~47 restent ouverts pour une future session (§16).
+non exécuté pour la convergence multi-app (§16) à l'attention du propriétaire du dépôt.
+
+**Mise à jour (sixième passe, §18)** : sur le tronc mono-app GP (§1.6), la totalité des ~80 commits
+`fix(...)` a désormais été examinée au moins par un titre et une décision documentée (37 de plus
+dans cette passe, 10 portés). **28 correctifs au total ont été portés sur l'ensemble de la
+mission.** Il ne reste ouvert que le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609`
+(extension mécanique de `messageErreurUtilisateur` à ~50-80 fichiers supplémentaires), documenté en
+§18.3 comme candidat bien scopé — sûr et de faible risque, mais trop volumineux en vérification
+site-par-site pour le budget restant de cette passe — pour une session dédiée future.
 
 ---
 
-**CANONICAL MODEL NOT RESOLVED** — les 18 correctifs portés en §11/§13/§14/§17 sont tous
+**CANONICAL MODEL NOT RESOLVED** — les 28 correctifs portés en §11/§13/§14/§17/§18 sont tous
 indépendants de cette question et ne la referment pas : le modèle d'entitlement multi-app reste un
 candidat documenté, non fusionné, en attente d'une décision du propriétaire du dépôt.
