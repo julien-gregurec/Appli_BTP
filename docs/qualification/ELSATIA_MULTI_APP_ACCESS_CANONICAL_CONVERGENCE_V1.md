@@ -4,6 +4,16 @@ Date : 2026-09-22 · Branche d'intégration : `claude/quirky-noether-n8aerc` (po
 commit identique à `main` @ `4d92ddb`, aucun autre commit dessus au moment du départ) · Session :
 `session_016o4kJj26SaPhgLsAXcfZd5`.
 
+**Mise à jour du 2026-09-22 (seconde passe, même session/branche)** : reprise là où la première
+passe s'était arrêtée (§1.5 y notait ~240 des 255 branches non classifiées). Cette passe classe
+~45 branches supplémentaires nommées dans le mandat (§1.5bis), documente une troisième lignée
+jusque-là non identifiée — un tronc mono-app GP jamais fusionné, distinct de la lignée
+d'entitlement multi-app (§1.6) — et **porte un correctif ciblé** sur
+`claude/quirky-noether-n8aerc` : une vraie faille d'auto-promotion de rôle plateforme, présente
+aujourd'hui sur cette branche, vérifiée par lecture directe du SQL actuel (§11, commit `cacada0`).
+C'est le premier changement de code de cette mission ; il ne modifie ni ne résout la question du
+modèle canonique multi-app, qui reste un sujet séparé et toujours ouvert.
+
 **Portée de ce document** : reconstruction d'historique et comparaison de modèles à partir de
 preuves git réelles (SHA cités, contenu lu avec `git show`/`git log -S`, pas de suppositions),
 suivies d'une évaluation honnête de ce qui peut réellement être convergé sur
@@ -12,7 +22,8 @@ n'est inventée** : chaque affirmation est tracée à une commande exécutée da
 mention explicite « rapporté par la session antérieure, non revérifié ici ».
 
 **Constat central, à lire avant tout le reste** : `main` (et donc `claude/quirky-noether-n8aerc`,
-qui lui est identique) est un dépôt **mono-application** — `liria-gestion-pro` (Gestion Pro
+qui lui était identique au démarrage de cette mission — voir §11 pour le seul commit qui l'en
+distingue désormais) est un dépôt **mono-application** — `liria-gestion-pro` (Gestion Pro
 seul, `package.json` racine, pas de champ `workspaces`). Il n'y a **ni `apps/`, ni `packages/`**
 sur `main` (`ls apps/` → *No such file or directory*). Tout l'écosystème multi-application
 ELSATIA (Colors, Tools, Réserves, le paquet `packages/application-access`, le catalogue
@@ -145,6 +156,116 @@ d'autres non nommées dans le mandat) n'a **pas** été classifié individuellem
 session : ce serait plusieurs centaines d'appels git supplémentaires pour un gain marginal, la
 lignée d'entitlement principale étant déjà clairement identifiée en §1.2-§1.4. **Ouvert.**
 
+### 1.5bis Classification étendue (seconde passe, 2026-09-22) — ~45 branches supplémentaires
+
+Reprise du mandat, branche par branche, avec tête réelle (`git log -1`), nombre de commits
+d'avance sur `main`@`4d92ddb` (`git rev-list --count 4d92ddb..<branche>`) et présence de `apps/`
+et `packages/` (`git ls-tree -d`). Toutes les commandes ont été exécutées dans cette session ;
+aucune valeur n'est reportée d'une source tierce sans le dire.
+
+| Branche | Tête (SHA, date) | Avance/`main` | `apps/`·`packages/` | Classification |
+| --- | --- | --- | --- | --- |
+| `fix/service-role-flux-acl-255-v1` | `d41f835`, 2026-09-11 | 375 | oui·oui | **PARTIAL** (inchangé vs §1.5 — confirmé, même SHA) |
+| `fix/document-partage-service-role-acl-v1` | `aa430ce`, 2026-09-11 | 373 | oui·oui | **PARTIAL** — bâtie sur `59e960a` (tête de `integration/elsatia-ecosystem-train-v3-commercial-platform-v1`, Train V3). Corrige la lecture publique par jeton des pages de partage de documents (`77676db`, `e9cb4af`) cassée par la migration 255 ; dépend du contexte Train V3 (réserves, journal d'audit plateforme), pas un correctif root isolable. |
+| `fix/colors-auth-callback-csp-p1-v2` | `5b21590`, 2026-09-05 | 267 | oui·oui | **UNSAFE (hors-cible)** — corrige `apps/colors`, qui n'existe pas sur `main`. Le diff touche aussi la racine (`.env.example`, `.github/workflows/ci.yml`, `PRODUCTION_CHECKLIST.md`…) parce que toute cette lignée a un socle racine déjà réécrit pour le monorepo multi-app (workspaces, CI, conventions `.env`), différent de celui de `main` — même en ignorant `apps/`/`packages/`, la base racine a divergé. |
+| `fix/colors-precommercial-noindex-robots-v1` | `e427f52`, 2026-09-06 | 272 | oui·oui | **UNSAFE (hors-cible)** — même constat (socle racine divergé, app absente de `main`). |
+| `fix/colors-safe-next-redirect-v1` | `5ea1d03`, 2026-09-05 | 264 | oui·oui | **UNSAFE (hors-cible)** — idem ; durcit une redirection interne dans `apps/colors`, absent de `main`. |
+| `fix/colors-security-p1-closure-v1` | `260523c`, 2026-09-05 | 265 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/colors-supabase-public-key-predeploy-guard-v1` | `30fed99`, 2026-09-06 | 273 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/studio-signup-closed-v1` | `634651a`, 2026-09-20 | 323 | oui·oui | **CANONICAL_CANDIDATE (isolé, hors-cible)** — inchangé vs §1.5 : correctif Studio réel et testé sur GoTrue, mais Studio n'existe pas sur `main` ; racine aussi divergée (`.github/workflows/studio-*.yml` propres à cette lignée). Rien à porter ici tant que Studio n'est pas sur la branche cible. |
+| `fix/tools-mobile-header-overlap-v1` | `aabf15f`, 2026-09-06 | 350 | oui·oui | **UNSAFE (hors-cible)** — corrige `apps/tools`, absent de `main`. |
+| `fix/tools-predeploy-env-guard-v1` | `051f317`, 2026-09-06 | 358 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/tools-print-export-safe-flow-v1` | `c8260e1`, 2026-09-06 | 330 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/tools-pwa-asset-precache-update-v1` | `4b60cf2`, 2026-09-06 | 328 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/tools-supabase-public-key-convention-v1` | `094bd43`, 2026-09-06 | 359 | oui·oui | **UNSAFE (hors-cible)** — idem. |
+| `fix/reserves-offline-resilience-train-v2` | `86ed10a`, 2026-09-08 | 328 | oui·oui | **DUPLICATE probable de tête** (inchangé vs §1.5) — tête « consigne le SHA », checkpoint de train plutôt que travail. |
+| `feat/elsatia-canonical-integration-v1` | `95a1bbb`, 2026-08-27 | 254 | **non**·oui | **REQUIRES_RECONCILIATION** (inchangé vs §1.5 — confirmé : pas de `apps/`, juste `packages/application-access`). |
+| `feat/elsatia-canonical-integration-r73-v1` | `24c944d`, 2026-08-28 | 258 | **non**·oui | **REQUIRES_RECONCILIATION** (idem). |
+| `feat/elsatia-canonical-integration-preprod-v1` | `9ad2729`, 2026-09-02 | 260 | oui·oui | **REQUIRES_RECONCILIATION** — contrairement aux deux ci-dessus, celle-ci a déjà `apps/` (tête = « feat(auth): add Supabase TOTP MFA and AAL2 guards », même sujet que `codex/elsatia-mfa-aal2-v1` ci-dessous, à quelques jours près) : c'est une variante plus avancée, pas un simple synonyme des deux premières. |
+| `codex/elsatia-colors-canonical-integration-v1` | `a4c01ea`, 2026-08-27 | 244 | oui·oui | **SUPERSEDED** (inchangé vs §1.5, confirmé même SHA). |
+| `feat/elsatia-colors-canonical-integration-v1` | `00e383d`, 2026-08-29 | 260 | oui·oui | **DUPLICATE probable** de `codex/elsatia-colors-canonical-integration-v1` — même sujet (« integrate Colors v1.3 into canonical platform »), 2 jours plus tard, préfixe `feat/` au lieu de `codex/` ; non diffées l'une contre l'autre dans cette session (budget), mais le nommage quasi identique et l'écart de 2 jours suggèrent une reprise du même lot sous deux conventions de nommage différentes plutôt que deux travaux indépendants. |
+| `feat/elsatia-gestion-pro-multi-app-ui-v1` | `7477014`, 2026-08-27 | 244 | **non**·oui | **PARTIAL** (inchangé vs §1.5, confirmé même SHA). |
+| `codex/elsatia-acl-reconciliation-v1` | `d4dee2f`, 2026-09-02 | 256 | oui·oui | **PARTIAL/orthogonal** (inchangé vs §1.5, confirmé même SHA). |
+| `codex/elsatia-capacity-stripe-r2-v1` | `fc3b313`, 2026-09-06 | 265 | oui·oui | **DUPLICATE probable de tête** — dernier commit « wip(storage): sauvegarde avant nettoyage disque », un checkpoint de sauvegarde, pas un livrable. |
+| `codex/elsatia-mfa-aal2-v1` | `b4fe130`, 2026-09-02 | 256 | oui·oui | **PARTIAL** — MFA TOTP/AAL2 pour la plateforme multi-app ; sujet orthogonal à l'entitlement, dépend du socle `apps/`. |
+| `codex/elsatia-preprod-db-e2e-rollback-v1` | `a354d13`, 2026-09-02 | 262 | oui·oui | **PARTIAL** — validation E2E DB et rollback préprod ; outillage de recette, pas un modèle d'accès. |
+| `codex/elsatia-root-qa-closure-v1` | `01720b6`, 2026-09-02 | 256 | oui·oui | **PARTIAL** — clôture qualité (typecheck/lint/dépendances) à la racine du monorepo multi-app ; non applicable à `main` qui n'a pas ce monorepo. |
+| `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` | `1fc1331`, 2026-09-08 | 324 | oui·oui | **REQUIRES_RECONCILIATION** — tête « consigne le SHA », point de contrôle du Train V2 (inchangé dans l'esprit vs §1.5). |
+| `integration/elsatia-ecosystem-train-v3-commercial-platform-v1` | `59e960a`, 2026-09-09 | 370 | oui·oui | **REQUIRES_RECONCILIATION** — tête du Train V3 (« audit final d'integration et de preparation au cutover ») ; base directe de `fix/document-partage-service-role-acl-v1` ci-dessus, donc bien un point d'ancrage réel pour d'autres branches, pas une impasse. |
+| `integration/elsatia-ledger-reconciliation-p0-v1` | `4f1f170`, 2026-09-07 | 315 | oui·oui | **REQUIRES_RECONCILIATION** — intégration du lot « Client Contracts » (« aucune migration » selon le message), P0 ledger. |
+| `integration/elsatia-train-v2-reserves-gp-isole-v1` | `50c50ff`, 2026-09-08 | 322 | oui·oui | **DUPLICATE probable** de `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` — même famille Train V2 Réserves/GP, tête « consigne le SHA final poussé » un jour plus tard ; non diffées entre elles (budget). |
+| `integration/gp-client-contracts-snapshot-v1` | `0bfebd8`, 2026-09-07 | 307 | oui·oui | **REQUIRES_RECONCILIATION** — rapport ELSATIA-GP-CLIENT-CONTRACTS-SNAPSHOT-INTEGRATION ; dépend du monorepo multi-app malgré le nom « gp-». |
+| `integration/gp-external-pilot-closure-v1` | `8f5fca1`, 2026-09-20 | 254 | **non**·**non** | **CANONICAL_CANDIDATE (mono-app, distinct de la lignée entitlement)** — voir §1.6, découverte majeure de cette passe. Contient le correctif porté en §11. |
+| `integration/gp-postcutover-migration-train-v1` | `049a401`, 2026-09-06 | 299 | oui·oui | **PARTIAL** — réconciliation du train de migration post-cutover ; dépend du cutover multi-app malgré le nom « gp-». |
+| `integration/gp-postcutover-pilot-hotfix-v1` | `7ba62c5`, 2026-09-06 | 297 | oui·oui | **PARTIAL** — idem, hotfixes post-cutover consolidés. |
+| `integration/gp-postcutover-precommercial-ops-v1` | `4266ba6`, 2026-09-06 | 300 | oui·oui | **PARTIAL** — idem, ops précommerciales post-cutover. |
+| `audit/elsatia-boutique-commerce-architecture-v1` | `65999e2`, 2026-09-08 | 330 | oui·oui | **REQUIRES_RECONCILIATION** — audit d'architecture Boutique/Commerce, R3 clos selon la tête ; non recroisé avec le contrat D1/D2/D3 (budget). |
+| `audit/elsatia-contact-card-architecture-v1` | `0e644d5`, 2026-09-08 | 329 | oui·oui | **REQUIRES_RECONCILIATION** — idem, architecture Contact Card. |
+| `audit/elsatia-drone-scan-architecture-master-v1` | `513968e`, 2026-09-08 | 296 | oui·oui | **REQUIRES_RECONCILIATION** — idem, architecture Scan/Drone. |
+| `docs/elsatia-capacity-stripe-r2-preflight-v1` | `ba96544`, 2026-09-03 | 264 | oui·oui | **PARTIAL/documentaire** — préparation R2 capacité/Stripe ; dépend du module de facturation modulaire multi-app (celui qui introduit `module_gestion_pro_actif_entreprise`, §4). |
+| `docs/elsatia-hardware-shop-labels-readiness-v1` | `d99f596`, 2026-09-03 | 268 | oui·oui | **PARTIAL/documentaire** — écosystème boutique matériel + Labels. |
+| `docs/elsatia-integration-core-market-readiness-v1` | `947fcf1`, 2026-09-02 | 264 | oui·oui | **PARTIAL/documentaire** — readiness du cœur d'intégration Elsatia. |
+| `docs/elsatia-modular-billing-capacity-readiness-v1` | `ac6045b`, 2026-09-03 | 265 | oui·oui | **PARTIAL/documentaire** — audit facturation modulaire + capacité personnes actives ; même famille que le module cité en §4. |
+| `docs/elsatia-modules-commercial-pricing-v1` | `da9c8be`, 2026-09-03 | 266 | oui·oui | **PARTIAL/documentaire** — stratégie tarifaire modulaire. |
+| `docs/elsatia-production-migration-cutover-preflight-v1` | `25e377b`, 2026-09-03 | 267 | oui·oui | **REQUIRES_RECONCILIATION** — preflight cutover production (GP + Colors + Tools), donc directement pertinent le jour où une fusion multi-app serait tentée. |
+| `docs/elsatia-production-rollback-runbook-v1` | `a3aad60`, 2026-09-02 | 262 | oui·oui | **REQUIRES_RECONCILIATION** — runbook go-live/rollback production ; même remarque. |
+
+**Aucune divergence trouvée avec les classifications déjà publiées en §1.5** : chaque SHA
+recontrôlé (`fix/service-role-flux-acl-255-v1`, `fix/studio-signup-closed-v1`,
+`fix/reserves-offline-resilience-train-v2`, `codex/elsatia-acl-reconciliation-v1`,
+`feat/elsatia-canonical-integration-v1`/`-r73-v1`, `feat/elsatia-gestion-pro-multi-app-ui-v1`,
+`claude/elsatia-redteam-v3`, `claude/preview-rehearsal-security-fixes-v1(-rpc-sweep)`) correspond
+exactement à ce que §1.5 rapportait. Rien à corriger dans les classifications antérieures.
+
+### 1.6 Découverte de cette passe : un tronc mono-app GP jamais fusionné, distinct de l'entitlement multi-app
+
+`integration/gp-external-pilot-closure-v1` (`8f5fca1`, 2026-09-20) a un profil unique parmi les
+branches examinées : **254 commits d'avance sur `main`, et ni `apps/` ni `packages/` à aucun
+moment de cette avance** (`git diff --name-only 4d92ddb..8f5fca1 | grep -E '^(apps|packages)/'` →
+vide, sur les 727 fichiers touchés). `git merge-base 4d92ddb 8f5fca1` retourne `4d92ddb`
+lui-même : `main` est un ancêtre direct de cette branche, ce n'est pas une divergence ancienne
+recollée.
+
+Ce n'est **pas** une branche isolée : elle partage un tronc commun avec la lignée multi-app
+elle-même — `git merge-base` entre `8f5fca1` et `codex/elsatia-root-qa-closure-v1` (une branche
+multi-app confirmée, §1.5bis) retourne `ca2f2a2` (« fix(pricing): route commercial CTAs to
+contact page », 2026-08-26, 240 commits après `main`), qui est un commit **linéaire** de
+`integration/gp-external-pilot-closure-v1` lui-même (pas apporté par une fusion — un seul commit
+de merge existe sur toute cette plage, `4b97b50`, et il ne concerne qu'un lot interne de remises
+clients/IA, rien d'ELSATIA). Lecture correcte : il existe un unique tronc de ~240 commits
+(fin juillet → 26 août 2026), entièrement mono-app, sur lequel toutes ces lignées (GP-pilot,
+`codex/elsatia-root-qa-closure-v1`, et par transitivité la lignée d'entitlement multi-app
+elle-même) sont construites — puis, **après** ce point, les branches divergent : certaines
+ajoutent `apps/`/`packages/` (la lignée multi-app, §1.2), `integration/gp-external-pilot-closure-v1`
+continue seule sur 254 commits supplémentaires strictement mono-app (durcissement GP : isolation
+multitenant, isolation du stockage RH/paie, en-têtes de sécurité, rate limiting, RGPD,
+notifications, correctifs P0/P1/P2 « gp-v1-rc » puis « gp-pilot »).
+
+Concrètement, `package.json.name` reste `elsatia-gestion-pro` sur toute cette branche (jamais
+renommé pour le monorepo), et elle compte **251 migrations** à sa tête contre 178 sur `main`
+(+73, `20260729000184` à `20260916000309`) — soit la suite naturelle, non fusionnée, du même
+produit mono-app que `main`, indépendante du travail multi-app malgré un tronc commun ancien.
+
+**Implication pratique, vérifiée par cette session (§11)** : parce que cette branche ne dépend
+d'aucun schéma multi-app, certains de ses correctifs peuvent en principe s'appliquer directement
+à `claude/quirky-noether-n8aerc` — contrairement à tout ce qui vit sous `apps/`/`packages/`. Un
+tel correctif a été identifié, vérifié et porté (§11). Les 77 autres commits `fix(...)` de cette
+branche (liste complète : voir la sortie de
+`git log --reverse --format='%h %ad %s' --date=short 4d92ddb..origin/integration/gp-external-pilot-closure-v1`,
+non retranscrite ici) **n'ont pas** été individuellement vérifiés contre le code actuel de
+`main` — ce serait un audit de 77 diffs, hors budget de cette session. Les plus prometteurs par
+seul intitulé (jamais vérifiés contre le SQL actuel, à recroiser avant tout portage) :
+`7a2a4c0 fix(db): renforcer isolation multitenant et fonctions`,
+`87bf61c fix(storage): isoler les documents de paie`,
+`bede72e fix(authz): proteger export comptable`,
+`a67ceab fix(storage): restreindre la lecture des documents RH/fournisseurs/pointage sensibles`,
+`2647d4e`/`9608f70 fix(security): migrer vers la Publishable key / supprimer le repli legacy anon`,
+`4211014 fix(securite): retirer le motif de contournement anon vestigial`,
+`8caef21 fix(gp-v1-rc): durcit les privilèges EXECUTE anon sur 22 fonctions SECURITY DEFINER`
+(ce dernier surtout : 22 fonctions d'un coup, à haute valeur si confirmé, mais trop large pour
+être vérifié à la main sans DB dans cette session). **DECISION_REQUIRED** pour un futur audit
+ciblé (repris en §12).
+
 ---
 
 ## 2. MODEL A / MODEL B — comparaison de modèles
@@ -253,7 +374,7 @@ preuve de robustesse du modèle**. Consigné comme obligation de portage : *quic
 jour la modularisation de la facturation GP (qui introduit
 `module_gestion_pro_actif_entreprise`) **doit** porter en même temps la garde de tenant de
 `20260905000266` et les 7 révocations de `20260905000267`, faute de quoi la même fuite
-réapparaîtra à l'identique.* Ce point est repris en §11 (OPEN DECISIONS).
+réapparaîtra à l'identique.* Ce point est repris en §12 (OPEN DECISIONS).
 
 **Limite de cette revalidation** : cette session n'a pas rejoué les pgTAP de preuve elle-même (pas
 d'accès Docker/Postgres local, §8) ; elle s'appuie sur la lecture du code du correctif et sur le
@@ -366,11 +487,92 @@ suffisantes chacune :
    si le schéma existait, cette session ne pourrait pas produire une preuve `pgTAP` réelle — et le
    mandat interdit explicitement de fabriquer des résultats de test.
 
-`supabase/migrations/` reste donc à 178 fichiers, inchangé, sur `claude/quirky-noether-n8aerc`.
+`supabase/migrations/` reste donc à 178 fichiers, inchangé, sur `claude/quirky-noether-n8aerc`
+**au moment de la première passe**. La seconde passe (§11) y ajoute une 179ᵉ migration, hors du
+modèle d'entitlement multi-app — voir la nuance ci-dessous.
 
 ---
 
-## 11. OPEN DECISIONS
+## 11. PORTAGE RÉALISÉ (seconde passe, 2026-09-22)
+
+**Un correctif a été porté sur `claude/quirky-noether-n8aerc`, commit `cacada0`** :
+`supabase/migrations/20260922000184_plateforme_admin_role_total_ferme_autopromotion.sql` +
+`supabase/tests/plateforme_admin_role_total_ferme_autopromotion.test.sql`.
+
+**La faille, vérifiée sur le SQL actuel de cette branche (pas rapportée par un tiers)** :
+`plateforme_ajouter_admin`/`plateforme_retirer_admin`
+(`supabase/migrations/20260714000072_plateforme_equipe.sql`, ligne 24 et 41) ne vérifient que
+`est_plateforme_admin()` — vrai pour n'importe quel membre de l'équipe plateforme, y compris un
+rôle `'lecture'`. Une migration plus tardive,
+`20260719000115_roles_plateforme_appliques.sql`, introduit pourtant un contrôle de rôle
+réellement appliqué (`plateforme_exiger_role('total','facturation')` etc.) pour les fonctions
+sensibles (abonnements, tarifs, impayés, création d'entreprise) — mais **n'a jamais mis à jour**
+`plateforme_ajouter_admin` pour l'utiliser. Conséquence directe, lue dans le code de cette
+branche : un membre plateforme en `'lecture'` peut s'appeler
+`plateforme_ajouter_admin(son_propre_email, null, 'total')` et obtenir ainsi, sans aucune
+vérification de son rôle actuel, tous les droits `'total'` — y compris
+`plateforme_creer_entreprise` et `plateforme_modifier_abonnement`. C'est une élévation de
+privilège réelle, sur du code qui existe aujourd'hui sur `claude/quirky-noether-n8aerc`, pas une
+faille hypothétique sur un schéma absent (contrairement à §4).
+
+**Origine du correctif** : trouvé en classifiant `integration/gp-external-pilot-closure-v1`
+(§1.6) — commit `8f5fca1` (2026-09-20, message de commit ci-dessous), migration
+`20260916000309_gp_pilot_plateforme_admin_role_total.sql` sur cette branche jamais fusionnée.
+Le message de commit source documente lui-même comment la faille a été repérée (relecture d'un
+rapport de clôture, pas un audit automatisé) :
+
+> Caught while double-checking my own earlier conclusion for the closure report: 20260719000115
+> introduced real, enforced role differentiation for platform admins […] but
+> plateforme_ajouter_admin (which decides who gets which role) was never updated to use it […]
+> A 'lecture' (or 'support'/'facturation') platform admin could call it on their own email with
+> p_role='total' and gain real access to the functions that role differentiation was supposed to
+> gate elsewhere.
+
+**Ce qui a été porté, et pourquoi c'est sûr** :
+- Le corps SQL des deux fonctions est repris **à l'identique** (mêmes signatures exactes,
+  vérifiées contre `20260714000072` sur `main` : `plateforme_ajouter_admin(text, text, text)`,
+  `plateforme_retirer_admin(text)` ; mêmes `GRANT`/`REVOKE` déjà en place, non retouchés) ; seule
+  ligne ajoutée : `perform public.plateforme_exiger_role('total');` en tête de chaque fonction.
+- `plateforme_exiger_role` existe déjà, inchangée, sur `main`/`claude/quirky-noether-n8aerc`
+  (`20260719000115`, confirmé par `git grep`). Aucune dépendance à `apps/`, `packages/`, ou à
+  quoi que ce soit de la lignée multi-app.
+- Migration purement additive (`create or replace function`), numérotée `20260922000184` (suite
+  directe de la dernière migration de `main`, `20260729000183`) ; validée par
+  `node scripts/verify-migrations.mjs` (« 179 migrations valides ») et
+  `node scripts/verify-secrets.mjs` (« 681 fichiers … aucun secret reconnu ») exécutés dans
+  cette session.
+- Ne touche aucun fichier `apps/`/`packages/` (inexistants ici) ni aucune autre fonction.
+
+**Le test n'a pas été copié tel quel** : le test source (`gp_pilot_plateforme_admin_role_total.test.sql`
+sur `integration/gp-external-pilot-closure-v1`) utilise un fixture
+(`supabase/tests/fixtures/isolation_multitenant.inc`) qui lui-même dépend d'un GUC
+(`elsatia.capacite_personnes_bypass`) propre à la lignée multi-app de facturation modulaire —
+absent de cette branche. Le test porté ici (`plateforme_admin_role_total_ferme_autopromotion.test.sql`)
+crée ses propres comptes `plateforme_admins` directement, sans fixture, dans le style des 6 tests
+déjà présents sur `main`/cette branche (`supabase/tests/*.test.sql`) — à ceci près que c'est le
+premier test de cette branche à utiliser `set_config('request.jwt.claim.email', …)` +
+`set local role authenticated` pour rejouer un appel authentifié plutôt qu'une simple
+introspection de schéma (`has_table`/`function_returns`) ; c'est le motif standard documenté par
+Supabase pour les tests pgTAP de fonctions `security definer`, et cette branche utilise déjà
+`auth.email()` de façon standard ailleurs (`20260710000036`, `20260714000072`), donc rien
+n'indique une redéfinition locale qui romprait ce motif — mais ce n'est, comme le reste, **pas
+rejoué** dans cette session (§9, pas de Docker/Postgres). **Correction trouvée en portant ce
+test** : le test source utilisait le motif `%réservée%` (féminin) pour le cas « appelant hors
+équipe plateforme », qui produit en réalité l'exception « Accès réservé à la plateforme »
+(masculin, sans « e » final) — un motif qui n'aurait très probablement **pas** matché s'il avait
+été rejoué. Le test porté utilise `%réservé%` (sans « e » final), qui matche les deux messages
+d'exception réels de `plateforme_exiger_role()`. Signalé ici pour que quiconque revisite le test
+source original en soit informé.
+
+**Ce qui n'a pas été fait, et pourquoi** : `integration/gp-external-pilot-closure-v1` compte 77
+autres commits `fix(...)` (§1.6), certains potentiellement pertinents pour `main` (candidats
+listés en §1.6) — aucun n'a été vérifié avec le même niveau de certitude que celui-ci, donc aucun
+n'a été porté. Le mandat demande explicitement de documenter plutôt que deviner en cas de doute ;
+c'est le choix fait ici pour ces 77 commits.
+
+---
+
+## 12. OPEN DECISIONS
 
 - **DECISION_REQUIRED — portage obligatoire du correctif cross-tenant** : si/quand la
   modularisation de la facturation Gestion Pro (qui introduit
@@ -380,12 +582,61 @@ suffisantes chacune :
   sans quoi la fuite cross-tenant documentée en §4 réapparaît à l'identique. Défaut conservateur
   retenu : documenter l'obligation plutôt que fabriquer un correctif spéculatif contre un schéma
   absent.
-- **DECISION_REQUIRED — au-delà de cette session** : la convergence du modèle d'entitlement
-  multi-app (contrat `decision_acces_application`) ne peut être réellement intégrée et testée que
-  dans un environnement qui (a) dispose déjà du monorepo multi-app (`apps/colors`, `apps/tools`,
-  `apps/reserves`, `packages/application-access`) porté sur la lignée qui deviendra `main`, et (b)
-  dispose d'un accès Docker/Postgres local pour rejouer les pgTAP. Aucun des deux n'est réuni ici.
-  Défaut conservateur retenu : ne rien fusionner à l'aveugle, documenter précisément ce qui manque.
+- **DECISION_REQUIRED — au-delà de cette session — plan concret pour la convergence multi-app,
+  non exécuté ici** : ce qu'impliquerait réellement de faire converger `main` vers le monorepo
+  multi-app (`fix/app-access-convergence-v1` comme candidat, §3), pour qu'un futur humain ou une
+  future session autorisée ait un point de départ, sans que cette session ne tranche la question
+  elle-même (c'est une décision d'architecture du propriétaire du dépôt, explicitement hors
+  mandat) :
+  1. **Taille réelle** : `fix/app-access-convergence-v1` (`290f6bf`) est à **404 commits**
+     d'avance sur `main`@`4d92ddb` (`git rev-list --count 4d92ddb..origin/fix/app-access-convergence-v1`,
+     mesuré dans cette session), pas les ~250-560 commits de divers points d'entrée cités en §1.2
+     pour d'autres branches — ce chiffre spécifique n'avait pas été mesuré dans la première passe.
+     `git diff --shortstat 4d92ddb origin/fix/app-access-convergence-v1` (mesuré dans cette
+     session) : **1453 fichiers changés, +196107/-1841 lignes**. Ce n'est pas un renommage ou un
+     module additif isolé : c'est
+     l'ajout de trois applications entières (`apps/colors`, `apps/tools`, `apps/reserves`) plus
+     `packages/application-access`, plus la réécriture du socle racine (workspaces npm, CI,
+     conventions `.env`, voir §1.5bis) — donc bien un changement d'identité du dépôt (mono-app
+     → monorepo), pas une fusion de fonctionnalité ordinaire.
+  2. **Schéma/RLS à ajouter** : au minimum les 3 tables du socle d'août
+     (`applications_elsatia`, `acces_applications_entreprises`,
+     `habilitations_applications_utilisateurs`, §1.2) + la fonction `decision_acces_application`
+     (§3) + ses migrations `.sql.proposed` non numérotées (à numéroter dans la séquence de la
+     branche cible, pas celle de la branche source) + toute table propre à Colors/Tools/Réserves
+     que ces apps requièrent pour fonctionner (non inventoriée dans cette session — nécessite de
+     lire `apps/colors/supabase` etc. sur la branche source, hors budget ici). Risque principal
+     documenté par la source elle-même (§7) : `est_membre_actif` ne lit pas encore
+     `suspension_plateforme`, donc la garde de suspension plateforme resterait incomplète pour
+     les données Gestion Pro existantes tant que ce lot dédié (mesure de charge sur 142 policies,
+     hérité ci-dessous) n'est pas fait.
+  3. **D1/D2/D3 — de « proposé » à « appliqué »** : au sens strict, D1/D2/D3 sont déjà **tranchés**
+     (« validée le 2026-09-21 », §1.2) sur la branche source — ce qui manque n'est pas une
+     décision produit mais l'exécution technique : (a) numéroter et rejouer les migrations
+     `.proposed` dans l'ordre de la séquence cible, (b) faire tourner la suite pgTAP citée en §3
+     (66/66, 103/103) **dans un environnement qui la rejoue réellement** (voir point 5), (c)
+     activer le pipeline GP OBSERVE (§5) en mode `observe` sur un environnement de préproduction
+     réel pendant les 14 jours documentés par la source avant d'envisager `enforce`, (d) ne
+     jamais sauter cette fenêtre d'observation même si la pression business pousse à activer plus
+     vite — c'est explicitement la garde-fou D1 étape 3 du mandat.
+  4. **Ordre d'opérations qui minimise le risque** (proposé, non exécuté) : (i) d'abord porter les
+     3 tables + `decision_acces_application` seules, en mode `observe` forcé, SANS `apps/colors`
+     /`apps/tools`/`apps/reserves` ; (ii) valider 14 jours d'observation sans écart sur `main`
+     réel (pas seulement sur la branche source) ; (iii) seulement alors porter les apps
+     elles-mêmes une par une (Colors d'abord — c'est la plus avancée et testée, §1.5bis — puis
+     Tools, puis Réserves), chacune comme un commit revuable séparé, jamais en un seul lot de
+     2136 fichiers ; (iv) porter en même temps que **la première application qui introduit
+     `module_gestion_pro_actif_entreprise`** (la modularisation de la facturation GP) les
+     migrations `20260905000266`/`267` du correctif cross-tenant (§4, obligation déjà consignée
+     ci-dessous) — sans quoi la fuite réapparaît dès ce moment précis, pas avant.
+  5. **Ce qui manque structurellement, indépendamment du choix ci-dessus** : aucun environnement
+     disponible dans une session comme celle-ci (ce worktree compris) n'a Docker, de serveur
+     Postgres local, ni de identifiants Supabase réels dans `.env.local` — vérifié à nouveau dans
+     cette session (`docker ps` → socket absent), et déjà noté par la session précédente. « Testé »
+     n'est donc atteignable dans **aucune session de ce type**, quelle que soit la branche choisie ;
+     toute tentative de convergence réelle nécessite un environnement doté d'un accès DB réel
+     (Docker+Postgres local, ou un projet Supabase de préproduction dédié), condition préalable
+     et non négociable avant tout portage de schéma, pas seulement pour le multi-app.
 - **Ouvert, non résolu par cette session (hérité tel quel du rapport source, §7)** : la suspension
   plateforme ne coupe pas encore les données Gestion Pro (`est_membre_actif`) — nécessite un lot
   dédié avec mesure de charge sur 142 policies.
@@ -395,16 +646,24 @@ suffisantes chacune :
   décisions Tools listées dans les annexes `annexe-d1-gp-observation-backfill.md` /
   `annexe-d2-tools-serveur.md` de `fix/app-access-convergence-v1` — non retranscrites en détail ici
   (hors budget de cette session), consultables par SHA (§1.4).
-- **Ouvert** : ~240 des 255 branches distantes non classifiées individuellement (§1.5) — la lignée
-  principale est identifiée avec un niveau de confiance élevé, mais l'inventaire exhaustif demandé
-  par le mandat n'est pas complet.
+- **Ouvert** : malgré les ~45 branches classées en plus lors de cette passe (§1.5bis), ~195 des
+  255 branches distantes restent non classifiées individuellement — la lignée principale
+  d'entitlement (§1.2) et le tronc mono-app GP jamais fusionné (§1.6) sont désormais tous deux
+  identifiés avec un niveau de confiance élevé, mais l'inventaire exhaustif demandé par le mandat
+  n'est toujours pas complet.
+- **DECISION_REQUIRED — audit ciblé du tronc GP mono-app (§1.6)** : `integration/gp-external-pilot-closure-v1`
+  contient 77 commits `fix(...)` supplémentaires non vérifiés contre le SQL actuel de `main`
+  (liste en §1.6), dont au moins un (`8caef21`, durcissement de 22 fonctions `SECURITY DEFINER`)
+  potentiellement à haute valeur s'il s'applique tel quel. Une future session avec un budget dédié
+  devrait relire ces 77 diffs un par un contre `main` actuel, dans le même esprit que le portage
+  du §11 — c'est un travail de vérification manuelle, pas de fusion de branche.
 - **Ouvert** : le nom exact « `decision_acces_application` » comme identifiant de fonction/contrat
   est confirmé ; comme nom de branche, il n'a été trouvé nulle part (le mandat l'envisageait déjà
   comme possible).
 
 ---
 
-## Pourquoi rien n'a été « intégré » au sens code sur cette branche
+## Pourquoi le monorepo multi-app n'a pas été « intégré » au sens code sur cette branche
 
 Le mandat demande de choisir, en cas d'ambiguïté, l'option la plus conservatrice compatible avec
 D1/D2/D3, sans bloquer. L'option retenue ici est : **ne pas fusionner à l'aveugle un monorepo de
@@ -415,12 +674,28 @@ explicitement par le mandat) et une fabrication de confiance (« testé ») que 
 pas obtenir. Le choix conservateur symétrique — copier uniquement la documentation déjà écrite par
 la session source dans `docs/qualification/` de cette branche — a été envisagé puis écarté : cela
 dupliquerait un contenu déjà accessible par SHA/branche git (source unique de vérité), sans ajouter
-de valeur de convergence réelle, pour un risque de désynchronisation future. La valeur ajoutée de
-cette session est donc entièrement dans ce document : reconstruction d'historique vérifiée,
-clarification qu'il s'agit d'une lignée unique et non de deux modèles rivaux, confirmation/
-infirmation précise de chaque fait du mandat, et consignation explicite de ce qui reste à faire et
-par qui.
+de valeur de convergence réelle, pour un risque de désynchronisation future. Ce raisonnement,
+posé lors de la première passe, tient toujours après la seconde : rien de la lignée multi-app n'a
+été fusionné ici, et la taille désormais mesurée avec précision (§12, 404 commits/1453 fichiers
+pour le seul candidat canonique) confirme que ç'aurait été prématuré.
+
+**Ce qui a changé entre les deux passes** : la première passe n'avait rien touché au code parce
+qu'elle n'avait trouvé, sur le périmètre qu'elle avait examiné, aucun correctif à la fois
+mono-app, autonome et vérifiable sans DB. La seconde passe, en classifiant davantage de branches
+(§1.5bis), en a trouvé un — une élévation de privilège réelle sur du code qui existe aujourd'hui
+sur cette branche (§11) — et l'a porté, seul, comme un commit séparé et minimal (`cacada0`),
+distinct de toute décision sur le monorepo multi-app. C'est exactement le type de geste que le
+mandat autorise sans requérir l'arbitrage du propriétaire du dépôt : un correctif ciblé, compris
+dans son intégralité, qui ne touche à aucun schéma absent de cette branche. La valeur ajoutée de
+cette session est donc double : ce correctif, et ce document — reconstruction d'historique
+vérifiée, clarification qu'il s'agit d'une lignée d'entitlement unique et non de deux modèles
+rivaux, identification d'un second tronc mono-app jamais fusionné (§1.6), classification
+d'environ 60 branches au total sur les 255 (première et seconde passe cumulées), et un plan
+d'action concret et non exécuté pour la convergence multi-app (§12) à l'attention du propriétaire
+du dépôt.
 
 ---
 
-**CANONICAL MODEL NOT RESOLVED**
+**CANONICAL MODEL NOT RESOLVED** — le correctif porté en §11 est indépendant de cette question et
+ne la referme pas : le modèle d'entitlement multi-app reste un candidat documenté, non fusionné,
+en attente d'une décision du propriétaire du dépôt.
