@@ -201,6 +201,18 @@ function descriptionRemise(type: TypeRemise, valeur: number, duree: DureeRemise,
   return `${montant} ${periode}`;
 }
 
+// Le champ `name` d'un coupon Stripe est plafonné à 40 caractères par l'API (rejet en erreur
+// sinon, pas de troncature silencieuse côté Stripe). La description (courte, porte
+// l'information commerciale utile) est toujours conservée entière ; c'est le nom d'entreprise
+// qui est tronqué si besoin.
+function nomCouponRemise(nomEntreprise: string, description: string): string {
+  const suffixe = ` — ${description}`;
+  const maxNomEntreprise = 40 - suffixe.length;
+  if (maxNomEntreprise <= 0) return description.slice(0, 40);
+  const nomTronque = nomEntreprise.length > maxNomEntreprise ? `${nomEntreprise.slice(0, Math.max(0, maxNomEntreprise - 1))}…` : nomEntreprise;
+  return `${nomTronque}${suffixe}`;
+}
+
 // Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de base de l'entreprise.
 // Un seul à la fois (Stripe remplace automatiquement la remise précédente d'une même
 // subscription). L'entreprise doit déjà avoir un abonnement Stripe Billing actif.
@@ -222,7 +234,7 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 
   const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
   try {
-    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: `${entreprise.nom} — ${description}` });
+    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(entreprise.nom, description) });
     await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
     if (isEmailLoginDisabled()) {
       await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
