@@ -55,7 +55,15 @@ export async function creerFactureAvanceeAction(formData: FormData) {
     p_est_dgd: texte(formData, "est_dgd") === "true",
     p_facture_origine_id: type === "avoir" ? texte(formData, "facture_origine_id") || null : null,
   });
-  if (error || !data) retourErreur("/facturation-avancee", error?.message ?? "Création impossible");
+  if (error || !data) {
+    // Idempotence : un double clic sur "Créer un avoir" résout vers l'avoir
+    // déjà créé (créé par la RPC creer_facture_avancee) au lieu d'en émettre
+    // un second.
+    const brut = error?.message ?? "";
+    const avoirExistant = brut.match(/avoir_existant:([0-9a-f-]{36})/i);
+    if (avoirExistant) redirect(`/factures/${avoirExistant[1]}`);
+    retourErreur("/facturation-avancee", brut || "Création impossible");
+  }
   revalidatePath("/factures");
   redirect(`/factures/${data}`);
 }
