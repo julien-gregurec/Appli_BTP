@@ -13,7 +13,7 @@ export default async function ImprimerFacturePage({ params }: { params: Promise<
 
   const { data: facture } = await supabase
     .from("factures")
-    .select("*, client:clients(nom, prenom, societe, adresse_facturation, code_postal, ville, siret)")
+    .select("*, client:clients!factures_client_id_fkey(nom, prenom, societe, adresse_facturation, code_postal, ville, siret)")
     .eq("id", id)
     .single();
 
