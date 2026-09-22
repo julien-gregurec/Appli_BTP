@@ -61,13 +61,15 @@ distantes — voir §0.2 DECISION_REQUIRED-01).
 - **`npm ci` (805 paquets racine + 510 paquets `apps/tools`), `eslint` (0 erreur, 6 avertissements
   préexistants sans rapport), `tsc --noEmit`, `vitest run`, `node scripts/verify-migrations.mjs`
   (316 migrations valides, noms et horodatages uniques)** — détail des résultats en §19.
+- **`npm run build` des 4 sous-applications exécuté réellement** (racine + `apps/tools` +
+  `apps/reserves` + `apps/colors`, chacune avec la variable d'environnement locale que son propre
+  garde de sécurité exige) : succès des 4, aucune erreur — voir §9.
 - Ce qui n'a **pas** été fait : accès Preview/Production réel, appel Stripe réel, image Docker
-  officielle Supabase (bloquée par la politique réseau du bac à sable, comme documenté), `npm run
-  build` complet du monorepo (jugé hors périmètre pour un correctif purement SQL + fichiers de
-  test — voir §19), concurrence testée avec deux **processus OS distincts** (contrairement à la
-  session Stripe Connect qui disposait de deux connexions psql parallèles réelles, la fenêtre de
-  session ici a favorisé une émulation séquentielle avant/après, déjà pratiquée ailleurs dans ce
-  dépôt pour les tests de révision optimiste — voir §7 et §16.2 scénario F).
+  officielle Supabase (bloquée par la politique réseau du bac à sable, comme documenté),
+  concurrence testée avec deux **processus OS distincts** (contrairement à la session Stripe
+  Connect qui disposait de deux connexions psql parallèles réelles, la fenêtre de session ici a
+  favorisé une émulation séquentielle avant/après, déjà pratiquée ailleurs dans ce dépôt pour les
+  tests de révision optimiste — voir §7 et §16.2 scénario F).
 
 ### 0.1 — Limites du harnais de base de données
 
@@ -347,6 +349,10 @@ Voir §16 pour le détail complet. Résumé :
 | `vitest run` (`apps/reserves`) | **13/13 fichiers, 178/178 tests** |
 | `vitest run` (`apps/colors`) | **38/38 fichiers, 427/427 tests** |
 | **Total application (JS/TS)** | **378/378 fichiers, 4 389/4 389 tests, 0 échec** |
+| `npm run build` (`next build`, `elsatia-gestion-pro`) | **succès** (toutes les routes compilées) |
+| `npm run build --prefix apps/tools` (`NEXT_PUBLIC_TOOLS_ENV=local`) | **succès** (47 pages, service worker généré) |
+| `npm run build:reserves` (`ELSATIA_APPLICATION_ENV=local`) | **succès** |
+| `npm run build:colors` (`ELSATIA_APPLICATION_ENV=local`) | **succès** |
 
 Le chiffre « 1 992+ » cité par la mission correspond exactement à la suite `apps/tools` (1 992
 tests) — confirmé et intégralement rejoué avec succès, ainsi que l'ensemble des 3 autres
@@ -356,6 +362,15 @@ leur propre `npm ci` (dépendance locale `file:../../packages/application-access
 par le seul `npm ci` racine) — écart d'environnement de ce bac à sable sans rapport avec cette
 session, corrigé avant de qualifier ces deux sous-projets plutôt que de les laisser hors
 périmètre.
+
+Les 4 builds de production ont été exécutés réellement (pas seulement typecheck/lint) : le build
+racine passe sans variable d'environnement particulière (garde `check-env-manifest.mjs` inactive
+hors Preview/Production) ; les 3 sous-applications (`tools`, `reserves`, `colors`) refusent par
+défaut un build sans leurs variables publiques Supabase/billing déclarées — un garde de sécurité
+intentionnel du dépôt (« un build publié sans ces variables réussirait silencieusement et
+livrerait [l'app] sans compte ni abonnement »), le même mécanisme que `ci.yml` contourne pour
+Tools via `NEXT_PUBLIC_TOOLS_ENV: local`. Rejoué à l'identique avec `ELSATIA_APPLICATION_ENV=local`
+pour `reserves`/`colors` : succès des 3 builds, aucune erreur liée à cette session.
 
 ---
 
@@ -493,9 +508,6 @@ pour confirmer l'absence de régression côté application.
   Free d'une entreprise Tools active, qui voyait le cloud-sync fonctionner, le voit maintenant
   échouer) n'a pas été vérifié manuellement dans un navigateur — seule la garde serveur a été
   qualifiée. Recommandation : vérifier le message d'erreur affiché côté client avant diffusion.
-- **`npm run build` complet** non exécuté dans cette session (voir §0, jugé hors périmètre pour
-  un correctif purement SQL + tests ; `tsc --noEmit` et `vitest run` couvrent la sûreté de
-  compilation TypeScript, qui n'a de toute façon pas été touchée par ce correctif).
 - **pgTAP non exécuté en CI** sur ce dépôt (`ci.yml` ne contient aucune étape `test:db`/pgTAP —
   confirmé par lecture directe du workflow) : les 97 fichiers de qualification, dont les 2
   modifiés/ajoutés par cette session, ne sont vérifiés qu'à la main, par ce type de session ou par
