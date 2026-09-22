@@ -95,6 +95,21 @@ for f in "$REPO"/supabase/migrations/*.sql; do
 done
 echo "OK: $count migrations applied"
 
+# On a real Supabase project, service_role (server-side admin client) has full table/sequence/function
+# access to public -- granted by the platform at project bootstrap, outside user migrations. Nothing in
+# this repo's 315 migrations grants it explicitly (pg_bootstrap.sql's ALTER DEFAULT PRIVILEGES attempt,
+# set before migrations run, gets narrowed back down by a later migration's own default-privilege reset
+# -- confirmed: service_role ends up with only TRUNCATE/REFERENCES/TRIGGER on app tables, not SELECT/
+# INSERT/UPDATE/DELETE). BYPASSRLS skips RLS *policies*; it does not imply table-level GRANTs. Apply the
+# grant directly to the now-existing tables/sequences/functions, after all migrations, so local
+# service_role calls (mirroring real server actions/admin client calls) behave like production.
+echo "== [6b/7] service_role grants (mirrors real Supabase project bootstrap, not covered by user migrations) =="
+su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d \"$DB\" -c \"
+  grant all on all tables in schema public to service_role;
+  grant all on all sequences in schema public to service_role;
+  grant execute on all functions in schema public to service_role;
+\"" || exit 1
+
 echo "== [7/7] pilot fixture (SARL Bati-Rhone Construction, 28 employees / 5 profiles) =="
 su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d \"$DB\" -f \"$REPO/supabase/production/seed_entreprise_pilote_btp.sql\"" || exit 1
 

@@ -108,3 +108,39 @@ script's `jwt_bridge.mjs` runs SQL under a verified real JWT's claims
 (`SET LOCAL role` + `request.jwt.claims`), that is RLS validated under a
 real, cryptographically verified JWT -- not a real PostgREST HTTP request.
 Its header spells out exactly what is and isn't equivalent.
+
+## Real local PostgREST + a real browser (V2)
+
+The "no Haskell toolchain" limitation above turned out to be about compiling
+PostgREST from source, not about running it: PostgREST ships a static Linux
+binary as a plain GitHub release asset, downloadable with an ordinary `curl`
+(no Docker/OCI registry involved, same as the GoTrue binary above) --
+`docs/qualification/ELSATIA_PILOT_ACCEPTANCE_AUTOMATION_V2.md` §1 has the
+details. `local_supabase_proxy.mjs` fronts that real PostgREST + the real
+GoTrue above with a single `/auth/v1`, `/rest/v1` URL, exactly what Kong does
+in production, so `@supabase/ssr`/`@supabase/supabase-js` (and therefore
+`next dev` and Playwright) can talk to a fully real local backend for the
+first time in this project's qualification history.
+
+```bash
+npm run pilot:acceptance:v2
+# = pilot:auth:local + a real PostgREST binary (downloaded once, cached) +
+#   local_supabase_proxy.mjs + the 69 ACTUALLY_AUTOMATABLE acceptance-test
+#   IDs from V1, executed for real (run_pilot_acceptance_v2.mjs)
+```
+
+For the browser layer (not part of the single command above -- needs a live
+`next dev` and a real browser):
+
+```bash
+# .env.local: NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321, with an anon/
+# service key signed with the same secret as GoTrue (node scripts/local-
+# postgres-bootstrap/jwt_bridge.mjs sign '{"role":"anon", ...}')
+npm run dev -- -p 3100
+npx playwright test tests/e2e/pilot-acceptance-v2.spec.ts --project=desktop-chromium
+```
+
+Still NOT covered: real Storage (`storage-api` isn't a static binary the way
+GoTrue/PostgREST are, and `api.github.com` -- needed even just to list
+release candidates -- stays blocked in this sandbox, confirmed again in V2)
+and anything needing real e-mail delivery or an LLM/external service call.

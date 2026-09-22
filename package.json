@@ -31,7 +31,8 @@
     "studio:e2e:gate": "node apps/studio/scripts/e2e-gate.mjs",
     "pilot:auth:bootstrap": "bash scripts/local-postgres-bootstrap/gotrue_pilot_bootstrap.sh pilot_gp",
     "pilot:auth:scenarios": "bash scripts/local-postgres-bootstrap/run_pilot_auth_scenarios.sh pilot_gp",
-    "pilot:auth:local": "npm run pilot:auth:bootstrap && npm run pilot:auth:scenarios"
+    "pilot:auth:local": "npm run pilot:auth:bootstrap && npm run pilot:auth:scenarios",
+    "pilot:acceptance:v2": "bash scripts/local-postgres-bootstrap/pilot_acceptance_v2.sh pilot_gp"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",

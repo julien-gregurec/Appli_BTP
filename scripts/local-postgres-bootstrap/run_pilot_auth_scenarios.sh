@@ -134,6 +134,20 @@ else
   fail "revoked membership did not block access as expected (before=$n_before after=$n_after)"
 fi
 
+echo "== session scenario: ROLE CHANGED WHILE ACTIVE (still-valid JWT, poste_id switched to Gérant) =="
+OUVRIER_ID=$(psql_q "select id from auth.users where email='${PROFILE_EMAIL[ouvrier]}';")
+POSTE_OUVRIER_ID=$(psql_q "select poste_id from public.utilisateurs_entreprises where utilisateur_id='$OUVRIER_ID' and entreprise_id='$ENTREPRISE_A';")
+POSTE_GERANT_ID=$(psql_q "select id from public.postes where entreprise_id='$ENTREPRISE_A' and nom='Gérant';")
+perm_before=$(echo "select public.a_permission('$ENTREPRISE_A','acces_clients');" | node "$BRIDGE" run "$TOKEN_OUVRIER" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.utilisateurs_entreprises set poste_id='$POSTE_GERANT_ID' where utilisateur_id='$OUVRIER_ID' and entreprise_id='$ENTREPRISE_A';\"" >/dev/null
+perm_after=$(echo "select public.a_permission('$ENTREPRISE_A','acces_clients');" | node "$BRIDGE" run "$TOKEN_OUVRIER" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.utilisateurs_entreprises set poste_id='$POSTE_OUVRIER_ID' where utilisateur_id='$OUVRIER_ID' and entreprise_id='$ENTREPRISE_A';\"" >/dev/null
+if [ "$perm_before" = "f" ] && [ "$perm_after" = "t" ]; then
+  pass "role change (ouvrier -> Gérant) on a still-valid JWT takes effect immediately, no re-login/refresh needed (acces_clients: false -> true)"
+else
+  fail "role change did not take effect as expected (before=$perm_before after=$perm_after)"
+fi
+
 echo "== SEC-01/02/03, AV-04, CM-07, EX-03, ST-08, PA-04/05: centralized permission guard (a_permission) =="
 PERMS="acces_clients acces_achats acces_exports acces_stock gerer_employes acces_employes gerer_utilisateurs acces_rentabilite consulter_sa_paie"
 for p in $PERMS; do

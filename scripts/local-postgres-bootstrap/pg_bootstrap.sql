@@ -42,6 +42,23 @@ create schema if not exists graphql_public;
 
 grant usage on schema public, extensions, auth, storage to anon, authenticated, service_role, postgres;
 
+-- On a real Supabase project, `service_role` (used by the server-side admin
+-- client / server actions) has full access to every table it needs --
+-- granted implicitly by the platform at project bootstrap, not by user
+-- migrations. Nothing in this repo's own migrations grants it explicitly
+-- (they only ever narrow anon/authenticated), so without this, local
+-- service_role calls fail with "permission denied for table ..." even
+-- though the role has BYPASSRLS -- BYPASSRLS skips policies, it does not
+-- imply table-level GRANTs. Set as default privileges for the `postgres`
+-- role (which runs every migration below) so it also covers every table
+-- the 315 app migrations are about to create, not just what exists now.
+alter default privileges for role postgres in schema public
+  grant all on tables to service_role;
+alter default privileges for role postgres in schema public
+  grant all on sequences to service_role;
+alter default privileges for role postgres in schema public
+  grant execute on functions to service_role;
+
 -- pgcrypto ships pre-installed in `extensions` on every real Supabase
 -- project (part of the base template, before any user migration runs) --
 -- reproduce that here so extensions.digest()/extensions.crypt() etc. used
