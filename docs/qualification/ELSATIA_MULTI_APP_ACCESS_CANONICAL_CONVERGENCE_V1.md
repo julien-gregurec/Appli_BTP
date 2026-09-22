@@ -14,6 +14,25 @@ aujourd'hui sur cette branche, vérifiée par lecture directe du SQL actuel (§1
 C'est le premier changement de code de cette mission ; il ne modifie ni ne résout la question du
 modèle canonique multi-app, qui reste un sujet séparé et toujours ouvert.
 
+**Mise à jour du 2026-09-22 (troisième passe, même session/branche)** : (1) vérifie intégralement
+`8caef21` (durcissement de 22 fonctions `SECURITY DEFINER`, flagué à haute valeur mais non
+vérifié en seconde passe) fonction par fonction contre le SQL actuel — 20 des 22 s'avèrent déjà
+sans risque sur cette branche, mais l'audit révèle **un gap réel différent** sur les 2 restantes
+(§13, commit `d357314`) ; (2) achève la classification des branches nommées dans le mandat
+(`suspension_plateforme`, `ELSATIA_GP_ACCES_APP`, `ELSATIA_COMMON_ACCOUNT_CONTRACT_V1`,
+`decision_acces_application` : confirmés définitivement absents comme noms de branche ;
+Colors/Tools/Studio/Reserves access : 5 branches supplémentaires classées, toutes hors-cible
+monorepo — §15) ; (3) scanne une partie des 77 commits `fix(...)` restants
+d'`integration/gp-external-pilot-closure-v1` et **porte 6 correctifs supplémentaires**, chacun
+vérifié indépendamment contre le code actuel de cette branche avec le même niveau de rigueur que
+`cacada0` (§14) : fuite de lecture de documents RH/fournisseurs/pointage sensibles, export
+comptable sans contrôle d'autorisation, policy RLS storage-paie fragile, durcissement de
+privilèges de socle, et un gap RGPD réel (fichiers Storage non supprimés par l'anonymisation
+RGPD). **7 correctifs au total ont maintenant été portés dans cette mission** (`cacada0` en
+seconde passe + 6 en troisième passe), tous additifs, tous revus par `npm run typecheck`/`lint`/
+`test`/`build` quand ils touchent du code applicatif (node_modules a pu être installé cette
+fois — voir §9bis) et par les scripts SQL du dépôt sinon.
+
 **Portée de ce document** : reconstruction d'historique et comparaison de modèles à partir de
 preuves git réelles (SHA cités, contenu lu avec `git show`/`git log -S`, pas de suppositions),
 suivies d'une évaluation honnête de ce qui peut réellement être convergé sur
@@ -264,7 +283,7 @@ seul intitulé (jamais vérifiés contre le SQL actuel, à recroiser avant tout 
 `8caef21 fix(gp-v1-rc): durcit les privilèges EXECUTE anon sur 22 fonctions SECURITY DEFINER`
 (ce dernier surtout : 22 fonctions d'un coup, à haute valeur si confirmé, mais trop large pour
 être vérifié à la main sans DB dans cette session). **DECISION_REQUIRED** pour un futur audit
-ciblé (repris en §12).
+ciblé (repris en §16).
 
 ---
 
@@ -374,7 +393,7 @@ preuve de robustesse du modèle**. Consigné comme obligation de portage : *quic
 jour la modularisation de la facturation GP (qui introduit
 `module_gestion_pro_actif_entreprise`) **doit** porter en même temps la garde de tenant de
 `20260905000266` et les 7 révocations de `20260905000267`, faute de quoi la même fuite
-réapparaîtra à l'identique.* Ce point est repris en §12 (OPEN DECISIONS).
+réapparaîtra à l'identique.* Ce point est repris en §16 (OPEN DECISIONS).
 
 **Limite de cette revalidation** : cette session n'a pas rejoué les pgTAP de preuve elle-même (pas
 d'accès Docker/Postgres local, §8) ; elle s'appuie sur la lecture du code du correctif et sur le
@@ -471,6 +490,23 @@ etc.) proviennent **exclusivement** du rapport `ELSATIA_APPLICATION_ACCESS_CONVE
 session antérieure, sur une autre branche, dans un environnement disposant apparemment de Docker.
 Ils sont rapportés ici **comme citation attribuée**, jamais comme un résultat obtenu par cette
 session. Aucun chiffre de test n'a été inventé ou étendu par cette session.
+
+### 9bis. Mise à jour (troisième passe) : `npm ci` fonctionne dans cet environnement
+
+Toujours aucun Docker/Postgres (`docker ps` non retenté, cette limite a déjà été confirmée deux
+fois par les sessions précédentes et une troisième fois n'apporterait rien) — **aucun test SQL
+pgTAP n'a été exécuté dans cette session, pour aucun des correctifs SQL portés en §13-§14**. En
+revanche, `npm ci` (avec le proxy réseau de cet environnement) **a fonctionné** ici, ce qui n'avait
+apparemment pas été tenté par les sessions précédentes (`node_modules/` était absent en début de
+session). Cela a permis d'exécuter réellement, pour la première fois dans cette mission,
+`npm run typecheck` (0 erreur), `npm run lint` (0 erreur, 3 warnings `@next/next/no-img-element`
+préexistants sans rapport), `npm run test` (106/106 tests, 29 fichiers, y compris les nouveaux
+tests ajoutés par cette session) et `npm run build` (succès) contre les deux correctifs de cette
+passe qui touchent du code applicatif TypeScript (§14, `bede72e` et `fb819f7`). C'est un niveau de
+preuve réel supérieur à celui disponible pour tout le reste de cette mission (qui reste limité aux
+scripts `verify-migrations`/`verify-secrets` côté SQL, faute de base de données). `npm audit`
+fonctionne aussi (lit `package-lock.json`, n'a pas besoin de `node_modules`) — voir §16 pour ce
+qu'il révèle.
 
 ---
 
@@ -572,7 +608,270 @@ c'est le choix fait ici pour ces 77 commits.
 
 ---
 
-## 12. OPEN DECISIONS
+## 13. VÉRIFICATION COMPLÈTE DE `8caef21` (troisième passe, 2026-09-22)
+
+Mandat de cette passe : vérifier `8caef21` (`fix(gp-v1-rc): durcit les privilèges EXECUTE anon
+sur 22 fonctions SECURITY DEFINER`, `integration/gp-external-pilot-closure-v1`, migration
+`20260914000298_gp_v1_rc_functions_privilege_hardening.sql`), flagué en seconde passe comme « à
+haute valeur si confirmé, mais trop large pour être vérifié à la main ». Fait ici, fonction par
+fonction, contre le SQL actuel de `claude/quirky-noether-n8aerc`.
+
+**Le mécanisme décrit par `8caef21` ne s'applique pas à cette branche.** Le commit source
+documente un défaut spécifique à sa propre lignée : les fonctions créées par le rôle `postgres`
+reçoivent par défaut un `EXECUTE` pour `anon` (`pg_default_acl`), que les migrations
+`20260902000255`/`20260911000297` (propres à cette autre lignée) ne révoquaient jamais pour
+`anon` (seulement pour `authenticated`/`service_role`). **Ces deux migrations n'existent pas sur
+`main`** (`ls supabase/migrations | grep -E '^202609(02|11)'` → vide). `main` ferme ce défaut par
+défaut depuis beaucoup plus tôt et de façon plus complète :
+`20260714000078_fermeture_acces_anonyme_production.sql` (2026-07-14, un ancêtre direct de la
+branche source elle-même) fait un `revoke execute on all functions in schema public from anon`
+**rétroactif** sur toutes les fonctions existantes à cette date, un balayage explicite de toutes
+les fonctions `security definer` (`revoke ... from public,anon` fonction par fonction, via
+`pg_proc`/`pg_namespace`), **et** un `alter default privileges ... revoke execute on functions
+from anon` pour l'avenir.
+
+**Vérification fonction par fonction (les 22 nommées par `8caef21`)** : pour chacune, recherche de
+sa première définition (`create [or replace] function`), de tout `revoke`/`grant` la ciblant
+explicitement (y compris en liste combinée, ex. `revoke ... on function a(),b(),c() from
+public,anon`), et lecture du corps pour vérifier les colonnes/tables référencées existent bien.
+
+| # | Fonction | État sur `claude/quirky-noether-n8aerc` |
+| - | --- | --- |
+| 1 | `recalc_totaux_devis(uuid)` | Créée avant migration 78 (`20260710000005`) → couverte par le balayage rétroactif. Sûre. |
+| 2 | `recalc_totaux_commande(uuid)` | `revoke ... from public,anon,authenticated` explicite dans sa migration de création (`20260710000021`). Sûre. |
+| 3 | `recalc_paiements_facture(uuid)` | Idem, `20260710000020`. Sûre. |
+| 4 | `recalculer_dossier_paie(uuid)` | `revoke` combiné (avec 5 autres fonctions paie) dans `20260723000141` ligne 411. Sûre. |
+| 5 | `recomputer_statut_commande(uuid)` | `revoke ... from public,anon` dans `20260717000098`. Sûre. |
+| 6 | `synchroniser_taches_devis_accepte(uuid)` | `revoke ... from public,anon,authenticated` dans `20260715000081`. Sûre. |
+| 7 | `controler_periode_paie_interne(uuid)` | `revoke` explicite, `20260724000148`. Sûre. |
+| 8 | `synchroniser_periode_paie_interne(uuid)` | `revoke` explicite, `20260724000147`. Sûre. |
+| 9 | `creer_commande_fournisseur_interne(uuid,jsonb,jsonb)` | `revoke` explicite, `20260713000043`. Sûre. |
+| 10 | `enregistrer_reception_commande_interne(uuid,uuid,jsonb)` | `revoke` explicite, `20260713000043`. Sûre. |
+| 11 | `appliquer_modele_role_predefini_interne(uuid,text,boolean)` | `revoke` explicite (×2), `20260718000104`/`000109`. Sûre. |
+| 12 | `notifier_permission(...)` | `revoke` explicite, `20260715000081`. Sûre. |
+| 13 | `notifier_utilisateur(...)` | `revoke` explicite, `20260723000135`. Sûre. |
+| 14 | `snapshot_compte_facturable(uuid,text)` | `revoke` explicite (×2), `20260713000063`/`20260717000090`. Sûre. |
+| 15 | `recalc_reglements_fournisseur(uuid)` | `revoke` explicite, `20260710000026`. Sûre. |
+| 16 | `obtenir_ou_creer_fournisseur_boutique(uuid)` | `revoke` explicite depuis sa création (`20260724000175`), **MAIS re-`grant ... to authenticated` dans la même migration** — gap réel, voir ci-dessous. |
+| 17 | `boutique_finaliser_commande_payee(uuid,text)` | `revoke ... from public,anon` **puis `grant ... to authenticated`** à chaque redéfinition (`20260724000145`/`000175`/`000176`) — gap réel, voir ci-dessous. |
+| 18 | `appliquer_suspensions_impayes()` | `revoke ... from public,anon,authenticated` explicite, `20260714000075`, aucun re-grant. Sûre. |
+| 19 | `creer_entreprise_bootstrap(...)` | `revoke ... from public` + `grant ... to authenticated` (×3, jamais `anon`) — design intentionnel (bootstrap self-service), conforme à la catégorie B de `8caef21` elle-même. Sûre. |
+| 20 | `rejoindre_entreprise_par_code(text)` | `grant execute ... to anon, authenticated` **délibéré** (`20260710000035`) — mais la fonction vérifie `auth.uid() is not null` en premier lieu et lève `'Non authentifié'` sinon : l'octroi à `anon` est inerte (un vrai appel anonyme a `auth.uid()` nul). Conforme à la catégorie B de `8caef21` elle-même (« le risque n'est pas fonctionnel »). Sûre, non modifiée. |
+| 21 | `plateforme_quitter_entreprise()` | `revoke ... from public,anon,authenticated` puis `grant ... to authenticated` seul, `20260714000075`. Sûre (conforme au traitement « authenticated uniquement » que `8caef21` applique lui-même à cette fonction). |
+| 22 | `modifier_facture_brouillon(uuid,jsonb,jsonb)` | `SECURITY INVOKER` (pas `DEFINER`), `revoke ... from public` puis `grant ... to anon, authenticated` (`20260710000017`). L'EXECUTE à `anon` est inerte : `anon` n'a plus AUCUN privilège de table sur `factures`/`lignes_factures` depuis le balayage rétroactif de la migration 78 (`revoke all privileges on all tables in schema public from anon`, jamais re-accordé depuis — vérifié par recherche exhaustive de `grant ... to anon` sur ces deux tables). Toute écriture échouerait sur le contrôle de privilège de table, avant même RLS. Conforme à la catégorie B de `8caef21` elle-même. Sûre, non modifiée. |
+
+**Conclusion : 20 des 22 fonctions sont déjà sûres sur cette branche, sans qu'aucun changement ne
+soit nécessaire.** Sur les 2 restantes (16 et 17), l'audit a trouvé un **gap réel mais différent**
+de celui que décrit `8caef21` : pas un défaut par omission (le mécanisme `pg_default_acl` ne
+s'applique pas ici), mais un `grant execute ... to authenticated` **explicite et délibéré**, jamais
+retiré, sur deux fonctions dont le seul appelant légitime, dans tout le code applicatif
+(`src/`), est le webhook Stripe boutique (`service_role`) :
+
+- `boutique_finaliser_commande_payee(p_commande_id, p_checkout_id)` ne vérifie que la
+  correspondance `(id, stripe_checkout_id)` sur `boutique_commandes` — jamais l'identité de
+  l'appelant ni un état de paiement Stripe réel — et marque la commande `'payee'` (stock
+  décrémenté, dépense fournisseur déjà réglée créée). Un utilisateur authentifié connaît déjà, pour
+  sa propre commande, les deux paramètres (le second lui est renvoyé par
+  `creerSessionCheckoutBoutique()` **avant** tout paiement réel, `src/app/actions/boutique.ts`) :
+  il peut donc l'appeler lui-même pour obtenir sa commande gratuitement, sans jamais payer sur
+  Stripe. **Contournement de paiement réel.**
+- `obtenir_ou_creer_fournisseur_boutique(p_entreprise_id)` ne vérifie aucune appartenance de
+  l'appelant à l'entreprise passée en argument, et n'est appelée dans le code applicatif que
+  depuis la fonction ci-dessus (appel SQL interne, qui ne nécessite pas son propre `EXECUTE`).
+  Accordée à `authenticated`, elle permet une écriture cross-tenant (création d'une fiche
+  fournisseur dans une entreprise tierce).
+
+**Correctif porté**, commit `d357314` sur `claude/quirky-noether-n8aerc` :
+`supabase/migrations/20260922000185_ferme_contournement_paiement_boutique.sql` +
+`supabase/tests/ferme_contournement_paiement_boutique.test.sql` — ferme l'`EXECUTE` à
+`authenticated` sur les deux fonctions, accorde `service_role` sur la première (seul appelant
+légitime restant). Additif, minimal (privilèges seuls, corps/signatures inchangés). Validé par
+`node scripts/verify-migrations.mjs` (180 migrations valides) et
+`node scripts/verify-secrets.mjs` — non rejoué contre une base réelle.
+
+---
+
+## 14. AUTRES CORRECTIFS PORTÉS DEPUIS `integration/gp-external-pilot-closure-v1` (troisième passe)
+
+Mandat : scanner les 77 commits `fix(...)` restants de cette branche (liste complète en §1.6) pour
+d'autres correctifs sûrs, vérifiables, pertinents mono-app, dans le même esprit que `cacada0`.
+**Non exhaustif** : sur 77 commits, une douzaine a été examinée en détail dans cette passe (les
+plus prometteurs par intitulé, datés du tout début de la lignée — 2026-07-30/31 — où elle
+correspond encore le plus étroitement à l'état de `main`), 6 ont été vérifiés avec suffisamment de
+certitude pour être portés. Les autres commits examinés mais non portés, et le reste des 77 non
+examinés du tout, sont documentés en §16 (OPEN DECISIONS) plutôt que devinés.
+
+### 14.1 `7a2a4c0` → commit `b16db67` : durcissement de privilèges du socle
+
+Migration source : `20260729000185_isolation_multitenant_grants_et_definer.sql` (~9 changements).
+**Revérifiée ligne par ligne contre le SQL actuel**, seuls 2 des ~9 changements portés :
+`revoke truncate, trigger, references ... from anon, authenticated` (rétroactif + par défaut —
+sans risque, PostgREST ne traduit jamais une requête en TRUNCATE/DDL) et
+`alter function entreprise_sans_membres(uuid) set search_path = public` (confirmée : seule
+fonction `security definer` de la migration fondatrice `20260710000001` sans `search_path` fixé).
+
+**Un des changements source (`alter table compteurs_reference enable row level security`) a été
+sciemment NON porté** après avoir trouvé un vrai risque de régression : `compteurs_reference`
+n'a en effet jamais eu la RLS activée sur cette branche (gap réel — `authenticated` n'a jamais eu
+ses privilèges de table révoqués dessus, seul `anon` l'a été rétroactivement par la migration 78),
+mais `public.trg_set_entreprise_reference()` (trigger `before insert on entreprises`, migration
+`20260710000001`) **n'est pas `security definer`** — contrairement à tous les autres triggers de
+numérotation du dépôt (confirmé sur 9 triggers homologues : tous `security definer`) — et
+`entreprises` autorise l'INSERT direct côté client
+(`create policy "un utilisateur crée une entreprise" on public.entreprises for insert with check
+(auth.uid() is not null)`). Un nouvel utilisateur créant sa première entreprise sans passer par
+`creer_entreprise_bootstrap` (le seul chemin `security definer`) déclencherait ce trigger avec son
+propre rôle authentifié, qui appelle `next_reference()` (`security invoker` lui aussi) pour insérer
+dans `compteurs_reference` : une RLS nue aurait bloqué cet INSERT et cassé la création
+d'entreprise pour ce chemin. Concevoir et tester la policy correcte nécessite un accès base de
+données réel, indisponible ici. **DECISION_REQUIRED**, reprise en §16.
+
+Le reste (revoke sur `peut_voir_document_chantier`, `plateforme_creer_version_tarif`, 7 fonctions
+trigger) vérifié déjà sans risque (protégé par construction ou déjà couvert par le
+default-privileges de la migration 78).
+
+### 14.2 `a67ceab` → commit `fd5bc65` : lecture des documents RH/fournisseurs/pointage sensibles
+
+**Élévation de privilège intra-entreprise réelle, confirmée par recherche exhaustive.**
+`20260713000043_permissions_rls_gestion.sql` borne correctement l'ÉCRITURE (INSERT/UPDATE/DELETE)
+sur `documents-employes`/`factures-fournisseurs`/`pointage-preuves` à la permission métier
+(`gerer_employes`/`gerer_achats`/`gerer_pointage`, policies RESTRICTIVE). **Aucune policy
+équivalente n'existe pour SELECT** sur ces trois buckets (recherche de `as restrictive for select`
+sur `storage.objects` dans tout `supabase/migrations/` : rien pour ces trois-là). La lecture ne
+dépend donc que des policies PERMISSIVE d'origine (`est_membre_actif` seul) : **n'importe quel
+membre actif de l'entreprise peut aujourd'hui lire/télécharger la carte BTP ou la signature d'un
+autre salarié, une facture fournisseur, ou une preuve de pointage, sans détenir la permission
+métier correspondante.** Colonnes `employes.{photo,carte_btp,signature}_storage_path` confirmées
+présentes avec la forme exacte attendue par le correctif. Correctif porté à l'identique (fonction
+`peut_lire_document_employe_sensible` + policy RESTRICTIVE `role_gestion_fichiers_select`), la
+photo restant volontairement lisible par tout membre (annuaire).
+
+### 14.3 `87bf61c` → commit `00da9fc` : fiabilise la lecture des documents de paie
+
+`documents_paie_select` (définition actuelle, `20260723000141_preparation_paie.sql`) fait un
+`exists(select 1 from public.utilisateurs_entreprises ue where ...)` **directement** dans son
+`using(...)` sur `storage.objects`, au lieu de passer par une fonction `security definer` bornée
+comme le fait déjà le reste du module paie (`a_permission()`, `est_employe_paie_courant()`, déjà
+utilisées plus loin dans la même policy). PostgreSQL évalue toutes les policies PERMISSIVE d'une
+commande sur `storage.objects`, y compris pour des lectures visant un bucket différent — le
+planificateur ne garantit pas d'évaluer `bucket_id='documents-paie'` avant la sous-requête.
+Remplace la sous-requête directe par le même garde que le reste du module, périmètre
+d'autorisation inchangé (même triplet de conditions). Plus une correction de fiabilité qu'une
+faille de sécurité active à proprement parler, mais dans la même famille que le motif documenté en
+§4 (dépendance RLS-sur-RLS fragile).
+
+### 14.4 `bede72e` → commit `c1ef953` : protège l'export comptable
+
+**Faille d'autorisation applicative réelle, confirmée sur le code actuel.**
+`src/app/api/exports/comptabilite/route.ts` n'effectue **aucun contrôle de permission** avant de
+générer un export CSV/XLSX (ventes, règlements, TVA, achats) — seul `getContexteEntreprise()`
+(appartenance à l'entreprise) est vérifié. N'importe quel membre authentifié, quelle que soit sa
+permission, peut télécharger l'intégralité des journaux comptables via cette route, en contournant
+tout masquage fait côté UI. `acces_exports` est une permission déjà existante et utilisée ailleurs
+dans le catalogue de permissions du dépôt (`src/lib/module-permissions.ts`, `src/lib/navigation.ts`,
+rôles prédéfinis) — ce correctif l'applique enfin à cette route ; il n'invente rien. Ajoute
+`src/lib/permissions-financieres.ts` + son test vitest, et le contrôle dans la route. **Premier
+correctif applicatif TypeScript de cette mission validé par la suite complète du dépôt**
+(`typecheck`/`lint`/`test`/`build`, tous verts — voir §9bis).
+
+### 14.5 `27121d3` → commit `07d13e7` : privilèges explicites du socle comptes (reproductibilité, pas sécurité active)
+
+Découvert en investiguant `7a2a4c0` : ce commit documente qu'une « reconstruction complète » de la
+base (rejeu de migrations à partir de zéro) laissait `authenticated` sans aucun privilège SQL sur
+`entreprises`/`utilisateurs`/`utilisateurs_entreprises` — tous les comptes renvoyés vers
+l'onboarding, la RLS jamais atteinte faute de privilège de table. Vérifié : **aucune migration de
+cette branche n'accorde explicitement SELECT/INSERT/UPDATE à `authenticated`** sur ces trois
+tables, créées par la toute première migration (`20260710000001`) et jamais retouchées depuis sur
+ce point. **Ce n'est pas une faille de sécurité active en production** (comme pour `anon` avant sa
+fermeture du 2026-07-14, ces privilèges proviennent d'un défaut posé par la plateforme Supabase à
+la création du projet, jamais capturé dans une migration — la RLS déjà en place reste le contrôle
+réel, et l'app fonctionne bel et bien en production aujourd'hui), mais un gap de reproductibilité
+réel : tout nouveau projet Supabase ou reconstruction hors gabarit standard perdrait
+silencieusement l'accès applicatif de base. Correctif porté par prudence (additif, un `GRANT` ne
+peut jamais retirer un accès existant) plutôt que laissé en `DECISION_REQUIRED`, car son risque de
+régression est nul contrairement à 14.1.
+
+### 14.6 `fb819f7` → commit `0edaa3a` : `anonymiser_employe` supprime réellement les fichiers Storage (RGPD)
+
+**Gap RGPD réel, confirmé sur le code actuel.** `anonymiser_employe()` (RPC,
+`20260719000114_rgpd_export_suppression.sql`) vide déjà dynamiquement les colonnes personnelles de
+`employes` — y compris les CHEMINS de stockage `photo_storage_path`/`signature_storage_path`/
+`carte_btp_storage_path` — mais c'est du SQL pur, sans accès à l'API Storage : les FICHIERS
+eux-mêmes restaient orphelins dans le bucket `documents-employes`, toujours récupérables avec leur
+chemin exact. L'UI (`src/app/(app)/employes/[id]/page.tsx`) affirme pourtant « effacées
+définitivement » — une affirmation fausse au sens strict jusqu'à ce correctif, sur le droit à
+l'effacement RGPD. `anonymiserEmployeAction` capture les 3 chemins avant l'appel RPC (qui les met à
+null), puis supprime les fichiers correspondants une fois l'anonymisation en base confirmée (best
+effort, ne fait jamais annuler l'effacement déjà acquis en cas d'échec Storage). Validé par la
+suite complète du dépôt (§9bis).
+
+### 14.7 Investigué et volontairement NON porté
+
+- **`6b71808`/`9b0ba76`/`3f3de4e` (bumps de dépendances npm)** : vérifiés contre
+  `package-lock.json` actuel — `fast-uri` (3.1.4), `brace-expansion` (1.1.16),
+  `js-yaml` (4.3.0) sont bien aux versions vulnérables que ces commits corrigeaient en
+  juillet/août 2026. **Mais `npm audit` exécuté dans cette session aujourd'hui (2026-09-22,
+  base d'avisories courante) montre que la situation a matériellement évolué depuis** : 7
+  vulnérabilités actuelles (1 modérée, 5 hautes, **1 critique — RCE non authentifiée sur
+  Next.js**), dont `fast-uri` reste dans la plage vulnérable même à la version 3.1.5 que
+  visait le correctif source (plage actuelle : 3.0.0-3.1.5), et `brace-expansion` a une
+  résolution vulnérable différente (`glob/node_modules/brace-expansion`@5.0.7, plage
+  4.0.0-5.0.8) que le correctif source (qui ne touchait que la résolution 1.1.x) ne couvre
+  pas. Porter le correctif d'origine donnerait un faux sentiment de sécurité sans résoudre
+  ce qu'`npm audit` signale aujourd'hui. Non porté ici — c'est un chantier de durcissement
+  de dépendances à part entière (certains correctifs, comme Next.js, sont des montées de
+  version majeure à risque réel, nécessitant des tests que cet environnement ne permet pas),
+  **DECISION_REQUIRED** distinct, repris en §16.
+- **`4211014`/`53d24a2` (retrait de branches `auth.role()='anon'` vestigiales)** : le
+  message de commit source lui-même les qualifie de « nettoyage de défense en profondeur »,
+  « confirmé inerte avant retrait » et « pas un correctif de faille active ». Vérifier
+  individuellement si les ~20 fonctions concernées existent avec le même motif sur cette
+  branche (elles n'ont pas la même histoire que le lot GP-pilot) demanderait un audit
+  fonction par fonction comparable à celui du §13, pour un gain que la branche source
+  elle-même qualifie de purement préventif. Non prioritaire, non fait dans cette passe.
+- **`2647d4e`/`9608f70` (migration vers la clé publique Supabase "Publishable key")** :
+  dépend de la configuration réelle des variables d'environnement de déploiement
+  (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) sur les environnements Production/Preview réels
+  de ce dépôt — invérifiable depuis ce bac à sable (aucun accès aux secrets de déploiement).
+  Porter cette migration à l'aveugle risquerait de casser la connexion Supabase si la
+  variable n'est pas déjà positionnée sur les environnements réels. Non porté, à vérifier
+  par quelqu'un ayant accès à la configuration Vercel/Supabase réelle.
+- Les ~65 autres commits `fix(...)` de la branche (liste en §1.6) n'ont pas été examinés du
+  tout dans cette passe (budget) — voir §16.
+
+---
+
+## 15. Classification complémentaire des branches nommées dans le mandat (troisième passe)
+
+- **`suspension_plateforme`, `ELSATIA_GP_ACCES_APP`, `ELSATIA_COMMON_ACCOUNT_CONTRACT_V1`,
+  `decision_acces_application`** comme noms de branche littéraux : recherche exhaustive
+  (`git branch -a --list`, insensible à la casse, séparateurs `_`/`-` variables) —
+  **confirmé définitivement absents des 255 branches distantes**, dans les deux passes
+  (première recherche en §1.5, revérifiée ici). Ce sont des identifiants de fichiers/docs/
+  contrats (§1.5, §3), jamais des noms de branche. Résolu.
+- **Colors access / Reserves access** : 5 branches supplémentaires correspondant aux mots-clés
+  du mandat, non encore classées en §1.5bis, examinées ici :
+  `audit/colors-account-access-predeploy-v1` (273 commits d'avance, `apps/`+`packages/`),
+  `feat/colors-multiapp-password-reset-v1` (269, idem), `feat/colors-commercial-readiness-v1`
+  (378, idem), `feat/reserves-v6-security-offline-pilot-gate-v1` (309, idem),
+  `fix/preview-blockers-reserves-notif-v1` (545, idem) — **toutes UNSAFE (hors-cible)** :
+  chacune contient `apps/` et `packages/`, confirmant le même diagnostic que les branches
+  Colors/Reserves déjà classées en §1.5bis (socle racine du monorepo multi-app, absent de
+  `main`). Rien de nouveau à porter.
+- **Tools entitlement** : recherche de branches combinant `tools` avec `access`/`entitle`/
+  `auth`/`acl` dans leur nom → aucune trouvée. Le thème « Tools entitlement » du mandat se
+  résout donc entièrement dans la lignée d'entitlement multi-app déjà identifiée (§1.2,
+  `feat/elsatia-gestion-pro-multi-app-ui-v1` et les branches `fix/tools-*` déjà classées
+  UNSAFE en §1.5bis) — aucune branche dédiée séparée n'existe sous ce nom.
+- **Studio access/signup** : `fix/studio-signup-closed-v1` reste le seul candidat pertinent
+  (déjà classé CANONICAL_CANDIDATE isolé/hors-cible en §1.5bis). La branche fondatrice
+  `feat/elsatia-studio-v1` (280 commits d'avance, `apps/`+`packages/`) a été vérifiée ici :
+  également hors-cible (monorepo multi-app), sans lien spécifique avec l'accès/signup au-delà
+  de ce que `fix/studio-signup-closed-v1` couvre déjà.
+
+---
+
+## 16. OPEN DECISIONS
 
 - **DECISION_REQUIRED — portage obligatoire du correctif cross-tenant** : si/quand la
   modularisation de la facturation Gestion Pro (qui introduit
@@ -646,20 +945,48 @@ c'est le choix fait ici pour ces 77 commits.
   décisions Tools listées dans les annexes `annexe-d1-gp-observation-backfill.md` /
   `annexe-d2-tools-serveur.md` de `fix/app-access-convergence-v1` — non retranscrites en détail ici
   (hors budget de cette session), consultables par SHA (§1.4).
-- **Ouvert** : malgré les ~45 branches classées en plus lors de cette passe (§1.5bis), ~195 des
-  255 branches distantes restent non classifiées individuellement — la lignée principale
+- **Ouvert** : malgré les ~50 branches classées en plus lors de cette mission (§1.5bis + §15),
+  ~190 des 255 branches distantes restent non classifiées individuellement — la lignée principale
   d'entitlement (§1.2) et le tronc mono-app GP jamais fusionné (§1.6) sont désormais tous deux
   identifiés avec un niveau de confiance élevé, mais l'inventaire exhaustif demandé par le mandat
   n'est toujours pas complet.
-- **DECISION_REQUIRED — audit ciblé du tronc GP mono-app (§1.6)** : `integration/gp-external-pilot-closure-v1`
-  contient 77 commits `fix(...)` supplémentaires non vérifiés contre le SQL actuel de `main`
-  (liste en §1.6), dont au moins un (`8caef21`, durcissement de 22 fonctions `SECURITY DEFINER`)
-  potentiellement à haute valeur s'il s'applique tel quel. Une future session avec un budget dédié
-  devrait relire ces 77 diffs un par un contre `main` actuel, dans le même esprit que le portage
-  du §11 — c'est un travail de vérification manuelle, pas de fusion de branche.
+- **RÉSOLU (troisième passe, §13)** : `8caef21` (durcissement de 22 fonctions `SECURITY DEFINER`)
+  a été intégralement vérifié fonction par fonction. 20 des 22 sont déjà sûres sur cette branche ;
+  les 2 restantes portaient un gap réel mais différent de celui décrit par le commit source
+  (`grant ... to authenticated` explicite plutôt qu'un défaut par omission), corrigé par le
+  correctif porté en §13 (commit `d357314`). Plus de portage supplémentaire requis pour ce commit
+  précis.
+- **DECISION_REQUIRED — reste du tronc GP mono-app (§1.6, §14)** : sur les 77 commits `fix(...)`
+  de `integration/gp-external-pilot-closure-v1`, 6 ont été portés en troisième passe (§14.1-14.6)
+  et 3 examinés-non-portés avec raison documentée (§14.7). Une douzaine au total a donc été
+  examinée en détail ; **~65 commits `fix(...)` restent non examinés** (liste en §1.6). Une future
+  session avec un budget dédié devrait continuer à les relire un par un contre `main` actuel, dans
+  le même esprit que §11/§13/§14 — travail de vérification manuelle, pas de fusion de branche.
+- **DECISION_REQUIRED — durcissement des dépendances npm** (nouveau, §14.7) : `npm audit` exécuté
+  dans cette session (2026-09-22, base d'avisories courante — possible pour la première fois car
+  `npm ci` a fonctionné cette passe, voir §9bis) rapporte **7 vulnérabilités sur
+  `claude/quirky-noether-n8aerc` aujourd'hui : 1 modérée, 5 hautes, et 1 CRITIQUE — RCE non
+  authentifiée sur Next.js** (`GHSA-p293-qw3h-jr36`, hosts Windows ; `GHSA-2xp9-vwfh-vxw4`, API
+  d'optimisation d'image AVIF), plus `sharp`, `browserslist`, `nanoid`, `fast-uri`,
+  `brace-expansion`, `baseline-browser-mapping`. Les correctifs npm trouvés sur
+  `integration/gp-external-pilot-closure-v1` (juillet/août 2026) sont **stales** vis-à-vis de ces
+  avisories actuelles (voir détail en §14.7) — ne pas les porter tels quels. C'est un chantier
+  distinct, non commencé dans cette mission : certains correctifs (Next.js en particulier) sont
+  des montées de version majeure à risque réel de régression, nécessitant des tests (build + e2e)
+  qu'aucune session sans base de données réelle ne peut garantir. À signaler au propriétaire du
+  dépôt comme prioritaire indépendamment de la question multi-app.
+- **DECISION_REQUIRED — RLS sur `compteurs_reference`** (nouveau, §14.1) : gap réel confirmé (la
+  table n'a jamais eu la RLS activée, `authenticated` n'a jamais eu ses privilèges de table
+  révoqués dessus), mais activer une RLS nue casserait la création d'entreprise directe côté
+  client (`trg_set_entreprise_reference()` n'est pas `security definer`, contrairement à tous les
+  autres triggers de numérotation du dépôt). Nécessite de concevoir une policy correcte (portée
+  par `entreprise_id`, y compris le sentinel uuid nul des compteurs globaux à la plateforme) et de
+  la tester contre une vraie base — non disponible dans cet environnement.
 - **Ouvert** : le nom exact « `decision_acces_application` » comme identifiant de fonction/contrat
-  est confirmé ; comme nom de branche, il n'a été trouvé nulle part (le mandat l'envisageait déjà
-  comme possible).
+  est confirmé ; comme nom de branche, il n'a été trouvé nulle part — **confirmé définitivement
+  absent** après une seconde recherche exhaustive en troisième passe (§15), avec
+  `suspension_plateforme`, `ELSATIA_GP_ACCES_APP` et `ELSATIA_COMMON_ACCOUNT_CONTRACT_V1` (mêmes
+  résultats : identifiants de fichiers/docs/contrats, jamais des noms de branche).
 
 ---
 
@@ -676,26 +1003,35 @@ la session source dans `docs/qualification/` de cette branche — a été envisa
 dupliquerait un contenu déjà accessible par SHA/branche git (source unique de vérité), sans ajouter
 de valeur de convergence réelle, pour un risque de désynchronisation future. Ce raisonnement,
 posé lors de la première passe, tient toujours après la seconde : rien de la lignée multi-app n'a
-été fusionné ici, et la taille désormais mesurée avec précision (§12, 404 commits/1453 fichiers
+été fusionné ici, et la taille désormais mesurée avec précision (§16, 404 commits/1453 fichiers
 pour le seul candidat canonique) confirme que ç'aurait été prématuré.
 
-**Ce qui a changé entre les deux passes** : la première passe n'avait rien touché au code parce
+**Ce qui a changé entre les passes** : la première passe n'avait rien touché au code parce
 qu'elle n'avait trouvé, sur le périmètre qu'elle avait examiné, aucun correctif à la fois
 mono-app, autonome et vérifiable sans DB. La seconde passe, en classifiant davantage de branches
 (§1.5bis), en a trouvé un — une élévation de privilège réelle sur du code qui existe aujourd'hui
-sur cette branche (§11) — et l'a porté, seul, comme un commit séparé et minimal (`cacada0`),
-distinct de toute décision sur le monorepo multi-app. C'est exactement le type de geste que le
-mandat autorise sans requérir l'arbitrage du propriétaire du dépôt : un correctif ciblé, compris
-dans son intégralité, qui ne touche à aucun schéma absent de cette branche. La valeur ajoutée de
-cette session est donc double : ce correctif, et ce document — reconstruction d'historique
-vérifiée, clarification qu'il s'agit d'une lignée d'entitlement unique et non de deux modèles
-rivaux, identification d'un second tronc mono-app jamais fusionné (§1.6), classification
-d'environ 60 branches au total sur les 255 (première et seconde passe cumulées), et un plan
-d'action concret et non exécuté pour la convergence multi-app (§12) à l'attention du propriétaire
-du dépôt.
+sur cette branche (§11) — et l'a porté, seul, comme un commit séparé et minimal (`cacada0`). La
+troisième passe a repris ce même geste à plus grande échelle sur le tronc mono-app GP identifié en
+§1.6 : vérification complète et fonction-par-fonction de `8caef21` (§13, 20 fonctions déjà sûres
+sur cette branche, 2 avec un gap réel différent du diagnostic source, corrigé), puis scan d'une
+douzaine des 77 commits `fix(...)` restants avec le même niveau de rigueur, aboutissant à 6
+correctifs supplémentaires portés (§14) : une fuite de lecture de documents RH/fournisseurs/
+pointage sensibles, un export comptable sans contrôle d'autorisation, une policy RLS fragile sur
+les documents de paie, un durcissement de privilèges de socle, des privilèges de table rendus
+explicites, et un vrai gap RGPD (fichiers Storage non supprimés par l'anonymisation). **7
+correctifs au total sur l'ensemble de la mission**, tous des commits séparés et minimaux, aucun
+ne touchant à un schéma absent de cette branche ni à la question du monorepo multi-app —
+exactement le type de geste que le mandat autorise sans requérir l'arbitrage du propriétaire du
+dépôt. La valeur ajoutée de cette mission est donc triple : ces 7 correctifs, une revérification
+complète d'un audit de 22 fonctions initialement jugé trop volumineux pour être vérifié à la main,
+et ce document — reconstruction d'historique vérifiée, clarification qu'il s'agit d'une lignée
+d'entitlement unique et non de deux modèles rivaux, identification d'un second tronc mono-app
+jamais fusionné (§1.6), classification d'environ 65 branches au total sur les 255 (trois passes
+cumulées), et un plan d'action concret et non exécuté pour la convergence multi-app (§16) à
+l'attention du propriétaire du dépôt.
 
 ---
 
-**CANONICAL MODEL NOT RESOLVED** — le correctif porté en §11 est indépendant de cette question et
-ne la referme pas : le modèle d'entitlement multi-app reste un candidat documenté, non fusionné,
-en attente d'une décision du propriétaire du dépôt.
+**CANONICAL MODEL NOT RESOLVED** — les 7 correctifs portés en §11/§13/§14 sont tous indépendants
+de cette question et ne la referment pas : le modèle d'entitlement multi-app reste un candidat
+documenté, non fusionné, en attente d'une décision du propriétaire du dépôt.
