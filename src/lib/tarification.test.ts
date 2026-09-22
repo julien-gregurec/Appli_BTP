@@ -79,4 +79,25 @@ describe("droits liés à l'offre", () => {
       expect(permissionIncluseDansOffre("gerer_utilisateurs", offre.cle)).toBe(true);
     }
   });
+
+  it("Mini peut gérer les comptes employés qu'elle facture, sans gagner le reste du palier Terrain", () => {
+    // Mini facture des comptes supplémentaires (comptesInclus=3, parCompteSup=15€) : le client
+    // doit donc pouvoir créer/gérer ces comptes (acces_employes), sans pour autant hériter du
+    // reste du palier Terrain (pointage, congés, notes de frais) ni d'un palier supérieur.
+    expect(permissionIncluseDansOffre("acces_employes", "mini")).toBe(true);
+    expect(permissionIncluseDansOffre("acces_pointage", "mini")).toBe(false);
+    expect(permissionIncluseDansOffre("demander_ses_conges", "mini")).toBe(false);
+    expect(permissionIncluseDansOffre("saisir_ses_notes_frais", "mini")).toBe(false);
+    expect(permissionIncluseDansOffre("acces_stock", "mini")).toBe(false);
+    // gerer_employes (mutation) n'a jamais été limité par offre : seule la route /employes
+    // (acces_employes) l'était. Aucune régression attendue ici, mais on fige le comportement.
+    expect(permissionIncluseDansOffre("gerer_employes", "mini")).toBe(true);
+    // Paie et RH avancé restent hors de portée pour Mini, même après ce correctif.
+    expect(permissionIncluseDansOffre("consulter_sa_paie", "mini")).toBe(false);
+    expect(permissionIncluseDansOffre("gerer_paie", "mini")).toBe(false);
+    // Les autres offres conservaient déjà acces_employes via le palier Terrain : pas de régression.
+    for (const offre of ["pro", "business", "entreprise", "sur_mesure"] as const) {
+      expect(permissionIncluseDansOffre("acces_employes", offre)).toBe(true);
+    }
+  });
 });

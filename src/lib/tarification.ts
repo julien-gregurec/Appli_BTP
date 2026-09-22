@@ -89,7 +89,11 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     operationsIAIncluses: 100,
     stockageGoInclus: 10,
     resume: "Le socle commercial et chantier pour démarrer avec une petite équipe.",
-    fonctionnalites: SOCLE,
+    // Mini facture des comptes supplémentaires (comptesInclus/parCompteSup ci-dessus) : le
+    // client doit donc pouvoir créer/gérer ces comptes. acces_employes (route /employes)
+    // est la seule permission manquante pour ça — gerer_employes n'est déjà limité par
+    // aucune offre (cf. permissionIncluseDansOffre) et paie/RH avancé restent hors SOCLE.
+    fonctionnalites: [...SOCLE, "acces_employes"],
   },
   {
     cle: "pro",
