@@ -13,6 +13,7 @@ import {
 } from "@/lib/documents";
 import { analyserDocumentIA, MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const BUCKET = "chantier-documents";
 
@@ -47,7 +48,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
     cacheControl: "3600",
     upsert: false,
   });
-  if (uploadError) retour(chantierId, "error", uploadError.message);
+  if (uploadError) retour(chantierId, "error", messageErreurUtilisateur("ajouterDocumentAction:upload", uploadError, "Impossible d’envoyer le document. Réessayez dans un instant."));
 
   const { error: insertError } = await supabase.from("documents_chantier").insert({
     entreprise_id: ctx.entrepriseId,
@@ -62,7 +63,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
   });
   if (insertError) {
     await supabase.storage.from(BUCKET).remove([path]);
-    retour(chantierId, "error", insertError.message);
+    retour(chantierId, "error", messageErreurUtilisateur("ajouterDocumentAction:insert", insertError, "Impossible d’enregistrer le document."));
   }
 
   revalidatePath(`/chantiers/${chantierId}`);
@@ -79,11 +80,11 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
   if (!document) retour(chantierId, "error", "Document introuvable");
 
   const { error: storageError } = await supabase.storage.from(BUCKET).remove([document.storage_path]);
-  if (storageError) retour(chantierId, "error", storageError.message);
+  if (storageError) retour(chantierId, "error", messageErreurUtilisateur("supprimerDocumentAction:storage", storageError, "Impossible de supprimer le fichier du document."));
 
   const { error } = await supabase.from("documents_chantier").delete()
     .eq("id", documentId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId);
-  if (error) retour(chantierId, "error", error.message);
+  if (error) retour(chantierId, "error", messageErreurUtilisateur("supprimerDocumentAction:delete", error, "Impossible de supprimer le document."));
 
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath(`/chantiers/${chantierId}/documents`);
