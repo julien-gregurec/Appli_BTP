@@ -108,6 +108,11 @@ sleep 3
 
 echo "== session scenario: INACTIVE USER (real GoTrue ban via admin API) =="
 SVC_JWT=$(node "$BRIDGE" sign "{\"role\":\"service_role\",\"iss\":\"local-gotrue\",\"iat\":$(date +%s),\"exp\":$(($(date +%s)+3600))}")
+# Persisted for run_pilot_acceptance_v2.mjs, which needs a service_role
+# principal for the handful of ACTUALLY_AUTOMATABLE cases (DV-10, NF-04,
+# RG-02/03/04) that legitimately go through the admin client in the real app
+# -- this script already mints exactly that JWT above, it just wasn't saved.
+echo "$SVC_JWT" > "$BUILD_DIR/tokens/service_role.access_token"
 OUV_ID=$(psql_q "select id from auth.users where email='${PROFILE_EMAIL[ouvrier]}';")
 curl -sS -m 10 -X PUT "http://localhost:9999/admin/users/$OUV_ID" -H "Authorization: Bearer $SVC_JWT" \
   -H "Content-Type: application/json" -d '{"ban_duration":"87600h"}' >/dev/null
@@ -146,6 +151,45 @@ if [ "$perm_before" = "f" ] && [ "$perm_after" = "t" ]; then
   pass "role change (ouvrier -> Gérant) on a still-valid JWT takes effect immediately, no re-login/refresh needed (acces_clients: false -> true)"
 else
   fail "role change did not take effect as expected (before=$perm_before after=$perm_after)"
+fi
+
+echo "== session scenario: EMPLOYEE MARKED INACTIVE WHILE ACTIVE (still-valid JWT, employes.statut -> sorti) =="
+# Distinct from REVOKED MEMBERSHIP above: this goes through the HR-facing
+# employes.statut column (what an admin actually edits from the employee
+# sheet, and what PL-02's DB guard also keys off), not a direct UPDATE of
+# utilisateurs_entreprises. Real product mechanism connecting the two:
+# trg_repercuter_statut_employe (20260713000044_inscription_employes.sql)
+# cascades employes.statut in ('sorti','suspendu') -> utilisateurs_entreprises
+# .statut='desactive' automatically, same-transaction, no cron.
+CE_EMPLOYE_ID=$(psql_q "select id from public.employes where utilisateur_id='$CE_ID' and entreprise_id='$ENTREPRISE_A';")
+n_before=$(echo "select count(*) from public.affectations where entreprise_id='$ENTREPRISE_A';" | node "$BRIDGE" run "$TOKEN_CE" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.utilisateurs_entreprises set statut='actif' where utilisateur_id='$CE_ID' and entreprise_id='$ENTREPRISE_A';\"" >/dev/null
+n_before=$(echo "select count(*) from public.affectations where entreprise_id='$ENTREPRISE_A';" | node "$BRIDGE" run "$TOKEN_CE" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.employes set statut='sorti' where id='$CE_EMPLOYE_ID';\"" >/dev/null
+n_after=$(echo "select count(*) from public.affectations where entreprise_id='$ENTREPRISE_A';" | node "$BRIDGE" run "$TOKEN_CE" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+statut_ue_after=$(psql_q "select statut from public.utilisateurs_entreprises where utilisateur_id='$CE_ID' and entreprise_id='$ENTREPRISE_A';")
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.employes set statut='actif' where id='$CE_EMPLOYE_ID';\"" >/dev/null
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.utilisateurs_entreprises set statut='desactive' where utilisateur_id='$CE_ID' and entreprise_id='$ENTREPRISE_A';\"" >/dev/null # restore fixture state (see REVOKED MEMBERSHIP above, deliberately left desactive by that scenario)
+if [ "$n_before" != "0" ] && [ "$n_after" = "0" ] && [ "$statut_ue_after" = "desactive" ]; then
+  pass "employes.statut='sorti' cascades to utilisateurs_entreprises.statut='desactive' and blocks RLS immediately on a still-valid JWT ($n_before -> 0 rows)"
+else
+  fail "employee-marked-inactive did not cascade/block as expected (before=$n_before after=$n_after statut_ue=$statut_ue_after)"
+fi
+
+echo "== session scenario: APP/TENANT SUSPENDED WHILE ACTIVE (still-valid JWT, entreprises.abonnement_statut -> suspendu) =="
+# est_membre_actif() checks e.abonnement_statut not in ('suspendu','annule')
+# directly (20260714000075_acces_plateforme_impayes.sql) -- an unpaid/closed
+# subscription cuts EVERY member's access at once, live, no cron, no
+# per-user toggle needed.
+n_before=$(echo "select count(*) from public.affectations where entreprise_id='$ENTREPRISE_A';" | node "$BRIDGE" run "$TOKEN_GERANT" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+statut_avant=$(psql_q "select abonnement_statut from public.entreprises where id='$ENTREPRISE_A';")
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.entreprises set abonnement_statut='suspendu' where id='$ENTREPRISE_A';\"" >/dev/null
+n_after=$(echo "select count(*) from public.affectations where entreprise_id='$ENTREPRISE_A';" | node "$BRIDGE" run "$TOKEN_GERANT" "$DB" - 2>&1 | grep -v '^$' | tail -1 | tr -d ' \r')
+su postgres -c "psql -X -q -d \"$DB\" -c \"update public.entreprises set abonnement_statut='$statut_avant' where id='$ENTREPRISE_A';\"" >/dev/null # restore fixture state
+if [ "$n_before" != "0" ] && [ "$n_after" = "0" ]; then
+  pass "entreprises.abonnement_statut='suspendu' blocks RLS immediately for every member on a still-valid JWT ($n_before -> 0 rows, gerant profile)"
+else
+  fail "app suspension did not block access as expected (before=$n_before after=$n_after)"
 fi
 
 echo "== SEC-01/02/03, AV-04, CM-07, EX-03, ST-08, PA-04/05: centralized permission guard (a_permission) =="

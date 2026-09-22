@@ -11,15 +11,18 @@
 // Routes:
 //   /auth/v1/*    -> GOTRUE_URL (prefix stripped)
 //   /rest/v1/*    -> POSTGREST_URL (prefix stripped)
-//   /storage/v1/* -> 501 (no real Storage service in this environment;
-//                    honestly reported, never silently faked)
+//   /storage/v1/* -> STORAGE_URL (prefix stripped) if set (local_storage_mock.mjs,
+//                    see ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3 §6) ; else 501,
+//                    honestly reported, never silently faked
 //
-// Usage: PORT=54321 GOTRUE_URL=http://localhost:9999 POSTGREST_URL=http://localhost:3001 node local_supabase_proxy.mjs
+// Usage: PORT=54321 GOTRUE_URL=http://localhost:9999 POSTGREST_URL=http://localhost:3001 \
+//        STORAGE_URL=http://localhost:5000 node local_supabase_proxy.mjs
 import http from 'node:http';
 
 const PORT = process.env.PORT || 54321;
 const GOTRUE_URL = new URL(process.env.GOTRUE_URL || 'http://localhost:9999');
 const POSTGREST_URL = new URL(process.env.POSTGREST_URL || 'http://localhost:3001');
+const STORAGE_URL = process.env.STORAGE_URL ? new URL(process.env.STORAGE_URL) : null;
 
 function proxy(req, res, target, stripPrefix) {
   const path = req.url.startsWith(stripPrefix) ? req.url.slice(stripPrefix.length) || '/' : req.url;
@@ -46,6 +49,7 @@ const server = http.createServer((req, res) => {
   if (req.url === '/auth/v1') return proxy(req, res, GOTRUE_URL, '/auth/v1');
   if (req.url.startsWith('/rest/v1/')) return proxy(req, res, POSTGREST_URL, '/rest/v1');
   if (req.url.startsWith('/storage/v1/')) {
+    if (STORAGE_URL) return proxy(req, res, STORAGE_URL, '/storage/v1');
     res.writeHead(501, { 'content-type': 'application/json' });
     return res.end(JSON.stringify({ error: 'no_local_storage_service', detail: 'Storage HTTP service not available in this sandbox (see README.md).' }));
   }

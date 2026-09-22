@@ -176,6 +176,11 @@ create table if not exists storage.objects (
   path_tokens text[] generated always as (string_to_array(name, '/')) stored
 );
 
+-- Real Supabase Storage enforces one object per (bucket, path); needed for
+-- x-upsert (INSERT ... ON CONFLICT) and for "already exists" (409) semantics
+-- to behave like the real service -- see local_storage_mock.mjs.
+create unique index if not exists storage_objects_bucket_name_idx on storage.objects (bucket_id, name);
+
 create or replace function storage.foldername(name text) returns text[]
   language sql immutable
   as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
@@ -194,6 +199,16 @@ create or replace function storage.extension(name text) returns text
 -- added by the migrations below is inert and every role sees every row.
 alter table storage.buckets enable row level security;
 alter table storage.objects enable row level security;
+
+-- On a real Supabase project, storage-api connects with full table-level
+-- access to storage.objects/storage.buckets, provisioned by the platform
+-- outside user migrations (RLS policies are then what actually narrows what
+-- each request can see/do) -- the same gap V2 found and fixed for
+-- service_role on `public` (see gotrue_pilot_bootstrap.sh §6b). Reproduce it
+-- here for local_storage_mock.mjs, which queries storage.objects "as" the
+-- caller's role (anon/authenticated/service_role) exactly the way real
+-- storage-api does, so RLS evaluates for the right principal.
+grant select, insert, update, delete on storage.objects, storage.buckets to anon, authenticated, service_role;
 
 -- pgsodium stub (only crypto_sign_verify_detached is referenced by the Stripe
 -- attestation migrations; those migrations are out of scope for the pilot but
