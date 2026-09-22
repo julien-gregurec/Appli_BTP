@@ -144,3 +144,34 @@ Still NOT covered: real Storage (`storage-api` isn't a static binary the way
 GoTrue/PostgREST are, and `api.github.com` -- needed even just to list
 release candidates -- stays blocked in this sandbox, confirmed again in V2)
 and anything needing real e-mail delivery or an LLM/external service call.
+
+## A faithful local Storage mock + more browser coverage (V3)
+
+`local_storage_mock.mjs` closes most of the Storage gap above -- "mocked"
+here means object METADATA lives in the real `storage.objects`/
+`storage.buckets` tables with the product's real RLS policies (JWT verified,
+`SET ROLE` + `request.jwt.claims`, same mechanism PostgREST itself uses),
+only object BYTES are simplified to local disk instead of S3. Wired into
+`local_supabase_proxy.mjs`'s `/storage/v1/*` (falls back to the honest 501
+if `STORAGE_URL` is unset). See that file's header for what it does and
+does not prove.
+
+```bash
+npm run pilot:acceptance:v3
+# = pilot:acceptance:v2 + local_storage_mock.mjs + DP-03/PE-05 (now executed
+#   for real instead of STORAGE_REQUIRED) + a service_role token fix +
+#   2 new live-session scenarios (employee marked inactive, app suspended)
+```
+
+The browser layer gained `tests/e2e/pilot-acceptance-v3.spec.ts` (ON-02,
+ON-08, CH-05, CH-08, PA-02, EX-01) on top of v2's spec, plus PA-05 added to
+the v2 spec itself. Full details, including 2 cases that stayed FAIL after
+real attempts (NF-01, PE-06 -- see that spec file's comments for the exact
+evidence) and one real product gap found by execution (CH-08: no
+`equipes_chantiers` assignment check on a chantier's detail page), are in
+`docs/qualification/ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3.md`.
+
+Still NOT covered: everything V2 already couldn't reach (real e-mail
+delivery, a real LLM call for MS-04 -- needs a real `OPENAI_API_KEY`), plus
+whatever real `storage-api` itself might do differently from this mock
+(image transforms, resumable uploads, real S3 durability/latency).

@@ -76,6 +76,19 @@ sleep 2
 curl -sS -o /dev/null -w '' "http://localhost:3001/" || fail "PostgREST not responding on :3001"
 echo "PostgREST up on :3001"
 
+echo "== gestures for the browser/Playwright layer (test-only, not committed to the fixture) =="
+# Mirrors V2's own documented gesture (README §Playwright): the pilot
+# fixture has a trial that's expired by construction, and 3 features this
+# V3 mission exercises live behind entitlement layers the fixture doesn't
+# turn on by default -- none of this is a product bug, just fixture state a
+# real paying customer would already have.
+ENT_A_ID=$(su postgres -c "psql -X -q -t -A -d \"$DB\" -c \"select id from entreprises where reference_interne='PILOTE-BTP-V1';\"")
+su postgres -c "psql -X -q -d \"$DB\" -c \"
+  update entreprises set abonnement_statut='actif', abonnement_offre='business' where id='$ENT_A_ID';
+  insert into entreprise_feature_flags(entreprise_id, feature_key, statut, active) values ('$ENT_A_ID','payroll','beta',true) on conflict (entreprise_id, feature_key) do update set active=true, statut='beta';
+  truncate rate_limits_applicatifs;
+\"" >/dev/null
+
 echo "== [5/7] local Storage mock (real storage.objects/buckets + real RLS, bytes on disk) on :$STORAGE_PORT =="
 mkdir -p "$STORAGE_ROOT"
 (cd "$REPO" && DB="$DB" PORT="$STORAGE_PORT" GOTRUE_JWT_SECRET="$(cat "$BUILD_DIR/jwt_secret.txt")" STORAGE_ROOT="$STORAGE_ROOT" \
@@ -97,8 +110,12 @@ echo
 echo "================================================================"
 echo "Backend done. Results: $BUILD_DIR/acceptance_v2_results.json"
 echo
-echo "For the browser/Playwright layer (login, URL guards, chantier/devis/facture/planning/pointage):"
+echo "For the browser/Playwright layer (login, URL guards, chantier/devis/facture/planning/pointage,"
+echo "paramètres/onboarding/DOE/paie/exports -- see V3 report §7 for the 2 known-FAIL cases):"
 echo "  NEXT_PUBLIC_SUPABASE_URL=http://localhost:$PROXY_PORT and the matching anon/service keys must"
 echo "  be in .env.local (see docs/qualification/ELSATIA_PILOT_ACCEPTANCE_AUTOMATION_V2.md §Playwright)."
 echo "  npm run dev -- -p 3100   (separate terminal)"
 echo "  npx playwright test tests/e2e/pilot-acceptance-v2.spec.ts tests/e2e/pilot-acceptance-v3.spec.ts --project=desktop-chromium"
+echo "  If some tests land back on /login unexpectedly: the app's own login rate-limiter (10/10min/IP,"
+echo "  real product protection, see src/lib/security/rate-limit.ts) tripped from repeated passes --"
+echo "  su postgres -c \"psql -d $DB -c 'truncate rate_limits_applicatifs;'\" between runs, not a bug."
