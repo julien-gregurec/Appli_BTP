@@ -4,14 +4,9 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { headers } from "next/headers";
 import { destinationInterneSure } from "@/lib/security/redirects";
+import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
 import { estPlateformeAdmin } from "@/lib/plateforme";
-
-export async function origineApplication() {
-  const entetes = await headers();
-  return entetes.get("origin") ?? `${entetes.get("x-forwarded-proto") ?? "https"}://${entetes.get("x-forwarded-host") ?? entetes.get("host")}`;
-}
 
 export async function signupAction(formData: FormData) {
   if (isEmailLoginDisabled()) {
@@ -25,8 +20,11 @@ export async function signupAction(formData: FormData) {
   const codeEntreprise = String(formData.get("code_entreprise") ?? "").trim().toUpperCase();
   const numeroEmploye = String(formData.get("numero_employe") ?? "").trim().toUpperCase();
 
+  const destination = numeroEmploye ? `/onboarding?numero=${numeroEmploye}` : codeEntreprise ? `/onboarding?code=${codeEntreprise}` : "/onboarding";
+  const emailRedirectTo = construireUrlCallbackAuth(destination);
+  if (!emailRedirectTo) redirect(`/signup?error=${encodeURIComponent(ERREUR_CONFIGURATION_URL_AUTH)}`);
+
   const supabase = await createClient();
-  const origine = await origineApplication();
 
   // Le profil public.utilisateurs est créé côté base par le trigger on_auth_user_created,
   // qui lit nom/prenom depuis les métadonnées passées ici.
@@ -35,7 +33,7 @@ export async function signupAction(formData: FormData) {
     password,
     options: {
       data: { nom, prenom, code_entreprise: codeEntreprise || null, numero_employe: numeroEmploye || null },
-      emailRedirectTo: `${origine}/auth/callback?next=${encodeURIComponent(numeroEmploye ? `/onboarding?numero=${numeroEmploye}` : codeEntreprise ? `/onboarding?code=${codeEntreprise}` : "/onboarding")}`,
+      emailRedirectTo,
     },
   });
   if (error) {
@@ -125,10 +123,11 @@ export async function demanderReinitialisationAction(formData: FormData) {
   if (isEmailLoginDisabled()) redirect("/dashboard");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent("Saisissez votre adresse email.")}`);
+  const redirectTo = urlCallbackReinitialisation();
+  if (!redirectTo) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(ERREUR_CONFIGURATION_URL_AUTH)}`);
   const supabase = await createClient();
-  const origine = await origineApplication();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origine}/auth/callback?next=${encodeURIComponent("/nouveau-mot-de-passe")}`,
+    redirectTo,
   });
   if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(error.message)}`);
   redirect(`/mot-de-passe-oublie?message=${encodeURIComponent("Si ce compte existe, un lien de réinitialisation vient d’être envoyé.")}`);
