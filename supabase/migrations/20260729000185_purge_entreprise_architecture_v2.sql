@@ -551,12 +551,25 @@ begin
     end loop;
   end loop;
 
+  -- Cas particulier : entreprises.logo_url stocke une URL publique complète
+  -- (`getPublicUrl()`, src/app/actions/entreprise.ts), pas un chemin nu — ne correspond
+  -- donc pas au motif `%storage_path%` ci-dessus. `entreprises` n'est pas une table
+  -- purgeable (la ligne n'est jamais supprimée, seulement anonymisée), donc son logo
+  -- doit toujours rester RETAIN tant que marquer_entreprise_purgee n'a pas tourné —
+  -- sans ce cas particulier, le logo serait classé ORPHELIN et supprimé prématurément
+  -- par le script AVANT que logo_url ne soit lui-même vidé, créant une référence morte
+  -- transitoire si la purge est interrompue entre les deux étapes.
+  insert into _storage_ref
+  select regexp_replace(logo_url, '^.*/storage/v1/object/public/[^/]+/', ''), '__entreprise_logo__'
+  from public.entreprises
+  where id = p_entreprise_id and logo_url is not null and logo_url ~ '/storage/v1/object/public/';
+
   return query
   select
     f.bucket_id, f.chemin,
     case
       when r.table_nom is null then 'ORPHELIN'
-      when r.table_nom = any(v_conservees) or r.table_nom = any(v_anonymisees) then 'RETAIN'
+      when r.table_nom = any(v_conservees) or r.table_nom = any(v_anonymisees) or r.table_nom = '__entreprise_logo__' then 'RETAIN'
       else 'A_PURGER'
     end as categorie,
     r.table_nom
