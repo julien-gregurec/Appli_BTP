@@ -17,6 +17,12 @@ export default async function BesoinsPage({
     const offre = offreParCle(recommande);
     const nbEmployes = Math.max(1, Number(nb ?? "1") || 1);
     const prix = prixAbonnementMensuel(nbEmployes, offre);
+    // Remise annuelle réelle (mission "closure V3", section 8) : calculée à partir
+    // du prix contractuel de l'offre plutôt qu'un texte "-20 %" codé en dur qui ne
+    // correspondait à aucune remise réelle (REDUCTION_ANNUELLE = 0 pour la plupart
+    // des offres — cf. rapport de qualification V2 §2.2). N'affiche le badge que
+    // lorsqu'une remise existe réellement pour l'offre affichée.
+    const remiseAnnuellePct = prix.total > 0 ? Math.round((1 - prix.mensuelSiAnnuel / prix.total) * 100) : 0;
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
@@ -33,7 +39,8 @@ export default async function BesoinsPage({
               {" "}· pour {nbEmployes} salarié(s)
             </p>
             <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−20 %)</span>
+              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel
+              {remiseAnnuellePct > 0 && <span className="text-xs font-normal"> (−{remiseAnnuellePct} %)</span>}
             </p>
             <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
@@ -47,7 +54,7 @@ export default async function BesoinsPage({
               <input type="hidden" name="offre" value={offre.cle}/>
               <input type="hidden" name="retour_erreur" value={`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`}/>
               <select name="periodicite" defaultValue="annuel" className="w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
-                <option value="annuel">Annuel · −20 %</option>
+                <option value="annuel">{remiseAnnuellePct > 0 ? `Annuel · −${remiseAnnuellePct} %` : "Annuel"}</option>
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>

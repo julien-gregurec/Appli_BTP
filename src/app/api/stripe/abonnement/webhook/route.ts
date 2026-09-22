@@ -104,7 +104,7 @@ async function synchroniserAbonnement(entrepriseId: string, abonnement: StripeSu
   };
   if (evenementCreeAt) miseAJour.abonnement_dernier_evenement_at = evenementCreeAt;
 
-  let statutResultant = statutCible;
+  let statutResultant: string = statutCible;
   if (statutCible === "suspendu" && statutActuel && statutActuel !== "suspendu" && statutActuel !== "annule") {
     // Transition vers un échec de paiement (past_due/unpaid) : jamais de coupure
     // synchrone et inconditionnelle. Le délai de grâce (0 par défaut, cf.

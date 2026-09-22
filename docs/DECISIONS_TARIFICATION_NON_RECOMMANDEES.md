@@ -40,10 +40,37 @@ Ce document regroupe les choix qui n'ont pas été activés automatiquement. Ils
 ## Points à décider avant commercialisation
 
 1. Entité juridique et coordonnées qui apparaissent sur les factures Liria.
-2. Durée exacte de grâce avant suspension après échec de paiement.
+2. Durée exacte de grâce avant suspension après échec de paiement. **Mise à jour 22
+   septembre 2026 (mission "closure V3")** : le code ne coupe plus l'accès de façon
+   synchrone sur un `invoice.payment_failed`/`past_due` — la durée est désormais
+   pilotée par la variable d'environnement `STRIPE_DELAI_GRACE_PAIEMENT_JOURS`
+   (0 par défaut = comportement conservateur inchangé tant que rien n'est réglé
+   ici ; voir `src/app/api/stripe/abonnement/webhook/route.ts`). Une authentification
+   3-D Secure (`invoice.payment_action_required`) ne suspend en revanche plus jamais,
+   quel que soit ce réglage — ce n'est pas un échec de paiement, donc pas une
+   décision commerciale.
 3. Prix unitaire d'un dépassement IA et taille définitive du pack à 29 €.
 4. Montant définitif des prestations de paramétrage, migration et formation dans les fourchettes publiées.
 5. Prestataire éventuel de signature électronique et d'archivage.
 6. Politique contractuelle de conservation, sauvegarde et réversibilité des données.
 7. Conditions d'utilisation et politique de confidentialité à faire valider avant ouverture publique.
+8. **Ajouté 22 septembre 2026** : remise annuelle incohérente entre offres. L'offre
+   Entreprise applique ~10 % de remise en paiement annuel (599 €/mois → 539 €/mois,
+   6 468 €/an) alors que Mini/Pro/Business n'en ont aucune (12 × le prix mensuel,
+   0 %) — `REDUCTION_ANNUELLE = 0` confirme qu'il n'existe pas de mécanisme de
+   remise globale, donc ce n'est pas un comportement voulu générique. Deux issues
+   possibles, aucune n'a été choisie ici (décision commerciale, hors périmètre
+   technique) : aligner Entreprise sur les 3 autres offres (`prixAnnuelCentimes`
+   Entreprise → 71880, soit 599×12), ou au contraire accorder une remise
+   équivalente aux 3 autres offres. Voir
+   `docs/qualification/ELSATIA_STRIPE_SELF_SERVICE_SUBSCRIPTION_CLOSURE_V2.md` §2.1.
+   Le seul correctif appliqué (certain, non commercial) est que la mention
+   « −20 % » affichée à l'inscription ne correspond plus à un texte figé mais au
+   pourcentage réellement calculé à partir des prix (0 % pour Mini/Pro/Business).
+9. **Ajouté 22 septembre 2026** : configuration réelle du Customer Portal Stripe
+   (quelles offres y sont proposées pour le changement de plan, annulation
+   immédiate ou en fin de période). `scripts/configurer-portail-stripe.mjs` rend
+   ce réglage explicite et versionné (au lieu du réglage par défaut du Dashboard,
+   invérifiable) mais reste une étape manuelle à exécuter avec une vraie clé
+   Stripe — non faite dans cette mission (aucun Stripe live).
 
