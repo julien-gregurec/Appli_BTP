@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TABLES_CONSERVEES_PURGE, cheminsStorageEmployeAAnonymiser, tablesEligiblesPurge } from "./rgpd";
+import { TABLES_ANONYMISEES_PURGE, TABLES_CONSERVEES_PURGE, cheminsStorageEmployeAAnonymiser, tablesEligiblesPurge } from "./rgpd";
 
 describe("cheminsStorageEmployeAAnonymiser", () => {
   it("retourne les trois chemins quand ils sont tous présents", () => {
@@ -32,12 +32,16 @@ describe("cheminsStorageEmployeAAnonymiser", () => {
 });
 
 describe("tablesEligiblesPurge", () => {
-  it("exclut les tables conservées pour raison comptable/légale", () => {
-    const toutes = ["employes", "factures", "chantiers", "paiements", "notes_frais", "journal_activite"];
+  it("exclut les tables conservées pour raison comptable/légale et les tables anonymisées (F3)", () => {
+    const toutes = ["employes", "factures", "chantiers", "paiements", "notes_frais", "journal_activite", "clients"];
     const eligibles = tablesEligiblesPurge(toutes);
-    expect(eligibles).toEqual(["chantiers", "employes", "notes_frais"]);
+    // employes/clients sont ANONYMIZE (ligne conservée, PII vidée), pas DELETE : F3.
+    expect(eligibles).toEqual(["chantiers"]);
     for (const conservee of TABLES_CONSERVEES_PURGE) {
       expect(eligibles).not.toContain(conservee);
+    }
+    for (const anonymisee of TABLES_ANONYMISEES_PURGE) {
+      expect(eligibles).not.toContain(anonymisee);
     }
   });
 
