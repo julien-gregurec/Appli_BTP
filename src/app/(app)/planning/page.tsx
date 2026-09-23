@@ -94,11 +94,24 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const sb = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
+  // PL-05 : sans droit de vue globale, le planning est celui du salarié connecté,
+  // pas celui de toute l'entreprise. Mêmes droits que le prédicat RLS
+  // peut_consulter_affectation_employe() (migration 20260923000327) pour que
+  // l'écran et la base disent exactement la même chose, et même geste que le
+  // tableau de bord qui filtrait déjà ses prochaines affectations.
+  const peutVoirToutLePlanning = permissions === null
+    || permissions.includes("gerer_planning")
+    || permissions.includes("voir_pointages_equipe")
+    || permissions.includes("voir_heures_chantiers");
+  const { data: employeCompte } = peutVoirToutLePlanning
+    ? { data: null }
+    : await sb.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
+  const requeteAffectations = sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date");
 
   const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
+    peutVoirToutLePlanning ? requeteAffectations : requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
     sb.from("pointages").select("date,heures_normales,heures_supplementaires,verification_statut,employe_id,chantier_id").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).eq("verification_statut","valide"),
   ]);
 
