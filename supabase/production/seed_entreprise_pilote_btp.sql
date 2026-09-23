@@ -42,12 +42,18 @@ declare
   -- reproduits ici en dur (et non via le RPC installer_roles_predefinis) car ce RPC exige un
   -- appelant authentifié avec le droit gerer_utilisateurs (peut_gerer_acces -> auth.uid()),
   -- absent d'une exécution SQL directe hors session applicative.
+  -- CH-08 : 'Ouvrier' et 'Chef d'équipe' portent voir_chantiers_assignes (et non
+  -- acces_chantiers), comme modeles_roles_predefinis — le catalogue canonique que
+  -- le commentaire ci-dessus dit reproduire. La dérive précédente (acces_chantiers)
+  -- faisait retourner true à peut_consulter_chantier() pour TOUS les chantiers de
+  -- l'entreprise, donc un ouvrier non affecté ouvrait /chantiers/<id> par URL
+  -- directe (200, pas de refus) : c'est ce que mesurait le FAIL CH-08 de la V3.
   v_roles text[][]:=array[
     array['Gérant','tous'],
     array['Administration','acces_clients,gerer_clients,acces_chantiers,acces_devis,gerer_devis,acces_factures,gerer_factures,acces_facturation_avancee,gerer_facturation_avancee,acces_achats,gerer_achats,acces_planning,acces_pointage,saisir_son_pointage,acces_employes,saisir_ses_notes_frais,gerer_notes_frais,demander_ses_conges,gerer_conges,utiliser_borne_stock,acces_stock,acces_flotte,acces_outillage,acces_exports,acces_crm,gerer_crm,acces_connecteurs,gerer_connecteurs,acces_messagerie,gerer_messagerie,acces_parametres,gerer_parametres,gerer_utilisateurs'],
     array['Chef de chantier','acces_clients,acces_chantiers,gerer_chantiers,voir_devis_chantier_sans_prix,voir_heures_chantiers,acces_planning,gerer_planning,acces_pointage,gerer_pointage,valider_pointages,saisir_son_pointage,acces_employes,saisir_ses_notes_frais,demander_ses_conges,utiliser_borne_stock,effectuer_entree_stock,effectuer_sortie_stock,acces_stock,gerer_stock,acces_flotte,acces_outillage,gerer_outillage,acces_interventions,gerer_interventions,acces_achats,acces_messagerie,gerer_messagerie,gerer_doe'],
-    array['Chef d''équipe','acces_chantiers,voir_devis_chantier_sans_prix,voir_heures_chantiers,acces_planning,acces_pointage,saisir_son_pointage,saisir_ses_notes_frais,demander_ses_conges,utiliser_borne_stock,effectuer_entree_stock,effectuer_sortie_stock,acces_stock,acces_flotte,acces_outillage,acces_interventions,acces_messagerie'],
-    array['Ouvrier','acces_chantiers,voir_devis_chantier_sans_prix,acces_planning,acces_pointage,saisir_son_pointage,saisir_ses_notes_frais,demander_ses_conges,utiliser_borne_stock,effectuer_entree_stock,effectuer_sortie_stock,acces_messagerie']
+    array['Chef d''équipe','voir_chantiers_assignes,voir_devis_chantier_sans_prix,voir_heures_chantiers,voir_pointages_equipe,acces_planning,acces_pointage,saisir_son_pointage,saisir_ses_notes_frais,demander_ses_conges,utiliser_borne_stock,effectuer_entree_stock,effectuer_sortie_stock,acces_stock,acces_flotte,acces_outillage,acces_interventions,acces_messagerie'],
+    array['Ouvrier','voir_chantiers_assignes,voir_devis_chantier_sans_prix,acces_planning,acces_pointage,saisir_son_pointage,saisir_ses_notes_frais,demander_ses_conges,utiliser_borne_stock,effectuer_entree_stock,effectuer_sortie_stock,acces_messagerie']
   ];
   v_role_cle text[]:=array[
     'gerant',

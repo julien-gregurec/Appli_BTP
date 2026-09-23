@@ -36,6 +36,21 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const peutVoirSousTraitants = (permissions === null || permissions.includes("acces_sous_traitants")) && featuresActives.includes("subcontractors");
   const peutVoirNotesEquipe = permissions === null || (permissions.includes("gerer_notes_frais") && permissions.includes("voir_indicateurs_financiers"));
 
+  // CH-08 : garde serveur explicite d'affectation, en plus du filtre tenant.
+  // La policy RLS de lecture de public.chantiers est déjà
+  // peut_consulter_chantier(entreprise_id, id) — un poste en
+  // 'voir_chantiers_assignes' sans 'acces_chantiers' ne voit que les chantiers
+  // où il est affecté. On rappelle ici le MÊME prédicat côté page : même
+  // décision (donc aucun accès légitime perdu, y compris pour un gérant ou un
+  // poste 'acces_chantiers' jamais affecté), mais l'accès par URL directe est
+  // refusé explicitement au lieu de dépendre uniquement de la RLS — qui
+  // tomberait si cette requête passait un jour par un client service_role.
+  const { data: autorise } = await supabase.rpc("peut_consulter_chantier", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_chantier_id: id,
+  });
+  if (autorise === false) notFound();
+
   const { data: chantier } = await supabase
     .from("chantiers")
     .select("*, client:clients(id, nom, prenom, societe), type:types_chantier(nom)")

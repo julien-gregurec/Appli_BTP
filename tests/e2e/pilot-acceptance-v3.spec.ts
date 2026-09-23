@@ -126,31 +126,61 @@ test.describe("CH-05: génération du DOE", () => {
 });
 
 test.describe("CH-08: ouvrier accède au détail d'un chantier où il n'est pas affecté", () => {
-  test("mesure du comportement réel (isolation attendue par le pack : accès refusé ou liste vide)", async ({ page }) => {
+  test("accès refusé par URL directe, chantier affecté toujours accessible", async ({ page }) => {
     const chantierId = psql(
       `select c.id from chantiers c where c.entreprise_id='${ENT_A}' and c.nom='Ravalement facade - Vidal'
        and not exists (select 1 from equipes_chantiers ec join employes e on e.id=ec.employe_id where ec.chantier_id=c.id and e.email='${PROFILES.ouvrier}');`,
     );
     expect(chantierId, "fixture precondition: unassigned chantier must exist").toBeTruthy();
+    // Fixture precondition, now asserted rather than assumed: the "Ouvrier" poste
+    // must NOT hold acces_chantiers (which means "every chantier of the company"
+    // in peut_consulter_chantier) -- it holds voir_chantiers_assignes, exactly as
+    // modeles_roles_predefinis defines the canonical 'ouvrier' role. The V3 FAIL
+    // came from the pilot seed drifting away from that catalogue.
+    const droitsGlobaux = psql(
+      `select count(*) from permissions_poste pp join postes p on p.id=pp.poste_id
+       join employes e on e.poste_id=p.id
+       where e.entreprise_id='${ENT_A}' and e.email='${PROFILES.ouvrier}'
+         and pp.autorise and pp.cle_permission in ('acces_chantiers','gerer_chantiers');`,
+    );
+    expect(droitsGlobaux, "fixture precondition: ouvrier must not hold a company-wide chantier right").toBe("0");
+
     await login(page, PROFILES.ouvrier);
     const response = await page.goto(`/chantiers/${chantierId}`);
     await page.waitForLoadState("networkidle");
     const finalUrl = new URL(page.url()).pathname;
     const bodyText = await page.locator("body").innerText();
     const redirected = finalUrl !== `/chantiers/${chantierId}`;
-    const emptyOrRefused = /acc[eè]s refus[eé]|non autoris[eé]|introuvable/i.test(bodyText);
-    // Record the exact observed behaviour (same measurement style as the
-    // CL-05/DV-09 URL guards in v2) rather than asserting the pack's
-    // "accès refusé ou liste vide" shape as a known-good expectation:
-    // chantiers/[id]/page.tsx (read directly) checks entreprise_id
-    // membership only, never equipes_chantiers assignment -- confirmed here
-    // by execution, not just by reading the source. Classified FAIL in the
-    // V3 matrix on this evidence; not silently absorbed into a PASS.
+    const emptyOrRefused = /acc[eè]s refus[eé]|non autoris[eé]|introuvable|404|not found/i.test(bodyText);
     console.log(`[CH-08] chantier=${chantierId} finalUrl=${finalUrl} status=${response?.status() ?? 0} redirected=${redirected} emptyOrRefused=${emptyOrRefused}`);
-    // Minimum bar enforced here: whatever the page shows, it must never leak
-    // financial data (budget/marge) to a role without peutVoirFinances --
-    // that gate IS permission-based (not assignment-based) and did hold.
+
+    // The pack's P0 criterion is now enforced, not just measured: direct URL
+    // access to an unassigned chantier must be refused. Two server-side layers
+    // agree on the same predicate -- the RLS policy
+    // lecture_chantiers_selon_permission on public.chantiers, and the explicit
+    // peut_consulter_chantier() call added at the top of
+    // src/app/(app)/chantiers/[id]/page.tsx -- so the row is invisible and the
+    // page answers notFound().
+    expect(redirected || emptyOrRefused, "an unassigned ouvrier must not get the chantier detail").toBe(true);
+    // The chantier's own name must not appear either: a 404 that still leaks the
+    // site name would satisfy the line above but not the isolation criterion.
+    const nomChantier = psql(`select nom from chantiers where id='${chantierId}';`);
+    expect(bodyText).not.toContain(nomChantier);
+    // Kept from the V3 measurement: whatever the page shows, it must never leak
+    // financial data (budget/marge) to a role without peutVoirFinances.
     expect(bodyText).not.toMatch(/marge|budget pr[eé]visionnel/i);
+
+    // Positive witness: the chantier the ouvrier IS assigned to stays reachable.
+    const chantierAffecte = psql(
+      `select ec.chantier_id from equipes_chantiers ec join employes e on e.id=ec.employe_id
+       where ec.entreprise_id='${ENT_A}' and e.email='${PROFILES.ouvrier}'
+         and ec.date_debut<=current_date and (ec.date_fin is null or ec.date_fin>=current_date) limit 1;`,
+    );
+    expect(chantierAffecte, "fixture precondition: ouvrier must have one active assignment").toBeTruthy();
+    await page.goto(`/chantiers/${chantierAffecte}`);
+    await page.waitForLoadState("networkidle");
+    expect(new URL(page.url()).pathname).toBe(`/chantiers/${chantierAffecte}`);
+    await expect(page.locator("body")).toContainText(psql(`select nom from chantiers where id='${chantierAffecte}';`));
   });
 });
 
@@ -201,15 +231,22 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
 });
 
 test.describe("PE-06: signature électronique de l'employé", () => {
-  // KNOWN ISSUE, not yet resolved (see ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3 §PE-06):
-  // no request of any kind reaches the dev server after the save click (confirmed
-  // by the absence of any log line, whereas a real save triggers a Server Action
-  // POST) -- the synthetic PointerEvent sequence below does not leave
-  // SignatureEmploye.tsx's `vide` ref false the way a real drawn stroke would, so
-  // `enregistrer()` short-circuits client-side ("Dessinez la signature avant
-  // d'enregistrer.") before ever calling enregistrerSignatureEmployeAction. An
-  // automation limitation of this canvas in this sandbox's headless Chromium, not
-  // a confirmed product bug -- classified FAIL on this evidence, not skipped.
+  // The V3 diagnosis for this case was WRONG and is corrected here. It claimed the
+  // synthetic PointerEvent sequence left SignatureEmploye.tsx's `vide` ref true,
+  // so that `enregistrer()` short-circuited client-side before calling the Server
+  // Action. Refuted by execution -- scripts/qualification/pe06_signature_canvas_probe.mjs
+  // replays that exact gesture against the component's real drawing-detection
+  // logic (same React 19 handlers, same refs) in real Chromium: all four handlers
+  // fire, `vide` goes false, and the save issues a network request. A real
+  // page.mouse gesture behaves identically, and a no-stroke run is the only one
+  // that produces the "Dessinez la signature avant d'enregistrer." guard.
+  //
+  // So the canvas is not the blocker. What the V3 test never did was capture the
+  // client-side error message, which is why the real cause stayed unknown. Two
+  // changes below: drive the canvas with a real pointer gesture (page.mouse,
+  // proven equivalent and closer to a real signature), and assert the absence of
+  // the client-side guard message so that any future failure names its own cause
+  // instead of being re-diagnosed by guesswork.
   test("signature dessinée puis enregistrée, réutilisable", async ({ page }) => {
     const empId = psql(`select id from employes where entreprise_id='${ENT_A}' and email='${PROFILES.ouvrier}';`);
     await login(page, PROFILES.gerant);
@@ -217,20 +254,20 @@ test.describe("PE-06: signature électronique de l'employé", () => {
     await page.waitForLoadState("networkidle");
     const canvas = page.locator("canvas").first();
     await expect(canvas).toBeVisible();
-    // The canvas listens to React onPointerDown/Move/Up -- dispatch real
-    // PointerEvents directly on the element (more reliable here than
-    // page.mouse, which drives OS-level input and was landing outside the
-    // element's synthetic-event path in this sandbox's headless Chromium).
-    await canvas.evaluate((el) => {
-      const rect = el.getBoundingClientRect();
-      const fire = (type: string, x: number, y: number) =>
-        el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: rect.left + x, clientY: rect.top + y, pointerId: 1, isPrimary: true }));
-      fire("pointerdown", 10, 10);
-      fire("pointermove", 40, 20);
-      fire("pointermove", rect.width - 10, rect.height - 10);
-      fire("pointerup", rect.width - 10, rect.height - 10);
-    });
+    // Real pointer gesture over the canvas. The component draws on
+    // pointerdown/pointermove and flips its `vide` ref on pointerdown, so a
+    // multi-step drag is what a signature actually is.
+    const boite = await canvas.boundingBox();
+    expect(boite, "canvas must have a real box before drawing").toBeTruthy();
+    await page.mouse.move(boite!.x + 12, boite!.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(boite!.x + boite!.width * 0.4, boite!.y + boite!.height * 0.7, { steps: 10 });
+    await page.mouse.move(boite!.x + boite!.width - 15, boite!.y + 20, { steps: 10 });
+    await page.mouse.up();
     await page.getByRole("button", { name: /Enregistrer la signature/ }).click();
+    // Name the cause on failure: if the stroke was not registered, the component
+    // says so client-side and never calls the Server Action.
+    await expect(page.locator("body")).not.toContainText("Dessinez la signature avant d'enregistrer.");
     await expect(page.getByAltText("Signature de l'employé")).toBeVisible({ timeout: 15_000 });
   });
 });
