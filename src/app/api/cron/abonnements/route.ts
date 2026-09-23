@@ -99,7 +99,14 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   } catch (erreur) {
     capacite = { erreur: erreur instanceof Error ? erreur.message : "Reprise capacité impossible" };
   }
-  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite };
+  // Billing Security V3 (§6) : matérialise les suspensions dont l'échéance
+  // (signalement manuel d'impayé par un admin plateforme) est dépassée. La fonction existait déjà
+  // (migration 20260714000075) mais n'était appelée par aucun cron.
+  const { data: suspensionsAppliquees, error: suspensionsErreur } = await admin.rpc("appliquer_suspensions_impayes");
+  const suspensionsImpayes = suspensionsErreur
+    ? { ok: false as const, raison: suspensionsErreur.message }
+    : { ok: true as const, nombre: suspensionsAppliquees };
+  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes };
 }
 
 export async function GET(request: Request) {

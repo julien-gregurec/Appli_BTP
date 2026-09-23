@@ -250,16 +250,38 @@ export async function POST(request: Request) {
       ]);
     } else if (["invoice.paid", "invoice.payment_failed", "invoice.payment_action_required"].includes(evenement.type)) {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
-      statutResultant = evenement.type === "invoice.paid" ? "actif" : "suspendu";
-      const { error } = await admin.from("entreprises").update({
-        abonnement_statut: statutResultant,
+      const traceFacture = {
         derniere_facture_stripe_id: objet.id,
         derniere_facture_url: objet.hosted_invoice_url || null,
         derniere_facture_pdf: objet.invoice_pdf || null,
         derniere_facture_statut: objet.status || evenement.type,
         derniere_facture_at: instantDepuisUnix(objet.created) || new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }).eq("id", entrepriseId);
+      };
+      let miseAJour: Record<string, unknown>;
+      if (evenement.type === "invoice.paid") {
+        // Billing Security V3 (§6) : paiement réussi → restauration d'accès
+        // immédiate ET régularisation de tout impayé en cours. Sans l'effacement
+        // de suspension_prevue_at, appliquer_suspensions_impayes() (désormais
+        // appelée par le cron) re-suspendrait plus tard un client qui a payé.
+        statutResultant = "actif";
+        miseAJour = { ...traceFacture, abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null };
+      } else if (evenement.type === "invoice.payment_action_required") {
+        // Billing Security V3 (§6) : une authentification 3-D Secure à confirmer
+        // n'est PAS un échec de paiement — seule la trace de facture est mise à
+        // jour, jamais le statut d'accès.
+        statutResultant = "action_requise";
+        miseAJour = traceFacture;
+      } else {
+        // invoice.payment_failed : comportement du tronc conservé (suspension
+        // immédiate). Le délai de grâce configurable de Billing V3 n'est pas
+        // porté sur le train canonique V1 : il exige aussi de modifier la RPC
+        // synchroniser_abonnement_stripe_service (past_due → suspendu) — voir
+        // docs/qualification/ELSATIA_CANONICAL_TRAIN_EXECUTION_V1.md.
+        statutResultant = "suspendu";
+        miseAJour = { ...traceFacture, abonnement_statut: "suspendu" };
+      }
+      const { error } = await admin.from("entreprises").update(miseAJour).eq("id", entrepriseId);
       if (error) throw new Error(error.message);
       await synchroniserFactureAbonnement(admin, entrepriseId, objet, objet.status || evenement.type.replace("invoice.", ""));
       // P1 — un paiement d'abonnement échoué suspend l'accès (ci-dessus) : le

@@ -27,8 +27,10 @@ export async function modifierAbonnementAction(entrepriseId: string, formData: F
 
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    // Mode prototype : mise à jour directe (l'admin plateforme réel passe par la RPC).
-    await supabase
+    // Mode prototype : colonnes commerciales réservées au service_role (RLS,
+    // migration 20260922000184) — estPlateformeAdmin() a déjà autorisé l'appel
+    // ci-dessus ; en production l'admin plateforme réel passe par la RPC.
+    await createAdminClient()
       .from("entreprises")
       .update({ abonnement_statut: statut, abonnement_echeance: echeance, abonnement_note: note, updated_at: new Date().toISOString() })
       .eq("id", entrepriseId);
@@ -321,7 +323,7 @@ export async function signalerImpayePlateformeAction(entrepriseId:string,formDat
   const supabase=await createClient();
   if(isEmailLoginDisabled()){
     const echeance=new Date(Date.now()+10*86400000).toISOString();
-    const{error}=await supabase.from("entreprises").update({impaye_signale_at:new Date().toISOString(),suspension_prevue_at:echeance,impaye_message:message,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
+    const{error}=await createAdminClient().from("entreprises").update({impaye_signale_at:new Date().toISOString(),suspension_prevue_at:echeance,impaye_message:message,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
     if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }else{
     const{error}=await supabase.rpc("plateforme_signaler_impaye",{p_entreprise_id:entrepriseId,p_message:message});
@@ -335,7 +337,7 @@ export async function enregistrerReglementPlateformeAction(entrepriseId:string,f
   const note=String(formData.get("note")??"").trim()||"Règlement reçu";
   const supabase=await createClient();
   if(isEmailLoginDisabled()){
-    const{error}=await supabase.from("entreprises").update({abonnement_statut:"actif",impaye_signale_at:null,suspension_prevue_at:null,impaye_message:null,dernier_reglement_at:new Date().toISOString(),abonnement_note:note,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
+    const{error}=await createAdminClient().from("entreprises").update({abonnement_statut:"actif",impaye_signale_at:null,suspension_prevue_at:null,impaye_message:null,dernier_reglement_at:new Date().toISOString(),abonnement_note:note,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
     if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }else{
     const{error}=await supabase.rpc("plateforme_enregistrer_reglement",{p_entreprise_id:entrepriseId,p_note:note});

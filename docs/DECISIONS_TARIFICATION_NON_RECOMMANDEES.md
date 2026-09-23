@@ -40,9 +40,37 @@ Ce document regroupe les choix qui n'ont pas été activés automatiquement. Ils
 ## Points à décider avant commercialisation
 
 1. Entité juridique et coordonnées qui apparaissent sur les factures ELSATIA.
-2. Durée exacte de grâce avant suspension après échec de paiement.
+2. Durée exacte de grâce avant suspension après échec de paiement. **Mise à jour 23
+   septembre 2026 (train canonique V1)** : la branche Billing Security V3 proposait un
+   délai configurable (`STRIPE_DELAI_GRACE_PAIEMENT_JOURS`) ; il **n'est pas porté** sur
+   le train canonique, dont la synchronisation d'abonnement passe par la RPC
+   `synchroniser_abonnement_stripe_service` (past_due → suspendu) — le porter exige de
+   modifier cette RPC, voir `docs/qualification/ELSATIA_CANONICAL_TRAIN_EXECUTION_V1.md`.
+   Porté en revanche : une authentification 3-D Secure (`invoice.payment_action_required`)
+   ne suspend plus au niveau facture — ce n'est pas un échec de paiement, donc pas une
+   décision commerciale.
 3. Prix unitaire d'un dépassement IA et taille définitive du pack à 29 €.
 4. Montant définitif des prestations de paramétrage, migration et formation dans les fourchettes publiées.
 5. Prestataire éventuel de signature électronique et d'archivage.
 6. Politique contractuelle de conservation, sauvegarde et réversibilité des données.
 7. Conditions d'utilisation et politique de confidentialité à faire valider avant ouverture publique.
+8. **Ajouté 22 septembre 2026** : remise annuelle incohérente entre offres. L'offre
+   Entreprise applique ~10 % de remise en paiement annuel (599 €/mois → 539 €/mois,
+   6 468 €/an) alors que Mini/Pro/Business n'en ont aucune (12 × le prix mensuel,
+   0 %) — `REDUCTION_ANNUELLE = 0` confirme qu'il n'existe pas de mécanisme de
+   remise globale, donc ce n'est pas un comportement voulu générique. Deux issues
+   possibles, aucune n'a été choisie ici (décision commerciale, hors périmètre
+   technique) : aligner Entreprise sur les 3 autres offres (`prixAnnuelCentimes`
+   Entreprise → 71880, soit 599×12), ou au contraire accorder une remise
+   équivalente aux 3 autres offres. Voir
+   `docs/qualification/ELSATIA_STRIPE_SELF_SERVICE_SUBSCRIPTION_CLOSURE_V2.md` §2.1.
+   Le seul correctif appliqué (certain, non commercial) est que la mention
+   « −20 % » affichée à l'inscription ne correspond plus à un texte figé mais au
+   pourcentage réellement calculé à partir des prix (0 % pour Mini/Pro/Business).
+9. **Ajouté 22 septembre 2026** : configuration réelle du Customer Portal Stripe
+   (quelles offres y sont proposées pour le changement de plan, annulation
+   immédiate ou en fin de période). `scripts/configurer-portail-stripe.mjs` rend
+   ce réglage explicite et versionné (au lieu du réglage par défaut du Dashboard,
+   invérifiable) mais reste une étape manuelle à exécuter avec une vraie clé
+   Stripe — non faite dans cette mission (aucun Stripe live).
+

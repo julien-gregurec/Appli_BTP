@@ -358,6 +358,41 @@ describe("email de paiement échoué", () => {
   });
 });
 
+// ── Billing Security V3 (claude/great-mayer-bzxad6), reporté sur le train ────
+// canonique : 3-D Secure non bloquant et régularisation de l'impayé au paiement.
+describe("statut d'accès sur les événements facture (Billing Security V3)", () => {
+  function miseAJourEntreprise(admin: ReturnType<typeof adminFake>) {
+    const appel = admin.appels.find((a) => a.table === "entreprises" && a.methode === "update");
+    return appel?.donnees as Record<string, unknown> | undefined;
+  }
+
+  it("invoice.payment_action_required (3-D Secure) ne suspend jamais l'accès", async () => {
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(evenementFacture("invoice.payment_action_required")));
+    expect(response.status).toBe(200);
+    const donnees = miseAJourEntreprise(admin);
+    expect(donnees).toBeDefined();
+    expect(donnees).not.toHaveProperty("abonnement_statut");
+    expect(donnees).toMatchObject({ derniere_facture_stripe_id: "in_test" });
+  });
+
+  it("invoice.paid rétablit l'accès et efface toute suspension programmée", async () => {
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(evenementFacture("invoice.paid")));
+    expect(response.status).toBe(200);
+    expect(miseAJourEntreprise(admin)).toMatchObject({
+      abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null,
+    });
+  });
+
+  it("invoice.payment_failed conserve la suspension immédiate du tronc", async () => {
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    expect(miseAJourEntreprise(admin)).toMatchObject({ abonnement_statut: "suspendu" });
+  });
+});
+
 // ── P0 — extraction de la logique métier hors de `route.ts` (build Next.js 16) ─
 // Next.js refuse tout export de `route.ts` autre qu'un gestionnaire HTTP ou une
 // clé de configuration de segment. Ces tests verrouillent le résultat de
