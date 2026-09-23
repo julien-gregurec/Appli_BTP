@@ -24,7 +24,7 @@ export default defineConfig({
     video: "off",
   },
   projects: [
-    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"], launchOptions: { executablePath: process.env.PW_CHROME_PATH } } },
     { name: "iphone-webkit", use: { ...devices["iPhone 13"] }, grep: /@responsive/ },
     { name: "android-chromium", use: { ...devices["Pixel 7"] }, grep: /@responsive/ },
     { name: "tablet-webkit", use: { ...devices["iPad (gen 7)"] }, grep: /@responsive/ },

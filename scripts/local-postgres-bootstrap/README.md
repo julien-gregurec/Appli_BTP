@@ -72,3 +72,106 @@ is expected to fail here for that reason alone — not a product defect.
 If Docker ever becomes available with unrestricted image pulls, prefer
 `supabase start` + `supabase test db` over this directory: it is a strictly
 closer match to production. This bootstrap is a fallback for when it isn't.
+
+## Real local Auth (GoTrue), when Docker itself works but image pulls don't
+
+`ELSATIA_EXTERNAL_PILOT_FULL_REHEARSAL_V2` found that `dockerd` could start in
+its environment but `supabase start` still failed, because pulling the
+Supabase images from the registry hit a proxy data-transfer cap
+(`Data limit exceeded`) rather than a missing daemon. Since GoTrue
+(`github.com/supabase/auth`) is a plain Go binary, it can be built from
+source over a plain `git clone` (no registry involved) and run against this
+same bootstrapped Postgres, giving real signed JWTs, real login/ban/expiry
+enforcement, and real onboarding RPC execution (`creer_entreprise_bootstrap`,
+`activer_compte_employe`) instead of pgTAP's fabricated `request.jwt.claim*`
+GUCs.
+
+```bash
+npm run pilot:auth:local
+# = gotrue_pilot_bootstrap.sh pilot_gp   (build GoTrue if needed, real GoTrue
+#   migrations, roles/db, app migrations, pilot fixture, start GoTrue :9999)
+# + run_pilot_auth_scenarios.sh pilot_gp (real signup/activation for the 5
+#   pilot profiles + a fresh "tenant B", then the mission's 5 session
+#   scenarios: valid / expired / wrong tenant / inactive user / revoked
+#   membership, plus the centralized permission-guard checks)
+```
+
+Requires the same PostgreSQL 16 as above, a Go toolchain, Node.js, and
+network access to `github.com` (plain git, not any Docker/OCI registry).
+
+Still NOT covered, same root cause as the Docker registry cap (see
+`docs/qualification/ELSATIA_PILOT_AUTH_POSTGREST_ACCEPTANCE_AUTOMATION_V1.md`
+for the full breakdown): real PostgREST (no Haskell toolchain in this
+sandbox either), real Storage, real e-mail delivery, and anything requiring
+an actual browser against a live `next dev`/PostgREST-backed app. Where this
+script's `jwt_bridge.mjs` runs SQL under a verified real JWT's claims
+(`SET LOCAL role` + `request.jwt.claims`), that is RLS validated under a
+real, cryptographically verified JWT -- not a real PostgREST HTTP request.
+Its header spells out exactly what is and isn't equivalent.
+
+## Real local PostgREST + a real browser (V2)
+
+The "no Haskell toolchain" limitation above turned out to be about compiling
+PostgREST from source, not about running it: PostgREST ships a static Linux
+binary as a plain GitHub release asset, downloadable with an ordinary `curl`
+(no Docker/OCI registry involved, same as the GoTrue binary above) --
+`docs/qualification/ELSATIA_PILOT_ACCEPTANCE_AUTOMATION_V2.md` §1 has the
+details. `local_supabase_proxy.mjs` fronts that real PostgREST + the real
+GoTrue above with a single `/auth/v1`, `/rest/v1` URL, exactly what Kong does
+in production, so `@supabase/ssr`/`@supabase/supabase-js` (and therefore
+`next dev` and Playwright) can talk to a fully real local backend for the
+first time in this project's qualification history.
+
+```bash
+npm run pilot:acceptance:v2
+# = pilot:auth:local + a real PostgREST binary (downloaded once, cached) +
+#   local_supabase_proxy.mjs + the 69 ACTUALLY_AUTOMATABLE acceptance-test
+#   IDs from V1, executed for real (run_pilot_acceptance_v2.mjs)
+```
+
+For the browser layer (not part of the single command above -- needs a live
+`next dev` and a real browser):
+
+```bash
+# .env.local: NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321, with an anon/
+# service key signed with the same secret as GoTrue (node scripts/local-
+# postgres-bootstrap/jwt_bridge.mjs sign '{"role":"anon", ...}')
+npm run dev -- -p 3100
+npx playwright test tests/e2e/pilot-acceptance-v2.spec.ts --project=desktop-chromium
+```
+
+Still NOT covered: real Storage (`storage-api` isn't a static binary the way
+GoTrue/PostgREST are, and `api.github.com` -- needed even just to list
+release candidates -- stays blocked in this sandbox, confirmed again in V2)
+and anything needing real e-mail delivery or an LLM/external service call.
+
+## A faithful local Storage mock + more browser coverage (V3)
+
+`local_storage_mock.mjs` closes most of the Storage gap above -- "mocked"
+here means object METADATA lives in the real `storage.objects`/
+`storage.buckets` tables with the product's real RLS policies (JWT verified,
+`SET ROLE` + `request.jwt.claims`, same mechanism PostgREST itself uses),
+only object BYTES are simplified to local disk instead of S3. Wired into
+`local_supabase_proxy.mjs`'s `/storage/v1/*` (falls back to the honest 501
+if `STORAGE_URL` is unset). See that file's header for what it does and
+does not prove.
+
+```bash
+npm run pilot:acceptance:v3
+# = pilot:acceptance:v2 + local_storage_mock.mjs + DP-03/PE-05 (now executed
+#   for real instead of STORAGE_REQUIRED) + a service_role token fix +
+#   2 new live-session scenarios (employee marked inactive, app suspended)
+```
+
+The browser layer gained `tests/e2e/pilot-acceptance-v3.spec.ts` (ON-02,
+ON-08, CH-05, CH-08, PA-02, EX-01) on top of v2's spec, plus PA-05 added to
+the v2 spec itself. Full details, including 2 cases that stayed FAIL after
+real attempts (NF-01, PE-06 -- see that spec file's comments for the exact
+evidence) and one real product gap found by execution (CH-08: no
+`equipes_chantiers` assignment check on a chantier's detail page), are in
+`docs/qualification/ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3.md`.
+
+Still NOT covered: everything V2 already couldn't reach (real e-mail
+delivery, a real LLM call for MS-04 -- needs a real `OPENAI_API_KEY`), plus
+whatever real `storage-api` itself might do differently from this mock
+(image transforms, resumable uploads, real S3 durability/latency).
