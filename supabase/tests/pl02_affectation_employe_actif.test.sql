@@ -1,4 +1,4 @@
--- PL-02 : garde-fou DB trg_affectation_employe_actif (20260922000325).
+-- PL-02 : garde-fou DB trg_affectation_employe_actif (20260923000334).
 -- Matrice demandée : employé actif autorisé / inactif refusé / autre
 -- entreprise refusé / réactivé (redevenu actif) autorisé.
 

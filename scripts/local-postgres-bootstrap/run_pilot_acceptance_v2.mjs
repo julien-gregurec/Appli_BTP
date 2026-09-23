@@ -10,7 +10,7 @@
 // the real output. CM-06 still has NO enforcement at the DB layer
 // (app/server-action-only) -- documented as such, not silently marked PASS
 // by a SQL statement that can't exercise the real guard. PL-02 had the same
-// gap until V3 (see 20260922000325_pl02_garde_fou_affectation_employe_actif.sql):
+// gap until V3 (see 20260923000334_pl02_garde_fou_affectation_employe_actif.sql):
 // the test below now exercises the real DB-level guard, not just documents
 // its absence.
 //
@@ -482,7 +482,7 @@ let FA_NEW;
   const r = run('chef_chantier', `insert into affectations(entreprise_id, chantier_id, employe_id, date, heures, type_activite) values ('${ENT_A}','${CHA_003}','${EMP_OUVRIER2}',current_date+101,8,'chantier') returning id;`);
   run('gerant', `update employes set statut='actif' where id='${EMP_OUVRIER2}';`); // restore fixture state
   record('PL-02', "Affectation d'un employé inactif : refusée avec message explicite", (!r.ok && /AFFECTATION_EMPLOYE_INACTIF/.test(r.stderr)) ? 'PASS' : 'FAIL',
-    `FIX (20260922000325_pl02_garde_fou_affectation_employe_actif.sql) : un trigger BEFORE INSERT/UPDATE OF employe_id,entreprise_id sur public.affectations exige désormais que l'employé référencé soit statut='actif' dans la même entreprise -- couvre INSERT direct/RPC/PostgREST, pas seulement le préfiltre de creerAffectationAction (toujours en place, défense en profondeur). Un INSERT SQL direct sous le rôle chef_chantier pour un employé mis statut='sorti' ${r.ok ? 'A RÉUSSI (régression)' : 'a été refusé par le trigger'} : erreur attendue AFFECTATION_EMPLOYE_INACTIF ${/AFFECTATION_EMPLOYE_INACTIF/.test(r.stderr) ? 'bien reçue' : 'ABSENTE'}. Matrice complète (actif/inactif/autre entreprise/réactivé) validée séparément par pgTAP (supabase/tests/pl02_affectation_employe_actif.test.sql, 9/9).\n${r.stdout}\n${r.stderr}`);
+    `FIX (20260923000334_pl02_garde_fou_affectation_employe_actif.sql) : un trigger BEFORE INSERT/UPDATE OF employe_id,entreprise_id sur public.affectations exige désormais que l'employé référencé soit statut='actif' dans la même entreprise -- couvre INSERT direct/RPC/PostgREST, pas seulement le préfiltre de creerAffectationAction (toujours en place, défense en profondeur). Un INSERT SQL direct sous le rôle chef_chantier pour un employé mis statut='sorti' ${r.ok ? 'A RÉUSSI (régression)' : 'a été refusé par le trigger'} : erreur attendue AFFECTATION_EMPLOYE_INACTIF ${/AFFECTATION_EMPLOYE_INACTIF/.test(r.stderr) ? 'bien reçue' : 'ABSENTE'}. Matrice complète (actif/inactif/autre entreprise/réactivé) validée séparément par pgTAP (supabase/tests/pl02_affectation_employe_actif.test.sql, 9/9).\n${r.stdout}\n${r.stderr}`);
 }
 {
   const r = run('chef_chantier', `insert into affectations(entreprise_id, chantier_id, employe_id, date, heures, type_activite) values ('${ENT_A}','${CHA_003}','${EMP_OUVRIER3}',current_date+103,4,'chantier'),('${ENT_A}','${CHA_003}','${EMP_OUVRIER3}',current_date+104,4,'chantier') returning id;`);

@@ -3,7 +3,7 @@
 #
 # Builds on npm run pilot:acceptance:v2 (real GoTrue + real PostgREST + the
 # 69 ACTUALLY_AUTOMATABLE cases) and adds:
-#   - the PL-02 DB-level fix (20260922000325_...sql), applied like any other
+#   - the PL-02 DB-level fix (20260923000334_...sql), applied like any other
 #     migration by gotrue_pilot_bootstrap.sh -> rebuild_db.sh -- nothing
 #     extra to do here, just confirms it is in the replayed migration set
 #   - the service_role token persistence run_pilot_acceptance_v2.mjs always
