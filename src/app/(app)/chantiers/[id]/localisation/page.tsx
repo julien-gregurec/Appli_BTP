@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { modifierLocalisationChantierAction } from "@/app/actions/chantiers";
 import { LocaliserGPSButton } from "@/components/LocaliserGPSButton";
+import { CarteChantier } from "@/components/CarteChantier";
 
 export default async function LocalisationChantierPage({
   params,
@@ -18,13 +19,14 @@ export default async function LocalisationChantierPage({
   const supabase = await createClient();
   const { data: chantier } = await supabase
     .from("chantiers")
-    .select("id, nom, latitude, longitude, rayon_metres, distance_siege_km")
+    .select("id, nom, adresse, code_postal, ville, latitude, longitude, rayon_metres, distance_siege_km")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .maybeSingle();
   if (!chantier) notFound();
 
   const modifier = modifierLocalisationChantierAction.bind(null, chantier.id);
+  const adresse = [chantier.adresse, [chantier.code_postal, chantier.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
   return (
     <main className="p-8">
@@ -37,6 +39,13 @@ export default async function LocalisationChantierPage({
 
         {messages.error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{messages.error}</p>}
         {messages.succes && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Position enregistrée.</p>}
+
+        <CarteChantier
+          latitude={chantier.latitude}
+          longitude={chantier.longitude}
+          rayonMetres={chantier.rayon_metres}
+          adresse={adresse}
+        />
 
         <form action={modifier} className="space-y-4 rounded-md border p-5">
           <LocaliserGPSButton

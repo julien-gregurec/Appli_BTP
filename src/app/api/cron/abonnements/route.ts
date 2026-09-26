@@ -66,6 +66,16 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
   return { ok: !error, raison: error?.message };
 }
 
+// FA-08 : bascule quotidienne envoyee -> en_retard des factures à échéance dépassée
+// (règle et garde-fous dans la migration 20260923000350). Sans elle, `en_retard` n'était
+// recalculé qu'au mouvement d'un règlement. Aucun appel externe (ni Stripe ni e-mail) :
+// exécutée dès que l'endpoint est authentifié, quelle que soit la porte ouverte, pour que
+// le statut affiché ne dépende pas de l'activation des jobs Stripe historiques.
+async function marquerFacturesEnRetard(admin: ReturnType<typeof createAdminClient>) {
+  const { data, error } = await admin.rpc("marquer_factures_en_retard");
+  return { ok: !error, basculees: typeof data === "number" ? data : 0, raison: error?.message };
+}
+
 // RELANCES-AUTO-PROD-ACTIVATION-V1 §9 : les jobs historiques (Stripe, option IA, paie,
 // pointage) restent gardés par FEATURE_CRONS_ENABLED. Les relances ont leur PROPRE porte,
 // FEATURE_RELANCES_AUTO_ENABLED, totalement indépendante — l'objectif explicite de ce lot
@@ -128,6 +138,9 @@ export async function GET(request: Request) {
   // l'autre de s'exécuter (§13 — les relances doivent tourner même si crons historiques
   // désactivés ; et symétriquement, une panne des jobs historiques ne doit jamais avaler
   // silencieusement les relances).
+  // Avant les relances : l'éligibilité se fonde déjà sur date_echeance, mais le statut
+  // stocké est ainsi à jour pour tout ce qui le lit ensuite (écrans, exports, relances).
+  const facturesEnRetard = await marquerFacturesEnRetard(admin);
   const jobsHistoriques = cronsActifs
     ? await executerJobsHistoriques(admin)
     : { executes: false as const };
@@ -140,8 +153,8 @@ export async function GET(request: Request) {
     // Les jobs historiques ont échoué au chargement (erreur DB) : comportement identique à
     // avant ce lot pour ce cas précis (500), mais SEULEMENT s'ils étaient sensés tourner —
     // les relances ont déjà été exécutées ci-dessus dans tous les cas.
-    return NextResponse.json({ error: jobsHistoriques.erreur, relances }, { status: 500 });
+    return NextResponse.json({ error: jobsHistoriques.erreur, relances, facturesEnRetard }, { status: 500 });
   }
 
-  return NextResponse.json({ cronsActifs, relancesActives, jobsHistoriques, relances });
+  return NextResponse.json({ cronsActifs, relancesActives, facturesEnRetard, jobsHistoriques, relances });
 }

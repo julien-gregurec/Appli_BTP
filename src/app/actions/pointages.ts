@@ -124,3 +124,28 @@ export async function creerMaFichePointageAdministrateurAction(){
   revalidatePath("/employes");
   redirect("/pointage?succes=fiche_admin");
 }
+
+// PT-08 : un responsable (gerer_pointage) saisit un pointage au nom d'un salarié — oubli
+// répété, salarié sans téléphone ce jour-là. Tous les contrôles (droit, salarié actif de
+// l'entreprise, chantier, fenêtre de 31 jours, motif obligatoire, calcul des heures) sont
+// faits par la RPC creer_pointage_regularisation : cette action ne fait que transmettre.
+export async function creerPointageRegularisationAction(formData: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const mois = /^\d{4}-\d{2}$/.test(String(formData.get("mois") ?? "")) ? String(formData.get("mois")) : new Date().toISOString().slice(0, 7);
+  const { error } = await supabase.rpc("creer_pointage_regularisation", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_employe_id: texte(formData, "employe_id"),
+    p_chantier_id: texte(formData, "chantier_id"),
+    p_date: texte(formData, "date"),
+    p_arrivee: texte(formData, "heure_arrivee"),
+    p_depart: texte(formData, "heure_depart"),
+    p_pause_minutes: Math.max(0, Number(formData.get("pause_minutes")) || 0),
+    p_motif: texte(formData, "motif"),
+  });
+  if (error) redirect(`/pointage/gestion?mois=${mois}&error=${encodeURIComponent(messageErreurUtilisateur("creerPointageRegularisationAction", error, "Impossible de créer ce pointage."))}`);
+  revalidatePath("/pointage");
+  revalidatePath("/pointage/gestion");
+  revalidatePath("/dashboard");
+  redirect(`/pointage/gestion?mois=${mois}&succes=regularisation`);
+}

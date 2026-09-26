@@ -47,6 +47,12 @@ const FICHIERS_EXCELJS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Développement uniquement : la recette Playwright cible http://127.0.0.1:3100
+  // (playwright.config.ts). Sans cette entrée, `next dev` bloque les ressources
+  // dev (chunks JS, HMR) demandées depuis 127.0.0.1 : la page se rend côté serveur
+  // mais aucun composant client ne s'hydrate (cause racine de NF-01 en recette).
+  // Sans effet sur `next build` / `next start`.
+  allowedDevOrigins: ["127.0.0.1"],
   async headers() {
     return [{ source: "/:path*", headers: headersSecurite(process.env.NODE_ENV === "production") }];
   },
