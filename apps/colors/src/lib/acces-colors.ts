@@ -1,8 +1,10 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 import { getContexteColors, type ContexteColors } from "@/lib/contexte";
 import { createClient } from "@/lib/supabase/server";
 import {
+  AccesApplicationRefuseError,
   exigerAccesApplication,
   listerApplicationsAutorisees,
   verifierAccesApplication,
@@ -64,4 +66,24 @@ export async function exigerShellColors(): Promise<ContexteColors> {
 
 export async function protegerRouteColors(contexte: ContexteColors): Promise<void> {
   await exigerAccesApplication(contexte, CODE_APPLICATION_COLORS);
+}
+
+/**
+ * Garde d'accès des routes API Colors.
+ *
+ * Rend une réponse 403 quand l'accès à l'application est refusé (suspension, entitlement
+ * échu ou absent, habilitation retirée), `null` sinon. Sans elle, l'erreur remontait non
+ * interceptée : la route restait fermée, mais répondait 500 et journalisait un refus
+ * d'accès ordinaire comme une panne serveur.
+ */
+export async function refusAccesRouteApi(contexte: ContexteColors): Promise<NextResponse | null> {
+  try {
+    await exigerAccesApplication(contexte, CODE_APPLICATION_COLORS);
+    return null;
+  } catch (error) {
+    if (error instanceof AccesApplicationRefuseError) {
+      return NextResponse.json({ erreur: "Accès Colors refusé" }, { status: 403 });
+    }
+    throw error;
+  }
 }

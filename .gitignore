@@ -73,3 +73,5 @@ output/verification/
 /output/video/orchestre.wav
 /output/video/bornes.json
 /output/video/points.json
+/playwright-report-colors/
+/tests/e2e/colors-pile-locale/stockage-recette/

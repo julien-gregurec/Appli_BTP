@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { deconnexionAction } from "@/app/actions";
 import { Brand } from "@/components/Brand";
 import { NavIcon } from "@/components/NavIcon";
 import { NAVIGATION_COLORS } from "@/lib/navigation";
@@ -80,6 +81,11 @@ export function MobileNavigation() {
           <button type="button" onClick={fermerNavigation} aria-label="Fermer la navigation">×</button>
         </div>
         <LiensNavigation fermer={fermerNavigation} />
+        {/* Sous 900 px la barre latérale, qui porte la déconnexion, est masquée : sans ce
+            bouton, un téléphone n'avait aucun moyen de fermer sa session. */}
+        <form action={deconnexionAction} className="mobile-drawer-footer">
+          <button type="submit" className="mobile-logout">Se déconnecter</button>
+        </form>
       </aside>}
     </>
   );

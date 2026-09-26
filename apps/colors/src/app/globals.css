@@ -64,7 +64,8 @@ a { color: inherit; text-decoration: none; }
 .topbar-actions { display: flex; align-items: center; gap: 16px; }
 .secure-pill { display: flex; align-items: center; gap: 7px; color: #6e6470; font-size: 11px; font-weight: 650; }
 .secure-pill i { width: 7px; height: 7px; border-radius: 50%; background: #52b788; box-shadow: 0 0 0 4px #e8f7ef; }
-.account-avatar { width: 36px; height: 36px; border-radius: 50%; font-size: 12px; }
+/* 44 px partout : une tablette tactile au-delà de 900 px reçoit aussi cette barre. */
+.account-avatar { width: 44px; height: 44px; border-radius: 50%; font-size: 13px; }
 .content { min-height: calc(100vh - 86px); padding: 42px; }
 
 .app-switcher { position: relative; }
@@ -262,6 +263,8 @@ a { color: inherit; text-decoration: none; }
   .account-avatar { min-width: 44px; width: 44px; height: 44px; }
   .main-nav a, .quick-links a { min-height: 44px; }
   .mobile-drawer .main-nav { padding-top: 18px; }
+  .mobile-drawer-footer { margin-top: auto; padding: 18px; border-top: 1px solid var(--line); }
+  .mobile-logout { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: #f5eff5; font-weight: 700; }
   .app-switcher-trigger { min-width: 0; width: 48px; height: 44px; padding: 8px; }
   .app-switcher-trigger > span:not(.switcher-grid) { display: none; }
   .app-switcher-menu { position: fixed; top: 62px; left: 16px; right: 16px; width: auto; }
