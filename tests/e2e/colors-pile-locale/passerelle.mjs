@@ -25,7 +25,8 @@
  *   POST /auth/v1/logout                                    POST /auth/v1/recover
  *   GET|HEAD|POST /rest/v1/<table>                          POST|GET /rest/v1/rpc/<fonction>
  *   POST /storage/v1/object/<bucket>/<chemin>               DELETE /storage/v1/object/<bucket>
- *   POST /storage/v1/object/sign/<bucket>/<chemin>
+ *   POST /storage/v1/object/sign/<bucket>/<chemin>          POST /storage/v1/object/sign/<bucket> (groupée)
+ *   PATCH /rest/v1/<table> (filtres PostgREST)
  *   GET  /storage/v1/object/sign/<bucket>/<chemin>?token=   GET /storage/v1/render/image/sign/…
  *   GET  /__recette/journal   POST /__recette/duree-jeton   (pilotage de recette, local seulement)
  */
@@ -174,9 +175,11 @@ async function lireJson(req) {
  * Un Bearer présent mais invalide ou expiré est REFUSÉ (401), jamais rétrogradé en anon.
  */
 function identifierAppelant(req) {
-  const apikey = req.headers.apikey;
   const autorisation = String(req.headers.authorization ?? "");
   const bearer = autorisation.toLowerCase().startsWith("bearer ") ? autorisation.slice(7).trim() : null;
+  // Sans en-tête `apikey`, une clé de projet passée en Bearer en tient lieu (comme la
+  // passerelle hébergée pour Storage) ; un JWT utilisateur seul reste refusé.
+  const apikey = req.headers.apikey ?? ([CLE_PUBLIQUE, CLE_SERVICE].includes(bearer) ? bearer : undefined);
   if (apikey !== CLE_PUBLIQUE && apikey !== CLE_SERVICE) return { refus: "Clé API invalide" };
   if (bearer === CLE_SERVICE || (!bearer && apikey === CLE_SERVICE)) return { role: "service_role", claims: { role: "service_role" } };
   if (!bearer || bearer === CLE_PUBLIQUE) return { role: apikey === CLE_SERVICE ? "service_role" : "anon", claims: { role: apikey === CLE_SERVICE ? "service_role" : "anon" } };
@@ -321,7 +324,7 @@ function decouper(texte, separateur = ",") {
   return parts.map((p) => p.trim()).filter(Boolean);
 }
 
-async function relationFk(client, source, cible) {
+async function relationFk(client, source, cible, contrainte = null) {
   const { rows } = await client.query(
     `select c.conrelid::regclass::text as de, c.confrelid::regclass::text as vers,
             (select array_agg(a.attname order by k.n) from unnest(c.conkey) with ordinality k(att,n)
@@ -331,8 +334,9 @@ async function relationFk(client, source, cible) {
        from pg_constraint c
       where c.contype = 'f'
         and ((c.conrelid = $1::regclass and c.confrelid = $2::regclass)
-          or (c.conrelid = $2::regclass and c.confrelid = $1::regclass))`,
-    [`public.${source}`, `public.${cible}`]);
+          or (c.conrelid = $2::regclass and c.confrelid = $1::regclass))
+        and ($3::text is null or c.conname = $3)`,
+    [`public.${source}`, `public.${cible}`, contrainte]);
   if (rows.length !== 1) throw Object.assign(new Error(`Relation ambiguë ou absente entre ${source} et ${cible}`), { code: "PGRST200", statut: 400 });
   const r = rows[0];
   const versUn = r.de === source || r.de === `public.${source}`;
@@ -343,10 +347,12 @@ async function relationFk(client, source, cible) {
 async function listeSelection(client, table, alias, selection) {
   const morceaux = [];
   for (const element of decouper(selection || "*")) {
-    const embarque = element.match(/^(?:([a-z_][a-z0-9_]*):)?([a-z_][a-z0-9_]*)(?:!inner)?\((.*)\)$/s);
+    // `cible!contrainte(...)` désigne la clé étrangère quand deux relations existent
+    // (PostgREST : « disambiguation ») ; `!inner` reste accepté comme avant.
+    const embarque = element.match(/^(?:([a-z_][a-z0-9_]*):)?([a-z_][a-z0-9_]*)(?:!([a-z_][a-z0-9_]*))?\((.*)\)$/s);
     if (embarque) {
-      const [, etiquette, cible, sousSelection] = embarque;
-      const rel = await relationFk(client, table, cible);
+      const [, etiquette, cible, indice, sousSelection] = embarque;
+      const rel = await relationFk(client, table, cible, indice && indice !== "inner" ? indice : null);
       const a2 = `${alias}_${cible}`;
       const interne = await listeSelection(client, cible, a2, sousSelection);
       const jointure = rel.colsSource.map((c, i) => `${a2}.${ident(rel.colsCible[i])} = ${alias}.${ident(c)}`).join(" and ");
@@ -437,7 +443,17 @@ async function routeRest(req, res, url, appelant) {
       const appel = `public.${ident(fonction)}(${appels.join(", ")})`;
       let corps;
       if (def.proretset || def.typtype === "c") {
-        const { rows } = await client.query(`select coalesce(json_agg(r), '[]'::json) as j from ${appel} r`, valeurs);
+        // `.range()` de supabase-js : `limit`/`offset` en paramètres d'URL (ou en-tête Range),
+        // appliqués au résultat d'une fonction ensembliste comme le fait PostgREST.
+        let pagination = "";
+        if (def.proretset) {
+          let limite = url.searchParams.get("limit"); let decalage = url.searchParams.get("offset");
+          const plage = String(req.headers.range ?? "").match(/^(\d+)-(\d+)$/);
+          if (plage) { decalage = plage[1]; limite = String(Number(plage[2]) - Number(plage[1]) + 1); }
+          if (limite !== null) pagination += ` limit ${Number(limite)}`;
+          if (decalage !== null) pagination += ` offset ${Number(decalage)}`;
+        }
+        const { rows } = await client.query(`select coalesce(json_agg(r), '[]'::json) as j from (select * from ${appel}${pagination}) r`, valeurs);
         corps = def.proretset ? rows[0].j : (rows[0].j[0] ?? null);
       } else if (def.retour === "void") {
         await client.query(`select ${appel}`, valeurs); corps = null;
@@ -445,7 +461,9 @@ async function routeRest(req, res, url, appelant) {
         const { rows } = await client.query(`select to_json(${appel}) as j`, valeurs); corps = rows[0].j;
       }
       return corps;
-    }).then((corps) => (corps === null ? repondre(res, 204) : repondre(res, 200, corps)));
+      // Un scalaire texte (uuid, text) doit partir ENCODÉ en JSON, comme PostgREST : `repondre`
+  // enverrait une chaîne brute, illisible pour supabase-js.
+  }).then((corps) => (corps === null ? repondre(res, 204) : repondre(res, 200, typeof corps === "string" ? JSON.stringify(corps) : corps)));
   }
 
   const table = segments[0];
@@ -505,6 +523,29 @@ async function routeRest(req, res, url, appelant) {
     });
   }
 
+  if (req.method === "PATCH") {
+    // Mise à jour filtrée, sous le rôle de l'appelant : la policy `using`/`with check`
+    // et les triggers de la base décident ; 0 ligne visible = 0 ligne modifiée.
+    const corps = await lireJson(req);
+    const colonnes = Object.keys(corps);
+    colonnes.forEach(ident);
+    return sousRole(appelant, async (client) => {
+      const valeurs = colonnes.map((c) => (corps[c] !== null && typeof corps[c] === "object" ? JSON.stringify(corps[c]) : corps[c]));
+      const where = clauseFiltres(url.searchParams, alias, valeurs);
+      const { rows } = await client.query(
+        `update public.${ident(table)} ${alias} set ${colonnes.map((c, i) => `${ident(c)} = $${i + 1}`).join(", ")} ${where} returning row_to_json(${alias}.*) as j`,
+        valeurs);
+      return rows.map((r) => r.j);
+    }).then((lignes) => {
+      if (!/return=representation/.test(prefer)) return repondre(res, 204);
+      if (String(req.headers.accept ?? "").includes("application/vnd.pgrst.object+json")) {
+        if (lignes.length !== 1) return repondre(res, 406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned", details: null, hint: null });
+        return repondre(res, 200, lignes[0]);
+      }
+      return repondre(res, 200, lignes);
+    });
+  }
+
   return repondre(res, 501, { code: "PGRST501", message: `Passerelle de recette : ${req.method} /rest/v1/${table} non servi` });
 }
 
@@ -518,6 +559,27 @@ const cheminFichier = (bucket, nom) => {
 };
 function repondreErreurStockage(res, statut, erreur, message) {
   repondre(res, statut, { statusCode: String(statut), error: erreur, message });
+}
+
+/** Partie « fichier » d'un corps multipart/form-data (la première qui porte un Content-Type). */
+function extraireFichierMultipart(corps, enteteType) {
+  const limite = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(enteteType);
+  if (!limite) return null;
+  const separateur = Buffer.from(`--${limite[1] ?? limite[2]}`);
+  let debut = corps.indexOf(separateur);
+  while (debut !== -1) {
+    const suivant = corps.indexOf(separateur, debut + separateur.length);
+    if (suivant === -1) break;
+    const bloc = corps.subarray(debut + separateur.length + 2, suivant - 2); // \r\n de part et d'autre
+    const finEntetes = bloc.indexOf("\r\n\r\n");
+    if (finEntetes !== -1) {
+      const entetes = bloc.subarray(0, finEntetes).toString("utf8");
+      const typePartie = /content-type:\s*([^\r\n;]+)/i.exec(entetes);
+      if (typePartie) return { type: typePartie[1].trim(), octets: bloc.subarray(finEntetes + 4) };
+    }
+    debut = suivant;
+  }
+  return null;
 }
 
 async function routeStockage(req, res, url, appelant) {
@@ -538,6 +600,26 @@ async function routeStockage(req, res, url, appelant) {
   }
 
   if (appelant.refus) return repondreErreurStockage(res, 400, "InvalidJWT", appelant.refus);
+
+  // Signature groupée (`createSignedUrls`) : même contrôle, objet par objet, sous RLS.
+  const groupe = route.match(/^\/object\/sign\/([^/]+)\/?$/);
+  if (groupe && req.method === "POST") {
+    const [, bucket] = groupe;
+    const corps = await lireJson(req);
+    const chemins = Array.isArray(corps.paths) ? corps.paths.map(String) : [];
+    const visibles = await sousRole(appelant, async (client) => {
+      const { rows } = await client.query("select name from storage.objects where bucket_id = $1 and name = any($2::text[])", [bucket, chemins]);
+      return new Set(rows.map((r) => r.name));
+    });
+    const exp = Math.floor(Date.now() / 1000) + Number(corps.expiresIn ?? 60);
+    const resultat = chemins.map((nom) => {
+      if (!visibles.has(nom)) { consigner({ type: "stockage_signature_refusee", bucket, nom, role: appelant.role }); return { path: nom, signedURL: null, error: "Object not found" }; }
+      consigner({ type: "stockage_signature", bucket, nom });
+      const jeton = signerJwt({ url: `${bucket}/${nom}`, exp, iat: Math.floor(Date.now() / 1000) });
+      return { path: nom, signedURL: `/object/sign/${bucket}/${nom}?token=${jeton}`, error: null };
+    });
+    return repondre(res, 200, resultat);
+  }
 
   const signature = route.match(/^\/object\/sign\/([^/]+)\/(.+)$/);
   if (signature && req.method === "POST") {
@@ -571,8 +653,15 @@ async function routeStockage(req, res, url, appelant) {
   const televersement = route.match(/^\/object\/([^/]+)\/(.+)$/);
   if (televersement && (req.method === "POST" || req.method === "PUT")) {
     const [, bucket, nom] = televersement;
-    const contenu = await lireCorps(req);
-    const type = String(req.headers["content-type"] ?? "application/octet-stream").split(";")[0];
+    let contenu = await lireCorps(req);
+    let type = String(req.headers["content-type"] ?? "application/octet-stream").split(";")[0];
+    // storage-js envoie un `File`/`Blob` en multipart/form-data (champ fichier + cacheControl) :
+    // on en extrait la partie fichier, son type et ses octets, comme storage-api.
+    if (type === "multipart/form-data") {
+      const partie = extraireFichierMultipart(contenu, String(req.headers["content-type"]));
+      if (!partie) return repondreErreurStockage(res, 400, "invalid_request", "Multipart sans fichier");
+      contenu = partie.octets; type = partie.type;
+    }
     const upsert = String(req.headers["x-upsert"] ?? "false") === "true" || req.method === "PUT";
     const { rows: seaux } = await poolAdmin.query("select file_size_limit, allowed_mime_types from storage.buckets where id = $1", [bucket]);
     if (!seaux[0]) return repondreErreurStockage(res, 404, "Bucket not found", "Bucket not found");

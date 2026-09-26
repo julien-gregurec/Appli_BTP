@@ -23,7 +23,8 @@ begin
 end $$;
 
 -- Tout ce que le parcours produit est effacé ; le décor lui-même est conservé.
-delete from public.reserves_historique;
+-- L'historique n'est PAS vidé directement : il est append-only pour tous les rôles
+-- (20260926000401). Il disparaît en cascade avec les réserves supprimées plus bas.
 delete from public.reserves_photos;
 delete from public.reserves_notifications_lectures;
 delete from public.reserves_notifications_envois;

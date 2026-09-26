@@ -495,7 +495,9 @@ select ok(
 select is(
   (select string_agg(action, ',' order by created_at)
    from public.reserves_historique where reserve_id = current_setting('elsatia.test_reserve_1')::uuid),
-  'creation,acceptation,photo_ajoutee,demande_levee,levee_refusee,demande_levee,levee_validee,reouverture',
+  -- Depuis 20260926000401, la précision de description (§8) est elle aussi tracée : une
+  -- modification de contenu ne peut plus être silencieuse.
+  'creation,acceptation,photo_ajoutee,demande_levee,levee_refusee,demande_levee,levee_validee,reouverture,modification',
   'l''historique restitue la séquence exacte des actions'
 );
 select is(

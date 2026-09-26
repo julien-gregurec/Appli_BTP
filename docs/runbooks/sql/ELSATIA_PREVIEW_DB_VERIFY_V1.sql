@@ -9,7 +9,8 @@
 -- Validé sur PostgreSQL 16 + socle Supabase reconstruit (scripts/local-postgres-bootstrap) après
 -- rejeu des 321 migrations de la ref de préparation (ELSATIA_PREVIEW_EXECUTION_PREP_V3) ; attendu
 -- aligné sur le train canonique V2 (335 migrations, dernière 20260923000400 — rapport
--- ELSATIA_CANONICAL_TRAIN_V2_FINAL_CONVERGENCE).
+-- ELSATIA_CANONICAL_TRAIN_V2_FINAL_CONVERGENCE), puis sur le correctif Réserves
+-- 20260926000401 (336 migrations — rapport ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -45,9 +46,9 @@ buckets_attendus(id) as (
          ('studio-originals'), ('studio-renders')
 ),
 controles(ordre, controle, attendu, observe, ok, bloquant) as (
-  select 1, 'migrations appliquées (registre CLI)', '335, dernière 20260923000400',
+  select 1, 'migrations appliquées (registre CLI)', '336, dernière 20260926000401',
          coalesce(m.nb::text || ', dernière ' || m.derniere, 'registre absent (harnais local)'),
-         m.nb is null or (m.nb = 335 and m.derniere = '20260923000400'), true
+         m.nb is null or (m.nb = 336 and m.derniere = '20260926000401'), true
   from migrations m
   union all
   select 2, 'extensions requises', 'pgcrypto, pg_trgm, unaccent, pgsodium (schéma)',
