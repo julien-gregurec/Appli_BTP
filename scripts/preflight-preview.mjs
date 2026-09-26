@@ -13,9 +13,10 @@
  * production/preview par migration — voir docs/runbooks/ELSATIA_PREVIEW_DOMAINS_STORAGE_STRIPE_V1.md §8).
  *
  * Volontairement PAS branché sur `npm run build`/`prebuild`/`verify` : ce script est un outil
- * d'inventaire pour un opérateur avant un provisioning Preview réel, pas un nouveau gate global —
- * `preflight_enforcement` du manifeste reste en mode `report` (voir config/env-manifest.json),
- * inchangé par ce livrable, exactement comme demandé par la mission.
+ * d'inventaire pour un opérateur avant un provisioning Preview réel, pas un nouveau gate global.
+ * Le gate de BUILD est ailleurs : `check-env-manifest.mjs --auto`, appelé par le prebuild de chaque
+ * app, bloquant en Preview depuis ELSATIA_PREVIEW_EXECUTION_PREP_V3
+ * (`preflight_enforcement_by_target.preview = enforce`), en report en Production.
  *
  * Usage :
  *   node scripts/preflight-preview.mjs                    # tous les gabarits .env.preview.example
@@ -23,7 +24,7 @@
  *   node scripts/preflight-preview.mjs --live               # process.env réel, pas les gabarits
  *   node scripts/preflight-preview.mjs --skip-storage       # saute la vérification buckets
  *
- * Code de sortie : toujours 0 (mode rapport, cohérent avec preflight_enforcement=report). Utiliser
+ * Code de sortie : toujours 0 (outil d'inventaire). Utiliser
  * --strict pour un code 1 en cas d'erreur (jamais appelé automatiquement par ce dépôt).
  */
 import { readFileSync } from "node:fs";

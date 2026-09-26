@@ -15,14 +15,17 @@
  *   3. Avant build (npm prebuild) — actif seulement sur un vrai build Vercel (VERCEL_ENV =
  *      preview|production), ignoré partout ailleurs :
  *        node scripts/check-env-manifest.mjs --auto --app gestion_pro
- *      Le manifeste décide si les erreurs bloquent (`preflight_enforcement`: enforce) ou sont
- *      seulement rapportées (report).
+ *      Le manifeste décide, PAR CIBLE, si les erreurs bloquent (enforce) ou sont seulement
+ *      rapportées (report) : `preflight_enforcement_by_target.<preview|production>`, à défaut
+ *      `preflight_enforcement`. Coupe-circuit opérateur, dans le seul sens qui désarme :
+ *      ELSATIA_PREFLIGHT_ENFORCEMENT=report (posée sur le projet Vercel) ramène le build à
+ *      « report » et le dit. Aucune autre valeur n'est honorée : on ne durcit jamais par là.
  *
  * Sortie : code 0 (aucune erreur) / 1 (au moins une erreur).
  */
 import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson } from "./lib/env-manifest-core.mjs";
+import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson, resolveEnforcement } from "./lib/env-manifest-core.mjs";
 import { createGitSource, runRepoChecks } from "./lib/env-manifest-scan.mjs";
 import { detectVercelTarget, parseEnvFile, runPreflight } from "./lib/env-manifest-preflight.mjs";
 
@@ -82,7 +85,15 @@ function runPreflightMode({ auto }) {
   let env = process.env;
   if (auto) {
     target = detectVercelTarget(process.env);
-    if (!target) { console.log("[env-manifest] build hors Vercel Preview/Production : preflight ignoré."); return 0; }
+    if (!target) {
+      if (process.env.VERCEL?.trim() === "1" && !process.env.VERCEL_ENV?.trim()) {
+        // Sur Vercel, VERCEL_ENV n'est visible au build que si les variables système sont exposées
+        // (réglage projet). Sans elle, ce contrôle ne peut pas savoir qu'il tourne en Preview.
+        console.warn("[env-manifest] ATTENTION : build Vercel sans VERCEL_ENV — activer « Automatically expose System Environment Variables » sur le projet, sinon ce preflight ne s'applique pas.");
+      }
+      console.log("[env-manifest] build hors Vercel Preview/Production : preflight ignoré.");
+      return 0;
+    }
   } else if (option("--env-file")) {
     env = parseEnvFile(readFileSync(resolve(option("--env-file")), "utf8"));
   }
@@ -97,9 +108,17 @@ function runPreflightMode({ auto }) {
   const counts = print(all, { verbose: true });
   summary([`### Preflight ${target} (${apps.join(", ")})`, `Erreurs : ${counts.error} · avertissements : ${counts.warning}`]);
 
-  if (counts.error && auto && (manifest.preflight_enforcement ?? "report") === "report") {
-    console.log(`\n[env-manifest] MODE REPORT : ${counts.error} erreur(s) NON bloquante(s). Passer preflight_enforcement à « enforce » pour bloquer.`);
-    return 0;
+  if (auto) {
+    let enforcement = resolveEnforcement(manifest, target);
+    if (enforcement === "enforce" && process.env.ELSATIA_PREFLIGHT_ENFORCEMENT?.trim() === "report") {
+      console.log("\n[env-manifest] COUPE-CIRCUIT : ELSATIA_PREFLIGHT_ENFORCEMENT=report sur ce déploiement — le manifeste demande « enforce » pour cette cible, le build n'est PAS bloqué.");
+      enforcement = "report";
+    }
+    console.log(`[env-manifest] cible ${target} : mode ${enforcement}.`);
+    if (counts.error && enforcement === "report") {
+      console.log(`\n[env-manifest] MODE REPORT : ${counts.error} erreur(s) NON bloquante(s) pour la cible ${target}. Voir preflight_enforcement_by_target dans ${MANIFEST_PATH}.`);
+      return 0;
+    }
   }
   console.log(counts.error ? `\nNO-GO : ${counts.error} erreur(s).` : "\nGO : aucune erreur.");
   return counts.error ? 1 : 0;

@@ -3,6 +3,10 @@
   "schema_version": 1,
   "description": "Manifeste canonique des variables d'environnement ELSATIA. Source : docs/audits/ELSATIA_ENV_SECRETS_INVENTORY_V1.md. AUCUNE VALEUR n'a sa place ici. Contrôlé par scripts/check-env-manifest.mjs (CI et preflight).",
   "preflight_enforcement": "report",
+  "preflight_enforcement_by_target": {
+    "preview": "enforce",
+    "production": "report"
+  },
   "applications": {
     "gestion_pro": {
       "kind": "web",
@@ -537,10 +541,11 @@
     {
       "id": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
       "owner": "Julien",
-      "question": "Valeur par défaut de l'inscription Studio : open (actuel) ou closed ?",
+      "question": "Quelle valeur de STUDIO_SIGNUP_MODE poser en PRODUCTION (open | allowlist | closed) ? Mis à jour par ELSATIA_PREVIEW_EXECUTION_PREP_V3 : la partie technique est fermée — le code est FAIL-CLOSED depuis le 2026-09-21 (absent/inconnu = closed, F-STUDIO-SIGNUP-DEFAULT-OPEN fixed) et la valeur Preview est fixée à « closed » par le manifeste (flag.expected.preview). Il ne reste que le choix produit de la valeur de production, qui ne conditionne pas la Preview.",
       "options": [
-        "closed par défaut",
-        "open par défaut"
+        "closed en production jusqu'à l'ouverture commerciale de Studio",
+        "allowlist en production (bêta fermée)",
+        "open en production"
       ]
     },
     {
@@ -555,10 +560,11 @@
     {
       "id": "DECISION_REQUIRED:PREVIEW-PROJECT-INVENTORY",
       "owner": "Julien",
-      "question": "Un ou plusieurs projets Vercel/Supabase « Preview » existent-ils déjà côté plateformes réelles ? Aucun identifiant (project ref, domaine, variable déjà positionnée) n'est versionné dans ce dépôt, donc personne ne peut le confirmer depuis un sandbox. À vérifier en premier, avant de supposer un départ de zéro (docs/runbooks/ELSATIA_PREVIEW_DEPLOYMENT_RUNBOOK_V1.md §0).",
+      "question": "Réutiliser les projets Preview EXISTANTS ou en provisionner de nouveaux ? Mis à jour par ELSATIA_PREVIEW_EXECUTION_PREP_V3 : l'inventaire n'est plus inconnu — le dépôt documente un Vercel « elsatia-preview » (Gestion Pro seule, projectId dans docs/organisation/REGISTRE_CENTRAL.md) et un Supabase « elsatia-preview » réf. pgvvpqyjziyapbbkydmc (eu-west-3, plan gratuit, organisation déjà à sa limite de 2 projets actifs avec elsatia-production), porteur de données de recette (entreprise B, comptes de test) et de l'ancienne lignée mono-app ; SMTP Brevo déjà configuré ; endpoint webhook Stripe Test we_1Tziay0bT5C0WG2a4Ib2ncwB. Aucun projet Vercel n'existe pour Colors, Tools, Réserves ni Studio. L'état réel (migrations appliquées, variables posées) reste à relever avec des identifiants (REMOTE_EXECUTION_REQUIRED). Un nouveau projet Supabase exige soit un plan payant, soit la suppression d'un projet : décision propriétaire.",
       "options": [
-        "aucun projet Preview n'existe : provisionner à neuf",
-        "un ou plusieurs projets Preview existent déjà : les inventorier avant toute action"
+        "réutiliser pgvvpqyjziyapbbkydmc (chemin d'upgrade, données de recette conservées, sauvegarde préalable)",
+        "réinitialiser pgvvpqyjziyapbbkydmc (Fresh, données de recette perdues)",
+        "nouveau projet Supabase Preview (plan payant ou suppression d'un projet existant)"
       ]
     },
     {
@@ -573,10 +579,10 @@
     {
       "id": "DECISION_REQUIRED:RESERVES-URL-FAIL-CLOSED",
       "owner": "Julien",
-      "question": "apps/reserves/src/lib/invitations.ts et apps/reserves/src/app/layout.tsx retombent silencieusement sur http://localhost:3020 quand NEXT_PUBLIC_RESERVES_URL est absente (au lieu d'échouer explicitement, comme le font déjà Colors et Studio pour un cas équivalent). Un oubli de cette variable en Preview/Production envoie des liens d'invitation inaccessibles, sans faire échouer le build. Faut-il aligner ce comportement sur celui de Colors/Studio (échec explicite) ?",
+      "question": "Faut-il AUSSI retirer du code le repli http://localhost:3020 (apps/reserves/src/lib/invitations.ts, apps/reserves/src/app/layout.tsx) ? Mis à jour par ELSATIA_PREVIEW_EXECUTION_PREP_V3 : le risque décrit à l'origine (un oubli de NEXT_PUBLIC_RESERVES_URL passe le build et envoie des liens d'invitation morts) est désormais fermé AU BUILD sur les deux cibles publiées — Production par apps/reserves/scripts/verify-public-env.mjs (bloquant), Preview par le preflight du manifeste (preflight_enforcement_by_target.preview = enforce, appelé par le prebuild de Réserves). Le repli ne subsiste que pour le confort local ; la question restante est d'hygiène de code, sans impact Preview.",
       "options": [
-        "faire échouer explicitement l'absence de NEXT_PUBLIC_RESERVES_URL (aligné sur Colors/Studio)",
-        "conserver le repli localhost (statu quo)"
+        "retirer le repli (échec explicite à l'exécution aussi)",
+        "conserver le repli local (statu quo, protégé par les gardes de build)"
       ]
     }
   ],
@@ -607,8 +613,8 @@
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY"
       ],
-      "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (Gestion Pro, Colors, Studio) et ANON legacy (Tools, Réserves).",
-      "next_step": "Lot code : lecture canonique + repli sur l'alias dans Tools et Réserves, puis retrait de l'alias."
+      "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (Gestion Pro, Colors, Studio, Tools) et ANON legacy (Réserves seulement — Tools a migré, 094bd43e).",
+      "next_step": "Lot code Réserves : lecture canonique + repli sur l'alias, puis retrait de l'alias."
     },
     {
       "id": "F-RESERVES-EXAMPLE-KEY",
@@ -693,7 +699,7 @@
         "NEXT_PUBLIC_RESERVES_URL"
       ],
       "text": "Replis localhost figés au build dans Colors et Réserves (liens d'invitation e-mail de Réserves).",
-      "next_step": "Colors et Réserves : garde de pré-build bloquante (apps/reserves/scripts/verify-public-env.mjs, sur le modèle de Colors/Tools — interrompt npm run build sans NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY/NEXT_PUBLIC_RESERVES_URL sur un build publié). NEXT_PUBLIC_ELSATIA_ACCOUNT_URL (Gestion Pro) reste sur preflight --auto, hors périmètre de ce correctif. Lot code restant : supprimer les replis eux-mêmes (conservés à dessein pour le confort du développement local)."
+      "next_step": "Colors et Réserves : garde de pré-build bloquante (apps/reserves/scripts/verify-public-env.mjs, sur le modèle de Colors/Tools — interrompt npm run build sans NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY/NEXT_PUBLIC_RESERVES_URL sur un build publié). NEXT_PUBLIC_ELSATIA_ACCOUNT_URL (Gestion Pro) reste sur preflight --auto, hors périmètre de ce correctif. Lot code restant : supprimer les replis eux-mêmes (conservés à dessein pour le confort du développement local). Mise à jour PREP V3 : en Preview, le preflight du manifeste est désormais BLOQUANT et appelé par le prebuild de Colors, Réserves, Studio et Tools — NEXT_PUBLIC_COLORS_URL, NEXT_PUBLIC_ELSATIA_ACCOUNT_URL et NEXT_PUBLIC_RESERVES_URL ne peuvent plus manquer sur un build Preview."
     },
     {
       "id": "F-STUDIO-SERVICE-KEY-NAME",
@@ -772,8 +778,8 @@
       "severity": "P1",
       "status": "open",
       "variables": [],
-      "text": "Le preflight --auto (avant build) est livré en mode « report » : il liste les erreurs sans bloquer.",
-      "next_step": "Le rejouer sur des valeurs Preview réelles (par Julien), puis passer preflight_enforcement à « enforce »."
+      "text": "Le preflight --auto (avant build) était livré en mode « report » pour toutes les cibles : il listait les erreurs sans bloquer.",
+      "next_step": "Preview : « enforce » depuis ELSATIA_PREVIEW_EXECUTION_PREP_V3 (preflight_enforcement_by_target.preview ; seules les variables build_time requises sont contrôlées au build, aucune n'attend une décision propriétaire ; coupe-circuit ELSATIA_PREFLIGHT_ENFORCEMENT=report). Production : reste « report » — à basculer après un preflight vert sur valeurs Production réelles (par Julien)."
     }
   ],
   "variables": [
@@ -839,7 +845,6 @@
     {
       "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "applications": [
-        "tools",
         "reserves"
       ],
       "required": true,
@@ -853,7 +858,7 @@
       "build_time": true,
       "runtime": true,
       "category": "supabase_public",
-      "description": "ALIAS LEGACY de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, encore lu par le code de Tools et de Réserves. Le NOM est legacy, la VALEUR doit déjà être une clé publishable (sb_publishable_…).",
+      "description": "ALIAS LEGACY de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, encore lu par le code de Réserves. Le NOM est legacy, la VALEUR doit déjà être une clé publishable (sb_publishable_…). Tools ne le lit plus depuis 094bd43e (apps/tools/src/lib/auth/client.ts ne lit que la clé canonique) : retiré de Tools par ELSATIA_PREVIEW_EXECUTION_PREP_V3.",
       "fail_mode": "closed",
       "deprecated": true,
       "replacement": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -5500,6 +5505,31 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false
+    },
+    {
+      "name": "ELSATIA_PREFLIGHT_ENFORCEMENT",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "tooling",
+      "description": "Coupe-circuit du preflight avant build (scripts/check-env-manifest.mjs --auto). Seule valeur honorée : « report », qui ramène un build Preview en mode non bloquant et le journalise. À poser uniquement sur le projet Vercel concerné, le temps de corriger un faux positif du manifeste, puis à retirer. Jamais utile en production (déjà « report »).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "allowed_values": [
+        "report"
+      ],
+      "external_consumer": "scripts/check-env-manifest.mjs (fichier du contrôle lui-même, exclu de l'analyse : SELF_PATHS)"
     },
     {
       "name": "E2E_BASE_URL",
