@@ -283,6 +283,10 @@
         "justification": "Lit les STRIPE_PRICE_* dont les noms sont dérivés du contrat canonique ; toutes déclarées au manifeste."
       },
       {
+        "path": "scripts/preview/stripe-test-verify.mjs",
+        "justification": "Pack Preview : lit, dans un fichier dotenv opérateur, les Price IDs STRIPE_PRICE_<FORFAIT>_<PÉRIODE> (liste fermée PRIX_FORFAITS, tous déclarés au manifeste), STRIPE_TOOLS_PRICE_MONTHLY/ANNUAL et les secrets de signature nommés dans ENDPOINTS (déclarés) — seulement pour tester leur présence et interroger Stripe Test en GET ; aucune valeur affichée."
+      },
+      {
         "path": "src/lib/stripe-abonnement.ts",
         "justification": "Tables de noms STRIPE_PRICE_* littérales (VARIABLES_PRIX*) : chaque nom figure au manifeste."
       },
@@ -5194,6 +5198,48 @@
       "runtime": true,
       "category": "tooling",
       "description": "Empêche l'exécution CLI (main) de scripts/preflight-preview.mjs à l'import : réservé à scripts/preflight-preview.test.mjs, jamais posé en Preview/Production.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_PREVIEW_DB_URL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL PostgreSQL de la base Supabase PREVIEW (contient un mot de passe), posée dans le shell de l'OPÉRATEUR uniquement. Lue par scripts/preview/db-verify.mjs (lecture seule forcée, garde de référence Preview, Production refusée). Jamais posée sur un déploiement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "VERCEL_AUTOMATION_BYPASS_SECRET",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Secret « Protection Bypass for Automation » du projet Vercel Preview, posé dans le shell de l'OPÉRATEUR pour scripts/preview/http-smoke.mjs (en-tête x-vercel-protection-bypass, jamais affiché). À régénérer après chaque campagne.",
       "fail_mode": "none",
       "deprecated": false,
       "replacement": null,

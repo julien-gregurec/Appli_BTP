@@ -1,5 +1,10 @@
 # ELSATIA — Runbook d'exécution Preview (V3)
 
+> **Remplacé pour l'exécution** par `docs/qualification/ELSATIA_PREVIEW_FINAL_EXECUTION_PACK_V1.md`
+> (train canonique V2, 335 migrations, scripts `scripts/preview/*`). Sur le train V2, ce runbook
+> contient 6 affirmations fausses (portail Stripe, script `configurer-portail-stripe.mjs`, 3-D Secure,
+> ref D1, crons GP en Preview, prix de capacité) — liste au §11 du pack.
+
 Date : 2026-09-23. Produit par `ELSATIA_PREVIEW_EXECUTION_PREP_V3`
 (`docs/qualification/ELSATIA_PREVIEW_EXECUTION_PREP_V3.md`). Remplace, pour l'exécution, la
 séquence de `ELSATIA_PREVIEW_DEPLOYMENT_RUNBOOK_V1.md`, qu'il corrige sur 6 points (§ « Écarts
