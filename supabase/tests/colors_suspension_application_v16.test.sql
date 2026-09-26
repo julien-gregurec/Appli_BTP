@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(90);
+select plan(92);
 
 -- COLORS V16 — Suspension d'application.
 --
@@ -218,15 +218,31 @@ select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
 select ok(public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · suspension programmée future : accès maintenu');
 select is((select count(*) from public.colors_seaux),1::bigint,'D · suspension programmée future : seaux visibles');
 -- Préavis d'impayé en cours : un membre ne peut pas annuler sa propre suspension programmée.
--- Le gestionnaire (sans gerer_parametres) est filtré par RLS (0 ligne) ; l'admin S, qui
--- détient gerer_parametres côté Gestion Pro, est arrêté par proteger_facturation_entreprise
--- (migration 20260923000355 — avant elle, UPDATE 1 et suspension annulée).
-select lives_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'D · gestionnaire : update suspension silencieusement filtré par RLS');
+-- Train canonique V2 : deux verrous indépendants s'appliquent désormais.
+--   1. ACL colonnes (20260923000332, Billing Security V3) : `authenticated` n'a plus le
+--      privilège UPDATE sur suspension_prevue_at / impaye_* / dernier_reglement_at →
+--      refus 42501 « permission denied » AVANT la RLS, pour le gestionnaire comme pour
+--      l'admin S (sur la branche Colors seule, sans …332, le gestionnaire était
+--      silencieusement filtré par RLS : lives_ok, 0 ligne) ;
+--   2. trigger proteger_facturation_entreprise (migration 20260923000355 — avant elle,
+--      UPDATE 1 et suspension annulée) : prouvé seul plus bas, ACL volontairement rouverte
+--      dans la transaction de test.
+select throws_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501',null,'D · gestionnaire : update suspension refusé (ACL colonnes …332)');
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000001');
 select ok(public.a_permission('e5000000-0000-0000-0000-000000000001','gerer_parametres'),'D · admin S détient bien gerer_parametres (précondition du contournement)');
 select throws_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501',null,'D · admin tenant ne peut pas annuler sa suspension programmée');
 select throws_ok($$update public.entreprises set impaye_signale_at=null, impaye_message=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501',null,'D · admin tenant ne peut pas effacer l''avertissement d''impayé');
 select lives_ok($$update public.entreprises set ville='Strasbourg' where id='e5000000-0000-0000-0000-000000000001'$$,'D · admin tenant garde la main sur ses paramètres non facturation');
+-- Défense en profondeur : même si l'ACL colonnes était rouverte (régression de …332, ex. un
+-- `grant update on entreprises to authenticated` table-large), le trigger …355 refuse seul.
+select pg_temp.en_service();
+grant update (suspension_prevue_at, impaye_signale_at, impaye_message) on public.entreprises to authenticated;
+select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000001');
+select throws_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501','La période d''essai et l''abonnement sont gérés par ELSATIA et Stripe','D · ACL rouverte : le trigger …355 refuse seul l''annulation de suspension');
+select throws_ok($$update public.entreprises set impaye_signale_at=null, impaye_message=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501','La période d''essai et l''abonnement sont gérés par ELSATIA et Stripe','D · ACL rouverte : le trigger …355 refuse seul l''effacement de l''impayé');
+select pg_temp.en_service();
+revoke update (suspension_prevue_at, impaye_signale_at, impaye_message) on public.entreprises from authenticated;
+select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000001');
 select pg_temp.en_service();
 select ok((select suspension_prevue_at is not null from public.entreprises where id='e5000000-0000-0000-0000-000000000001'),'D · suspension programmée toujours en place');
 
