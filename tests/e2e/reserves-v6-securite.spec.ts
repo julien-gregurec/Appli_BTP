@@ -304,7 +304,7 @@ test("le statut d'une réserve ne se force pas par écriture directe", async ({ 
 });
 
 /**
- * DÉFAUT CONNU V6, CORRIGÉ par `20260926000401_reserves_qualification_correctifs_v1.sql`
+ * DÉFAUT CONNU V6, CORRIGÉ par `20260926000503_reserves_qualification_correctifs_v1.sql`
  * (R-05) — le `fixme` d'origine devient une garde active. Le porteur d'une réserve ne
  * change plus que par les gestes métier tracés (invitation, désignation, révocation).
  */

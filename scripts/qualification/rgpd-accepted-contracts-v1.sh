@@ -3,7 +3,10 @@
 # Rapport : docs/qualification/ELSATIA_RGPD_ACCEPTED_CONTRACTS_RECONCILIATION_V1.md
 #
 # PostgreSQL 16 local + scripts/local-postgres-bootstrap (pas de Docker). Étapes :
-#   1. T0      : train canonique V2 (sans 20260926000401 ni 20260926000402) + tenant
+#   (Train V3 : migrations renumérotées 401 → 501, 402 → 502 ; « T0 » = train V2 seul, sans
+#    aucune migration V3 ; l'UPGRADE applique toutes les migrations V3 dans l'ordre. Le
+#    harnais complet V3 est scripts/qualification/canonical-train-v3.sh.)
+#   1. T0      : train canonique V2 (sans aucune migration 2026092600050x) + tenant
 #                réaliste → reproduction du blocage.
 #   2. UPGRADE : même base, données comprises, + 401 + 402 → compteurs inchangés, schéma
 #                identique au fresh, politique non_decidee, purge arrêtée (DECISION_REQUIRED).
@@ -24,8 +27,9 @@ BOOT="$REPO/scripts/local-postgres-bootstrap"
 OUT="${1:-$(mktemp -d)}"
 mkdir -p "$OUT"
 chmod 755 "$OUT" 2>/dev/null || true
-MIG_401="20260926000401_rgpd_purge_facture_emise_reconciliation.sql"
-MIG_402="20260926000402_rgpd_purge_contrats_acceptes_politique.sql"
+MIG_401="20260926000501_rgpd_purge_facture_emise_reconciliation.sql"
+MIG_402="20260926000502_rgpd_purge_contrats_acceptes_politique.sql"
+MIG_V3_RE="^2026092600050[0-9]_"
 A="a0000000-0000-0000-0000-000000000001"
 RUN="c9000000-0000-0000-0000-0000000000d1"
 
@@ -119,7 +123,7 @@ echo "== sortie : $OUT"
 echo "== 1. T0 (train V2 sans ${MIG_401%%_*} ni ${MIG_402%%_*}) : reproduction"
 db_new rgpdc_t0
 pg -d rgpdc_t0 -v dbname=rgpdc_t0 < "$BOOT/pg_bootstrap.sql" >/dev/null 2>&1
-echo "   migrations appliquées : $(migrer rgpdc_t0 "^(${MIG_401}|${MIG_402})$")"
+echo "   migrations appliquées : $(migrer rgpdc_t0 "$MIG_V3_RE")"
 charger_tenant rgpdc_t0
 db_new rgpdc_t0_data rgpdc_t0
 echo "   contrats acceptés du tenant A : $(pga -d rgpdc_t0 -c "select (select count(*) from devis where entreprise_id = '$A' and statut = 'accepte') || ' devis, ' || (select count(*) from avenants where entreprise_id = '$A' and statut = 'accepte') || ' avenant(s)'")"
@@ -129,8 +133,9 @@ echo "   pièces jointes du devis accepté restantes après la purge T0 : $(pga 
 
 echo "== 2. UPGRADE : T0 + données → + ${MIG_401%%_*} + ${MIG_402%%_*}"
 db_new rgpdc_up rgpdc_t0_data
-appliquer rgpdc_up "$REPO/supabase/migrations/$MIG_401"
-appliquer rgpdc_up "$REPO/supabase/migrations/$MIG_402"
+for f in "$REPO"/supabase/migrations/*.sql; do
+  [[ "$(basename "$f")" =~ $MIG_V3_RE ]] && appliquer rgpdc_up "$f"
+done
 echo "   migrations appliquées sur base avec données : OK"
 for t in devis lignes_devis avenants lignes_avenants pieces_jointes_devis factures paiements; do
   printf '   %s : %s → %s\n' "$t" "$(pga -d rgpdc_t0_data -c "select count(*) from $t")" "$(pga -d rgpdc_up -c "select count(*) from $t")"

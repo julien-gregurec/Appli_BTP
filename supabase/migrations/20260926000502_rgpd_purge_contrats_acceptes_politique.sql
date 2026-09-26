@@ -2,7 +2,7 @@
 -- Rapport : docs/qualification/ELSATIA_RGPD_ACCEPTED_CONTRACTS_RECONCILIATION_V1.md
 --
 -- Problème (DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE, rapport factures V1 §6) :
--- la purge RGPD d'une entreprise (20260923000331 + 20260926000401) classe `devis`,
+-- la purge RGPD d'une entreprise (20260923000331 + 20260926000501) classe `devis`,
 -- `lignes_devis`, `avenants`, `pieces_jointes_devis` en DELETE. Les verrous
 -- `verrouiller_devis_accepte` / `verrouiller_avenant_accepte` refusent la suppression
 -- d'un contrat accepté (et le délien de son chantier) : la purge de toute entreprise
@@ -41,7 +41,7 @@
 --  P4  Dans les deux cas, la suppression d'un contrat accepté n'est possible que
 --      pendant la purge, et seulement si une preuve du contenu EXACT du contrat à cet
 --      instant existe (empreinte recalculée dans le verrou même) : autorisation
---      R1 (20260926000401) liée à la transaction, déposée par la seule fonction de
+--      R1 (20260926000501) liée à la transaction, déposée par la seule fonction de
 --      purge (service_role, échéance contrôlée), jamais par un utilisateur.
 --      Hors purge, les verrous sont inchangés ; même pendant la purge, aucun champ
 --      d'un contrat accepté ne devient modifiable (seul le délien d'un chantier
@@ -56,7 +56,7 @@
 --      pieces_jointes_devis : service_role détient TRUNCATE sur ces tables (ACL
 --      20260902000255) et TRUNCATE ne déclenche pas les verrous de ligne — c'était la
 --      seule écriture capable d'effacer un contrat accepté sans preuve (même trou que
---      R8 de 20260926000401 pour les factures).
+--      R8 de 20260926000501 pour les factures).
 --
 -- Activation (NE PAS faire sans décision juridique) :
 --   select platform.definir_politique_purge_contrats(
@@ -388,7 +388,7 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 revoke all on function public._preuve_contrat_a_jour(text, uuid) from public, anon, authenticated, service_role;
 
--- Autorisation R1 (20260926000401) pour cette transaction, cette entreprise et cette
+-- Autorisation R1 (20260926000501) pour cette transaction, cette entreprise et cette
 -- table, ET politique décidée. Seul `purger_table_entreprise` dépose l'autorisation.
 create or replace function public._purge_contrat_autorisee(p_entreprise_id uuid, p_table text)
 returns boolean language sql stable security definer set search_path = public as $$
@@ -570,7 +570,7 @@ $$;
 -- ═══════════════════════════════════════════════════════════════════════
 -- P1–P3. Purge d'une table : porte « contrats acceptés »
 -- ═══════════════════════════════════════════════════════════════════════
--- Corps identique à 20260926000401 hors des blocs « contrats acceptés ».
+-- Corps identique à 20260926000501 hors des blocs « contrats acceptés ».
 create or replace function public.purger_table_entreprise(p_entreprise_id uuid, p_table text, p_run_id uuid default gen_random_uuid())
 returns table(ok boolean, lignes_supprimees integer, erreur text)
 language plpgsql
@@ -689,7 +689,7 @@ grant execute on function public.purger_table_entreprise(uuid, text, uuid) to se
 -- ═══════════════════════════════════════════════════════════════════════
 -- Storage : photos conservées dans un instantané contractuel = RETAIN
 -- ═══════════════════════════════════════════════════════════════════════
--- Corps identique à 20260926000401 (R7) plus une source de références.
+-- Corps identique à 20260926000501 (R7) plus une source de références.
 create or replace function public.verifier_storage_entreprise(p_entreprise_id uuid)
 returns table(bucket_id text, chemin text, categorie text, table_referencee text)
 language plpgsql

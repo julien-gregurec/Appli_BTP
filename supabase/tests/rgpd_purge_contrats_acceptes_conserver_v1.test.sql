@@ -1,5 +1,5 @@
 -- RGPD × contrats acceptés — V1, stratégie C « conserver_contrat_minimise »
--- (migration 20260926000402 ; NON activée dans le dépôt : le test l'active dans sa
+-- (migration 20260926000502, ex-20260926000402 ; NON activée dans le dépôt : le test l'active dans sa
 -- transaction, comme le ferait une migration de décision, puis annule tout).
 --
 -- Tenant réaliste A : purge complète ; chaque contrat accepté est figé en instantané
