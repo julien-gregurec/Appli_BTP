@@ -89,6 +89,12 @@ async function saisir(page: Page, champs: {
   reserveIndex?: number;
 }) {
   await page.locator('[data-test="type-mutation"]').selectOption(champs.type);
+  // La coquille présélectionne le PREMIER chantier en cache. Le décor en compte plusieurs
+  // pour l'organisation A (recette de qualification, reprise Gestion Pro) : le test
+  // désigne donc le sien au lieu de dépendre de l'ordre du cache.
+  if (champs.type === "reserve_creer") {
+    await page.locator('[data-test="chantier"]').selectOption(CHANTIER);
+  }
   if (champs.reserveIndex !== undefined) {
     const options = page.locator('[data-test="reserve"] option');
     await options.first().waitFor();
