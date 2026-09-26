@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TABLES_ANONYMISEES_PURGE, TABLES_CONSERVEES_PURGE, cheminsStorageEmployeAAnonymiser, tablesEligiblesPurge } from "./rgpd";
 
@@ -53,5 +55,20 @@ describe("tablesEligiblesPurge", () => {
 
   it("gère une liste vide", () => {
     expect(tablesEligiblesPurge([])).toEqual([]);
+  });
+});
+
+describe("TABLES_CONSERVEES_PURGE — miroir de la SQL", () => {
+  it("est identique à la dernière définition de public.tables_conservees_purge() dans les migrations", () => {
+    const dossier = join(process.cwd(), "supabase", "migrations");
+    const definitions = readdirSync(dossier)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(join(dossier, f), "utf8"))
+      .flatMap((sql) => [...sql.matchAll(/function public\.tables_conservees_purge\(\)[\s\S]*?\$\$([\s\S]*?)\$\$/g)].map((m) => m[1]));
+    const derniere = definitions.at(-1) ?? "";
+    const tablesSql = [...derniere.replace(/--.*$/gm, "").matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    expect(tablesSql.length).toBeGreaterThan(0);
+    expect([...tablesSql].sort()).toEqual([...TABLES_CONSERVEES_PURGE].sort());
   });
 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { creerPortPurgeSupabase, lireConfigPlanificateurPurge, planifierPurgesRgpd } from "@/lib/rgpd-purge-planificateur";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -82,5 +83,10 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  // Purge RGPD après l'échéance de 30 jours : DÉSACTIVÉE par défaut (variable
+  // RGPD_PURGE_PLANIFICATEUR_MODE absente = aucun accès base). Greffée ici, en dernier,
+  // pour la même raison que les fonctions ci-dessus. Activation soumise à décision
+  // propriétaire : voir docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md.
+  const purgeRgpd = await planifierPurgesRgpd(creerPortPurgeSupabase(admin), lireConfigPlanificateurPurge(process.env), new Date());
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, purgeRgpd });
 }

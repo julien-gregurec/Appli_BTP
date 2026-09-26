@@ -65,6 +65,9 @@ export const TABLES_CONSERVEES_PURGE = [
   "versions_documents_notes_frais",
   "exports_notes_frais",
   "elements_export_notes_frais",
+  // F9 (migration 20260923000400) : archives immuables par trigger, comme journal_audit_paie.
+  "journal_audit_notes_frais",
+  "validations_notes_frais",
   "signatures_documents",
   "journal_activite",
 ] as const;

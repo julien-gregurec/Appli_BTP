@@ -1,7 +1,8 @@
 // Purge RGPD (art. 17) d'une entreprise après le délai de 30 jours (CGV art. 10).
 //
-// Opération manuelle, supervisée par la plateforme (jamais self-service, jamais
-// automatique/cron) — conforme à PROMPT_CODEX_RGPD.md. Irréversible pour les tables
+// Opération manuelle, supervisée par la plateforme (jamais self-service) — conforme à
+// PROMPT_CODEX_RGPD.md. Le planificateur src/lib/rgpd-purge-planificateur.ts reproduit ce
+// déroulé depuis le cron quotidien mais reste DÉSACTIVÉ par défaut (décision propriétaire). Irréversible pour les tables
 // DELETE ; réversible seulement par restauration de sauvegarde pour le reste.
 //
 // V2 (architecture, voir docs/qualification/ELSATIA_RGPD_PURGE_ARCHITECTURE_CLOSURE_V2.md) :
@@ -14,6 +15,16 @@
 //   node scripts/purger-entreprise.mjs <entreprise_id> dry-run
 //   node scripts/purger-entreprise.mjs <entreprise_id> execute [--run-id=<uuid>]
 //   node scripts/purger-entreprise.mjs <entreprise_id> verify
+//   node scripts/purger-entreprise.mjs <entreprise_id> preuve [--out=<fichier.json>]
+//   node scripts/purger-entreprise.mjs <entreprise_id> restaurer-echeance --preuve=<fichier.json>
+//
+// "preuve" (migration 20260923000400) exporte un résumé JSON de la piste d'audit avec son
+// empreinte SHA-256. À archiver HORS de la base (stockage de l'opérateur) après chaque
+// purge : c'est la seule preuve qui survit à la restauration d'une sauvegarde antérieure
+// à la purge, et la liste des purges à rejouer après une telle restauration (voir
+// docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md §5).
+// "restaurer-echeance" ré-applique l'échéance d'une preuve archivée sur une base restaurée
+// depuis une sauvegarde antérieure à la DEMANDE de suppression, puis `execute` rejoue.
 //
 // "execute" sans --run-id démarre un nouveau run et affiche son run_id : notez-le. En
 // cas d'interruption (Ctrl+C, crash, panne), relancez EXACTEMENT la même commande avec
@@ -25,12 +36,15 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const [, , entrepriseId, mode, ...rest] = process.argv;
 const runIdArg = rest.find((a) => a.startsWith("--run-id="))?.split("=")[1];
+const outArg = rest.find((a) => a.startsWith("--out="))?.slice("--out=".length);
+const preuveArg = rest.find((a) => a.startsWith("--preuve="))?.slice("--preuve=".length);
 
-if (!entrepriseId || !["dry-run", "execute", "verify"].includes(mode)) {
-  console.error("Usage: node scripts/purger-entreprise.mjs <entreprise_id> <dry-run|execute|verify> [--run-id=<uuid>]");
+if (!entrepriseId || !["dry-run", "execute", "verify", "preuve", "restaurer-echeance"].includes(mode)) {
+  console.error("Usage: node scripts/purger-entreprise.mjs <entreprise_id> <dry-run|execute|verify|preuve|restaurer-echeance> [--run-id=<uuid>] [--out=<fichier.json>] [--preuve=<fichier.json>]");
   process.exit(1);
 }
 
@@ -197,7 +211,45 @@ async function executer(runId) {
   }
   console.log("OK  entreprise anonymisée et marquée purgee_at");
   console.log(`\nPurge terminée (run_id=${runId}). Vérifiez avec :`);
-  console.log(`  node scripts/purger-entreprise.mjs ${entrepriseId} verify\n`);
+  console.log(`  node scripts/purger-entreprise.mjs ${entrepriseId} verify`);
+  console.log("Puis archivez la preuve HORS de la base (elle doit survivre à une restauration) :");
+  console.log(`  node scripts/purger-entreprise.mjs ${entrepriseId} preuve --out=preuve-purge-${entrepriseId}.json\n`);
+}
+
+async function exporterPreuve() {
+  const { data, error } = await supabase.rpc("preuve_purge_entreprise", { p_entreprise_id: entrepriseId });
+  if (error) {
+    console.error(`Preuve de purge impossible : ${error.message}`);
+    process.exit(1);
+  }
+  const json = `${JSON.stringify(data, null, 2)}\n`;
+  if (outArg) {
+    // wx : ne jamais écraser une preuve déjà archivée.
+    writeFileSync(outArg, json, { flag: "wx" });
+    console.error(`Preuve écrite dans ${outArg} (statut ${data?.statut}, empreinte ${data?.empreinte_audit_sha256}).`);
+  } else {
+    process.stdout.write(json);
+  }
+  process.exit(data?.statut === "PURGEE" ? 0 : 1);
+}
+
+async function restaurerEcheance() {
+  if (!preuveArg) {
+    console.error("--preuve=<fichier.json> est requis (preuve archivée par le mode `preuve`).");
+    process.exit(1);
+  }
+  const preuve = JSON.parse(readFileSync(preuveArg, "utf8"));
+  if (preuve.entreprise_id !== entrepriseId) {
+    console.error(`La preuve concerne ${preuve.entreprise_id}, pas ${entrepriseId}.`);
+    process.exit(1);
+  }
+  const { data, error } = await supabase.rpc("restaurer_echeance_depuis_preuve", { p_preuve: preuve });
+  if (error) {
+    console.error(`Échéance non restaurée : ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`Échéance ré-appliquée (${data}). Rejouez la purge :`);
+  console.log(`  node scripts/purger-entreprise.mjs ${entrepriseId} execute`);
 }
 
 async function verifier() {
@@ -237,6 +289,10 @@ if (mode === "dry-run") {
   console.log("Mode dry-run : rien n'a été modifié. Relancez avec `execute` pour la purge réelle.");
 } else if (mode === "verify") {
   await verifier();
+} else if (mode === "preuve") {
+  await exporterPreuve();
+} else if (mode === "restaurer-echeance") {
+  await restaurerEcheance();
 } else {
   const runId = runIdArg ?? randomUUID();
   await executer(runId);

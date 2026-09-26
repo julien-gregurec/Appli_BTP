@@ -142,6 +142,13 @@ restent `LEGAL_DECISION_REQUIRED` :
   policy, + REVOKE explicite).
 - La purge n'est jamais déclenchée automatiquement (aucun `pg_cron`) : toujours une
   exécution manuelle supervisée par la plateforme, conforme à `PROMPT_CODEX_RGPD.md`.
+  Un planificateur existe depuis `20260923000400` (`src/lib/rgpd-purge-planificateur.ts`,
+  greffé sur `/api/cron/abonnements`) mais il est **désactivé par défaut** et ne s'active
+  qu'avec `RGPD_PURGE_PLANIFICATEUR_MODE=execute` + `RGPD_PURGE_DECISION_REF`.
+- Après chaque purge : `preuve --out=<fichier>` et archivage **hors base**. Après toute
+  restauration de sauvegarde : rejouer les purges archivées (`restaurer-echeance` si
+  besoin, puis `execute`) — voir
+  `docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md` §5.
 
 ## 10. Cas bloqués
 
