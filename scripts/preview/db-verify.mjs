@@ -8,7 +8,8 @@
  *      la Production (exhvuzegsefmoguxoiak) ;
  *   2. registre des migrations : supabase_migrations.schema_migrations comparé aux fichiers
  *      supabase/migrations/*.sql (nombre, dernière version, versions manquantes des deux côtés) ;
- *   3. docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql (13 contrôles, bloquants/non bloquants) ;
+ *   3. docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql (contrôles bloquants/non bloquants ; leur
+ *      nombre est lu dans le SQL, l'attendu du registre est généré par train-expectations.mjs) ;
  *   4. docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql en mode preview ;
  *   5. RLS smoke structurel : tables public sans RLS, tables RLS sans aucune policy,
  *      privilèges d'écriture d'anon sur public, buckets publics ;
@@ -28,7 +29,7 @@
  * Sortie : 0 GO · 1 NO-GO · 2 refus.
  */
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   REF_PREVIEW_AUTORISEE, Refus, SORTIE, estPointEntree, exigerRefPreview, ligne, lireOptions, refDepuisUrlDb,
@@ -40,6 +41,12 @@ const PREFLIGHT_SQL = resolve(ROOT, "docs/operations/PLATFORM_SECURITY_PREFLIGHT
 
 export function versionsLocales(dir = resolve(ROOT, "supabase/migrations")) {
   return readdirSync(dir).filter((f) => /^\d{14}_.+\.sql$/.test(f)).map((f) => f.slice(0, 14)).sort();
+}
+
+/** Nombre de contrôles du SQL de vérification (ordres `select N, '…'` du CTE controles). */
+export function compterControles(sql) {
+  const ordres = [...sql.matchAll(/^\s+select (\d+), '/gm)].map((m) => Number(m[1]));
+  return ordres.length ? Math.max(...ordres) : 0;
 }
 
 /** Compare registre distant et fichiers locaux. */
@@ -191,7 +198,8 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
     if (!cmp.inconnuesDuDepot.length && !cmp.nonAppliquees.length) log(ligne("ok", "DB-MIGRATIONS", "registre", "aligné sur le dépôt"));
   }
 
-  // 2. Vérification Preview (13 contrôles).
+  // 2. Vérification Preview (nombre de contrôles lu dans le SQL).
+  const nbControles = compterControles(readFileSync(VERIFY_SQL, "utf8"));
   const v = psql(url, ["-At", "-F", "|", "-f", VERIFY_SQL]);
   if (v.code !== 0) ko("DB-VERIFY", "ELSATIA_PREVIEW_DB_VERIFY_V1.sql", v.stderr.trim().split("\n").at(-1));
   else {
@@ -201,7 +209,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
       else if (l.bloquant) ko("DB-VERIFY", l.controle, `attendu ${l.attendu} — observé ${l.observe}`);
       else log(ligne("warn", "DB-VERIFY", l.controle, `non bloquant — observé ${l.observe}`));
     }
-    if (lignes.length !== 13) ko("DB-VERIFY-SHAPE", "ELSATIA_PREVIEW_DB_VERIFY_V1.sql", `${lignes.length} ligne(s) lue(s), 13 attendues`);
+    if (lignes.length !== nbControles) ko("DB-VERIFY-SHAPE", "ELSATIA_PREVIEW_DB_VERIFY_V1.sql", `${lignes.length} ligne(s) lue(s), ${nbControles} attendues`);
   }
 
   // 3. Préflight sécurité plateforme, mode preview.

@@ -6,17 +6,20 @@
 --
 -- Sortie : une ligne par contrôle (controle, attendu, observe, ok, bloquant).
 -- GO base = aucune ligne `bloquant = true` avec `ok = false`.
--- Validé sur PostgreSQL 16 + socle Supabase reconstruit (scripts/local-postgres-bootstrap) après
--- rejeu des 321 migrations de la ref de préparation (ELSATIA_PREVIEW_EXECUTION_PREP_V3) ; attendu
--- aligné sur le train canonique V2 (335 migrations, dernière 20260923000400 — rapport
--- ELSATIA_CANONICAL_TRAIN_V2_FINAL_CONVERGENCE) + réconciliations RGPD factures émises (401) et
--- contrats acceptés (402) : 337 migrations, dernière 20260926000402 (rapport
--- ELSATIA_RGPD_ACCEPTED_CONTRACTS_RECONCILIATION_V1).
+-- Validé sur PostgreSQL 16 + socle Supabase reconstruit (scripts/local-postgres-bootstrap).
+-- Attendu du contrôle 1 : CTE `attendu_train` ci-dessous, GÉNÉRÉ depuis supabase/migrations par
+-- `npm run sync:train-expectations` et vérifié en CI (`npm run verify:train-expectations`) :
+-- aucun nombre de migrations n'est maintenu à la main (train canonique V3 — rapport
+-- ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE). Contrôles 14-17 : garde-fous du train V3
+-- (RGPD factures/contrats, Réserves).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
+-- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
+attendu_train(nb, derniere) as (values (340, '20260926000505')),
+-- [/train-expectations]
 migrations as (
   -- Le registre du CLI n'existe que sur un vrai projet (absent du harnais local).
   select case when to_regclass('supabase_migrations.schema_migrations') is null then null
@@ -47,10 +50,10 @@ buckets_attendus(id) as (
          ('studio-originals'), ('studio-renders')
 ),
 controles(ordre, controle, attendu, observe, ok, bloquant) as (
-  select 1, 'migrations appliquées (registre CLI)', '337, dernière 20260926000402',
+  select 1, 'migrations appliquées (registre CLI)', a.nb::text || ', dernière ' || a.derniere,
          coalesce(m.nb::text || ', dernière ' || m.derniere, 'registre absent (harnais local)'),
-         m.nb is null or (m.nb = 337 and m.derniere = '20260926000402'), true
-  from migrations m
+         m.nb is null or (m.nb = a.nb and m.derniere = a.derniere), true
+  from migrations m cross join attendu_train a
   union all
   select 2, 'extensions requises', 'pgcrypto, pg_trgm, unaccent, pgsodium (schéma)',
          (select string_agg(extname, ', ' order by extname) from pg_extension where extname in ('pgcrypto', 'pg_trgm', 'unaccent', 'pgsodium'))
@@ -117,6 +120,41 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
   select 13, 'propriétaire plateforme actif (admin total)', '1 après plateforme_proprietaire_revendiquer()',
          (select count(*) from public.plateforme_admins where utilisateur_id is not null and role = 'total')::text || ' admin(s) total rattaché(s)',
          (select count(*) from public.plateforme_admins where utilisateur_id is not null and role = 'total') >= 1, false
+  union all
+  -- Train V3 (20260926000502/504) : politique RGPD des contrats acceptés retenue par le
+  -- propriétaire ; tant que la durée n'est pas validée, l'état effectif est duree_requise
+  -- (purge des contrats refusée, fail-closed). Un autre choix = dérive de la décision.
+  select 14, 'RGPD contrats acceptés : politique retenue', 'conserver_contrat_minimise (état duree_requise tant que la durée n''est pas validée)',
+         coalesce((select politique || ' / durée ' || coalesce(duree_conservation::text, 'non validée') from platform.purge_politique_contrats), 'ABSENTE'),
+         coalesce((select politique = 'conserver_contrat_minimise' from platform.purge_politique_contrats), false), true
+  union all
+  select 15, 'TRUNCATE refusé sur factures et contrats (501/502)', '8 triggers refuser_truncate_*',
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in (
+            'refuser_truncate_factures', 'refuser_truncate_lignes_factures', 'refuser_truncate_paiements',
+            'refuser_truncate_devis', 'refuser_truncate_lignes_devis', 'refuser_truncate_avenants',
+            'refuser_truncate_lignes_avenants', 'refuser_truncate_pieces_jointes_devis'))::text || '/8',
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname in (
+            'refuser_truncate_factures', 'refuser_truncate_lignes_factures', 'refuser_truncate_paiements',
+            'refuser_truncate_devis', 'refuser_truncate_lignes_devis', 'refuser_truncate_avenants',
+            'refuser_truncate_lignes_avenants', 'refuser_truncate_pieces_jointes_devis')) = 8, true
+  union all
+  select 16, 'Réserves : gardes R-01 à R-05 (503)', '7 triggers actifs',
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname in (
+            'reserves_modification_garde', 'reserves_modification_historisee', 'reserves_decision_levee_garde',
+            'reserves_chantiers_detachement_gp', 'reserves_intervenants_garde_rattachement',
+            'reserves_historique_immuable', 'reserves_historique_immuable_truncate'))::text || '/7',
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname in (
+            'reserves_modification_garde', 'reserves_modification_historisee', 'reserves_decision_levee_garde',
+            'reserves_chantiers_detachement_gp', 'reserves_intervenants_garde_rattachement',
+            'reserves_historique_immuable', 'reserves_historique_immuable_truncate')) = 7, true
+  union all
+  select 17, 'Export RGPD : tables enfants (505)', 'lignes_avenants couverte',
+         case when (select bool_or(pg_get_functiondef(p.oid) like '%lignes_avenants%') from pg_proc p
+                    join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.proname = 'exporter_donnees_entreprise') then 'présente' else 'ABSENTE' end,
+         coalesce((select bool_or(pg_get_functiondef(p.oid) like '%lignes_avenants%') from pg_proc p
+                   join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'public' and p.proname = 'exporter_donnees_entreprise'), false), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

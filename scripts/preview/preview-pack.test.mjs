@@ -1,7 +1,7 @@
 // Tests hors réseau du pack d'exécution Preview (scripts/preview/*).
 // Lancer : node --test scripts/preview/preview-pack.test.mjs   (npm run test:preview-pack)
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -121,12 +121,17 @@ test("env-check : fichiers réels, refus d'un fichier Production, NO-GO sur gaba
 
 // ── Base ───────────────────────────────────────────────────────────────────
 test("db : comparaison du registre des migrations", () => {
+  // Aucun nombre codé en dur : le train (V2 : 335, V3 : 340…) change à chaque lot. On vérifie
+  // la forme (tri, unicité, horodatages) et la comparaison sur une coupe relative.
   const locales = versionsLocales();
-  assert.equal(locales.length, 335);
-  assert.equal(locales.at(-1), "20260923000400");
+  assert.ok(locales.length >= 335, "au moins le train canonique V2");
+  assert.deepEqual([...locales].sort(), locales);
+  assert.equal(new Set(locales).size, locales.length);
+  assert.ok(locales.includes("20260923000400"), "dernière migration du V2 présente");
+  assert.ok(locales.every((v) => /^\d{14}$/.test(v)));
   const ok = comparerMigrations(locales, locales);
   assert.deepEqual([ok.nonAppliquees.length, ok.inconnuesDuDepot.length], [0, 0]);
-  const autre = comparerMigrations(locales, [...locales.slice(0, 328), "20260922000184"]);
+  const autre = comparerMigrations(locales, [...locales.slice(0, locales.length - 7), "20260922000184"]);
   assert.equal(autre.nonAppliquees.length, 7);
   assert.deepEqual(autre.inconnuesDuDepot, ["20260922000184"]);
 });
@@ -297,4 +302,38 @@ test("redis : règles noeviction / version / TLS", () => {
   assert.ok(evaluerRedis({ ...base, infoMemory: { maxmemory_policy: "allkeys-lru" } }).some(([n, c]) => n === "error" && c === "REDIS-EVICTION"));
   assert.ok(evaluerRedis({ ...base, infoServer: { redis_version: "4.0.9" } }).some(([n, c]) => n === "error" && c === "REDIS-VERSION"));
   assert.ok(evaluerRedis({ ...base, protocole: "redis:" }).some(([n, c]) => n === "warning" && c === "REDIS-NO-TLS"));
+});
+
+// ── Attendus du train (source unique : supabase/migrations) ─────────────────
+test("train : attendus générés = fichiers du dépôt (DB verify SQL, runbooks)", async () => {
+  const te = await import("./train-expectations.mjs");
+  const { attendus, changes } = te.synchroniser({ ecrire: false });
+  const locales = versionsLocales();
+  assert.equal(attendus.nb, locales.length);
+  assert.equal(attendus.derniere, locales.at(-1));
+  assert.deepEqual(changes, [], "lancer npm run sync:train-expectations");
+  const sql = readFileSync(te.VERIFY_SQL, "utf8");
+  assert.match(sql, new RegExp(`attendu_train\\(nb, derniere\\) as \\(values \\(${locales.length}, '${locales.at(-1)}'\\)\\)`));
+  assert.ok(attendus.controles >= 17, "contrôles V3 (14-17) présents");
+});
+
+test("train : réécriture des marqueurs SQL et Markdown", async () => {
+  const te = await import("./train-expectations.mjs");
+  const a = { nb: 999, derniere: "20991231000000", controles: 42 };
+  const sql = "with\n-- [train-expectations] x\nattendu_train(nb, derniere) as (values (1, '20000101000000')),\n-- [/train-expectations]\n";
+  assert.match(te.appliquerSql(sql, a), /values \(999, '20991231000000'\)/);
+  assert.throws(() => te.appliquerSql("sans marqueurs", a));
+  const md = "a <!--train:nb-->1<!--/train:nb--> b <!--train:derniere-->x<!--/train:derniere--> c <!--train:controles-->3<!--/train:controles-->";
+  assert.equal(te.appliquerMarkdown(md, a),
+    "a <!--train:nb-->999<!--/train:nb--> b <!--train:derniere-->20991231000000<!--/train:derniere--> c <!--train:controles-->42<!--/train:controles-->");
+  assert.equal(te.compterControles("  select 1, 'a'\n  select 17, 'b'\n"), 17);
+});
+
+test("env inventory : le fichier généré du dépôt correspond au manifeste courant", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const racine = resolve(import.meta.dirname, "../..");
+  const r = spawnSync(process.execPath, [resolve(import.meta.dirname, "env-inventory.mjs")], { encoding: "utf8", cwd: racine });
+  assert.equal(r.status, 0);
+  const fichier = readFileSync(resolve(racine, "docs/qualification/preview-pack/ENV_INVENTORY_PREVIEW_V1.generated.md"), "utf8");
+  assert.equal(r.stdout, fichier, "régénérer : npm run -s preview:env-inventory > docs/qualification/preview-pack/ENV_INVENTORY_PREVIEW_V1.generated.md");
 });

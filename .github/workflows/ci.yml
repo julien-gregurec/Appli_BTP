@@ -61,6 +61,9 @@ jobs:
       - name: Tests du pack d'exécution Preview (sans réseau, sans dépendance)
         run: npm run test:preview-pack
 
+      - name: Attendus du train (migrations, DB verify, runbooks) générés et à jour
+        run: npm run verify:train-expectations
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 
