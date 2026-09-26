@@ -153,7 +153,10 @@ test.describe("CH-08: ouvrier accède au détail d'un chantier où il n'est pas 
     const finalUrl = new URL(page.url()).pathname;
     const bodyText = await page.locator("body").innerText();
     const redirected = finalUrl !== `/chantiers/${chantierId}`;
-    const emptyOrRefused = /acc[eè]s refus[eé]|non autoris[eé]|introuvable|404|not found/i.test(bodyText);
+    // A real HTTP 404 from notFound() is a refusal in its own right, whatever
+    // wording the 404 page uses (train canonique V1 : le produit répondait 404,
+    // seule la regex sur le texte manquait).
+    const emptyOrRefused = response?.status() === 404 || /acc[eè]s refus[eé]|non autoris[eé]|introuvable|404|not found/i.test(bodyText);
     console.log(`[CH-08] chantier=${chantierId} finalUrl=${finalUrl} status=${response?.status() ?? 0} redirected=${redirected} emptyOrRefused=${emptyOrRefused}`);
 
     // The pack's P0 criterion is now enforced, not just measured: direct URL
@@ -259,13 +262,29 @@ test.describe("PE-06: signature électronique de l'employé", () => {
     // Real pointer gesture over the canvas. The component draws on
     // pointerdown/pointermove and flips its `vide` ref on pointerdown, so a
     // multi-step drag is what a signature actually is.
-    const boite = await canvas.boundingBox();
-    expect(boite, "canvas must have a real box before drawing").toBeTruthy();
-    await page.mouse.move(boite!.x + 12, boite!.y + 12);
-    await page.mouse.down();
-    await page.mouse.move(boite!.x + boite!.width * 0.4, boite!.y + boite!.height * 0.7, { steps: 10 });
-    await page.mouse.move(boite!.x + boite!.width - 15, boite!.y + 20, { steps: 10 });
-    await page.mouse.up();
+    // page.mouse works in viewport coordinates: on the long /employes/[id] page
+    // the canvas sits below the fold, and a gesture on an off-screen box never
+    // reaches it (train canonique V1 : cause mesurée du dernier FAIL PE-06).
+    await canvas.scrollIntoViewIfNeeded();
+    // Under `next dev` the first gesture can land before React has hydrated the
+    // component (no pointer handlers attached yet, nothing drawn, no error
+    // either). Redraw until the canvas really holds ink, measured in the page
+    // itself, so a failure below can only be the save path, never the gesture.
+    const aDeLEncre = () => canvas.evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return true;
+      return false;
+    });
+    await expect.poll(async () => {
+      const boite = await canvas.boundingBox();
+      if (!boite) return false;
+      await page.mouse.move(boite.x + 12, boite.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(boite.x + boite.width * 0.4, boite.y + boite.height * 0.7, { steps: 10 });
+      await page.mouse.move(boite.x + boite.width - 15, boite.y + 20, { steps: 10 });
+      await page.mouse.up();
+      return aDeLEncre();
+    }, { message: "the drawn stroke must reach the canvas", timeout: 20_000, intervals: [500, 1_000, 2_000] }).toBe(true);
     await page.getByRole("button", { name: /Enregistrer la signature/ }).click();
     // Name the cause on failure: if the stroke was not registered, the component
     // says so client-side and never calls the Server Action.
