@@ -22,8 +22,13 @@ insert into public.utilisateurs(id) values ('53000000-0000-0000-0000-00000000000
 insert into public.utilisateurs_entreprises(utilisateur_id,entreprise_id)
  values ('53000000-0000-0000-0000-000000000004','53000000-0000-0000-0000-0000000000e1');
 
--- 1) Inscription fermée (défaut livré).
-select is((select mode from public.studio_signup_policy where singleton),'closed'::text,'signup : défaut livré closed');
+-- 1) Inscription fermée (défaut livré). Le harnais E2E jetable (apps/studio/scripts/local-test.mjs)
+-- ouvre la politique sur son instance : on vérifie donc le défaut porté par la migration elle-même,
+-- puis on remet explicitement la politique à 'closed' pour que la suite ne dépende pas de l'instance.
+select is((select column_default::text from information_schema.columns
+ where table_schema='public' and table_name='studio_signup_policy' and column_name='mode'),
+ '''closed''::text'::text,'signup : défaut livré closed');
+update public.studio_signup_policy set mode='closed', allowlist='{}', updated_at=now() where singleton;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','53000000-0000-0000-0000-000000000001',true);
 select throws_ok($$select public.studio_create_workspace('A','personal')$$,'42501','Inscription fermée','closed : tenant A refusé');

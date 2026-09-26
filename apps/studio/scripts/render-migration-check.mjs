@@ -1,5 +1,5 @@
 /** Fresh disposable runtime only: rollback E, seed a populated D timeline, upgrade E. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,12 @@ if (
   !/^elsatia-studio-a-[a-z0-9]+$/.test(state.projectId)
 )
   throw Error("Disposable runtime required");
+// Migration counts are relative to the disposable directory, not hard-coded: the canonical
+// train carries every ELSATIA migration, not only the Studio lineage. Held files (".held")
+// are excluded, so each nested check sees its own fresh state.
+const FRESH = readdirSync(join(state.directory, "supabase/migrations")).filter((n) =>
+  n.endsWith(".sql"),
+).length;
 function sql(input) {
   return execFileSync(
     "docker",
@@ -30,7 +36,7 @@ function sql(input) {
   ).trim();
 }
 if (
-  sql("select count(*) from supabase_migrations.schema_migrations") !== "257" ||
+  sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH) ||
   sql("select count(*) from studio_render_jobs") !== "0"
 )
   throw Error("Fresh empty render schema required");
@@ -57,7 +63,7 @@ const r = await fetch(
 );
 if (!r.ok) throw Error("Empty private bucket deletion failed");
 sql(readFileSync(join(app, "scripts/rollback-render-local.sql"), "utf8"));
-if (sql("select count(*) from supabase_migrations.schema_migrations") !== "256")
+if (sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH - 1))
   throw Error("Rollback failed");
 let fixture = readFileSync(
   resolve(app, "../../supabase/tests/studio_timeline.test.sql"),
@@ -75,19 +81,19 @@ const before = sql(
 );
 const log = execFileSync(
   resolve(app, "../../node_modules/.bin/supabase"),
-  ["migration", "up", "--local", "--workdir", state.directory],
+  ["migration", "up", "--local", "--include-all", "--workdir", state.directory],
   { encoding: "utf8", timeout: 120000 },
 );
 writeFileSync(join(state.directory, "render-reapply.log"), log, {
   mode: 0o600,
 });
 if (
-  sql("select count(*) from supabase_migrations.schema_migrations") !== "257" ||
+  sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH) ||
   sql(
     "select md5(string_agg(row_to_json(t)::text,'' order by id)) from studio_timelines t;",
   ) !== before
 )
   throw Error("Upgrade changed D timeline");
 console.log(
-  "Fresh 257 → rollback 256 → populated Lot D fixture → upgrade/reapply 257: PASS; timeline byte-identical",
+  `Fresh ${FRESH} → rollback ${FRESH - 1} → populated Lot D fixture → upgrade/reapply ${FRESH}: PASS; timeline byte-identical`,
 );

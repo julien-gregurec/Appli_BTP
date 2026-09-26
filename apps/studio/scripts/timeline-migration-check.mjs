@@ -1,5 +1,5 @@
 /** Destructive rollback qualification restricted to the registered, empty Studio fixture schema. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,12 @@ const config = readFileSync(
 );
 if (!config.includes(`project_id = "${state.projectId}"`))
   throw Error("Local project mismatch");
+// Migration counts are relative to the disposable directory, not hard-coded: the canonical
+// train carries every ELSATIA migration, not only the Studio lineage. Held files (".held")
+// are excluded, so each nested check sees its own fresh state.
+const FRESH = readdirSync(join(state.directory, "supabase/migrations")).filter((n) =>
+  n.endsWith(".sql"),
+).length;
 function sql(input) {
   return execFileSync(
     "docker",
@@ -38,19 +44,19 @@ function sql(input) {
 }
 const count = () =>
   Number(sql("select count(*) from supabase_migrations.schema_migrations;"));
-if (count() !== 256) throw Error("Expected fresh 256-migration state");
+if (count() !== FRESH) throw Error(`Expected fresh ${FRESH}-migration state`);
 const before = sql(
   "select count(*)||':'||(select count(*) from public.studio_media_assets) from public.studio_projects;",
 );
 sql(readFileSync(join(app, "scripts/rollback-timeline-local.sql"), "utf8"));
 if (
-  count() !== 255 ||
+  count() !== FRESH - 1 ||
   sql("select to_regclass('public.studio_timelines') is null;") !== "t"
 )
   throw Error("Rollback failed");
 const result = spawnSync(
   resolve(app, "../../node_modules/.bin/supabase"),
-  ["migration", "up", "--local", "--workdir", state.directory],
+  ["migration", "up", "--local", "--include-all", "--workdir", state.directory],
   { encoding: "utf8", timeout: 120000 },
 );
 writeFileSync(
@@ -58,12 +64,12 @@ writeFileSync(
   `${result.stdout}\n${result.stderr}`,
   { mode: 0o600 },
 );
-if (result.status !== 0 || count() !== 256)
+if (result.status !== 0 || count() !== FRESH)
   throw Error("Reapply failed: inspect local timeline-reapply.log");
 const after = sql(
   "select count(*)||':'||(select count(*) from public.studio_media_assets) from public.studio_projects;",
 );
 if (before !== after) throw Error("Existing project/media counts changed");
 console.log(
-  "Fresh 256 → rollback 255 → reapply 256: PASS; project/media counts preserved",
+  `Fresh ${FRESH} → rollback ${FRESH - 1} → reapply ${FRESH}: PASS; project/media counts preserved`,
 );

@@ -1,5 +1,5 @@
 /** Disposable fresh F only. Reject rollback if any F data exists, preserve populated E snapshots. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,12 @@ if (
   !/^elsatia-studio-a-[a-z0-9]+$/.test(state.projectId)
 )
   throw Error("Disposable runtime required");
+// Migration counts are relative to the disposable directory, not hard-coded: the canonical
+// train carries every ELSATIA migration, not only the Studio lineage. Held files (".held")
+// are excluded, so each nested check sees its own fresh state.
+const FRESH = readdirSync(join(state.directory, "supabase/migrations")).filter((n) =>
+  n.endsWith(".sql"),
+).length;
 function sql(input) {
   return execFileSync(
     "docker",
@@ -30,12 +36,12 @@ function sql(input) {
     { input, encoding: "utf8", timeout: 30000 },
   ).trim();
 }
-if (sql("select count(*) from supabase_migrations.schema_migrations") !== "258")
-  throw Error("Fresh F required");
+if (sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH))
+  throw Error(`Fresh F required`);
 sql(readFileSync(join(app, "scripts/rollback-templates-local.sql"), "utf8"));
-if (sql("select count(*) from supabase_migrations.schema_migrations") !== "257")
+if (sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH - 1))
   throw Error("F rollback failed");
-// Earlier E rollback/upgrade gate is still checked at its intended 257 schema.
+// Earlier E rollback/upgrade gate is still checked at its intended schema (FRESH - 1 migrations here).
 // F file is temporarily absent from the disposable migration directory only.
 const f = join(
   state.directory,
@@ -75,11 +81,11 @@ const timelines = () =>
 const timelineBefore = timelines();
 execFileSync(
   join(root, "node_modules/.bin/supabase"),
-  ["migration", "up", "--local", "--workdir", state.directory],
+  ["migration", "up", "--local", "--include-all", "--workdir", state.directory],
   { stdio: "inherit", timeout: 120000 },
 );
 if (
-  sql("select count(*) from supabase_migrations.schema_migrations") !== "258" ||
+  sql("select count(*) from supabase_migrations.schema_migrations") !== String(FRESH) ||
   hash() !== before ||
   timelines() !== timelineBefore
 )
@@ -87,7 +93,7 @@ if (
 sql(readFileSync(join(app, "scripts/rollback-templates-local.sql"), "utf8"));
 execFileSync(
   join(root, "node_modules/.bin/supabase"),
-  ["migration", "up", "--local", "--workdir", state.directory],
+  ["migration", "up", "--local", "--include-all", "--workdir", state.directory],
   { stdio: "inherit", timeout: 120000 },
 );
 if (hash() !== before || timelines() !== timelineBefore)
@@ -95,13 +101,13 @@ if (hash() !== before || timelines() !== timelineBefore)
 writeFileSync(
   join(state.directory, "templates-migration-evidence.json"),
   JSON.stringify({
-    fresh: 258,
-    rollback: 257,
-    reapplied: 258,
+    fresh: FRESH,
+    rollback: FRESH - 1,
+    reapplied: FRESH,
     immutableRenderSnapshot: true,
     unchangedTimeline: true,
   }),
 );
 console.log(
-  "F fresh 258 / rollback 257 / E rollback-upgrade / populated E upgrade 258 / F rollback-reapply: PASS",
+  `F fresh ${FRESH} / rollback ${FRESH - 1} / E rollback-upgrade / populated E upgrade ${FRESH} / F rollback-reapply: PASS`,
 );

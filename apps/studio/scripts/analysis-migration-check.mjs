@@ -1,5 +1,5 @@
 /** Local H: empty rollback, prior H upgrade gates, and data preservation. */
-import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,12 @@ if (
   !/^elsatia-studio-a-[a-z0-9]+$/.test(state.projectId)
 )
   throw Error("Disposable local runtime required");
+// Migration counts are relative to the disposable directory, not hard-coded: the canonical
+// train carries every ELSATIA migration, not only the Studio lineage. Held files (".held")
+// are excluded, so each nested check sees its own fresh state.
+const FRESH = readdirSync(join(state.directory, "supabase/migrations")).filter((n) =>
+  n.endsWith(".sql"),
+).length;
 function sql(input) {
   return execFileSync(
     "docker",
@@ -35,10 +41,10 @@ const hash = () =>
   sql(
     "select md5(coalesce((select string_agg(to_jsonb(t)::text,'' order by id) from studio_timelines t),'')||coalesce((select string_agg(snapshot::text,'' order by id) from studio_render_jobs),''))",
   );
-if (count() !== "260") throw Error("Fresh H 260 required");
+if (count() !== String(FRESH)) throw Error(`Fresh H ${FRESH} required`);
 const before = hash();
 sql(readFileSync(join(app, "scripts/rollback-analysis-local.sql"), "utf8"));
-if (count() !== "259" || hash() !== before)
+if (count() !== String(FRESH - 1) || hash() !== before)
   throw Error("H rollback changed data");
 const migration = join(
   state.directory,
@@ -58,16 +64,16 @@ const populated = hash();
 function up() {
   execFileSync(
     join(root, "node_modules/.bin/supabase"),
-    ["migration", "up", "--local", "--workdir", state.directory],
+    ["migration", "up", "--local", "--include-all", "--workdir", state.directory],
     { stdio: "inherit", timeout: 120000 },
   );
 }
 up();
-if (count() !== "260" || hash() !== populated)
+if (count() !== String(FRESH) || hash() !== populated)
   throw Error("H upgrade changed F data");
 sql(readFileSync(join(app, "scripts/rollback-analysis-local.sql"), "utf8"));
 up();
-if (count() !== "260" || hash() !== populated)
+if (count() !== String(FRESH) || hash() !== populated)
   throw Error("H populated rollback/reapply changed data");
 const probeId =
   sql(`insert into studio_media_analysis(workspace_id,project_id,asset_id,requested_by,analysis_version)
@@ -84,7 +90,7 @@ try {
 }
 if (
   !refused ||
-  count() !== "260" ||
+  count() !== String(FRESH) ||
   sql(`select count(*) from studio_media_analysis where id='${probeId}'`) !==
     "1"
 )
@@ -93,13 +99,13 @@ sql(`delete from studio_media_analysis where id='${probeId}'`);
 writeFileSync(
   join(state.directory, "analysis-migration-evidence.json"),
   JSON.stringify({
-    fresh: 260,
-    rollback: 259,
-    reapplied: 260,
+    fresh: FRESH,
+    rollback: FRESH - 1,
+    reapplied: FRESH,
     populatedGUnchanged: true,
     populatedAnalysisRollbackRefused: true,
   }),
 );
 console.log(
-  "H fresh 260 / A-G gates / populated upgrade / empty rollback-reapply: PASS",
+  `H fresh ${FRESH} / A-G gates / populated upgrade / empty rollback-reapply: PASS`,
 );
