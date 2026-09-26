@@ -229,7 +229,18 @@ Témoins : `docs/qualification/witnesses/reserves-full-local-v1/pdf-detaille-ent
 
 ### 4.3 Playwright (Réserves compilé + passerelle + Chromium)
 
-__E2E_TABLE__
+Passe finale propre (base reconstruite, 336 migrations, décor rejoué, correctifs inclus), dans
+l'ordre prévu par les specs :
+
+| Spec | Résultat | Ce qu'elle prouve |
+|---|---|---|
+| `reserves-v3-collaboration` | ✅ 1/1 | invitation par lien, rattachement, repère page 2, acceptation, demande et validation de levée, export restreint à l'entreprise, révocation, accès coupé |
+| `reserves-v4-listes-pdf` | ✅ 11/11 | listes, filtres, document imprimable synthétique/détaillé, cloisonnement du document |
+| `reserves-v4-offline-mobile` | ✅ 6/6 | socle hors-ligne mobile, réactivation de l'intervenant |
+| `reserves-v5-offline` | ✅ 13/13 (+1 non exécutable, ci-dessous) | coquille sans réseau, file persistante, rejeu sans doublon, photo hors-ligne, levée validée ailleurs jamais écrasée, cloisonnement des identités |
+| `reserves-v6-securite` | ✅ **23/23** (le `fixme` R-05 est désormais un test actif et vert) | cloisonnement A/B par toutes les portes, auto-levée refusée, photo obligatoire non contournable, historique non réécrivable, objet déjà déposé acquitté |
+| `reserves-v6-performance` | ✅ 5/5 | 2 000 réserves : fiche 6,8 s, liste 8,1 s, document 6,8 s (1,5 Mo) ; 100 mutations 1,1 s ; coquille avec 500 réserves locales 126 ms |
+| **Total** | **59/59** | |
 
 **Cas non exécutable dans ce harnais (pas un défaut produit)** : V5 « un rechargement hors ligne
 ne perd ni le cache ni la file ». La coquille est servie en *network-first* par le service worker ;
@@ -255,6 +266,9 @@ jouent dans l'ordre V3 → V4 → V4 mobile → V5 → V6 (V3 révoque B, V4 mob
   objet par objet sous RLS) ; décodage multipart des téléversements `File` ; pagination
   `.range()` des RPC ensemblistes ; scalaire texte/uuid encodé en JSON ; clé de projet acceptée
   en `Bearer` sans en-tête `apikey`.
+- Non-régression : la recette Colors complète (`npm run test:e2e:colors`, base `colors_e2e`
+  reconstruite, Colors recompilé) reste à **73/73** avec la passerelle étendue — même résultat que
+  `ELSATIA_COLORS_FULL_QUALIFICATION_V2.md`.
 
 ## 6. Écarts ouverts (non bloquants)
 
