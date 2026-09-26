@@ -209,6 +209,10 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
     }
     await page.getByLabel("Date du justificatif").fill(new Date().toISOString().slice(0, 10));
     await page.getByLabel("Fournisseur / commerçant").fill("TestNF01 Fournisseur");
+    // Train canonique V1 : "Montant TTC" est désormais un champ requis du
+    // formulaire (validation navigateur) -- sans lui, le brouillon n'est jamais
+    // soumis (aucun POST), ce qui n'a rien à voir avec le symptôme /login de V3.
+    await page.getByLabel("Montant TTC").fill("12.50");
     // "Affectation" (SearchableSelect, required) already carries a valid
     // default value ("hors:sans_chantier") from the page itself -- leave it
     // untouched; typing into it clears the selected value until a fresh
@@ -226,6 +230,10 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
     await page.getByRole("button", { name: "Valider le justificatif" }).click();
     await page.waitForLoadState("networkidle");
     await expect(page.locator("body")).not.toContainText("Une erreur");
+    // The upload goes through /api/notes-frais/upload asynchronously: wait for
+    // the stored document to be listed before submitting, otherwise the
+    // transition RPC rightly answers "Ajoutez au moins un justificatif".
+    await expect(page.locator("body")).toContainText("justificatif.jpg", { timeout: 15_000 });
 
     const soumettre = page.getByRole("button", { name: "Soumettre la dépense" });
     await expect(soumettre).toBeVisible({ timeout: 10_000 });
