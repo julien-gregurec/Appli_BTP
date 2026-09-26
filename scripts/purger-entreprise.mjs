@@ -179,6 +179,20 @@ async function executer(runId) {
     }
   }
 
+  // Balayage final : une suppression tardive (devis, chantiers…) peut recréer par
+  // trigger une ligne dans une table DELETE déjà vidée (ex. entreprises_dashboard_cache).
+  // marquer_entreprise_purgee refuserait alors le marquage : on relit le rapport
+  // jusqu'à stabilité avant de passer au Storage.
+  for (let balayage = 1; balayage <= 3; balayage += 1) {
+    const restantes = (await rapport()).filter((l) => l.categorie === "DELETE");
+    if (restantes.length === 0) break;
+    for (const l of restantes) {
+      const res = await purgerUneTable(l.table_nom, runId);
+      if (res.ok) console.log(`OK  ${l.table_nom} (${res.lignes_supprimees} ligne(s), balayage final ${balayage})`);
+      else console.error(`ÉCHEC ${l.table_nom} (balayage final ${balayage}) : ${res.erreur}`);
+    }
+  }
+
   // Storage (F7) : seuls les fichiers ORPHELINs (plus référencés par aucune ligne) sont
   // physiquement supprimés. Les RETAIN (ex. signatures_documents, notes_frais
   // conservées) ne sont jamais touchés.

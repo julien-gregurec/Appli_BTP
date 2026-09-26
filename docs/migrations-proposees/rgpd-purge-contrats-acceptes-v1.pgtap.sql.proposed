@@ -1,0 +1,328 @@
+-- PROTOTYPE NON ACTIVÉ — test du fichier rgpd-purge-contrats-acceptes-v1.sql.proposed
+-- (DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE, réponse « supprimer »).
+-- À exécuter sur une base où 20260923000347 ET ce prototype sont appliqués, depuis ce
+-- dossier (les \ir sont relatifs) : scripts/qualification/rgpd-invoice-immutability-v1.sh
+--
+-- Tenant réaliste construit par les chemins applicatifs (devis et avenant ACCEPTÉS,
+-- acompte, finale, avoir, paiements), purge complète par le déroulé du script, puis
+-- contrôle de l'intégrité comptable de chaque facture conservée. La sécurité du
+-- mécanisme facture est couverte par
+-- supabase/tests/rgpd_purge_facture_emise_reconciliation_v1.test.sql ; ici, celle
+-- propre aux contrats acceptés.
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(43);
+
+\ir ../../supabase/tests/fixtures/isolation_multitenant.inc
+\ir ../../supabase/tests/fixtures/rgpd_tenant_facture_emise.inc
+
+select set_config('t.a', 'a0000000-0000-0000-0000-000000000001', true);
+select set_config('t.b', 'b0000000-0000-0000-0000-000000000001', true);
+select set_config('t.chantier', 'c2000000-0000-0000-0000-000000000001', true);
+select set_config('t.devis', 'c3000000-0000-0000-0000-000000000001', true);
+select set_config('t.devis_numero', (select numero from public.devis where id = 'c3000000-0000-0000-0000-000000000001'), true);
+
+-- ─────────────────────────────────────────────────────────────
+-- 0. Point de départ
+-- ─────────────────────────────────────────────────────────────
+select is(
+  (select count(*)::integer from public.factures
+    where entreprise_id = current_setting('t.a')::uuid and statut <> 'brouillon'
+      and chantier_id = current_setting('t.chantier')::uuid and devis_origine_id = current_setting('t.devis')::uuid),
+  3,
+  'départ : acompte, finale et avoir émis, tous liés au chantier et au devis accepté'
+);
+select is(
+  (select count(*)::integer from public.factures
+    where id in (current_setting('rgpd.fx_acompte')::uuid, current_setting('rgpd.fx_finale')::uuid, current_setting('rgpd.fx_avoir')::uuid)
+      and entreprise_snapshot ->> 'raison_sociale' = 'Isolation A Bâtiment SARL'),
+  3,
+  'R4 : l''identité émettrice est figée en base à l''émission, sans passer par l''action TypeScript'
+);
+
+-- Photographie avant purge : contenu comptable et projection « document » de chaque
+-- facture des deux tenants.
+create temporary table _avant on commit drop as
+select f.id, f.entreprise_id, f.numero, f.type, f.statut, f.date_emission, f.date_echeance,
+       f.montant_ht, f.montant_tva, f.montant_ttc, f.montant_paye, f.facture_origine_id,
+       f.chantier_id, f.devis_origine_id, f.client_snapshot, f.entreprise_snapshot,
+       public.empreinte_comptable_facture(f.id) as empreinte,
+       (select jsonb_agg(jsonb_build_object('d', l.designation, 'q', l.quantite, 'pu', l.prix_unitaire_ht, 'tva', l.taux_tva) order by l.ordre, l.id)
+          from public.lignes_factures l where l.facture_id = f.id) as lignes,
+       (select jsonb_agg(jsonb_build_object('m', p.montant, 'd', p.date, 'r', p.reference) order by p.date, p.id)
+          from public.paiements p where p.facture_id = f.id) as paiements
+from public.factures f
+where f.entreprise_id in (current_setting('t.a')::uuid, current_setting('t.b')::uuid);
+
+-- ─────────────────────────────────────────────────────────────
+-- 1. Sécurité propre aux contrats acceptés
+-- ─────────────────────────────────────────────────────────────
+select is(has_function_privilege('authenticated', 'public._purge_rgpd_autorisee(uuid)', 'EXECUTE'), false,
+  'authenticated ne peut pas interroger l''autorisation de purge');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_like(
+  format('delete from public.devis where id = %L', current_setting('t.devis')),
+  '%accepté%',
+  'administrateur du tenant : supprimer un devis accepté reste refusé'
+);
+select throws_like(
+  format('delete from public.avenants where id = %L', current_setting('rgpd.fx_avenant')),
+  '%accepté%',
+  'administrateur du tenant : supprimer un avenant accepté reste refusé'
+);
+select throws_ok(
+  format('delete from public.chantiers where id = %L', current_setting('t.chantier')),
+  'P0001', null,
+  'administrateur du tenant : supprimer le chantier d''un contrat accepté et facturé reste refusé'
+);
+reset role;
+
+insert into platform.purge_autorisations_facture (txid, entreprise_id, table_purgee)
+values (txid_current(), current_setting('t.a')::uuid, 'devis');
+select throws_like(
+  format('update public.devis set numero = %L where id = %L', 'X', current_setting('t.devis')),
+  '%accepté%',
+  'contexte de purge : renuméroter un devis accepté reste refusé'
+);
+select throws_like(
+  format('update public.devis set statut = %L where id = %L', 'refuse', current_setting('t.devis')),
+  '%accepté%',
+  'contexte de purge : changer le statut d''un devis accepté reste refusé'
+);
+select throws_like(
+  format('delete from public.devis where id = %L', 'b9000000-0000-0000-0000-000000000001'),
+  '%accepté%',
+  'mauvais tenant : une autorisation pour A ne permet pas de supprimer un devis accepté de B'
+);
+delete from platform.purge_autorisations_facture where txid = txid_current();
+
+-- ─────────────────────────────────────────────────────────────
+-- 2. Garde-fou comptable (R3) : une écriture qui passe le verrou (champ libre) mais
+--    change le contenu d'une facture pendant la purge annule l'étape ; la reprise du
+--    même run, sans l'effet de bord, termine la purge.
+-- ─────────────────────────────────────────────────────────────
+update public.entreprises set suppression_prevue_at = now() - interval '1 second' where id = current_setting('t.a')::uuid;
+
+create function pg_temp.effet_de_bord_facture() returns trigger language plpgsql as $$
+begin
+  update public.factures set montant_paye = montant_paye + 1 where entreprise_id = old.entreprise_id and statut <> 'brouillon';
+  return old;
+end $$;
+create trigger effet_de_bord_facture after delete on public.pointages for each row execute function pg_temp.effet_de_bord_facture();
+
+select set_config('t.nb_pointages', (select count(*)::text from public.pointages where entreprise_id = current_setting('t.a')::uuid), true);
+select set_config('rgpd.entreprise_cible', current_setting('t.a'), true);
+select set_config('rgpd.run_id', 'c9000000-0000-0000-0000-000000000001', true);
+\ir ../../supabase/tests/fixtures/rgpd_purge_driver.inc
+
+select ok(current_setting('rgpd.resultat') like 'incomplete:%pointages%',
+  'R3 : la purge s''arrête sur pointages, dont la suppression modifierait une facture conservée');
+select ok(
+  exists (select 1 from platform.purge_audit
+           where run_id = 'c9000000-0000-0000-0000-000000000001' and table_nom = 'pointages'
+             and not ok and erreur like 'Garde-fou comptable%'),
+  'R3 : l''échec est consigné dans l''audit avec sa cause'
+);
+select is(
+  (select count(*)::integer from public.pointages where entreprise_id = current_setting('t.a')::uuid),
+  current_setting('t.nb_pointages')::integer,
+  'R3 : l''étape annulée n''a rien supprimé'
+);
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid
+      and a.empreinte is distinct from public.empreinte_comptable_facture(a.id)),
+  0,
+  'R3 : aucune facture n''a été modifiée'
+);
+drop trigger effet_de_bord_facture on public.pointages;
+
+-- ─────────────────────────────────────────────────────────────
+-- 3. Purge complète (service_role, déroulé du script)
+-- ─────────────────────────────────────────────────────────────
+set local role service_role;
+select is(
+  (select ok from public.purger_table_entreprise(current_setting('t.b')::uuid, 'chantiers')),
+  false,
+  'mauvais tenant : B n''a pas d''échéance, la purge de B est refusée'
+);
+reset role;
+
+-- Reprise du même run (comme `execute --run-id=`).
+\ir ../../supabase/tests/fixtures/rgpd_purge_driver.inc
+
+select is(current_setting('rgpd.resultat'), 'complete', 'service_role : la purge complète aboutit pour un tenant qui a émis des factures');
+select isnt((select purgee_at from public.entreprises where id = current_setting('t.a')::uuid), null, 'entreprise marquée purgée');
+select is(
+  (select count(*)::integer from public.chantiers where entreprise_id = current_setting('t.a')::uuid)
+  + (select count(*)::integer from public.devis where entreprise_id = current_setting('t.a')::uuid),
+  0,
+  'chantiers et devis du tenant supprimés'
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 4. Intégrité comptable
+-- ─────────────────────────────────────────────────────────────
+select is(
+  (select count(*)::integer from public.factures where entreprise_id = current_setting('t.a')::uuid),
+  (select count(*)::integer from _avant where entreprise_id = current_setting('t.a')::uuid),
+  'toutes les factures du tenant sont conservées'
+);
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid
+      and a.empreinte is distinct from public.empreinte_comptable_facture(a.id)),
+  0,
+  'empreinte comptable identique pour chaque facture conservée'
+);
+select is(
+  (select count(*)::integer from _avant a join public.factures f on f.id = a.id
+    where a.entreprise_id = current_setting('t.a')::uuid
+      and (f.numero, f.type, f.statut, f.date_emission, f.date_echeance, f.montant_ht, f.montant_tva, f.montant_ttc, f.montant_paye, f.facture_origine_id)
+          is distinct from
+          (a.numero, a.type, a.statut, a.date_emission, a.date_echeance, a.montant_ht, a.montant_tva, a.montant_ttc, a.montant_paye, a.facture_origine_id)),
+  0,
+  'numéro, type, statut, dates, totaux HT/TVA/TTC, montant payé et lien d''avoir inchangés'
+);
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid
+      and a.lignes is distinct from (select jsonb_agg(jsonb_build_object('d', l.designation, 'q', l.quantite, 'pu', l.prix_unitaire_ht, 'tva', l.taux_tva) order by l.ordre, l.id)
+                                     from public.lignes_factures l where l.facture_id = a.id)),
+  0,
+  'lignes (désignation, quantité, prix, taux de TVA) inchangées'
+);
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid
+      and a.paiements is distinct from (select jsonb_agg(jsonb_build_object('m', p.montant, 'd', p.date, 'r', p.reference) order by p.date, p.id)
+                                        from public.paiements p where p.facture_id = a.id)),
+  0,
+  'paiements inchangés'
+);
+select is(
+  (select sum(montant)::numeric from public.paiements where facture_id in (current_setting('rgpd.fx_acompte')::uuid, current_setting('rgpd.fx_finale')::uuid)),
+  1580.00::numeric,
+  'historique de règlement : 1 080 € (acompte) + 500 € (finale)'
+);
+select is(
+  (select facture_origine_id from public.factures where id = current_setting('rgpd.fx_avoir')::uuid),
+  current_setting('rgpd.fx_finale')::uuid,
+  'l''avoir crédite toujours la facture finale'
+);
+select is(
+  (select count(*)::integer from _avant a join public.factures f on f.id = a.id
+    where a.entreprise_id = current_setting('t.a')::uuid
+      and (f.client_snapshot is distinct from a.client_snapshot or f.entreprise_snapshot is distinct from a.entreprise_snapshot)),
+  0,
+  'identités figées (client, émetteur) inchangées'
+);
+select is(
+  (select client_snapshot ->> 'nom_affiche' from public.factures where id = current_setting('rgpd.fx_finale')::uuid),
+  'Marc Lefèvre',
+  'snapshot client : le destinataire de la facture reste lisible'
+);
+select is(
+  (select row(nom, email) from public.clients where id = 'c1000000-0000-0000-0000-000000000001'),
+  row('Anonymise RGPD'::text, null::text),
+  'fiche client vivante anonymisée'
+);
+select is(
+  (select coalesce(f.entreprise_snapshot, to_jsonb(e)) ->> 'raison_sociale'
+     from public.factures f join public.entreprises e on e.id = f.entreprise_id
+    where f.id = current_setting('rgpd.fx_finale')::uuid),
+  'Isolation A Bâtiment SARL',
+  'rendu : l''émetteur imprimé reste l''identité figée, pas la fiche anonymisée'
+);
+select is(
+  (select nom from public.entreprises where id = current_setting('t.a')::uuid),
+  'Entreprise supprimee',
+  'fiche entreprise vivante anonymisée'
+);
+select is(
+  (select count(*)::integer from public.factures f
+    where f.entreprise_id = current_setting('t.a')::uuid and (f.chantier_id is not null or f.devis_origine_id is not null)),
+  0,
+  'aucune référence cassée : les clés vers les lignes supprimées sont à NULL'
+);
+select is(
+  (select row(purge_snapshot -> 'chantier_id' ->> 'id', purge_snapshot -> 'chantier_id' ->> 'libelle',
+              purge_snapshot -> 'devis_origine_id' ->> 'id', purge_snapshot -> 'devis_origine_id' ->> 'libelle')
+     from public.factures where id = current_setting('rgpd.fx_finale')::uuid),
+  row(current_setting('t.chantier'), 'Rénovation maison Lefèvre'::text, current_setting('t.devis'), current_setting('t.devis_numero')),
+  'snapshot de références : chantier et devis (numéro) consignés avant délien'
+);
+select is(
+  (select count(*)::integer from platform.purge_audit
+    where run_id = 'c9000000-0000-0000-0000-000000000001' and etape = 'purge_table' and ok
+      and table_nom in ('chantiers', 'devis') and detail ->> 'controle_factures' = 'empreinte_inchangee'),
+  2,
+  'audit : les étapes chantiers et devis consignent le contrôle d''empreinte'
+);
+select is(
+  (select count(*)::integer from platform.purge_audit
+    where run_id = 'c9000000-0000-0000-0000-000000000001' and not ok
+      and erreur not like 'Garde-fou comptable%'
+      and erreur not like 'update or delete on table%violates foreign key%'),
+  0,
+  'audit : hors l''échec provoqué (R3) et ses dépendances FK, aucune étape en échec dans le run'
+);
+select is((select count(*)::integer from platform.purge_autorisations_facture), 0,
+  'aucune autorisation de purge ne subsiste après la purge');
+select is(
+  (select count(*)::integer from storage.objects where name = 'a0000000-0000-0000-0000-000000000001/logo.png'),
+  1,
+  'R7 : le logo figé dans l''identité émettrice des factures est conservé'
+);
+select is(
+  (select count(*)::integer from storage.objects where name like 'a0000000-0000-0000-0000-000000000001/c2000000-0000-0000-0000-000000000001/%'),
+  0,
+  'Storage : la photo de chantier (orpheline) est supprimée'
+);
+select is(
+  (select row(chantier_id, purge_snapshot -> 'chantier_id' ->> 'id') from public.notes_frais where id = 'c4000000-0000-0000-0000-000000000001'),
+  row(null::uuid, current_setting('t.chantier')),
+  'note de frais conservée, déliée du chantier avec sa référence consignée'
+);
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.b')::uuid
+      and (a.empreinte is distinct from public.empreinte_comptable_facture(a.id)
+           or a.chantier_id is distinct from (select chantier_id from public.factures where id = a.id))),
+  0,
+  'isolation : les factures de B sont intactes'
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 5. Immutabilité après purge, rejeu
+-- ─────────────────────────────────────────────────────────────
+select throws_like(
+  format('update public.factures set montant_ttc = 0 where id = %L', current_setting('rgpd.fx_finale')),
+  '%déjà été émise%',
+  'après purge : la facture conservée reste non modifiable'
+);
+select throws_like(
+  format('update public.factures set purge_snapshot = ''{}'' where id = %L', current_setting('rgpd.fx_finale')),
+  '%déjà été émise%',
+  'après purge : la trace de purge ne peut pas être effacée'
+);
+select throws_like(
+  format('delete from public.factures where id = %L', current_setting('rgpd.fx_finale')),
+  '%ne peut plus être supprimée%',
+  'après purge : la facture conservée reste non supprimable'
+);
+
+set local role service_role;
+select is(
+  (select row(ok, lignes_supprimees) from public.purger_table_entreprise(current_setting('t.a')::uuid, 'chantiers', 'c9000000-0000-0000-0000-000000000001')),
+  row(true, 0),
+  'rejeu : purger à nouveau chantiers est idempotent (ok, 0 ligne)'
+);
+reset role;
+select is(
+  (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid
+      and a.empreinte is distinct from public.empreinte_comptable_facture(a.id)),
+  0,
+  'rejeu : empreintes toujours identiques'
+);
+
+select * from finish();
+rollback;
