@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type Ref } from "react";
+import { hasCapability } from "@/lib/access";
 import { activeTools, type ToolDefinition, type ToolId } from "@/lib/catalog";
 import { categories, getCategory, type CategoryId } from "@/lib/categories";
 import { revealFilteredTools, toggleCategoryFilter } from "@/lib/home-navigation";
@@ -57,7 +58,7 @@ export function HomeDashboard() {
   return (
     <main>
       <section className="hero shell">
-        <div className="topline"><Brand /><div className="home-actions"><Link href="/atelier">Atelier</Link><Link href="/projets">Mes projets</Link><Link href="/compte">{account.user ? "Mon compte" : "Se connecter"}</Link><span className="free-pill">{account.access.tier === "pro" ? "Tools Pro" : "Free · sans compte"}</span></div></div>
+        <div className="topline"><Brand /><div className="home-actions"><Link href="/atelier">Atelier</Link><Link href="/projets">Mes projets</Link>{hasCapability(account.access, "releve-metre") && <Link href="/releves">Relevés</Link>}<Link href="/compte">{account.user ? "Mon compte" : "Se connecter"}</Link><span className="free-pill">{account.access.tier === "pro" ? "Tools Pro" : "Free · sans compte"}</span></div></div>
         <div className="hero-copy">
           <p className="eyebrow">LA BOÎTE À OUTILS NUMÉRIQUE DU CHANTIER</p>
           <h1>Que voulez-vous<br /><em>faire aujourd’hui&nbsp;?</em></h1>

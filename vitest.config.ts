@@ -19,6 +19,9 @@ export default defineConfig({
       "@elsatia/platform-support-comms": fileURLToPath(
         new URL("./packages/platform-support-comms/src/index.ts", import.meta.url),
       ),
+      "@elsatia/releve-domain": fileURLToPath(
+        new URL("./packages/releve-domain/src/index.ts", import.meta.url),
+      ),
       // Next.js intercepte cet import spécial au build ; en dehors de son
       // bundler (ici Vitest), le vrai paquet lève systématiquement une
       // erreur. On le neutralise comme le fait Next, uniquement pour les tests.

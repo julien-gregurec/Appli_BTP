@@ -5,5 +5,11 @@ export default defineConfig({
   test: { environment: "node", include: ["src/**/*.test.ts"] },
   // Même alias que `tsconfig.json` : les routes de métadonnées (`app/robots.ts`, `app/sitemap.ts`)
   // importent `@/lib/...` et doivent rester testables sans passer par le build Next.
-  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Domaine Relevé & Métré partagé (web, mobile, futur module natif) : même résolution que `tsconfig.json`.
+      "@elsatia/releve-domain": fileURLToPath(new URL("../../packages/releve-domain/src/index.ts", import.meta.url)),
+    },
+  },
 });

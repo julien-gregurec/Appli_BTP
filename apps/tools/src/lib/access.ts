@@ -1,14 +1,23 @@
 export const ACCESS_TIERS = ["free", "pro"] as const;
 export type AccessTier = (typeof ACCESS_TIERS)[number];
 
-export const CAPABILITIES = [
+/** Capabilities du palier Pro — miroir de `tools_capabilities_pro()` (SQL). */
+export const PRO_CAPABILITIES = [
   "basic-calculation", "basic-tracing", "site-instructions", "advanced-layout",
   "dimensioned-plan", "export-pdf", "export-svg", "saved-projects",
   "advanced-tracing", "promotion-free",
   "advanced-geometry", "construction-points", "design-shapes", "derived-quantities",
   "print-plan", "native-share", "project-duplicate", "project-archive",
 ] as const;
+/**
+ * Capabilities d'add-on (`tools_capabilities_addon()`), vendues séparément du palier Pro et
+ * JAMAIS déduites d'un palier : seul le serveur peut les renvoyer. `releve-metre` ouvre le
+ * sous-produit premium Relevé & Métré (non commercialisé, attribution interne uniquement).
+ */
+export const ADDON_CAPABILITIES = ["releve-metre"] as const;
+export const CAPABILITIES = [...PRO_CAPABILITIES, ...ADDON_CAPABILITIES] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+export type AddonCapability = (typeof ADDON_CAPABILITIES)[number];
 // `plateforme` n'est pas une source d'achat : elle identifie le niveau Pro résolu par le
 // serveur pour le propriétaire global ELSATIA (et les administrateurs plateforme « total »).
 // Elle n'est jamais écrite dans `entitlements_utilisateurs_elsatia` et ne peut pas être
@@ -20,7 +29,7 @@ export type AccessContext = { tier: AccessTier; capabilities: ReadonlySet<Capabi
 
 const TIER_CAPABILITIES: Record<AccessTier, readonly Capability[]> = {
   free: ["basic-calculation", "basic-tracing", "site-instructions"],
-  pro: CAPABILITIES,
+  pro: PRO_CAPABILITIES,
 };
 
 export const FREE_ACCESS: AccessContext = { tier: "free", capabilities: new Set(TIER_CAPABILITIES.free), source: "free-default" };
