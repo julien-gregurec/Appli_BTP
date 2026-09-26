@@ -42,7 +42,9 @@ Total estimé : **≈ 173 – 265 j** hors AR/LiDAR natifs avancés (voir lot 4b
 | Tests | Baseline exécutée : 174 fichiers / 1 992 tests verts, `tsc` 0 erreur |
 | Sortie | Deux documents `docs/product/*_V1.md`, verdict émis |
 
-## Lot 2 — Architecture
+## Lot 2 — Architecture ✅
+
+> Réalisé sur le train canonique V2 : [ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md) — verdict **RELEVE METRE LOT 2 FOUNDATION QUALIFIED**. Le lot a aussi livré, par anticipation, la table `tools_releves` et ses enfants, le gate serveur `releve-metre` et les écrans liste / structure prévus au lot 3 (en ligne ; le dépôt IndexedDB reste au lot 3).
 
 | | |
 |---|---|
