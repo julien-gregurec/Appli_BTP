@@ -5,6 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { creerSessionStripe, creerUrlStripeOAuth } from "@/lib/stripe";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function creerLienPaiementStripeAction(factureId: string) {
   const ctx = await getContexteEntreprise();
@@ -14,7 +15,7 @@ export async function creerLienPaiementStripeAction(factureId: string) {
   }
   const supabase = await createClient();
   const { data: facture } = await supabase.from("factures")
-    .select("id,numero,statut,montant_ttc,montant_paye,stripe_checkout_url,lien_paiement_expire_at,client:clients(email)")
+    .select("id,numero,statut,montant_ttc,montant_paye,stripe_checkout_url,lien_paiement_expire_at,client:clients!factures_client_id_fkey(email)")
     .eq("id",factureId).eq("entreprise_id",ctx.entrepriseId).single();
   if (!facture || !["envoyee","payee_partiel","en_retard"].includes(facture.statut)) redirect(`/factures/${factureId}?error=${encodeURIComponent("La facture doit être émise avant le paiement en ligne")}`);
   const reste = Math.round((Number(facture.montant_ttc)-Number(facture.montant_paye))*100);
@@ -28,7 +29,7 @@ export async function creerLienPaiementStripeAction(factureId: string) {
     const {error}=await supabase.from("factures").update({stripe_checkout_id:session.id,stripe_checkout_url:session.url,stripe_payment_status:session.payment_status,lien_paiement_expire_at:new Date(session.expires_at*1000).toISOString()}).eq("id",factureId).eq("entreprise_id",ctx.entrepriseId);
     if(error)throw error;
   } catch(error) {
-    redirect(`/factures/${factureId}?error=${encodeURIComponent(error instanceof Error?error.message:"Paiement en ligne indisponible")}`);
+    redirect(`/factures/${factureId}?error=${encodeURIComponent(messageErreurUtilisateur("creerLienPaiementStripeAction", error, "Paiement en ligne momentanément indisponible. Réessayez dans un instant."))}`);
   }
   revalidatePath(`/factures/${factureId}`);
   redirect(`/factures/${factureId}?success=${encodeURIComponent("Lien de paiement créé. Envoyez-le au client ; aucun paiement n’a été déclenché depuis votre compte.")}`);

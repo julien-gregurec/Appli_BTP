@@ -10,6 +10,7 @@ import {
   validerMediaDevis,
 } from "@/lib/devis-medias";
 import { createClient } from "@/lib/supabase/server";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type ContexteRoute = { params: Promise<{ id: string }> };
 type PieceRequete = {
@@ -113,7 +114,7 @@ export async function POST(request: Request, { params }: ContexteRoute) {
   });
   if (error) {
     await supabase.storage.from("devis-medias").remove(chemins);
-    return erreur(error.message || "Les pièces jointes n’ont pas pu être enregistrées", 500);
+    return erreur(messageErreurUtilisateur("financeDevisPiecesJointes:rpc", error, "Les pièces jointes n’ont pas pu être enregistrées"), 500);
   }
   return NextResponse.json({ ok: true });
 }

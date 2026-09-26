@@ -21,7 +21,7 @@ const BETA: FeatureDefinition = { status: "beta", visibleByDefault: false };
 const DISABLED: FeatureDefinition = { status: "disabled", visibleByDefault: false };
 
 /**
- * Catalogue produit Liria Gestion Pro V3.
+ * Catalogue des fonctionnalités du produit.
  *
  * Une permission détermine ce qu'un utilisateur a le droit de faire. Une feature
  * détermine ce que le produit commercial expose réellement. Les deux contrôles

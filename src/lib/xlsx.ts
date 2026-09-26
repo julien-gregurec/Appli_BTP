@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "@/lib/brand";
+
 type CelluleExcel = {
   value: unknown;
   text: string;
@@ -74,7 +76,7 @@ export function calculerLargeursXlsx(lignes: unknown[][], nombreColonnes: number
 export async function creerClasseurXlsx(lignes: unknown[][], options: OptionsXlsx = {}) {
   const ExcelJS = (await import("@excel.js/exceljs")).default;
   const classeur = new ExcelJS.Workbook() as unknown as ClasseurExcel;
-  classeur.creator = "Liria Gestion Pro";
+  classeur.creator = PRODUCT_NAME;
   classeur.created = new Date();
 
   const feuille = classeur.addWorksheet((options.nomFeuille ?? "Export").slice(0, 31));

@@ -1,9 +1,26 @@
-import { type NextRequest } from "next/server";
+import { NextRequest, type NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { construireContentSecurityPolicy, headersSecurite } from "@/lib/security/headers";
 
 // Next.js 16 a renommé "middleware" en "proxy" (même mécanisme).
-export function proxy(request: NextRequest) {
-  return updateSession(request);
+export async function proxy(request: NextRequest) {
+  const nonce = crypto.randomUUID().replaceAll("-", "");
+  const csp = construireContentSecurityPolicy({
+    nonce,
+    isDevelopment: process.env.NODE_ENV !== "production",
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("content-security-policy", csp);
+  requestHeaders.set("x-nonce", nonce);
+  const requeteSecurisee = new NextRequest(request, { headers: requestHeaders });
+  const response: NextResponse = await updateSession(requeteSecurisee);
+  response.headers.set("Content-Security-Policy", csp);
+  for (const { key, value } of headersSecurite(process.env.NODE_ENV === "production")) {
+    response.headers.set(key, value);
+  }
+  return response;
 }
 
 export const config = {

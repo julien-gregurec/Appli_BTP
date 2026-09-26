@@ -21,6 +21,10 @@ export function ReceptionCommandeForm({ lignes, action }: { lignes: LigneRecepti
     return [ligne.id, { etat: recue <= 0 ? "non_recu" : recue >= commandee ? "recu" : "partiel", quantite: recue }];
   })) as Record<string, { etat: Etat; quantite: number }>;
   const [receptions, setReceptions] = useState(initial);
+  // Stable pour tout le cycle de vie du formulaire monté : un double clic ou
+  // un retry réseau renvoie donc la même clé, et le moteur de réception
+  // traite la seconde occurrence comme un rejeu sans écrire deux fois.
+  const [cleIdempotence] = useState(() => crypto.randomUUID());
 
   const valeurs = useMemo(() => lignes.map((ligne) => {
     const saisie = receptions[ligne.id] ?? { etat: "non_recu" as Etat, quantite: 0 };
@@ -32,6 +36,7 @@ export function ReceptionCommandeForm({ lignes, action }: { lignes: LigneRecepti
 
   return (
     <form action={action} className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-amber-50/50 p-4 dark:bg-amber-950/10">
+      <input type="hidden" name="cle_idempotence" value={cleIdempotence} />
       <div>
         <h2 className="text-sm font-semibold">Réception des articles</h2>
         <p className="text-xs text-neutral-500">Indiquez pour chaque article s’il est reçu, non reçu ou reçu partiellement. Les quantités manquantes restent visibles.</p>

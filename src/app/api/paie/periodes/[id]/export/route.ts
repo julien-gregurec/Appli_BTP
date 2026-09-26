@@ -83,6 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     await journaliserExport(ctx.entrepriseId,ctx.userId,id,format,(dossiers??[]).length);
     return new Response(body, { headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${base}.zip"`, "Cache-Control": "private, no-store", "X-Content-SHA256": sha256(zip) } });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Export de paie impossible" }, { status: 400 });
+    console.error("Échec d'export de paie", error);
+    return NextResponse.json({ error: "Export de paie impossible" }, { status: 400 });
   }
 }

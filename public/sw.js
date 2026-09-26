@@ -1,16 +1,14 @@
-/* Liria Gestion Pro — service worker.
+/* ELSATIA Gestion Pro — service worker.
    Objectif : hors-ligne LÉGER sans jamais mettre en cache de données métier privées.
    - Ressources statiques versionnées (JS/CSS/polices/icônes) : cache-first (sûres, fingerprintées, non personnelles).
    - Navigation : réseau d'abord, page « /offline » en secours si pas de réseau.
    - Tout le reste (API, Supabase, Stripe, données privées) : réseau uniquement, aucun cache. */
 
-const VERSION = "liria-v3";
+const VERSION = "elsatia-v4";
 const STATIC_CACHE = `${VERSION}-static`;
 const PRECACHE = [
   "/offline",
   "/manifest.webmanifest",
-  "/icons/liria-gestion-pro-v3-192.png",
-  "/icons/liria-gestion-pro-v3-512.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -78,12 +76,10 @@ self.addEventListener("push", (event) => {
   try { payload = event.data.json(); } catch { return; }
   const options = {
     body: payload.message || "",
-    icon: "/icons/liria-gestion-pro-v3-192.png",
-    badge: "/icons/liria-gestion-pro-v3-192.png",
     data: { lien: payload.lien || "/dashboard" },
     tag: payload.lien || undefined,
   };
-  event.waitUntil(self.registration.showNotification(payload.titre || "Liria Gestion Pro", options));
+  event.waitUntil(self.registration.showNotification(payload.titre || "ELSATIA Gestion Pro", options));
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -3,6 +3,8 @@ import { enregistrerBesoinsAction } from "@/app/actions/besoins";
 import { demarrerAbonnementAction } from "@/app/actions/abonnement";
 import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
+import { BRAND_NAME } from "@/lib/brand";
+import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
 
 export default async function BesoinsPage({
   searchParams,
@@ -11,6 +13,7 @@ export default async function BesoinsPage({
 }) {
   const { error, recommande, nb } = await searchParams;
   const paiementConfigure = stripeBillingEstConfigure();
+  const abonnementsOuverts = abonnementsPublicsOuverts();
 
   // Écran de recommandation (après soumission du questionnaire).
   if (recommande) {
@@ -33,25 +36,25 @@ export default async function BesoinsPage({
               {" "}· pour {nbEmployes} salarié(s)
             </p>
             <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−20 %)</span>
+              ou {prix.totalAnnuel} € HT/an <span className="text-xs font-normal">(2 mois offerts)</span>
             </p>
             <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
-              Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
+              Essai gratuit {DUREE_ESSAI_JOURS} jours. Les abonnements en ligne ouvriront prochainement.
             </p>
             <p className="mt-2 text-xs text-neutral-500">
-              Estimation indicative. La tarification définitive vous sera confirmée par LIRIA.
+              Estimation indicative. La tarification définitive vous sera confirmée par {BRAND_NAME}.
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            {paiementConfigure ? <form action={demarrerAbonnementAction} className="space-y-2">
+            {paiementConfigure && abonnementsOuverts ? <form action={demarrerAbonnementAction} className="space-y-2">
               <input type="hidden" name="offre" value={offre.cle}/>
               <input type="hidden" name="retour_erreur" value={`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`}/>
               <select name="periodicite" defaultValue="annuel" className="w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
-                <option value="annuel">Annuel · −20 %</option>
+                <option value="annuel">Annuel · 2 mois offerts</option>
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>
-            </form> : <Link href="/onboarding/demarrage" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Configurer mon espace</Link>}
+            </form> : <Link href="/onboarding/demarrage" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Configurer mon espace sans paiement</Link>}
             <Link href="/onboarding/besoins" className="w-full rounded-md border px-3 py-2 text-center text-sm">
               Revoir mes réponses
             </Link>
@@ -67,7 +70,7 @@ export default async function BesoinsPage({
       <div className="w-full max-w-lg space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Trouvons l&apos;abonnement adapté</h1>
-          <p className="text-sm text-neutral-500">Quelques questions pour vous recommander la formule la plus adaptée à votre entreprise.</p>
+          <p className="text-sm text-neutral-500">Quelques questions pour vous recommander l’offre la plus adaptée à votre entreprise.</p>
         </div>
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

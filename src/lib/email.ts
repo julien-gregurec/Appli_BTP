@@ -12,7 +12,7 @@ export function construireLienMailto(opts:{to:string;sujet:string;corps:string;c
 // (notamment l'ajout manuel du PDF) restent dans l'interface et ne doivent jamais
 // apparaître dans l'e-mail professionnel.
 export function contenuEmailDocument(opts: {
-  typeDoc: "devis" | "facture";
+  typeDoc: "devis" | "facture" | "avoir";
   numero: string | null;
   client: ClientMail;
   montantTtc: number;
@@ -22,20 +22,23 @@ export function contenuEmailDocument(opts: {
   const to = opts.client.email?.trim();
   if (!to) return null;
 
-  const estFacture = opts.typeDoc === "facture";
-  const libelle = estFacture ? "facture" : "devis";
-  const ref = opts.numero ?? (estFacture ? "facture" : "devis");
+  // Un avoir suit le ton "facture" (même relation contractuelle), mais ne doit jamais être
+  // appelé "facture" dans l'objet/le corps — seul le libellé et l'article changent.
+  const estAvoir = opts.typeDoc === "avoir";
+  const estFacture = opts.typeDoc === "facture" || estAvoir;
+  const libelle = estAvoir ? "avoir" : estFacture ? "facture" : "devis";
+  const article = estAvoir ? "l'" : estFacture ? "la " : "le ";
+  const ref = opts.numero ?? libelle;
   const contact = [opts.client.prenom, opts.client.nom].filter(Boolean).join(" ");
   const salutation = contact || "Madame, Monsieur";
 
-  const sujet = `${estFacture ? "Facture" : "Devis"} ${ref} — ${opts.entrepriseNom}`;
+  const sujetLabel = estAvoir ? "Avoir" : estFacture ? "Facture" : "Devis";
+  const sujet = `${sujetLabel} ${ref} — ${opts.entrepriseNom}`;
 
   const corps = [
     `Bonjour ${salutation},`,
     "",
-    estFacture
-      ? `Veuillez trouver ci-joint la ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`
-      : `Veuillez trouver ci-joint le ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`,
+    `Veuillez trouver ci-joint ${article}${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`,
     "",
     estFacture
       ? "Nous restons à votre disposition pour tout renseignement et vous remercions de votre confiance."
@@ -46,6 +49,20 @@ export function contenuEmailDocument(opts: {
   ].join("\n");
 
   return {to,sujet,corps};
+}
+
+// Version HTML du même message texte que contenuEmailDocument(), avec un
+// bouton d'accès au document. Le texte source reste la référence : cette
+// fonction ne fait qu'y ajouter une mise en forme minimale + le lien.
+export function corpsHtmlEmailDocument(corpsTexte: string, lienDocument: string | null): string {
+  const paragraphes = corpsTexte
+    .split("\n\n")
+    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").join("<br>")}</p>`)
+    .join("");
+  const bouton = lienDocument
+    ? `<p style="margin:20px 0;"><a href="${lienDocument}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Consulter le document</a></p>`
+    : "";
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px;">${paragraphes}${bouton}</div>`;
 }
 
 export function contenuEmailCommande(opts: { numero: string; fournisseurNom: string; fournisseurEmail: string | null; montantTtc: number; entrepriseNom: string; dateLivraison?: string | null }) {

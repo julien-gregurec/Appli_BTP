@@ -7,6 +7,8 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { suggererReponse, type MessageThread } from "@/lib/ai/messagerie";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function retour(type: "error" | "success", message: string, conversationId?: string): never {
   const query = new URLSearchParams({ [type]: message });
@@ -37,7 +39,7 @@ export async function creerConversationInterneAction(formData: FormData) {
         entreprise_id: ctx.entrepriseId, type: "chantier", chantier_id: cibleId,
         cree_par_employe_id: employe.id,
       }).select("id").single();
-      if (error || !data) retour("error", error?.message ?? "Conversation impossible à créer");
+      if (error || !data) retour("error", messageErreurUtilisateur("creerConversationInterneAction", error, "Conversation impossible à créer."));
       conversationId = data.id;
     }
   } else {
@@ -53,7 +55,7 @@ export async function creerConversationInterneAction(formData: FormData) {
         entreprise_id: ctx.entrepriseId, type: "directe", destinataire_employe_id: cibleId,
         cree_par_employe_id: employe.id,
       }).select("id").single();
-      if (error || !data) retour("error", error?.message ?? "Conversation impossible à créer");
+      if (error || !data) retour("error", messageErreurUtilisateur("creerConversationInterneAction", error, "Conversation impossible à créer."));
       conversationId = data.id;
     }
   }
@@ -62,7 +64,7 @@ export async function creerConversationInterneAction(formData: FormData) {
     entreprise_id: ctx.entrepriseId, conversation_id: conversationId,
     auteur_employe_id: employe.id, contenu,
   });
-  if (error) retour("error", error.message);
+  if (error) retour("error", messageErreurUtilisateur("envoyerMessageAction", error, "Impossible d’envoyer ce message."));
   revalidatePath("/messagerie");
   retour("success", "Message envoyé", conversationId ?? undefined);
 }
@@ -79,12 +81,13 @@ export async function envoyerMessageInterneAction(conversationId: string, formDa
     entreprise_id: ctx.entrepriseId, conversation_id: conversationId,
     auteur_employe_id: employe.id, contenu,
   });
-  if (error) retour("error", error.message, conversationId);
+  if (error) retour("error", messageErreurUtilisateur("envoyerReponseSuggereeAction", error, "Impossible d’envoyer ce message."), conversationId);
   revalidatePath("/messagerie");
   retour("success", "Message envoyé", conversationId);
 }
 
 export async function suggererReponseIAAction(conversationId: string): Promise<{ brouillon: string } | { error: string }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -131,12 +134,15 @@ export async function suggererReponseIAAction(conversationId: string): Promise<{
   if (depassement) return { error: depassement };
 
   try {
-    const brouillon = await suggererReponse(fil);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes" });
+    const { texte: brouillon, usage } = await suggererReponse(fil);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { brouillon };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("suggererReponseMessagerieAction", err, "La suggestion IA n’est pas disponible pour le moment.") };
   }
 }

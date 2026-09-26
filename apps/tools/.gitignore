@@ -1,0 +1,21 @@
+/.next/
+# Genere par `scripts/generate-service-worker.mjs` a chaque build : jamais versionne.
+/public/sw-tools.js
+/node_modules/
+/out/
+*.tsbuildinfo
+
+# Native signing and local machine configuration
+android/local.properties
+**/*.jks
+**/*.keystore
+android/keystore.properties
+**/google-services.json
+**/GoogleService-Info.plist
+ios/*.mobileprovision
+ios/**/*.xcuserstate
+ios/**/xcuserdata/
+*.p12
+*.cer
+*.provisionprofile
+.env*.local

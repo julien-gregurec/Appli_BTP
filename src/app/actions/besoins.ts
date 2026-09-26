@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { recommanderOffre } from "@/lib/plateforme";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function enregistrerBesoinsAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
@@ -31,7 +32,10 @@ export async function enregistrerBesoinsAction(formData: FormData) {
     },
     { onConflict: "entreprise_id" },
   );
-  if (error) redirect(`/onboarding/besoins?error=${encodeURIComponent(error.message)}`);
+  if (error) {
+    const message = messageErreurUtilisateur("enregistrerBesoinsAction", error, "Impossible d’enregistrer vos besoins pour le moment.");
+    redirect(`/onboarding/besoins?error=${encodeURIComponent(message)}`);
+  }
 
   revalidatePath("/onboarding/besoins");
   redirect(`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`);

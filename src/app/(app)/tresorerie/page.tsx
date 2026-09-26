@@ -16,7 +16,7 @@ export default async function TresoreriePage() {
   const maintenant = new Date(); const aujourdHui = new Date(`${iso(maintenant)}T12:00:00`);
   const depuis30Jours = iso(new Date(aujourdHui.getTime() - 29 * JOUR));
   const [{ data: factures }, { data: depenses }, { data: encaissements }, { data: decaissements }, { data: charges }, { data: avoirs }] = await Promise.all([
-    supabase.from("factures").select("id,numero,date_emission,date_echeance,montant_ttc,montant_paye,statut,client:clients(nom,prenom,societe),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId),
+    supabase.from("factures").select("id,numero,date_emission,date_echeance,montant_ttc,montant_paye,statut,client:clients!factures_client_id_fkey(nom,prenom,societe),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId),
     supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,date_echeance,montant_ttc,montant_regle,statut,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId),
     supabase.from("paiements").select("montant,date,facture:factures!inner(entreprise_id)").eq("facture.entreprise_id",ctx.entrepriseId).gte("date",depuis30Jours),
     supabase.from("reglements_fournisseurs").select("montant,date,depense:depenses_fournisseurs!inner(entreprise_id)").eq("depense.entreprise_id",ctx.entrepriseId).gte("date",depuis30Jours),

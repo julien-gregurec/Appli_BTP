@@ -1,0 +1,404 @@
+/*
+ * Styles de l'Atelier — report + métrés.
+ *
+ * CSS Module : classes localement scopées, aucune modification de globals.css.
+ * Les couleurs réutilisent les variables de thème (:root dans globals.css).
+ * §11 mobile : les tableaux passent en cartes verticales sous 480 px, sans overflow global.
+ */
+
+.panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.panel + .panel {
+  margin-top: 18px;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.panelHint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---- Origine de mesure -------------------------------------------------- */
+
+.originLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.originLabel {
+  color: var(--ink-soft);
+}
+
+.originValue {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* ---- Badges (origine + qualité) --------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.badgeGlyph {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.badgeText {
+  font-weight: 700;
+}
+
+.badgeCode {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.badgeTrusted {
+  border-color: #9ecdb8;
+  background: #eef7f2;
+  color: #14503a;
+}
+
+.badgeIndicative {
+  border-color: #e6c58a;
+  background: var(--amber-soft);
+  color: #7a5300;
+}
+
+.badgeEstimate {
+  border-style: dashed;
+}
+
+.warning {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #e0ad55;
+  background: var(--amber-soft);
+  color: #7a5300;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e2b3b3;
+  border-left: 3px solid #c0504d;
+  border-radius: 8px;
+  background: #fbeeee;
+  color: #8a2f2c;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.empty {
+  margin: 0;
+  padding: 14px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* ---- Tableau responsive --------------------------------------------- */
+
+.tableScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.table caption {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #ececE8;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  border-bottom: 1.5px solid var(--line);
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.table td.num,
+.table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rowNote {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* ---- Bloc résumé (clé / valeur) ------------------------------------ */
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.summaryItem {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.summaryItem dt {
+  margin: 0 0 4px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.summaryItem dd {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryItem dd small {
+  display: block;
+  margin-top: 2px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* ---- Sélecteur de marge ------------------------------------------- */
+
+.fieldset {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.choice:has(input:checked) {
+  border-color: #d3a24e;
+  background: var(--amber-soft);
+  color: #7a5300;
+}
+
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.choice input {
+  margin: 0;
+}
+
+.customField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.customField input {
+  width: 92px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.witnessBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.witnessBar span:first-child {
+  flex: 1;
+  height: 0;
+  border-top: 2px solid var(--navy);
+}
+
+.witnessBar span:first-child::before,
+.witnessBar span:first-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 12px;
+  background: var(--navy);
+  vertical-align: middle;
+}
+
+.witnessBar span:first-child::after {
+  float: right;
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 16px;
+  }
+
+  .tableScroll {
+    overflow-x: visible;
+  }
+
+  .table,
+  .table thead,
+  .table tbody,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+  }
+
+  .table caption {
+    display: block;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ececE8;
+    text-align: right;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    color: var(--ink-soft);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+
+  .table td.num {
+    text-align: right;
+  }
+
+  .rowNote {
+    text-align: right;
+  }
+}

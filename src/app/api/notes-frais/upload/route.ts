@@ -154,6 +154,7 @@ export async function POST(request: Request) {
       message: doublonPossible ? "Document ajouté. Une empreinte identique existe déjà dans l’entreprise : vérification recommandée." : "Document ajouté et empreinte enregistrée.",
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Import impossible" }, { status: 400 });
+    console.error("Échec d'import d'une note de frais", error);
+    return NextResponse.json({ error: "Import impossible" }, { status: 400 });
   }
 }

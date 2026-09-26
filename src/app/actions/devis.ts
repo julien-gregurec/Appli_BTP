@@ -5,10 +5,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
+import type { SurchargeDestinataire } from "@/lib/document-resend-override";
 import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type DevisPayload = {
   client_id: string;
@@ -59,7 +64,7 @@ export async function creerDevisAction(payload: DevisPayload) {
   });
 
   if (error || !devisId) {
-    return { error: error?.message ?? "Erreur à la création du devis" };
+    return { error: messageErreurUtilisateur("creerDevisAction", error, "Impossible de créer ce devis. Vérifiez les informations saisies.") };
   }
 
   revalidatePath("/devis");
@@ -97,7 +102,7 @@ export async function modifierDevisAction(devisId: string, payload: DevisPayload
     p_lignes: lignes,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: messageErreurUtilisateur("modifierDevisAction", error, "Impossible d’enregistrer ces modifications. Vérifiez les informations saisies.") };
 
   revalidatePath("/devis");
   revalidatePath(`/devis/${devisId}`);
@@ -149,7 +154,7 @@ export async function associerDevisChantierAction(devisId: string, retour: strin
     .update({ chantier_id: chantierId, updated_at: new Date().toISOString() })
     .eq("id", devisId)
     .eq("entreprise_id", ctx.entrepriseId);
-  if (error) redirect(avecMessage("error", error.message));
+  if (error) redirect(avecMessage("error", messageErreurUtilisateur("associerDevisChantierAction", error, "Impossible d’associer ce devis au chantier.")));
 
   revalidatePath("/devis");
   revalidatePath(`/devis/${devisId}`);
@@ -185,6 +190,13 @@ export async function changerStatutDevisAction(devisId: string, statut: string) 
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (!error) {
+    // GP-EXTERNAL-PILOT-CLOSURE-V1 (mission §20) : personne n'était informé
+    // qu'un devis venait d'être marqué accepté. Journalise et notifie les
+    // responsables (gerer_devis) — best effort, ne doit jamais faire échouer
+    // le changement de statut lui-même s'il échoue.
+    if (statut === "accepte" && devis.statut !== "accepte") {
+      await supabase.rpc("notifier_devis_accepte", { p_devis_id: devisId });
+    }
     revalidatePath(`/devis/${devisId}`);
     revalidatePath("/devis");
     revalidatePath("/dashboard");
@@ -221,14 +233,43 @@ export async function dupliquerDevisAction(devisId: string) {
   const { data, error } = await supabase.rpc("dupliquer_devis", { p_devis_id: devisId });
 
   if (error || !data) {
-    redirect(`/devis/${devisId}?error=${encodeURIComponent(error?.message ?? "Impossible de dupliquer le devis")}`);
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("dupliquerDevisAction", error, "Impossible de dupliquer le devis."))}`);
   }
 
   revalidatePath("/devis");
   redirect(`/devis/${data}/modifier`);
 }
 
+export async function envoyerDevisEmailAction(
+  devisId: string,
+  surchargeDestinataire?: SurchargeDestinataire | null,
+): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_devis")) {
+    return { error: "Votre poste ne permet pas d'envoyer de devis par e-mail." };
+  }
+
+  const resultat = await envoyerDocumentCommercialParEmail(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    entrepriseNom: ctx.entrepriseNom,
+    prenomEmetteur: ctx.prenom,
+    userId: ctx.userId,
+    typeDocument: "devis",
+    documentId: devisId,
+    surchargeDestinataire,
+    peutSurchargerDestinataire: peutSurchargerDestinataire(permissions),
+  });
+  if ("error" in resultat) return resultat;
+
+  revalidatePath(`/devis/${devisId}`);
+  revalidatePath("/devis");
+  return { ok: true };
+}
+
 export async function genererDevisIAAction(description: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -249,12 +290,36 @@ export async function genererDevisIAAction(description: string) {
   if (depassement) return { error: depassement };
 
   try {
-    const lignes = await genererLignesDevisIA(texte, prestations ?? []);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes" });
+    const { lignes, usage } = await genererLignesDevisIA(texte, prestations ?? []);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { lignes };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("genererDevisIAAction", err, "La génération assistée du devis n’est pas disponible pour le moment.") };
   }
+}
+
+export async function retirerPieceJointeDevisAction(devisId: string, pieceId: string) {
+  const supabase = await createClient();
+  const { data: path, error } = await supabase.rpc("retirer_piece_jointe_devis", { p_piece_id: pieceId });
+  if (error || !path) {
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("retirerPieceJointeDevisAction", error, "Cette pièce jointe n’a pas pu être retirée."))}`);
+  }
+  await supabase.storage.from("devis-medias").remove([path]);
+  revalidatePath(`/devis/${devisId}`);
+  redirect(`/devis/${devisId}?success=${encodeURIComponent("Pièce jointe retirée")}`);
+}
+
+export async function retirerPieceJointeDevisEnEditionAction(pieceId: string): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { data: path, error } = await supabase.rpc("retirer_piece_jointe_devis", { p_piece_id: pieceId });
+  if (error || !path) {
+    return { error: messageErreurUtilisateur("retirerPieceJointeDevisEnEditionAction", error, "Cette pièce jointe n’a pas pu être retirée.") };
+  }
+  await supabase.storage.from("devis-medias").remove([path]);
+  return { ok: true };
 }

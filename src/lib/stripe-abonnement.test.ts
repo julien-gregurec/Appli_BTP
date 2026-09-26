@@ -1,14 +1,130 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const createAdminClient = vi.fn();
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }));
+
+const {
+  appliquerCouponAbonnement,
   calculerFacturationStockage,
+  creerConfigurationPortailAbonnement,
+  creerSessionPortailStripe,
+  creerCouponRemise,
+  observerRemiseDepuisAbonnement,
   prixOptionIAStripePour,
   prixStripePour,
+  reconcilierAbonnementStripe,
+  recupererAbonnementStripe,
+  retirerCouponAbonnement,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
   variablesStripeBillingManquantes,
-} from "./stripe-abonnement";
+} = await import("./stripe-abonnement");
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
+
+// Fabrique un client Supabase minimal couvrant exactement les requêtes faites par
+// reconcilierAbonnementStripe : l'entreprise (abonnement Stripe + offre/périodicité) et
+// le comptage des comptes facturables (compte_application_statut actif/pause), qui passe par la
+// RPC de service compter_comptes_application_service depuis l'ACL canonique (migration 255).
+function supabaseFakePourReconciliation(params: { entreprise: Record<string, unknown> | null; nbComptes: number; erreurComptage?: boolean }) {
+  return {
+    from(table: string) {
+      if (table === "entreprises") {
+        const requete: Record<string, unknown> = {};
+        for (const methode of ["select", "eq"]) requete[methode] = () => requete;
+        requete.maybeSingle = async () => ({ data: params.entreprise, error: null });
+        return requete;
+      }
+      throw new Error(`Table non prévue par ce mock : ${table}`);
+    },
+    rpc: vi.fn(async (nom: string) => {
+      if (nom !== "compter_comptes_application_service") throw new Error(`RPC non prévue par ce mock : ${nom}`);
+      return params.erreurComptage
+        ? { data: null, error: { code: "42501", message: "permission denied" } }
+        : { data: params.nbComptes, error: null };
+    }),
+  };
+}
+
+// Fabrique un fetch global minimal : répond à la lecture de l'abonnement (GET
+// subscriptions/{id}) et enregistre tous les appels d'écriture (subscription_items) pour
+// vérification, sans jamais appeler le vrai réseau Stripe.
+function fetchFakeStripe(params: { itemExistant?: { id: string; price: { id: string } } }) {
+  const appels: Array<{ url: string; methode: string; corps: string | null }> = [];
+  const fauxFetch = vi.fn(async (url: string, options: { method?: string; body?: URLSearchParams } = {}) => {
+    const methode = options.method ?? "GET";
+    appels.push({ url, methode, corps: options.body ? options.body.toString() : null });
+    if (url.includes("/subscriptions/") && !url.includes("subscription_items") && methode === "GET") {
+      return {
+        ok: true,
+        json: async () => ({
+          id: "sub_test",
+          customer: "cus_test",
+          status: "active",
+          items: { data: params.itemExistant ? [params.itemExistant] : [] },
+        }),
+      };
+    }
+    return { ok: true, json: async () => ({ id: "si_nouveau" }) };
+  });
+  return { fauxFetch, appels };
+}
+
+describe("observation non-lossy des remises Stripe", () => {
+  const abonnement = (discounts: NonNullable<Parameters<typeof observerRemiseDepuisAbonnement>[0]["discounts"]>) => ({
+    id: "sub_test", customer: "cus_test", status: "active", discounts,
+  });
+
+  it("distingue explicitement l'absence confirmée", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([]))).toEqual({
+      status: "absent", count: 0, discount_id: null,
+      source_type: null, source_id: null, coupon_id: null,
+    });
+  });
+
+  it("résout un discount coupon complètement développé", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_active", object: "discount", source: { type: "coupon", coupon: "coupon_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_active",
+      source_type: "coupon", source_id: "coupon_active", coupon_id: "coupon_active",
+    });
+  });
+
+  it("atteste séparément un promotion code et son coupon", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_promo", source: { type: "coupon", coupon: { id: "coupon_promo" } },
+      promotion_code: { id: "promo_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_promo",
+      source_type: "promotion_code", source_id: "promo_active", coupon_id: "coupon_promo",
+    });
+  });
+
+  it.each([
+    ["référence string", ["di_unexpanded_active"]],
+    ["objet minimal", [{ id: "di_active" }]],
+    ["source inconnue", [{ id: "di_active", source: { type: "future_source", coupon: "coupon_active" } }]],
+    ["plusieurs discounts", [
+      { id: "di_a", source: { type: "coupon", coupon: "coupon_a" } },
+      { id: "di_b", source: { type: "coupon", coupon: "coupon_b" } },
+    ]],
+  ])("échoue fermé pour %s", (_nom, discounts) => {
+    expect(() => observerRemiseDepuisAbonnement(abonnement(discounts))).toThrow("incomplète");
+  });
+
+  it("demande explicitement les expansions nécessaires au GET Stripe", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+    await recupererAbonnementStripe("sub_test");
+    expect(appels[0].url).toContain("expand%5B%5D=discounts");
+  });
+});
 
 describe("tarifs Stripe Billing", () => {
   it("associe chaque offre et périodicité au bon prix", () => {
@@ -93,5 +209,277 @@ describe("facturation du stockage", () => {
       quotaGo: 25,
       periodicite: "annuel",
     })).toMatchObject({ depassementGo: 2, montantHt: 12, nombreMois: 12 });
+  });
+});
+
+// COMPTES-SUPPLEMENTAIRES-V1 : reconcilierAbonnementStripe echouait silencieusement en
+// l'absence des variables STRIPE_PRICE_COMPTE_SUP_{offre}_{periodicite}. Ces tests couvrent
+// les quatre issues reelles (creation/mise a jour/suppression de l'item Stripe, et l'echec
+// explicite si la configuration manque) plutot que le seul symptome (no-op silencieux).
+describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-V1)", () => {
+  function stubEnvPrixMini() {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    vi.stubEnv("STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL", "price_compte_sup_mini_m");
+  }
+
+  it("ne fait rien et le signale si le Price du compte supplémentaire n'est pas configuré", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 5,
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: false, raison: "prix_supplement_absent" });
+    expect(appels).toHaveLength(0);
+  });
+
+  it("signale l'absence d'abonnement Stripe sans tenter aucun appel", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: null, abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 5,
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: false, raison: "abonnement_absent" });
+    expect(appels).toHaveLength(0);
+  });
+
+  it("ne crée aucun item si aucun compte ne dépasse le quota inclus", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 3, // Mini inclut déjà 3 comptes.
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: true, quantite: 0 });
+    expect(appels.filter((a) => a.methode !== "GET")).toHaveLength(0);
+  });
+
+  it("crée l'item Stripe du compte supplémentaire au bon Price et à la bonne quantité", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 5, // 3 inclus + 2 supplémentaires.
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: true, quantite: 2 });
+    const creation = appels.find((a) => a.url.endsWith("/subscription_items") && a.methode === "POST");
+    expect(creation?.corps).toContain("price=price_compte_sup_mini_m");
+    expect(creation?.corps).toContain("quantity=2");
+    expect(creation?.corps).toContain("subscription=sub_test");
+  });
+
+  it("met à jour la quantité d'un item de compte supplémentaire déjà présent", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 6, // 3 supplémentaires désormais.
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: true, quantite: 3 });
+    const mise_a_jour = appels.find((a) => a.url.endsWith("/subscription_items/si_existant") && a.methode === "POST");
+    expect(mise_a_jour?.corps).toContain("quantity=3");
+  });
+
+  it("supprime l'item Stripe quand plus aucun compte ne dépasse le quota", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 3, // Retour au quota inclus.
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
+    vi.stubGlobal("fetch", fauxFetch);
+
+    const resultat = await reconcilierAbonnementStripe("entreprise-1");
+
+    expect(resultat).toEqual({ synchronise: true, quantite: 0 });
+    const suppression = appels.find((a) => a.url.endsWith("/subscription_items/si_existant") && a.methode === "DELETE");
+    expect(suppression).toBeDefined();
+  });
+
+  // ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 : après la 255, le comptage direct de `employes` était refusé,
+  // valait 0 et SUPPRIMAIT l'item Stripe des comptes supplémentaires. Un comptage en échec doit
+  // désormais bloquer la réconciliation sans toucher à Stripe.
+  it("échoue sans aucun appel d'écriture Stripe si le comptage des comptes est impossible", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 0,
+      erreurComptage: true,
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await expect(reconcilierAbonnementStripe("entreprise-1")).rejects.toThrow("Comptage des comptes facturables impossible");
+    expect(appels.filter((a) => a.methode !== "GET")).toHaveLength(0);
+  });
+});
+
+describe("remises commerciales (REMISES-CLIENTS-V1)", () => {
+  it("crée un coupon pourcentage avec la bonne durée", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await creerCouponRemise({ type: "pourcentage", valeur: 15, duree: "once", nom: "Test — 15 %" });
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/coupons");
+    expect(appel.corps).toContain("percent_off=15");
+    expect(appel.corps).toContain("duration=once");
+    expect(appel.corps).not.toContain("amount_off");
+  });
+
+  it("crée un coupon montant fixe en centimes, devise EUR", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await creerCouponRemise({ type: "montant", valeur: 20, duree: "forever", nom: "Test — 20 € à vie" });
+
+    const appel = appels[0];
+    expect(appel.corps).toContain("amount_off=2000");
+    expect(appel.corps).toContain("currency=eur");
+    expect(appel.corps).toContain("duration=forever");
+  });
+
+  it("exige un nombre de mois pour une remise 'repeating'", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    await expect(
+      creerCouponRemise({ type: "pourcentage", valeur: 10, duree: "repeating", nom: "Test" }),
+    ).rejects.toThrow(/mois/);
+  });
+
+  it("applique le coupon via discounts[0][coupon] (billing_mode flexible, cf. audit REMISES-CLIENTS-V1) et non via le paramètre coupon= classique", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await appliquerCouponAbonnement("sub_test", "coupon_abc");
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/subscriptions/sub_test");
+    expect(appel.corps).toContain("discounts%5B0%5D%5Bcoupon%5D=coupon_abc");
+    expect(appel.corps).not.toMatch(/^coupon=|&coupon=/);
+  });
+
+  it("retire la remise via l'endpoint discount de l'abonnement", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await retirerCouponAbonnement("sub_test");
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/subscriptions/sub_test/discount");
+    expect(appel.methode).toBe("DELETE");
+  });
+});
+
+// Billing Security V3 (claude/great-mayer-bzxad6) — configuration explicite du
+// Portail Stripe, reportée sur le train canonique.
+type AppelStripe = { url: string; methode: string; corps?: URLSearchParams };
+
+function simulerFetchStripe(reponses: Record<string, unknown>) {
+  const appels: AppelStripe[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: { method?: string; body?: URLSearchParams }) => {
+      const methode = init?.method ?? "POST";
+      appels.push({ url, methode, corps: init?.body });
+      const trouve = Object.entries(reponses).find(([motif]) => {
+        const [methodeAttendue, ...reste] = motif.split(" ");
+        return methode === methodeAttendue && url.includes(reste.join(" "));
+      });
+      if (!trouve) throw new Error(`Appel Stripe non simulé : ${methode} ${url}`);
+      return new Response(JSON.stringify(trouve[1]), { status: 200 });
+    }),
+  );
+  return appels;
+}
+
+
+describe("configuration du Portail Stripe (upgrade/downgrade self-service)", () => {
+  beforeEach(() => vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_xxx"));
+
+  it("regroupe les prix commercialisés par produit et active subscription_update", async () => {
+    vi.stubEnv("STRIPE_PRICE_MINI_MENSUEL", "price_mini_m");
+    vi.stubEnv("STRIPE_PRICE_MINI_ANNUEL", "price_mini_a");
+    vi.stubEnv("STRIPE_PRICE_PRO_MENSUEL", "price_pro_m");
+    vi.stubEnv("STRIPE_PRICE_PRO_ANNUEL", "price_pro_a");
+    vi.stubEnv("STRIPE_PRICE_BUSINESS_MENSUEL", "price_business_m");
+    vi.stubEnv("STRIPE_PRICE_BUSINESS_ANNUEL", "price_business_a");
+    vi.stubEnv("STRIPE_PRICE_ENTREPRISE_MENSUEL", "price_entreprise_m");
+    vi.stubEnv("STRIPE_PRICE_ENTREPRISE_ANNUEL", "price_entreprise_a");
+    const appels = simulerFetchStripe({
+      "GET https://api.stripe.com/v1/prices/price_mini_m": { id: "price_mini_m", product: "prod_mini" },
+      "GET https://api.stripe.com/v1/prices/price_pro_m": { id: "price_pro_m", product: "prod_pro" },
+      "GET https://api.stripe.com/v1/prices/price_business_m": { id: "price_business_m", product: "prod_business" },
+      "GET https://api.stripe.com/v1/prices/price_entreprise_m": { id: "price_entreprise_m", product: "prod_entreprise" },
+      "POST https://api.stripe.com/v1/billing_portal/configurations": { id: "bpc_test" },
+    });
+
+    const id = await creerConfigurationPortailAbonnement();
+
+    expect(id).toBe("bpc_test");
+    const creation = appels.find((a) => a.url.endsWith("/v1/billing_portal/configurations"));
+    const corps = creation!.corps!;
+    expect(corps.get("features[subscription_update][enabled]")).toBe("true");
+    expect(corps.get("features[subscription_update][proration_behavior]")).toBe("create_prorations");
+    // 4 offres commercialisées => 4 groupes produit, chacun avec ses 2 prix (mensuel/annuel).
+    expect(corps.get("features[subscription_update][products][0][product]")).toBe("prod_mini");
+    expect(corps.get("features[subscription_update][products][0][prices][0]")).toBe("price_mini_m");
+    expect(corps.get("features[subscription_update][products][0][prices][1]")).toBe("price_mini_a");
+    expect(corps.get("features[subscription_update][products][3][product]")).toBe("prod_entreprise");
+  });
+
+  it("échoue proprement si aucun prix commercialisé n'est configuré", async () => {
+    await expect(creerConfigurationPortailAbonnement()).rejects.toThrow(/aucun prix/i);
+  });
+
+  it("passe la configuration explicite (env STRIPE_PORTAL_CONFIGURATION_ID) à la session Portail", async () => {
+    vi.stubEnv("STRIPE_PORTAL_CONFIGURATION_ID", "bpc_env");
+    const appels = simulerFetchStripe({
+      "POST https://api.stripe.com/v1/billing_portal/sessions": { id: "bps_1", url: "https://billing.stripe.com/session/bps_1" },
+    });
+
+    await creerSessionPortailStripe("cus_1", "https://app.example.com/abonnement");
+
+    expect(appels[0].corps?.get("configuration")).toBe("bpc_env");
+  });
+
+  it("omet le paramètre configuration quand rien n'est configuré (comportement Portail par défaut, inchangé)", async () => {
+    const appels = simulerFetchStripe({
+      "POST https://api.stripe.com/v1/billing_portal/sessions": { id: "bps_1", url: "https://billing.stripe.com/session/bps_1" },
+    });
+
+    await creerSessionPortailStripe("cus_1", "https://app.example.com/abonnement");
+
+    expect(appels[0].corps?.has("configuration")).toBe(false);
   });
 });

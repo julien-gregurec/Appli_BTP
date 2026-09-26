@@ -1,0 +1,244 @@
+{
+  "$comment": "Schéma du manifeste d'environnement ELSATIA. Source unique des énumérations : le contrôleur (scripts/lib/env-manifest-core.mjs) lit ce fichier, il ne les redéfinit pas. Aucune valeur d'environnement n'a sa place ici ni dans le manifeste.",
+  "$defs": {
+    "environment": { "enum": ["local", "test", "preview", "production"] },
+    "visibility": { "enum": ["public", "server"] },
+    "fail_mode": { "enum": ["closed", "open", "default", "none"] },
+    "severity": { "enum": ["P0", "P1", "P2"] },
+    "finding_status": { "enum": ["open", "detected", "fixed", "accepted"] },
+    "category": {
+      "enum": [
+        "supabase_public", "supabase_service_role", "auth", "env_indicator", "url", "email", "security",
+        "cron", "push", "encryption", "banking", "payments", "billing_price", "tools_billing", "ai",
+        "mobile_iap", "observability", "feature_flag", "build_metadata", "legal", "media", "tooling", "ci"
+      ]
+    },
+    "url_class": { "enum": ["app_base", "auth_callback", "stripe_return", "api_endpoint", "provider_base", "cross_app_link", "origin_list"] },
+    "criticality": { "enum": ["critical", "high", "medium", "low"] },
+    "flag_kind": { "enum": ["boolean", "mode", "kill_switch", "local_only"] },
+    "application_kind": { "enum": ["web", "shared", "worker", "tooling"] },
+    "example_environment": { "enum": ["local", "preview", "production", "any"] }
+  },
+  "type": "object",
+  "required": ["schema_version", "applications", "system_variables", "scan", "variables"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "type": "integer" },
+    "description": { "type": "string" },
+    "preflight_enforcement": { "enum": ["report", "enforce"] },
+    "applications": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "label", "roots"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "$ref": "#/$defs/application_kind" },
+          "label": { "type": "string" },
+          "roots": { "type": "array", "items": { "type": "string" } },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "environment"],
+              "additionalProperties": false,
+              "properties": { "path": { "type": "string" }, "environment": { "$ref": "#/$defs/example_environment" } }
+            }
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "system_variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "justification"],
+        "additionalProperties": false,
+        "properties": { "name": { "type": "string" }, "justification": { "type": "string" } }
+      }
+    },
+    "scan": {
+      "type": "object",
+      "required": ["exclude_paths", "literal_prefixes", "ignored_literals", "dynamic_access_allowed", "reference_only"],
+      "additionalProperties": false,
+      "properties": {
+        "exclude_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "justification"],
+            "additionalProperties": false,
+            "properties": { "path": { "type": "string" }, "justification": { "type": "string" } }
+          }
+        },
+        "literal_prefixes": { "type": "array", "items": { "type": "string" } },
+        "ignored_literals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "justification"],
+            "additionalProperties": false,
+            "properties": { "name": { "type": "string" }, "justification": { "type": "string" } }
+          }
+        },
+        "reference_only": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "path", "justification"],
+            "additionalProperties": false,
+            "properties": { "name": { "type": "string" }, "path": { "type": "string" }, "justification": { "type": "string" } }
+          }
+        },
+        "dynamic_access_allowed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "justification"],
+            "additionalProperties": false,
+            "properties": { "path": { "type": "string" }, "justification": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "external_secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "dr_critical", "dr_note", "held_in"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "dr_critical": { "type": "boolean" },
+          "dr_note": { "type": "string" },
+          "held_in": { "type": "string" },
+          "recreatable": { "type": "boolean" }
+        }
+      }
+    },
+    "stripe_contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "family", "status", "description", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "family": { "type": "string" },
+          "status": { "enum": ["runtime", "catalogue_contract", "legacy"] },
+          "description": { "type": "string" },
+          "decision": { "type": ["string", "null"] },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "pattern"],
+              "additionalProperties": false,
+              "properties": { "path": { "type": "string" }, "pattern": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "options"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^DECISION_REQUIRED:[A-Z0-9-]+$" },
+          "question": { "type": "string" },
+          "options": { "type": "array", "items": { "type": "string" } },
+          "owner": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "status", "variables", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "$ref": "#/$defs/severity" },
+          "status": { "$ref": "#/$defs/finding_status" },
+          "variables": { "type": "array", "items": { "type": "string" } },
+          "text": { "type": "string" },
+          "next_step": { "type": "string" }
+        }
+      }
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name", "applications", "required", "environments", "visibility", "secret", "build_time",
+          "runtime", "category", "description", "fail_mode", "deprecated", "replacement", "dr_critical",
+          "example_required"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "applications": { "type": "array", "items": { "type": "string" } },
+          "required": { "type": "boolean" },
+          "required_when": { "type": "string" },
+          "environments": { "type": "array", "items": { "$ref": "#/$defs/environment" } },
+          "forbidden_in": { "type": "array", "items": { "$ref": "#/$defs/environment" } },
+          "visibility": { "$ref": "#/$defs/visibility" },
+          "public_via": { "enum": ["next_public_prefix", "next_config_env"] },
+          "secret": { "type": "boolean" },
+          "build_time": { "type": "boolean" },
+          "runtime": { "type": "boolean" },
+          "category": { "$ref": "#/$defs/category" },
+          "description": { "type": "string", "minLength": 8 },
+          "fail_mode": { "$ref": "#/$defs/fail_mode" },
+          "deprecated": { "type": "boolean" },
+          "replacement": { "type": ["string", "null"] },
+          "migration": { "type": "string" },
+          "accepted_aliases": { "type": "array", "items": { "type": "string" } },
+          "dr_critical": { "type": "boolean" },
+          "dr_note": { "type": "string" },
+          "example_required": { "type": "boolean" },
+          "feature": { "type": "string" },
+          "external_consumer": { "type": "string" },
+          "flag": {
+            "type": "object",
+            "required": ["kind", "absent_behavior", "owner", "criticality", "expected"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "$ref": "#/$defs/flag_kind" },
+              "absent_behavior": { "enum": ["closed", "open"] },
+              "open_by_design": { "type": "string" },
+              "owner": { "type": "string" },
+              "criticality": { "$ref": "#/$defs/criticality" },
+              "expected": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "local": { "type": "string" },
+                  "test": { "type": "string" },
+                  "preview": { "type": "string" },
+                  "production": { "type": "string" }
+                }
+              },
+              "must_be_defined_in": { "type": "array", "items": { "$ref": "#/$defs/environment" } }
+            }
+          },
+          "url_class": { "$ref": "#/$defs/url_class" },
+          "local_origin_exceptions": { "type": "array", "items": { "type": "string" } },
+          "allowed_values": { "type": "array", "items": { "type": "string" } },
+          "value_pattern": { "type": "string" },
+          "example_value": { "type": "string" },
+          "decision": { "type": "string", "pattern": "^DECISION_REQUIRED:[A-Z0-9-]+$" },
+          "finding_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

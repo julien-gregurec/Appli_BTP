@@ -1,4 +1,5 @@
 import { creerProviderOpenAI } from "@/lib/ai/providers/openai";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 export type FichierIA = { base64: string; mimeType: string };
 
@@ -11,7 +12,8 @@ export type AppelOutilIA = { id: string; nom: string; entree: Record<string, unk
 
 export type OutilIA = { nom: string; description: string; parametres: Record<string, unknown> };
 
-export type ReponseCompletion = { texte: string; appelsOutils: AppelOutilIA[] };
+export type UsageIA = { jetonsEntree: number; jetonsSortie: number; jetonsTotal: number; coutEstimeHT: number };
+export type ReponseCompletion = { texte: string; appelsOutils: AppelOutilIA[]; usage?: UsageIA };
 
 export type EvenementStreamIA =
   | { type: "texte"; delta: string }
@@ -33,7 +35,7 @@ export interface ProviderIA {
     texte: string;
     fichier: FichierIA;
     maxTokens?: number;
-  }): Promise<string>;
+  }): Promise<{ texte: string; usage?: UsageIA }>;
 
   /** Variante streamée de `completer`, pour affichage progressif dans le chat. */
   streamer(params: {
@@ -47,5 +49,6 @@ export interface ProviderIA {
 // Point d'extension unique : un futur providers/anthropic.ts ou providers/gemini.ts
 // n'implique aucun changement dans lib/ai/*.ts, seulement ce switch.
 export function obtenirProviderIA(): ProviderIA {
+  if (!iaEstActive()) throw new Error(MESSAGE_IA_INDISPONIBLE);
   return creerProviderOpenAI();
 }

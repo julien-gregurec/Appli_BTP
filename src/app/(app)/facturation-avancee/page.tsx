@@ -13,10 +13,10 @@ export default async function FacturationAvanceePage({ searchParams }: { searchP
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const [devisResult, situationsResult, remisesResult, facturesCreditablesResult] = await Promise.all([
-    supabase.from("devis").select("id,numero,montant_ht,chantier_id,client:clients(nom,prenom,societe),chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").order("date_emission", { ascending: false }),
-    supabase.from("situations_travaux").select("id,numero,date_situation,statut,montant_marche_ht,montant_cumule_ht,montant_periode_ht,montant_retenue,facture_id,devis:devis(numero,client:clients(nom,prenom,societe)),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
+    supabase.from("devis").select("id,numero,montant_ht,chantier_id,client:clients!devis_client_id_fkey(nom,prenom,societe),chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").order("date_emission", { ascending: false }),
+    supabase.from("situations_travaux").select("id,numero,date_situation,statut,montant_marche_ht,montant_cumule_ht,montant_periode_ht,montant_retenue,facture_id,devis:devis(numero,client:clients!devis_client_id_fkey(nom,prenom,societe)),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("remises_banque").select("id,numero,date_remise,mode,statut,montant").eq("entreprise_id", ctx.entrepriseId).order("date_remise", { ascending: false }).limit(12),
-    supabase.from("factures").select("id,numero,montant_ttc,devis_origine_id,client:clients(nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).neq("type", "avoir").not("devis_origine_id", "is", null).order("date_emission", { ascending: false }),
+    supabase.from("factures").select("id,numero,montant_ttc,devis_origine_id,client:clients!factures_client_id_fkey(nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).neq("type", "avoir").not("devis_origine_id", "is", null).order("date_emission", { ascending: false }),
   ]);
   const devis = devisResult.data ?? [];
   const situations = situationsResult.data ?? [];

@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { createClient } from "@/lib/supabase/server";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function marquerInvitationEmployeAction(employeId: string, canal: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const { error } = await supabase.rpc("marquer_invitation_employe", { p_entreprise_id: ctx.entrepriseId, p_employe_id: employeId, p_canal: canal });
-  if (error) return { error: error.message };
+  if (error) return { error: messageErreurUtilisateur("marquerInvitationEmployeAction", error, "Impossible d’enregistrer l’invitation.") };
   revalidatePath("/employes");
   revalidatePath(`/employes/${employeId}`);
   return { ok: true };

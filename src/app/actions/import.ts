@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
 import { logicielSource, typeImport } from "@/lib/import/config";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { contexteQuotaPersonnes } from "@/lib/capacite-personnes";
+import { messageImportCapacite } from "@/lib/quota-personnes-message";
 
 const MAX_LIGNES = 5000;
 
@@ -17,7 +20,7 @@ export async function analyserFichierImport(formData: FormData): Promise<Fichier
     const res = await analyserFichier(file);
     return { ...res, lignes: res.lignes.slice(0, MAX_LIGNES) };
   } catch (e) {
-    return { entete: [], lignes: [], total: 0, erreur: `Lecture impossible : ${(e as Error).message}` };
+    return { entete: [], lignes: [], total: 0, erreur: messageErreurUtilisateur("analyserFichierImport", e, "Lecture du fichier impossible. Vérifiez le format et réessayez.") };
   }
 }
 
@@ -67,6 +70,9 @@ export async function importerDonneesAction(payload: {
 
   // Construction des enregistrements selon le type.
   const enregistrements: Record<string, unknown>[] = [];
+  // Parallèle à `enregistrements` uniquement pour payload.type === "employes"
+  // (même index, voir plus bas).
+  const tauxHorairesEmployesImportes: (number | null)[] = [];
 
   if (payload.type === "clients") {
     for (const [i, l] of lignes.entries()) {
@@ -86,12 +92,17 @@ export async function importerDonneesAction(payload: {
     for (const l of lignes) {
       const prenom = val(l, "prenom"), nom = val(l, "nom");
       if (!prenom && !nom) { ignores++; continue; }
+      // taux_horaire n'est pas une colonne de `employes` (déplacée vers
+      // `employes_taux_facture`, table dédiée à lecture restreinte par
+      // 20260922000323_securiser_taux_horaire_facture_employe.sql) : conservé
+      // à part, lié aux id générés par lot après l'insertion ci-dessous.
+      tauxHorairesEmployesImportes.push(nombre(val(l, "taux_horaire")));
       enregistrements.push({
         entreprise_id: entrepriseId, prenom: prenom || nom, nom: nom || prenom,
         poste: val(l, "poste") || null,
         type_contrat: dansEnsemble(val(l, "type_contrat"), ["cdi", "cdd", "interim", "apprenti", "stage", "freelance", "autre"], "cdi"),
         email: val(l, "email") || null, telephone: val(l, "telephone") || null,
-        taux_horaire: nombre(val(l, "taux_horaire")), date_entree: dateIso(val(l, "date_entree")), statut: "actif",
+        date_entree: dateIso(val(l, "date_entree")), statut: "actif",
       });
     }
   } else if (payload.type === "catalogue") {
@@ -158,7 +169,7 @@ export async function importerDonneesAction(payload: {
           .select("id")
           .single();
         if (error || !nouveau) {
-          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${error?.message ?? "création impossible"}`);
+          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${messageErreurUtilisateur("importerDonneesAction:fournisseur", error, "création impossible")}`);
           ignores++;
           continue;
         }
@@ -199,7 +210,7 @@ export async function importerDonneesAction(payload: {
         const { data: nouveau, error } = await supabase.from("clients")
           .insert({ entreprise_id: entrepriseId, type: "particulier", nom: clientNom, statut: "actif" })
           .select("id").single();
-        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${error?.message ?? "création impossible"}`); ignores++; continue; }
+        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${messageErreurUtilisateur("importerDonneesAction:client", error, "création impossible")}`); ignores++; continue; }
         clientId = nouveau.id;
         indexClient.set(clientNom.toLowerCase(), clientId!);
       }
@@ -213,17 +224,72 @@ export async function importerDonneesAction(payload: {
     }
   }
 
+  // Plafond de personnes actives : contrôle AVANT toute écriture, jamais d'import
+  // partiel silencieux. Les fiches importées sont toutes créées "actif".
+  if (payload.type === "employes" && enregistrements.length > 0) {
+    const { data: capaciteBrut } = await supabase
+      .rpc("capacite_personnes_entreprise", { p_entreprise_id: entrepriseId })
+      .maybeSingle();
+    const capacite = capaciteBrut as {
+      personnes_actives?: number | null;
+      capacite_totale?: number | null;
+    } | null;
+    if (capacite) {
+      const restant = Math.max(
+        0,
+        Number(capacite.capacite_totale ?? 0) - Number(capacite.personnes_actives ?? 0),
+      );
+      if (enregistrements.length > restant) {
+        // Message contextuel : ne propose jamais « ajoutez de la capacité » ou
+        // « changez d'offre » quand ces chemins sont fermés (essai sans offre,
+        // ABONNEMENTS_PUBLICS_OUVERTS=false).
+        return {
+          inseres: 0,
+          ignores: ignores + enregistrements.length,
+          erreurs: [
+            messageImportCapacite(await contexteQuotaPersonnes(entrepriseId), {
+              totale: Number(capacite.capacite_totale ?? 0),
+              actives: Number(capacite.personnes_actives ?? 0),
+              restant,
+              demandees: enregistrements.length,
+            }),
+          ],
+        };
+      }
+    }
+  }
+
   // Insertion par lots.
   let inseres = 0;
   for (let i = 0; i < enregistrements.length; i += 200) {
     const lot = enregistrements.slice(i, i + 200);
+    if (payload.type === "employes") {
+      // taux_horaire vit dans employes_taux_facture (lecture restreinte) : il
+      // faut l'id généré par l'insertion pour le lier, dans le même ordre que
+      // `lot` (et donc que `tauxHorairesEmployesImportes`).
+      const { data: employesInseres, error, count } = await supabase.from(conf.table).insert(lot, { count: "exact" }).select("id");
+      if (error) {
+        erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
+      } else {
+        inseres += count ?? lot.length;
+        const tauxDuLot = tauxHorairesEmployesImportes.slice(i, i + 200);
+        const tauxAEnregistrer = (employesInseres ?? [])
+          .map((e, j) => ({ employe_id: e.id, entreprise_id: entrepriseId, taux_horaire: tauxDuLot[j], updated_at: new Date().toISOString() }))
+          .filter((l) => l.taux_horaire !== null && l.taux_horaire !== undefined);
+        if (tauxAEnregistrer.length > 0) {
+          const { error: tauxError } = await supabase.from("employes_taux_facture").insert(tauxAEnregistrer);
+          if (tauxError) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot_taux_horaire", tauxError, "taux horaire facturé non enregistré pour ce lot")}`);
+        }
+      }
+      continue;
+    }
     const requete = payload.type === "tarifs_fournisseurs"
       ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,fournisseur_id,reference_fournisseur", count: "exact" })
       : payload.type === "stock"
         ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,reference", count: "exact" })
         : supabase.from(conf.table).insert(lot, { count: "exact" });
     const { error, count } = await requete;
-    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${error.message}`);
+    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
     else inseres += count ?? lot.length;
   }
 

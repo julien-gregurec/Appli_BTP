@@ -19,12 +19,15 @@ export type SignatureDocument = {
   declaration: string;
 };
 
+// Article + nom déjà accordés : "facture" est féminin ("de la facture"), les autres
+// types sont masculins ("du devis", "du bon de commande"...). Ne jamais reconstruire
+// cet accord par concaténation d'un déterminant unique avec le nom.
 export const LIBELLES_DOCUMENT_SIGNATURE: Record<TypeDocumentSignature, string> = {
-  devis: "devis",
-  facture: "facture",
-  commande: "bon de commande",
-  intervention: "bon d’intervention",
-  bon_livraison: "bon de livraison",
+  devis: "du devis",
+  facture: "de la facture",
+  commande: "du bon de commande",
+  intervention: "du bon d’intervention",
+  bon_livraison: "du bon de livraison",
 };
 
 export function estTypeDocumentSignature(value: string): value is TypeDocumentSignature {

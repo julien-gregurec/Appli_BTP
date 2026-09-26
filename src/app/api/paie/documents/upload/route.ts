@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     const destination = retour.startsWith("/") && !retour.startsWith("//") ? retour : "/paie";
     return NextResponse.redirect(new URL(`${destination}${destination.includes("?") ? "&" : "?"}success=${encodeURIComponent("Pièce jointe privée ajoutée")}`, request.url), 303);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Import impossible" }, { status: 400 });
+    console.error("Échec d'import d'un document de paie", error);
+    return NextResponse.json({ error: "Import impossible" }, { status: 400 });
   }
 }

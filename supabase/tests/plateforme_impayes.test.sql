@@ -11,7 +11,7 @@ select function_returns('public','est_acces_support_actif',array['uuid'],'boolea
 select function_returns('public','plateforme_entrer_entreprise',array['uuid','text'],'void','L’entrée support est atomique');
 select function_returns('public','plateforme_quitter_entreprise',array[]::text[],'void','La sortie support restaure le contexte');
 select function_returns('public','plateforme_signaler_impaye',array['uuid','text'],'timestamp with time zone','Un impayé produit une échéance précise');
-select function_returns('public','plateforme_enregistrer_reglement',array['uuid','text'],'void','Le règlement rétablit le compte');
+select function_returns('public','plateforme_enregistrer_reglement',array['uuid','text'],'boolean','Le règlement retourne explicitement si le compte a été mis à jour');
 select function_returns('public','appliquer_suspensions_impayes',array[]::text[],'integer','Les échéances sont matérialisables en statut suspendu');
 select function_returns('public','contexte_abonnement_courant',array[]::text[],'setof record','Le statut reste lisible avant la barrière RLS');
 

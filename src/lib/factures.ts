@@ -46,3 +46,7 @@ export const MODES_PAIEMENT = [
 export function typeFactureLabel(cle: string) {
   return FACTURE_TYPES.find((t) => t.cle === cle)?.libelle ?? cle;
 }
+
+export function resteAPayerFacture(facture: { montant_ttc: number | string; montant_paye: number | string }): number {
+  return Math.max(0, Number(facture.montant_ttc) - Number(facture.montant_paye));
+}

@@ -1,8 +1,8 @@
 {
   "guide": {
-    "titre": "Liria Gestion Pro — démonstration",
+    "titre": "ELSATIA Gestion Pro — démonstration",
     "scenes": [
-      {"cle": "intro", "texte": "Voici Liria Gestion Pro. Un seul logiciel pour vos clients, vos chantiers, vos devis, vos factures, votre planning et vos heures. Je vous montre."},
+      {"cle": "intro", "texte": "Voici ELSATIA Gestion Pro. Un seul logiciel pour vos clients, vos chantiers, vos devis, vos factures, votre planning et vos heures. Je vous montre."},
       {"cle": "connexion", "texte": "Je saisis mon adresse… mon mot de passe… et je me connecte. Chaque salarié a son propre compte : les heures et les mouvements de stock engagent celui qui les saisit."},
       {"cle": "dashboard", "texte": "Voilà l'accueil. Il ne montre que vos modules autorisés : un patron voit ses marges, un ouvrier voit son planning. Je descends : les indicateurs, les alertes, les raccourcis."},
       {"cle": "clients", "texte": "J'ouvre les clients. Trente fiches ici. Je tape dans la recherche… et la liste se filtre à la volée sur le nom, la référence ou la ville."},
@@ -16,7 +16,7 @@
       {"cle": "employes", "texte": "Chaque salarié a sa fiche : son contrat, son coût horaire, ses habilitations, sa carte BTP. C'est son poste qui décide de ce qu'il voit dans le logiciel."},
       {"cle": "stock", "texte": "Le stock suit ce qui dort au dépôt et ce qui part sur les chantiers. Trente articles, la valeur d'achat calculée. Au dépôt, chacun s'identifie à la borne pour prendre du matériel."},
       {"cle": "rentabilite", "texte": "Et voilà l'écran qui compte. Deux cent quatre-vingt-dix-huit mille de chiffre d'affaires, deux cent quarante-huit mille de main-d'œuvre réellement pointée, cinquante mille de marge. Chantier par chantier, sans rien saisir deux fois."},
-      {"cle": "fin", "texte": "Liria Gestion Pro. Du devis à la rentabilité, dans un seul logiciel."}
+      {"cle": "fin", "texte": "ELSATIA Gestion Pro. Du devis à la rentabilité, dans un seul logiciel."}
     ]
   }
 }

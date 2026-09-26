@@ -64,11 +64,11 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
-# Specifies an ordered list of seed files to load during db reset.
-# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Aucun seed versionné n'est approuvé pour ce projet. Les scripts manuels de
+# supabase/production ne doivent jamais être chargés automatiquement par db reset.
+# Réactiver uniquement après validation séparée d'un seed explicite et sûr.
+enabled = false
+sql_paths = []
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -243,6 +243,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Templates français ELSATIA — mécanisme de lien (token_hash + type explicite vers /auth/confirm)
+# volontairement identique à celui validé en P5 ; seul le texte/l'habillage change ici.
+[auth.email.template.confirmation]
+subject = "Confirmez votre adresse email"
+content_path = "./supabase/templates/confirm_signup.html"
+
+[auth.email.template.recovery]
+subject = "Réinitialisez votre mot de passe"
+content_path = "./supabase/templates/reset_password.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
@@ -300,8 +310,8 @@ max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

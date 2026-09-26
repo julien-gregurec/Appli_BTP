@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Replace the legacy guide cover with the Liria Gestion Pro identity."""
+"""Replace the legacy guide cover with the ELSATIA Gestion Pro identity."""
 
 from __future__ import annotations
 
+import os
 from io import BytesIO
 from pathlib import Path
 
@@ -17,9 +18,10 @@ from reportlab.pdfgen import canvas
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf"
-PUBLIC = ROOT / "public/guides/Guide_utilisation_Liria_Gestion_Pro.pdf"
-LOGO = ROOT / "public/liria-gestion-pro-logo.png"
+SOURCE = ROOT / "output/pdf/Guide_utilisation_ELSATIA_Gestion_Pro.pdf"
+PUBLIC = ROOT / "public/guides/Guide_utilisation_ELSATIA_Gestion_Pro.pdf"
+LOGO = ROOT / "public/elsatia-logo-officiel.png"
+APP_URL = os.environ.get("NEXT_PUBLIC_APP_URL", "URL officielle à configurer")
 
 NAVY = HexColor("#0b1f35")
 BLUE = HexColor("#0d67e8")
@@ -55,7 +57,7 @@ def cover_pdf() -> BytesIO:
 
     c.setFillColor(NAVY)
     c.setFont("Arial-Bold", 24)
-    c.drawCentredString(width / 2, 510, "Liria Gestion Pro")
+    c.drawCentredString(width / 2, 510, "ELSATIA Gestion Pro")
     c.setFont("Arial-Bold", 23)
     c.drawCentredString(width / 2, 455, "Guide complet d'utilisation")
     c.setFillColor(MUTED)
@@ -64,7 +66,7 @@ def cover_pdf() -> BytesIO:
 
     left, right, top, row_h = 99, 496, 370, 27
     labels = ["Version du guide", "Application", "Logiciel"]
-    values = ["1.0 - 14 juillet 2026", "https://liria-concept-gestion-btp.vercel.app", "Liria Gestion Pro"]
+    values = ["1.0 - 14 juillet 2026", APP_URL, "ELSATIA Gestion Pro"]
     for i, (label, value) in enumerate(zip(labels, values)):
         y = top - (i + 1) * row_h
         c.setFillColor(NAVY)
@@ -120,9 +122,9 @@ def main():
     for page in original.pages[1:]:
         writer.add_page(page)
     writer.add_metadata({
-        "/Title": "Guide complet d'utilisation - Liria Gestion Pro",
-        "/Author": "Liria Gestion Pro",
-        "/Subject": "Utilisation du logiciel Liria Gestion Pro",
+        "/Title": "Guide complet d'utilisation - ELSATIA Gestion Pro",
+        "/Author": "ELSATIA Gestion Pro",
+        "/Subject": "Utilisation du logiciel ELSATIA Gestion Pro",
     })
     copy_outline(original, writer)
     with SOURCE.open("wb") as handle:

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function genererDoeAction(chantierId: string) {
   const ctx = await getContexteEntreprise();
@@ -37,7 +38,7 @@ export async function genererDoeAction(chantierId: string) {
   const { error } = await supabase.from("doe_generations").insert({
     entreprise_id: ctx.entrepriseId, chantier_id: chantierId, version, manifeste,
   });
-  if (error) redirect(`/chantiers/${chantierId}/doe?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/chantiers/${chantierId}/doe?error=${encodeURIComponent(messageErreurUtilisateur("genererDoeAction", error, "Impossible de générer le DOE pour ce chantier."))}`);
   revalidatePath(`/chantiers/${chantierId}/doe`);
   redirect(`/chantiers/${chantierId}/doe?success=${encodeURIComponent(`DOE version ${version} figé`)}`);
 }

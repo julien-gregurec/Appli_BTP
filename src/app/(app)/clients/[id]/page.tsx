@@ -5,6 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient, statutChantier, CLIENT_TYPES, CLIENT_STATUTS } from "@/lib/chantier-statuts";
 import { euros, statutDevis } from "@/lib/devis";
 import { statutFacture } from "@/lib/factures";
+import { ExclusionRelanceClient } from "@/components/ExclusionRelanceClient";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -64,14 +65,32 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <section className="space-y-2 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="text-sm font-semibold">Coordonnées</h2>
           {ligne("Société", client.societe)}
+          {/*
+            Dénomination légale (ELSATIA-GP-CLIENT-LEGAL-FIELDS-V1). Affichée seulement si
+            elle diffère du nom commercial : répéter deux fois le même nom n'informe personne.
+          */}
+          {client.raison_sociale && client.raison_sociale !== client.societe
+            ? ligne("Raison sociale", client.raison_sociale)
+            : null}
+          {ligne("Forme juridique", client.forme_juridique)}
           {ligne("SIRET", client.siret)}
+          {ligne("N° TVA", client.numero_tva)}
           {ligne("Adresse", client.adresse_facturation)}
+          {ligne("Complément d’adresse", client.adresse_complement)}
           {ligne("Code postal / Ville", [client.code_postal, client.ville].filter(Boolean).join(" "))}
+          {/*
+            `pays` non renseigné est traité comme la France à la LECTURE, jamais écrit en base
+            (cf. commentaire de la colonne, migration 20260908000274). Le libellé le dit.
+          */}
+          {ligne("Pays", client.pays ?? "FR (par défaut)")}
           {ligne("Téléphone", client.telephone)}
           {ligne("Email", client.email)}
           {ligne("Conditions de paiement", client.conditions_paiement)}
           {ligne("Délai de paiement", `${client.delai_paiement_jours ?? 30} jours`)}
           {ligne("Notes", client.notes)}
+          <div className="border-t border-neutral-100 pt-2 dark:border-neutral-800">
+            <ExclusionRelanceClient clientId={id} exclueInitial={Boolean(client.relance_auto_exclue)} />
+          </div>
         </section>
 
         <section className="space-y-3">

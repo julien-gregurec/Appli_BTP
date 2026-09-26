@@ -1,0 +1,50 @@
+{
+  "_lire": "Identifiants Price du compte Stripe TEST. Ce ne sont pas des secrets : un price_id ne permet aucune action sans la cle secrete. Les versionner rend la generation tarifaire relisible et diffable, et permet a la CI de verifier prix affiche == prix facture avec un seul secret (STRIPE_SECRET_KEY de test).",
+  "_interdit": "N'ecrire ici AUCUN identifiant Live, AUCUN montant (la source des montants est src/lib/tarification.canonical.json), AUCUNE cle.",
+  "environment": "test",
+  "generation": "CANONICAL-V4-2026-09",
+  "prices": {
+    "STRIPE_PRICE_BUSINESS_ANNUEL": "price_1UDUOb0bT5C0WG2aVE0bp5Sj",
+    "STRIPE_PRICE_BUSINESS_MENSUEL": "price_1UDUOb0bT5C0WG2apRjiTeMd",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_ANNUEL": "price_1UDUOe0bT5C0WG2aGuMY3FQU",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_MENSUEL": "price_1UDUOe0bT5C0WG2aYC13DQEy",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_ANNUEL": "price_1UDUOd0bT5C0WG2aXwQGnUmj",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_MENSUEL": "price_1UDUOd0bT5C0WG2acLwNe1Id",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_ANNUEL": "price_1UDUOc0bT5C0WG2aLXM0iSGd",
+    "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_MENSUEL": "price_1UDUOc0bT5C0WG2aOqVgFZ5p",
+    "STRIPE_PRICE_ENTREPRISE_ANNUEL": "price_1UDUOc0bT5C0WG2aK4QMWYl9",
+    "STRIPE_PRICE_ENTREPRISE_MENSUEL": "price_1UDUOb0bT5C0WG2aj7N7qB5L",
+    "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL": "price_1UDUOi0bT5C0WG2aok0i3kBZ",
+    "STRIPE_PRICE_IA_INTENSIVE_ANNUEL": "price_1UDUOj0bT5C0WG2aEAmSUtul",
+    "STRIPE_PRICE_IA_INTENSIVE_MENSUEL": "price_1UDUOi0bT5C0WG2aFgrKalHM",
+    "STRIPE_PRICE_MINI_ANNUEL": "price_1UDUOa0bT5C0WG2aJAUITZoQ",
+    "STRIPE_PRICE_MINI_MENSUEL": "price_1UDUOa0bT5C0WG2afaHylblg",
+    "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_ANNUEL": "price_1UDUOg0bT5C0WG2aCZqy1RyJ",
+    "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_MENSUEL": "price_1UDUOg0bT5C0WG2axw8LQGCP",
+    "STRIPE_PRICE_MODULE_NOTES_FRAIS_ANNUEL": "price_1UDUOh0bT5C0WG2atADuKlI2",
+    "STRIPE_PRICE_MODULE_NOTES_FRAIS_MENSUEL": "price_1UDUOh0bT5C0WG2axegCslUM",
+    "STRIPE_PRICE_MODULE_POINTAGE_ANNUEL": "price_1UDUOf0bT5C0WG2a4t2hFhJV",
+    "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL": "price_1UDUOe0bT5C0WG2aDlGkCPhW",
+    "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_ANNUEL": "price_1UDUOh0bT5C0WG2aGP3T3XVL",
+    "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_MENSUEL": "price_1UDUOh0bT5C0WG2a9BZvhzOK",
+    "STRIPE_PRICE_MODULE_STOCK_ANNUEL": "price_1UDUOf0bT5C0WG2as6d652xK",
+    "STRIPE_PRICE_MODULE_STOCK_MENSUEL": "price_1UDUOf0bT5C0WG2aANIRiHJn",
+    "STRIPE_PRICE_PRO_ANNUEL": "price_1UDUOb0bT5C0WG2aCckRTjNQ",
+    "STRIPE_PRICE_PRO_MENSUEL": "price_1UDUOb0bT5C0WG2asBoaCWYC"
+  },
+  "generationsPrecedentes": {
+    "_lire": "Price de forfait de generations fermees, encore portes par des abonnements Test. Connus du serveur pour rester reconciliables ; jamais vendables.",
+    "priceIds": [
+      "price_1Tzi6A0bT5C0WG2aAv1cX5d0",
+      "price_1Tzi6O0bT5C0WG2amx0tF8rw",
+      "price_1U53030bT5C0WG2aKO7X6sy3",
+      "price_1U53040bT5C0WG2aPdkAvmvm",
+      "price_1U53050bT5C0WG2a8a89yVB9",
+      "price_1U53050bT5C0WG2aThSBI8kv",
+      "price_1UBJ9l0bT5C0WG2av4Ut3MMQ",
+      "price_1UBJ9m0bT5C0WG2aFjSrFw3x",
+      "price_1UBJ9m0bT5C0WG2aTxUD6x4f",
+      "price_1UBJ9n0bT5C0WG2aTKlCsMZR"
+    ]
+  }
+}

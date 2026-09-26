@@ -1,4 +1,4 @@
-import { obtenirProviderIA } from "@/lib/ai/provider";
+import { obtenirProviderIA, type UsageIA } from "@/lib/ai/provider";
 
 const OUTIL_STRUCTURER = {
   nom: "structurer_compte_rendu",
@@ -17,10 +17,10 @@ const OUTIL_STRUCTURER = {
   },
 };
 
-export async function structurerCompteRendu(transcription: string): Promise<{ titre: string; contenu: string }> {
+export async function structurerCompteRendu(transcription: string): Promise<{ titre: string; contenu: string; usage?: UsageIA }> {
   const provider = obtenirProviderIA();
 
-  const { appelsOutils } = await provider.completer({
+  const { appelsOutils, usage } = await provider.completer({
     system:
       "Tu structures la dictée orale d'un chef de chantier BTP en compte-rendu écrit clair, en français. " +
       "Reste fidèle à ce qui est dit : ne complète ni n'invente aucune information absente de la dictée.",
@@ -35,5 +35,5 @@ export async function structurerCompteRendu(transcription: string): Promise<{ ti
 
   const input = appel.entree as { titre?: string; contenu?: string };
   if (!input.contenu) throw new Error("L'IA n'a pas pu structurer ce compte-rendu.");
-  return { titre: input.titre?.trim() || "Compte-rendu", contenu: input.contenu.trim() };
+  return { titre: input.titre?.trim() || "Compte-rendu", contenu: input.contenu.trim(), usage };
 }

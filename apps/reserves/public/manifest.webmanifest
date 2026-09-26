@@ -1,0 +1,12 @@
+{
+  "name": "ELSATIA Réserves",
+  "short_name": "Réserves",
+  "description": "Les réserves de chantier, du constat à la levée.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1f4f8f",
+  "lang": "fr-FR"
+}

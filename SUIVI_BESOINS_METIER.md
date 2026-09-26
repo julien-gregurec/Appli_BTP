@@ -1,4 +1,4 @@
-# Suivi des besoins métier — Liria Gestion Pro
+# Suivi des besoins métier — ELSATIA Gestion Pro
 
 Mise à jour : 14 juillet 2026. Ce document distingue ce qui est utilisable, ce qui reste progressif et ce qui dépend d’un service externe.
 
@@ -38,7 +38,7 @@ Mise à jour : 14 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Scanner/importer une facture papier | ✅ Fait | PDF/photo depuis fichier ou appareil photo, stockage privé, aperçu/téléchargement depuis la dépense. |
 | Import véhicules et outillage Excel/PDF | ✅ Fait | Import XLSX/CSV/PDF depuis les listes Flotte et Outillage, détection des colonnes usuelles, doublons véhicules mis à jour et doublons outils ignorés. |
 | Photos chantier par les équipes | ✅ Fait | Prise de photo directe depuis le téléphone, classement avant/pendant/après et note de suivi, en plus du dépôt documentaire complet. |
-| Logo entreprise dans logiciel et documents | ✅ Fait | Import PNG/JPG/WebP dans Paramètres, logo visible dans la carte de l’entreprise active et sur ses PDF. L’identité du logiciel reste toujours Liria Gestion Pro. |
+| Logo entreprise dans logiciel et documents | ✅ Fait | Import PNG/JPG/WebP dans Paramètres, logo visible dans la carte de l’entreprise active et sur ses PDF. L’identité du logiciel reste toujours ELSATIA Gestion Pro. |
 | Utilisation complète sur mobile | ✅ Fait | Interface responsive et application installable sur l’écran d’accueil. Les listes principales ont des cartes mobiles dédiées ; menu renforcé pour les zones sûres iPhone et bouton Retour vers la page parente. Le tableau de bord terrain réunit pointage et planning personnel. Aucune donnée privée n’est mise en cache. |
 | Espace propriétaire SaaS | ✅ Fait | Liste des entreprises, codes, membres, statut d’abonnement, échéance et note ; accès réservé au propriétaire en auth réelle. |
 | Stock inspiré d’une application GitHub existante | ⏳ En attente de source | Le socle est opérationnel. Comparaison/fusion détaillée à faire dès réception du dépôt GitHub annoncé par l’utilisateur. |

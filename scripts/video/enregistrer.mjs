@@ -1,4 +1,4 @@
-// Enregistre une démonstration réelle de Liria Gestion Pro.
+// Enregistre une démonstration réelle d'ELSATIA Gestion Pro.
 //
 // Principe : la voix off est générée d'abord, sa durée pilote le tournage.
 // Chaque geste est déclenché à la seconde précise où la narration en parle —
@@ -7,21 +7,25 @@
 //
 // Rien n'est simulé : vraies pages, vraies données de l'entreprise de démo.
 //
-//   node scripts/video/enregistrer.mjs
+//   ELSATIA_VIDEO_SCENES_FILE=chemin/vers/scenes.json node scripts/video/enregistrer.mjs
 // Sortie : output/video/brut/demo.webm
 
 import { chromium } from "playwright";
 import path from "node:path";
 import { mkdir, readFile, rm, readdir, rename } from "node:fs/promises";
 
-const baseUrl = process.env.LIRIA_AUDIT_URL ?? "http://127.0.0.1:3000";
-const email = process.env.LIRIA_AUDIT_EMAIL;
-const password = process.env.LIRIA_AUDIT_PASSWORD;
+const baseUrl = process.env.ELSATIA_AUDIT_URL ?? "http://127.0.0.1:3000";
+const email = process.env.ELSATIA_AUDIT_EMAIL;
+const password = process.env.ELSATIA_AUDIT_PASSWORD;
 const sortie = path.resolve("output/video/brut");
 
-if (!email || !password) throw new Error("LIRIA_AUDIT_EMAIL et LIRIA_AUDIT_PASSWORD sont obligatoires.");
+if (!email || !password) throw new Error("ELSATIA_AUDIT_EMAIL et ELSATIA_AUDIT_PASSWORD sont obligatoires.");
 
-const scenes = JSON.parse(await readFile("output/video/scenes.json", "utf8"));
+const scenesFile = process.env.ELSATIA_VIDEO_SCENES_FILE;
+if (!scenesFile) {
+  throw new Error("ELSATIA_VIDEO_SCENES_FILE est obligatoire ; l'archive Liria ne peut pas être utilisée implicitement.");
+}
+const scenes = JSON.parse(await readFile(path.resolve(scenesFile), "utf8"));
 const duree = (cle) => (scenes.find((s) => s.cle === cle)?.duree ?? 5) * 1000;
 
 // Courte respiration entre deux phrases, le temps que la page s'affiche.

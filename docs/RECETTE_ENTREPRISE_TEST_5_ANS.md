@@ -9,7 +9,7 @@ réaliste couvrant cinq exercices, de juillet 2021 à juillet 2026.
 Le script :
 
 - conserve les comptes, mots de passe et rôles déjà créés ;
-- n’ajoute aucune donnée dans LIRIA CONCEPT ou une autre entreprise ;
+- n’ajoute aucune donnée dans ELSATIA ou une autre entreprise ;
 - marque ses données avec `[RECETTE 5A]` ;
 - peut être rejoué sans multiplier les données de démonstration ;
 - refuse de démarrer si Entreprise Test ou son compte administrateur est absent.

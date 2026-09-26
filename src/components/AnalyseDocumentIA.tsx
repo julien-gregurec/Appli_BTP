@@ -21,7 +21,7 @@ export function AnalyseDocumentIA({ documentId }: { documentId: string }) {
   }
 
   if (analyse) {
-    return <p className="whitespace-pre-wrap rounded-md bg-liria-gold/10 p-2 text-xs text-neutral-700 dark:text-neutral-300">{analyse}</p>;
+    return <p className="whitespace-pre-wrap rounded-md bg-elsatia-gold/10 p-2 text-xs text-neutral-700 dark:text-neutral-300">{analyse}</p>;
   }
 
   return (

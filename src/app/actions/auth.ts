@@ -1,13 +1,22 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { headers } from "next/headers";
+import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
+import { destinationInterneSure } from "@/lib/security/redirects";
+import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
+import { estPlateformeAdmin } from "@/lib/plateforme";
 
-export async function origineApplication() {
-  const entetes = await headers();
-  return entetes.get("origin") ?? `${entetes.get("x-forwarded-proto") ?? "https"}://${entetes.get("x-forwarded-host") ?? entetes.get("host")}`;
+function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
+  const query = new URLSearchParams();
+  if (params.numero) query.set("numero", params.numero);
+  if (params.code) query.set("code", params.code);
+  if (params.offre) query.set("offre", params.offre);
+  const suffixe = query.toString();
+  return suffixe ? `/onboarding?${suffixe}` : "/onboarding";
 }
 
 export async function signupAction(formData: FormData) {
@@ -21,9 +30,13 @@ export async function signupAction(formData: FormData) {
   const prenom = String(formData.get("prenom") ?? "");
   const codeEntreprise = String(formData.get("code_entreprise") ?? "").trim().toUpperCase();
   const numeroEmploye = String(formData.get("numero_employe") ?? "").trim().toUpperCase();
+  const offreBrute = String(formData.get("offre") ?? "").trim().toLowerCase();
+  const offre = estCodeOffreTarifaire(offreBrute) ? offreBrute : "";
 
+  const destination = destinationOnboarding({ numero: numeroEmploye, code: codeEntreprise, offre });
+  const emailRedirectTo = construireUrlCallbackAuth(destination);
+  if (!emailRedirectTo) redirect(`/signup?error=${encodeURIComponent(ERREUR_CONFIGURATION_URL_AUTH)}`);
   const supabase = await createClient();
-  const origine = await origineApplication();
 
   // Le profil public.utilisateurs est créé côté base par le trigger on_auth_user_created,
   // qui lit nom/prenom depuis les métadonnées passées ici.
@@ -31,12 +44,12 @@ export async function signupAction(formData: FormData) {
     email,
     password,
     options: {
-      data: { nom, prenom, code_entreprise: codeEntreprise || null, numero_employe: numeroEmploye || null },
-      emailRedirectTo: `${origine}/auth/callback?next=${encodeURIComponent(numeroEmploye ? `/onboarding?numero=${numeroEmploye}` : codeEntreprise ? `/onboarding?code=${codeEntreprise}` : "/onboarding")}`,
+      data: { nom, prenom, code_entreprise: codeEntreprise || null, numero_employe: numeroEmploye || null, offre: offre || null },
+      emailRedirectTo,
     },
   });
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+    redirect(`/signup?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
   if (!data.user) {
     redirect(`/signup?error=${encodeURIComponent("Compte non créé.")}`);
@@ -47,7 +60,7 @@ export async function signupAction(formData: FormData) {
     redirect("/login?message=" + encodeURIComponent("Compte créé. Vérifie tes emails pour confirmer, puis connecte-toi."));
   }
 
-  redirect(numeroEmploye ? `/onboarding?numero=${encodeURIComponent(numeroEmploye)}` : codeEntreprise ? `/onboarding?code=${encodeURIComponent(codeEntreprise)}` : "/onboarding");
+  redirect(destination);
 }
 
 export async function loginAction(formData: FormData) {
@@ -61,9 +74,12 @@ export async function loginAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
 
+  // Un admin plateforme n'est rattaché à aucune entreprise cliente : l'envoyer
+  // vers le tableau de bord entreprise n'aurait aucun sens pour lui.
+  if (await estPlateformeAdmin()) redirect("/plateforme");
   redirect("/dashboard");
 }
 
@@ -119,12 +135,13 @@ export async function demanderReinitialisationAction(formData: FormData) {
   if (isEmailLoginDisabled()) redirect("/dashboard");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent("Saisissez votre adresse email.")}`);
+  const redirectTo = urlCallbackReinitialisation();
+  if (!redirectTo) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(ERREUR_CONFIGURATION_URL_AUTH)}`);
   const supabase = await createClient();
-  const origine = await origineApplication();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origine}/auth/callback?next=${encodeURIComponent("/nouveau-mot-de-passe")}`,
+    redirectTo,
   });
-  if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   redirect(`/mot-de-passe-oublie?message=${encodeURIComponent("Si ce compte existe, un lien de réinitialisation vient d’être envoyé.")}`);
 }
 
@@ -138,7 +155,43 @@ export async function modifierMotDePasseAction(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent("Le lien a expiré. Demandez un nouveau lien.")}`);
   const { error } = await supabase.auth.updateUser({ password: motDePasse });
-  if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   await supabase.auth.signOut();
   redirect(`/login?message=${encodeURIComponent("Mot de passe modifié. Vous pouvez maintenant vous connecter.")}`);
+}
+
+const MESSAGE_LIEN_INVALIDE = "Lien de confirmation invalide ou expiré.";
+
+/**
+ * Ne vérifie le token qu'au clic explicite (formulaire, pas GET) : un lien de
+ * confirmation à usage unique consommé par un simple chargement de page (pré-
+ * chargement de client mail, scanner de sécurité) invaliderait le vrai clic.
+ */
+export async function confirmerCompteAction(formData: FormData) {
+  const tokenHash = String(formData.get("token_hash") ?? "");
+  const type = String(formData.get("type") ?? "") as EmailOtpType;
+  const next = formData.get("next");
+  // Page d'atterrissage en cas d'échec : pour une récupération de mot de passe,
+  // ramener vers le formulaire "mot de passe oublié" (qui permet de redemander
+  // un lien) plutôt que vers /login, qui n'offre pas ce choix directement.
+  const pageErreur = type === "recovery" ? "/mot-de-passe-oublie" : "/login";
+
+  if (!tokenHash || !type) redirect(`${pageErreur}?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  if (error) {
+    // Un jeton à usage unique déjà consommé (double ouverture, préchargement
+    // par un client mail) et un jeton expiré remontent souvent la même erreur
+    // technique côté Supabase : traduireErreurAuth distingue l'expiration
+    // explicite quand elle est identifiable, sinon on retombe sur un message
+    // "lien invalide" — jamais le message générique "erreur technique", qui
+    // suggère à tort une panne plutôt qu'un lien simplement inutilisable.
+    const traduit = traduireErreurAuth(error.message);
+    const message = traduit === MESSAGE_TECHNIQUE_AUTH ? MESSAGE_LIEN_INVALIDE : traduit;
+    redirect(`${pageErreur}?error=${encodeURIComponent(message)}`);
+  }
+
+  const repli = type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
+  redirect(destinationInterneSure(typeof next === "string" ? next : null, repli));
 }

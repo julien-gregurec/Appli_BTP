@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OutilIA } from "@/lib/ai/provider";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
 type Supabase = SupabaseClient;
@@ -25,18 +26,24 @@ function correspondTousLesMots(texte: string, terme: string): boolean {
   return mots.length > 0 && mots.every((mot) => cible.includes(mot));
 }
 
-async function rechercher(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
-  const [{ data: clients }, { data: chantiers }, { data: devis }, { data: factures }] = await Promise.all([
+async function rechercher(supabase: Supabase, entrepriseId: string, permissions: string[] | null, input: { terme: string }) {
+  const chercherDevis = permissions === null || permissions.includes("acces_devis");
+  const chercherFactures = permissions === null || permissions.includes("acces_factures");
+  const [{ data: clients }, { data: chantiers }, devisResultat, facturesResultat] = await Promise.all([
     supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", entrepriseId).limit(300),
     supabase.from("chantiers").select("id, nom, ville, statut").eq("entreprise_id", entrepriseId).limit(300),
-    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
-    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
+    chercherDevis
+      ? supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients!devis_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5)
+      : Promise.resolve({ data: null }),
+    chercherFactures
+      ? supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients!factures_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5)
+      : Promise.resolve({ data: null }),
   ]);
   return {
     clients: (clients ?? []).filter((c) => correspondTousLesMots(`${c.prenom ?? ""} ${c.nom ?? ""} ${c.societe ?? ""}`, input.terme)).slice(0, 5),
     chantiers: (chantiers ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5),
-    devis: devis ?? [],
-    factures: factures ?? [],
+    devis: devisResultat.data ?? [],
+    factures: facturesResultat.data ?? [],
   };
 }
 
@@ -67,7 +74,7 @@ async function absencesDuJour(supabase: Supabase, entrepriseId: string) {
 async function facturesImpayees(supabase: Supabase, entrepriseId: string) {
   const { data } = await supabase
     .from("factures")
-    .select("id, numero, statut, montant_ttc, montant_paye, date_echeance, clients(nom, societe)")
+    .select("id, numero, statut, montant_ttc, montant_paye, date_echeance, clients!factures_client_id_fkey(nom, societe)")
     .eq("entreprise_id", entrepriseId)
     .in("statut", ["envoyee", "en_retard"])
     .order("date_echeance")
@@ -79,7 +86,7 @@ async function devisEnAttente(supabase: Supabase, entrepriseId: string) {
   const seuil = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const { data } = await supabase
     .from("devis")
-    .select("id, numero, montant_ttc, date_emission, clients(nom, societe)")
+    .select("id, numero, montant_ttc, date_emission, clients!devis_client_id_fkey(nom, societe)")
     .eq("entreprise_id", entrepriseId)
     .eq("statut", "envoye")
     .lt("date_emission", seuil)
@@ -162,6 +169,155 @@ async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, 
   return (data ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5);
 }
 
+// AI-LAUNCH-V1B, outil manquant depuis V1 (§17). Contrainte de modele de donnees decouverte en
+// l'implementant : la table `affectations` a ete deliberement redessinee (migration
+// 20260710000011, "Refonte Planning : modele 'affectation heures'... Remplace l'agenda
+// debut/fin par : un ouvrier affecte a un chantier, une date, un nombre d'heures") pour NE PLUS
+// avoir d'heure de debut/fin, uniquement une date et une duree en heures. Un "creneau" au sens
+// de ce produit est donc une DATE ou chaque employe demande a assez de marge restante ce jour-la
+// pour la duree demandee, jamais un horaire precis (ex. "10h-11h") : proposer une heure precise
+// serait une donnee inventee (§13, ne jamais halluciner). Convention documentee ici en l'absence
+// de toute regle de disponibilite existante (aucune table horaires_entreprise/horaires_salaries
+// dans le schema) : capacite journaliere = 7h, reprise du defaut deja utilise par la colonne
+// `affectations.heures` (default 7) plutot qu'un chiffre invente.
+const CAPACITE_JOURNALIERE_HEURES = 7;
+const MAX_CRENEAUX_PROPOSES = 3;
+const MAX_JOURS_BALAYES = 31;
+
+async function proposerCreneauxPlanning(
+  supabase: Supabase,
+  entrepriseId: string,
+  input: { employe_ids?: unknown; duree_heures?: unknown; date_debut?: unknown; date_fin?: unknown },
+) {
+  const employeIds = [...new Set((Array.isArray(input.employe_ids) ? input.employe_ids : []).map((v) => String(v)).filter(Boolean))];
+  const dureeHeures = Number(input.duree_heures);
+  const dateDebut = String(input.date_debut ?? "");
+  const dateFin = String(input.date_fin ?? "");
+  if (!employeIds.length || !dureeHeures || dureeHeures <= 0 || dureeHeures > CAPACITE_JOURNALIERE_HEURES) {
+    return { error: "Paramètres invalides : au moins un employé, une durée entre 0 et 7 h, une période de dates." };
+  }
+  if (!dateDebut || !dateFin || dateFin < dateDebut) {
+    return { error: "Période invalide." };
+  }
+
+  const { data: employes } = await supabase.from("employes").select("id, nom, prenom").in("id", employeIds).eq("entreprise_id", entrepriseId).eq("statut", "actif");
+  if (!employes || employes.length !== employeIds.length) {
+    return { error: "Un ou plusieurs employés sont introuvables ou inactifs." };
+  }
+  const nomsParId = new Map(employes.map((e) => [e.id, `${e.prenom} ${e.nom}`]));
+
+  const [{ data: affectations }, { data: conges }] = await Promise.all([
+    supabase.from("affectations").select("employe_id, date, heures").in("employe_id", employeIds).eq("entreprise_id", entrepriseId).gte("date", dateDebut).lte("date", dateFin),
+    supabase.from("demandes_conges").select("employe_id, date_debut, date_fin").in("employe_id", employeIds).eq("entreprise_id", entrepriseId).eq("statut", "approuvee").lte("date_debut", dateFin).gte("date_fin", dateDebut),
+  ]);
+
+  const heuresParEmployeEtJour = new Map<string, number>();
+  for (const a of affectations ?? []) {
+    const cle = `${a.employe_id}|${a.date}`;
+    heuresParEmployeEtJour.set(cle, (heuresParEmployeEtJour.get(cle) ?? 0) + Number(a.heures));
+  }
+  const congesParEmploye = new Map<string, Array<{ debut: string; fin: string }>>();
+  for (const c of conges ?? []) {
+    const liste = congesParEmploye.get(c.employe_id) ?? [];
+    liste.push({ debut: c.date_debut, fin: c.date_fin });
+    congesParEmploye.set(c.employe_id, liste);
+  }
+  const enConge = (employeId: string, date: string) => (congesParEmploye.get(employeId) ?? []).some((c) => c.debut <= date && date <= c.fin);
+
+  const creneaux: Array<{ date: string; employes: Array<{ id: string; nom: string; heures_deja_prevues: number; marge_restante: number }> }> = [];
+  const debut = new Date(`${dateDebut}T00:00:00Z`);
+  const fin = new Date(`${dateFin}T00:00:00Z`);
+  for (let jour = new Date(debut), compteur = 0; jour <= fin && compteur < MAX_JOURS_BALAYES && creneaux.length < MAX_CRENEAUX_PROPOSES; jour.setUTCDate(jour.getUTCDate() + 1), compteur++) {
+    const date = jour.toISOString().slice(0, 10);
+    if (employeIds.some((id) => enConge(id, date))) continue;
+    const disponibilites = employeIds.map((id) => {
+      const dejaPrevues = heuresParEmployeEtJour.get(`${id}|${date}`) ?? 0;
+      return { id, nom: nomsParId.get(id)!, heures_deja_prevues: dejaPrevues, marge_restante: Math.max(0, CAPACITE_JOURNALIERE_HEURES - dejaPrevues) };
+    });
+    if (disponibilites.every((d) => d.marge_restante >= dureeHeures)) {
+      creneaux.push({ date, employes: disponibilites });
+    }
+  }
+
+  return {
+    duree_demandee_heures: dureeHeures,
+    capacite_journaliere_heures: CAPACITE_JOURNALIERE_HEURES,
+    creneaux,
+    note: creneaux.length === 0 ? "Aucun jour disponible pour tous les employés demandés sur cette période." : null,
+  };
+}
+
+// IA-DEVIS-V1 §5 : source de prix "fiable" — catalogue de prestations de l'entreprise.
+async function rechercherPrestationsDevis(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
+  const { data } = await supabase
+    .from("prestations_catalogue")
+    .select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva")
+    .eq("entreprise_id", entrepriseId)
+    .eq("actif", true)
+    .limit(300);
+  // Chevauchement (designationsProches), pas correspondTousLesMots : le terme recherché par
+  // le modèle est souvent plus long/descriptif que la désignation catalogue elle-même (ex.
+  // "Cloison 72/48 avec isolation laine de verre 45mm" contre une prestation enregistrée
+  // "Cloison 72/48 avec isolation") — exiger que TOUS les mots du terme soient présents dans
+  // la désignation aurait échoué sur ce cas précis, comme observé en recette réelle pour la
+  // recherche de prix historique (voir designationsProches ci-dessous).
+  return (data ?? [])
+    .filter((p) => designationsProches(`${p.designation ?? ""} ${p.description ?? ""}`, input.terme))
+    .slice(0, 10);
+}
+
+// Mots trop génériques pour être significatifs dans un rapprochement de désignations BTP
+// (articles, prépositions, et les participes "fourni(e)(s)"/"posé(e)(s)" quasi systématiques
+// dans les libellés de prestation, qui matcheraient presque tout sans discriminer).
+const MOTS_VIDES_DESIGNATION = new Set([
+  "de", "du", "des", "le", "la", "les", "un", "une", "et", "à", "a", "au", "aux",
+  "avec", "pour", "sur", "en", "fourni", "fournie", "fournis", "fournies",
+  "pose", "posee", "poses", "posees",
+]);
+
+function motsSignificatifs(valeur: string): Set<string> {
+  return new Set(normaliser(valeur).split(/\s+/).filter((mot) => mot.length >= 3 && !MOTS_VIDES_DESIGNATION.has(mot)));
+}
+
+// Chevauchement plutôt qu'inclusion stricte dans un sens ou l'autre : une désignation de
+// catalogue/historique ("Faux plafond") est souvent plus courte que ce que demande
+// l'utilisateur ou reformule le modèle ("Faux plafond fourni et posé, dalles 600x600"), donc
+// ni `A contient B` ni `B contient A` ne matchent de façon fiable — un ILIKE directionnel
+// avait échoué exactement sur ce cas en recette réelle IA-DEVIS-V1.
+function designationsProches(a: string, b: string): boolean {
+  const motsA = motsSignificatifs(a);
+  for (const mot of motsSignificatifs(b)) if (motsA.has(mot)) return true;
+  return false;
+}
+
+// IA-DEVIS-V1 §5/§7 : source de prix "historique" — dernières lignes de devis de
+// l'entreprise correspondant à la désignation, sans exposer le devis complet ni le nom du
+// client (§38, confidentialité) : uniquement prix/unité/TVA/numéro/date, le strict
+// nécessaire pour que le modèle propose un prix et le signale comme "basé sur un devis
+// précédent" plutôt que comme un tarif enregistré certain.
+async function rechercherPrixHistoriqueDevis(supabase: Supabase, entrepriseId: string, input: { designation: string }) {
+  const terme = input.designation.trim();
+  if (!terme) return [];
+  const { data } = await supabase
+    .from("lignes_devis")
+    .select("designation, prix_unitaire_ht, unite, taux_tva, devis:devis_id(numero, date_emission, entreprise_id)")
+    .limit(1000);
+  return (data ?? [])
+    .map((l) => ({ ...l, devis: Array.isArray(l.devis) ? l.devis[0] : l.devis }))
+    .filter((l): l is typeof l & { devis: { numero: string | null; date_emission: string; entreprise_id: string } } => l.devis?.entreprise_id === entrepriseId)
+    .filter((l) => designationsProches(l.designation, terme))
+    .sort((a, b) => (b.devis.date_emission ?? "").localeCompare(a.devis.date_emission ?? ""))
+    .slice(0, 5)
+    .map((l) => ({
+      designation: l.designation,
+      prix_unitaire_ht: l.prix_unitaire_ht,
+      unite: l.unite,
+      taux_tva: l.taux_tva,
+      devis_numero: l.devis.numero,
+      date: l.devis.date_emission,
+    }));
+}
+
 async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
   const [{ data: affectations }, { data: conge }, { data: habilitations }] = await Promise.all([
     supabase.from("affectations").select("id, heures, tache, chantier_id, chantier:chantiers(nom), lieu_activite, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
@@ -174,6 +330,40 @@ async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: st
     en_conge_ce_jour: conge ? conge.type_conge : null,
     habilitations: habilitations ?? [],
   };
+}
+
+// Certains outils exposent des données couvertes par un droit de menu spécifique
+// (rentabilité, flotte, stock, factures, devis, heures de l'équipe) : la RLS Postgres
+// sur ces tables reste large (accès par simple appartenance à l'entreprise, cf. les
+// politiques "membres ..."), l'application du droit fin se fait normalement au niveau
+// page/action. Le copilote doit reproduire cette même restriction explicitement, sinon
+// il devient un contournement en langage naturel des droits de menu (ex. un poste
+// Terrain sans acces_rentabilite ne doit jamais obtenir la marge d'un chantier via l'IA).
+const PERMISSION_REQUISE_OUTIL: Partial<Record<string, readonly string[]>> = {
+  rentabilite_chantiers: ["acces_rentabilite"],
+  vehicules_entretien: ["acces_flotte"],
+  stock_faible: ["acces_stock"],
+  factures_impayees: ["acces_factures"],
+  devis_en_attente: ["acces_devis"],
+  heures_supplementaires_semaine: ["voir_pointages_equipe", "gerer_pointage"],
+  rechercher_prestations_devis: ["acces_devis"],
+  rechercher_prix_historique_devis: ["acces_devis"],
+  // proposer_devis (écriture) n'est pas filtré ici : comme proposer_affectation, il reste
+  // visible du modèle mais est gardé par le droit gerer_devis directement dans son résolveur
+  // (src/lib/ai/assistant.ts) et par la consigne du prompt système — voir IA_DEVIS_V1.md.
+};
+
+// null = accès complet (prototype ou compte support), comme partout ailleurs dans
+// src/lib/permissions.ts.
+export function autoriseOutilCopilote(nom: string, permissions: string[] | null): boolean {
+  if (permissions === null) return true;
+  const requises = PERMISSION_REQUISE_OUTIL[nom];
+  if (!requises) return true;
+  return requises.some((cle) => permissions.includes(cle));
+}
+
+export function outilsAutorisesCopilote(permissions: string[] | null): OutilIA[] {
+  return OUTILS_COPILOTE.filter((outil) => autoriseOutilCopilote(outil.nom, permissions));
 }
 
 export const OUTILS_COPILOTE: OutilIA[] = [
@@ -229,6 +419,28 @@ export const OUTILS_COPILOTE: OutilIA[] = [
     parametres: { type: "object", properties: {} },
   },
   {
+    nom: "rechercher_prestations_devis",
+    description:
+      "Recherche dans le catalogue de prestations de l'entreprise (source de prix FIABLE, un tarif réellement enregistré) par mot-clé. " +
+      "À utiliser en priorité pour chiffrer une ligne de devis avant d'estimer un prix.",
+    parametres: {
+      type: "object",
+      properties: { terme: { type: "string", description: "Mots-clés de la prestation recherchée (ex. \"cloison placo\")" } },
+      required: ["terme"],
+    },
+  },
+  {
+    nom: "rechercher_prix_historique_devis",
+    description:
+      "Cherche, parmi les devis déjà émis par l'entreprise, le prix unitaire utilisé pour une désignation proche (source de prix HISTORIQUE, pas un tarif catalogue). " +
+      "À utiliser seulement si rechercher_prestations_devis n'a rien trouvé. Si tu utilises ce prix dans ta proposition, indique-le comme basé sur un devis précédent, jamais comme un tarif certain.",
+    parametres: {
+      type: "object",
+      properties: { designation: { type: "string", description: "Désignation de la prestation à rechercher dans l'historique" } },
+      required: ["designation"],
+    },
+  },
+  {
     nom: "chercher_employe",
     description: "Recherche un employé actif par nom ou prénom approximatif, pour obtenir son identifiant.",
     parametres: {
@@ -259,6 +471,24 @@ export const OUTILS_COPILOTE: OutilIA[] = [
     },
   },
   {
+    nom: "proposer_creneaux_planning",
+    description:
+      "Cherche jusqu'à 3 dates où TOUS les employés demandés ont assez de marge dans leur journée pour une durée donnée, sur une période. " +
+      "N'écrit rien en base et ne propose aucun horaire précis (ce produit ne gère pas d'heure de début/fin, seulement une date et un nombre d'heures par jour) : " +
+      "utilise cet outil pour répondre à une demande du type « trouve un créneau/un moment libre avec X et Y », avant de proposer une affectation avec proposer_affectation. " +
+      "Cherche d'abord chaque employé cité via chercher_employe. Une fois qu'une date convient à l'utilisateur, termine avec proposer_affectation (ou proposer_modification_affectation) pour cette date, pas avant.",
+    parametres: {
+      type: "object",
+      properties: {
+        employe_ids: { type: "array", items: { type: "string" }, description: "Identifiants des employés concernés (obtenus via chercher_employe)" },
+        duree_heures: { type: "number", description: "Durée recherchée en heures (ex. 1 pour une heure), maximum 7" },
+        date_debut: { type: "string", description: "Début de la période de recherche, format AAAA-MM-JJ" },
+        date_fin: { type: "string", description: "Fin de la période de recherche, format AAAA-MM-JJ (ex. fin de semaine si l'utilisateur dit \"cette semaine\")" },
+      },
+      required: ["employe_ids", "duree_heures", "date_debut", "date_fin"],
+    },
+  },
+  {
     nom: "proposer_affectation",
     description:
       "Termine la conversation en proposant à l'utilisateur une affectation précise, pour validation manuelle. " +
@@ -279,7 +509,7 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       type: "object",
       properties: {
         employe_ids: { type: "array", items: { type: "string" }, description: "Un ou plusieurs identifiants d'employé (obtenus via chercher_employe). Une même affectation est créée pour chacun." },
-        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: "\"chantier\" par défaut. \"conge\" pose une absence directement (sans passer par une demande à approuver). \"autre\" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans Liria...)." },
+        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: `"chantier" par défaut. "conge" pose une absence directement (sans passer par une demande à approuver). "autre" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans ${PRODUCT_NAME}...).` },
         chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
         lieu_activite: { type: "string", description: "Quand type_activite n'est pas \"chantier\" : reprends fidèlement ce que l'utilisateur a dit sur le lieu/contexte (ex. \"Restaurant avec le président du RCSA\", \"Dépôt principal\", \"Chantier non enregistré : nom cité\")" },
         date: { type: "string", description: "Date au format AAAA-MM-JJ" },
@@ -338,7 +568,7 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "Termine la conversation en proposant d'envoyer un message interne, pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
       "Deux destinations possibles, exactement une des deux : destinataire_employe_id pour un message direct à un collègue nommé (identifié via chercher_employe), " +
       "ou chantier_id pour poster sur le fil de discussion partagé d'un chantier (identifié via chercher_chantier_planning), visible par toute l'équipe du chantier. " +
-      "Réservé aux messages professionnels internes à l'entreprise — pas pour contacter le support Liria (utilise proposer_message_support pour ça).",
+      `Réservé aux messages professionnels internes à l'entreprise — pas pour contacter le support ${BRAND_NAME} (utilise proposer_message_support pour ça).`,
     parametres: {
       type: "object",
       properties: {
@@ -352,8 +582,8 @@ export const OUTILS_COPILOTE: OutilIA[] = [
   {
     nom: "proposer_message_support",
     description:
-      "Termine la conversation en proposant d'envoyer un message au support Liria (l'éditeur du logiciel), pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
-      "Uniquement pour un problème technique, une question sur le fonctionnement de l'application, la facturation de l'abonnement Liria, etc. — jamais pour une question métier BTP ou une communication avec un client/collègue.",
+      `Termine la conversation en proposant d'envoyer un message au support ${BRAND_NAME} (l'éditeur du logiciel), pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. ` +
+      `Uniquement pour un problème technique, une question sur le fonctionnement de l'application, la facturation de l'abonnement ${PRODUCT_NAME}, etc. — jamais pour une question métier BTP ou une communication avec un client/collègue.`,
     parametres: {
       type: "object",
       properties: {
@@ -362,17 +592,66 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       required: ["contenu"],
     },
   },
+  {
+    nom: "proposer_devis",
+    description:
+      "Termine la conversation en proposant un BROUILLON de devis structuré, pour validation manuelle. N'écrit rien en base. " +
+      "Réservé aux postes qui ont le droit de gérer les devis — voir le contexte au début de cette conversation pour savoir si c'est le cas ; si non, ne l'utilise pas. " +
+      "Cherche d'abord le client via rechercher (si plusieurs correspondances, demande lequel avant de continuer ; si aucune, dis-le et ne propose pas de devis). " +
+      "Pour chaque prestation distincte de la demande, crée une ligne séparée (ne fusionne jamais deux prestations différentes dans une seule ligne). " +
+      "Pour le prix de chaque ligne : cherche d'abord rechercher_prestations_devis (source \"catalogue\"), puis rechercher_prix_historique_devis si rien trouvé (source \"historique\", à signaler comme basé sur un devis précédent) ; " +
+      "si aucune des deux ne donne de prix exploitable, laisse prix_unitaire_ht à null (source \"absent\") — n'invente JAMAIS un prix au marché, ce produit ne le permet pas. " +
+      "Toute hypothèse que tu ajoutes toi-même (finition, épaisseur, méthode non précisée par l'utilisateur) doit être listée dans hypotheses, jamais présentée comme une information fournie par l'utilisateur. " +
+      "Si la demande est trop vague pour être chiffrée (ex. juste \"fais-moi un devis\"), pose au maximum 2 à 4 questions prioritaires avant de proposer, plutôt que de deviner.",
+    parametres: {
+      type: "object",
+      properties: {
+        client_id: { type: "string", description: "Identifiant du client (obtenu via rechercher), obligatoire pour créer le brouillon" },
+        objet: { type: "string", description: "Titre court du devis (ex. \"Cloisons bureaux Strasbourg\")" },
+        lignes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              designation: { type: "string" },
+              description: { type: "string", description: "Détail visible sur le devis, chaîne vide si inutile" },
+              type: { type: "string", enum: ["main_oeuvre", "fourniture", "sous_traitance", "deplacement", "forfait"] },
+              quantite: { type: "number" },
+              unite: { type: "string", enum: ["u", "m²", "ml", "h", "forfait", "kg", "L"] },
+              prix_unitaire_ht: { type: ["number", "null"], description: "Prix HT en euros, ou null si aucune source fiable/historique — jamais une estimation inventée" },
+              source_prix: { type: "string", enum: ["catalogue", "historique", "absent"] },
+              taux_tva: { type: "number", enum: [20, 10, 5.5, 0] },
+              remise_ligne: { type: "number", description: "Remise en % sur cette ligne, 0 par défaut. Uniquement si l'utilisateur l'a explicitement demandée." },
+            },
+            required: ["designation", "type", "quantite", "unite", "source_prix", "taux_tva"],
+          },
+        },
+        hypotheses: { type: "array", items: { type: "string" }, description: "Hypothèses que TU as ajoutées (non fournies explicitement par l'utilisateur)" },
+        notes_client: { type: "string", description: "Notes additionnelles visibles sur le devis, chaîne vide si inutile" },
+        commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer ce brouillon" },
+      },
+      required: ["objet", "lignes"],
+    },
+  },
 ];
 
 export async function executerOutilCopilote(
   supabase: Supabase,
   entrepriseId: string,
+  permissions: string[] | null,
   nom: string,
   input: Record<string, unknown>,
 ): Promise<unknown> {
+  // Deuxieme barriere en profondeur : outilsAutorisesCopilote() retire deja ces outils
+  // de la liste proposee au modele, mais on ne fait jamais confiance uniquement a ce que
+  // le modele choisit d'appeler (cf. AI-LAUNCH-V1 §2 — l'IA n'a aucun droit que
+  // l'utilisateur n'a pas deja).
+  if (!autoriseOutilCopilote(nom, permissions)) {
+    return { error: "Ton poste n'a pas accès à cette information." };
+  }
   switch (nom) {
     case "rechercher":
-      return rechercher(supabase, entrepriseId, input as { terme: string });
+      return rechercher(supabase, entrepriseId, permissions, input as { terme: string });
     case "chantiers_en_retard":
       return chantiersEnRetard(supabase, entrepriseId);
     case "absences_du_jour":
@@ -389,12 +668,18 @@ export async function executerOutilCopilote(
       return heuresSupplementairesSemaine(supabase, entrepriseId);
     case "rentabilite_chantiers":
       return rentabiliteChantiers(supabase, entrepriseId);
+    case "rechercher_prestations_devis":
+      return rechercherPrestationsDevis(supabase, entrepriseId, input as { terme: string });
+    case "rechercher_prix_historique_devis":
+      return rechercherPrixHistoriqueDevis(supabase, entrepriseId, input as { designation: string });
     case "chercher_employe":
       return chercherEmploye(supabase, entrepriseId, input as { terme: string });
     case "chercher_chantier_planning":
       return chercherChantierParNom(supabase, entrepriseId, input as { terme: string });
     case "verifier_disponibilite_employe":
       return verifierDisponibiliteEmploye(supabase, entrepriseId, input as { employe_id: string; date: string });
+    case "proposer_creneaux_planning":
+      return proposerCreneauxPlanning(supabase, entrepriseId, input);
     default:
       return { error: `Outil inconnu : ${nom}` };
   }

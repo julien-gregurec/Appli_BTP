@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { TRANSITIONS_COMMANDES, type LigneCommande } from "@/lib/commandes";
 import { delaiPaiementFournisseurValide } from "@/lib/echeances-fournisseurs";
 
@@ -35,7 +36,7 @@ export async function creerFournisseurAction(formData: FormData) {
     delai_paiement_jours: delaiPaiement,
   });
 
-  if (error) redirect(`/fournisseurs?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/fournisseurs?error=${encodeURIComponent(messageErreurUtilisateur("creerFournisseurAction", error, "Impossible de créer ce fournisseur."))}`);
   revalidatePath("/fournisseurs");
   revalidatePath("/commandes/nouveau");
   redirect("/fournisseurs");
@@ -61,7 +62,7 @@ export async function modifierFournisseurAction(id: string, formData: FormData) 
     delai_paiement_jours: delaiPaiement,
     updated_at: new Date().toISOString(),
   }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
-  if (error) redirect(`/fournisseurs/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/fournisseurs/${id}?error=${encodeURIComponent(messageErreurUtilisateur("modifierFournisseurAction", error, "Impossible d’enregistrer ce fournisseur."))}`);
   revalidatePath("/fournisseurs");
   revalidatePath(`/fournisseurs/${id}`);
   revalidatePath("/depenses");
@@ -108,7 +109,7 @@ export async function creerFournisseurRapideAction(
     .select("id, nom")
     .single();
 
-  if (error || !cree) return { error: error?.message ?? "Impossible de créer le fournisseur." };
+  if (error || !cree) return { error: messageErreurUtilisateur("creerFournisseurRapideAction", error, "Impossible de créer le fournisseur.") };
   revalidatePath("/fournisseurs");
   return { id: cree.id, label: cree.nom };
 }
@@ -148,7 +149,7 @@ export async function creerCommandeAction(
       prix_unitaire_ht: Number(l.prix_unitaire_ht), taux_tva: Number(l.taux_tva), ordre: i,
     })),
   });
-  if (error || !commandeId) return { error: error?.message ?? "Impossible de créer la commande." };
+  if (error || !commandeId) return { error: messageErreurUtilisateur("creerCommandeAction", error, "Impossible de créer la commande.") };
   revalidatePath("/commandes");
   return { id: commandeId as string };
 }
@@ -173,7 +174,7 @@ export async function changerStatutCommandeAction(id: string, statut: string) {
   const { error } = await supabase.rpc("changer_statut_commande", {
     p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_statut: statut,
   });
-  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutCommandeAction", error, "Impossible de modifier le statut de la commande."))}`);
 
   revalidatePath(`/commandes/${id}`);
   revalidatePath("/commandes");
@@ -206,10 +207,12 @@ export async function enregistrerReceptionCommandeAction(id: string, formData: F
     redirect(`/commandes/${id}?error=${encodeURIComponent("Une quantité reçue est invalide ou supérieure à la quantité commandée")}`);
   }
 
+  const cleIdempotence = String(formData.get("cle_idempotence") ?? "").trim() || null;
   const { error } = await supabase.rpc("enregistrer_reception_commande", {
     p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_lignes: receptions,
+    p_idempotency_key: cleIdempotence,
   });
-  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerReceptionCommandeAction", error, "Impossible d’enregistrer la réception."))}`);
   revalidatePath(`/commandes/${id}`);
   revalidatePath("/commandes");
   revalidatePath("/dashboard");

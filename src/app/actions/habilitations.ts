@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 async function exigerGestion(ctx: Awaited<ReturnType<typeof getContexteEntreprise>>, employeId: string) {
   const permissions = await permissionsUtilisateur(ctx);
@@ -28,7 +29,7 @@ export async function ajouterHabilitationAction(employeId: string, formData: For
     date_obtention,
     date_expiration,
   });
-  if (error) redirect(`/employes/${employeId}/carte?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/employes/${employeId}/carte?error=${encodeURIComponent(messageErreurUtilisateur("ajouterHabilitationAction", error, "Impossible d’enregistrer cette habilitation."))}`);
   revalidatePath(`/employes/${employeId}/carte`);
   redirect(`/employes/${employeId}/carte?succes=1`);
 }

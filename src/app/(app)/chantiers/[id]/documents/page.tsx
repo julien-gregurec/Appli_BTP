@@ -8,6 +8,7 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AnalyseDocumentIA } from "@/components/AnalyseDocumentIA";
 import { DOCUMENT_CATEGORIES, libelleCategorie, tailleLisible } from "@/lib/documents";
 import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { iaEstActive } from "@/lib/preview-features";
 
 export default async function DocumentsChantierPage({
   params,
@@ -20,7 +21,9 @@ export default async function DocumentsChantierPage({
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutUtiliserIA = iaEstActive() && aAccesIA(permissions);
+  const peutSupprimer = permissions === null || permissions.includes("gerer_chantiers");
   const [{ data: chantier }, { data: documents }, { data: mediasConversation }] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
@@ -35,11 +38,19 @@ export default async function DocumentsChantierPage({
   ]);
   if (!chantier) notFound();
 
-  const avecUrls = await Promise.all((documents ?? []).map(async (document) => {
-    if (!document.mime_type.startsWith("image/")) return { ...document, previewUrl: null };
-    const { data } = await supabase.storage.from("chantier-documents")
-      .createSignedUrl(document.storage_path, 900);
-    return { ...document, previewUrl: data?.signedUrl ?? null };
+  // Performance : un appel Storage par document (N+1) devenait notable avec
+  // plusieurs centaines de photos sur un même chantier — createSignedUrls
+  // (pluriel) fait tous les documents images en un seul aller-retour réseau.
+  const cheminsImages = (documents ?? [])
+    .filter((document) => document.mime_type.startsWith("image/"))
+    .map((document) => document.storage_path);
+  const { data: signedUrls } = cheminsImages.length
+    ? await supabase.storage.from("chantier-documents").createSignedUrls(cheminsImages, 900)
+    : { data: [] as { path: string | null; signedUrl: string | null }[] };
+  const urlParChemin = new Map((signedUrls ?? []).map((entry) => [entry.path, entry.signedUrl]));
+  const avecUrls = (documents ?? []).map((document) => ({
+    ...document,
+    previewUrl: document.mime_type.startsWith("image/") ? urlParChemin.get(document.storage_path) ?? null : null,
   }));
   const ajouter = ajouterDocumentChantierAction.bind(null, id);
 
@@ -134,9 +145,11 @@ export default async function DocumentsChantierPage({
                     {peutUtiliserIA && MIME_ANALYSABLES_IA.includes(document.mime_type) && <AnalyseDocumentIA documentId={document.id} />}
                     <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-sm dark:border-neutral-800">
                       <a href={`/api/documents/${document.id}?download=1`} className="font-medium hover:underline">Télécharger</a>
-                      <form action={supprimer}>
-                        <ConfirmSubmitButton message={`Supprimer « ${document.nom} » ?`} className="text-red-600 hover:underline dark:text-red-400">Supprimer</ConfirmSubmitButton>
-                      </form>
+                      {peutSupprimer && (
+                        <form action={supprimer}>
+                          <ConfirmSubmitButton message={`Supprimer « ${document.nom} » ?`} className="text-red-600 hover:underline dark:text-red-400">Supprimer</ConfirmSubmitButton>
+                        </form>
+                      )}
                     </div>
                   </div>
                 </article>

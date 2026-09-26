@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
-import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
+import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion, type UsageIA } from "@/lib/ai/provider";
+import { outilsAutorisesCopilote, executerOutilCopilote } from "@/lib/ai/copilote";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
+import { UNITES, TAUX_TVA, LIGNE_TYPES } from "@/lib/devis";
 
 export type MessageChat = { role: "user" | "assistant"; contenu: string; fichier?: FichierIA };
 
@@ -57,14 +59,77 @@ export type PropositionMessageSupport = {
   contenu: string;
 };
 
+// IA-DEVIS-V1 : source_prix n'est jamais écrite en base (lignes_devis n'a pas cette colonne),
+// c'est une métadonnée de transparence affichée uniquement dans la carte de proposition — voir
+// docs/ia/IA_DEVIS_V1.md. prix_unitaire_ht=null signifie "aucune source fiable/historique" :
+// affiché "À renseigner", jamais transformé silencieusement en 0 avant confirmation.
+export type LigneProposeeDevis = {
+  designation: string;
+  description: string | null;
+  type: string;
+  quantite: number;
+  unite: string;
+  prixUnitaireHt: number | null;
+  sourcePrix: "catalogue" | "historique" | "absent";
+  tauxTva: number;
+  remiseLigne: number;
+};
+
+export type PropositionDevis = {
+  clientId: string;
+  clientNom: string;
+  objet: string;
+  lignes: LigneProposeeDevis[];
+  hypotheses: string[];
+  notesClient: string | null;
+  avertissement: string | null;
+};
+
 export type EvenementAssistant =
   | { type: "texte"; delta: string }
   | { type: "proposition"; proposition: PropositionAffectation }
   | { type: "proposition_conge"; proposition: PropositionConge }
   | { type: "proposition_message_interne"; proposition: PropositionMessageInterne }
-  | { type: "proposition_message_support"; proposition: PropositionMessageSupport };
+  | { type: "proposition_message_support"; proposition: PropositionMessageSupport }
+  | { type: "proposition_devis"; proposition: PropositionDevis };
+
+// Noms des outils IA-DEVIS-V1 (schémas déclarés dans copilote.ts) : filtrés de la liste
+// envoyée au modèle quand FEATURE_AI_DEVIS_ENABLED est désactivé, indépendamment du filtrage
+// par permission déjà fait par outilsAutorisesCopilote — permet une désactivation isolée
+// (§70/§71) sans toucher au reste de l'assistant.
+export const NOMS_OUTILS_IA_DEVIS = ["rechercher_prestations_devis", "rechercher_prix_historique_devis", "proposer_devis"] as const;
 
 const MAX_TOURS_OUTILS = 5;
+
+type ContextePromptSysteme = {
+  entrepriseNom: string;
+  aujourdhui: string;
+  descriptionUtilisateur: string;
+  consigneAffectation: string;
+  consigneDevis: string;
+};
+
+export function construirePromptSystemeAssistant({
+  entrepriseNom,
+  aujourdhui,
+  descriptionUtilisateur,
+  consigneAffectation,
+  consigneDevis,
+}: ContextePromptSysteme): string {
+  return (
+    `Tu es l'assistant intégré de ${PRODUCT_NAME}, un logiciel de gestion pour entreprises du BTP, pour l'entreprise "${entrepriseNom}". ` +
+    `Nous sommes le ${aujourdhui}. ${descriptionUtilisateur}` +
+    `Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
+    `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
+    `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
+    consigneAffectation +
+    consigneDevis +
+    `Tu n'as accès à aucun outil de recherche de lieu réel (pas de carte, pas d'annuaire) : si l'utilisateur cite un lieu vague ou qui peut désigner plusieurs endroits (ex. un nom de restaurant courant, sans ville ni quartier), ne devine pas et ne l'invente pas — propose 2-3 hypothèses plausibles à partir de ta connaissance générale et demande laquelle est la bonne avant de conclure la proposition ; si le lieu est déjà précis (adresse, ville, quartier, nom distinctif), pas besoin de demander. ` +
+    `Pour envoyer un message à un collègue nommé ou sur le fil d'un chantier, utilise proposer_message_interne (cherche d'abord le destinataire ou le chantier via chercher_employe / chercher_chantier_planning). Pour contacter le support ${BRAND_NAME} au sujet de l'application elle-même (bug, question technique, facturation de l'abonnement ${PRODUCT_NAME}), utilise proposer_message_support — jamais pour une question métier BTP. Dans les deux cas, rien n'est envoyé sans validation manuelle. ` +
+    `Ne redirige jamais vers un menu que tu n'as pas vérifié. ` +
+    `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`
+  );
+}
 
 type ChampsAffectation = { typeActivite: TypeActiviteProposable; date: string; heures: number; tache: string | null; lieuActivite: string | null; commentaireModele: string | null };
 
@@ -278,6 +343,92 @@ function resoudrePropositionMessageSupport(input: Record<string, unknown>): Prop
   return { contenu };
 }
 
+const TYPES_LIGNE_CLES: readonly string[] = LIGNE_TYPES.map((t) => t.cle);
+
+// Découvert en recette réelle : avec `strict: false` côté provider (src/lib/ai/providers/
+// openai.ts), l'enum du paramètre `type` n'est qu'indicatif, pas imposé par l'API — le modèle
+// a renvoyé une casse différente ("Fourniture" au lieu de "fourniture") sur TOUTES les lignes
+// d'une même proposition, faisant tomber silencieusement les trois dans le repli "forfait"
+// (correspondance exacte sensible à la casse). Une comparaison insensible à la casse/espaces
+// suffit à couvrir ce cas sans risquer d'accepter une valeur réellement hors-liste.
+function cleLigneNormalisee(valeur: unknown): string | null {
+  if (typeof valeur !== "string") return null;
+  const normalisee = valeur.trim().toLowerCase();
+  return TYPES_LIGNE_CLES.find((cle) => cle === normalisee) ?? null;
+}
+const MAX_LIGNES_PROPOSITION_DEVIS = 40;
+
+// IA-DEVIS-V1 : construit la proposition de devis à partir de l'appel outil du modèle.
+// Contrairement a resoudrePropositionAffectation (qui refuse tout input mal forme), on
+// tolere les valeurs hors-liste sur type/unite/taux_tva en les ramenant a une valeur par
+// defaut sure (meme logique de tolerance que genererLignesDevisIA, src/lib/ai/devis.ts) —
+// mais JAMAIS sur le prix ou la quantite, qui sont soit valides, soit la ligne est rejetee :
+// une quantite ou un prix invente serait une donnee metier fausse presentee comme reelle,
+// alors qu'un type/unite/TVA par defaut reste visible et corrigible avant confirmation.
+// Exportee (contrairement aux autres resolveurs de ce fichier, prives) pour un test unitaire
+// dedie — cf. IA-DEVIS-V1 §53, logique de tolerance/rejet nouvelle et significative.
+export async function resoudrePropositionDevis(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  peutGererDevis: boolean,
+  input: Record<string, unknown>,
+): Promise<PropositionDevis | null> {
+  if (!peutGererDevis) return null;
+
+  const clientId = typeof input.client_id === "string" ? input.client_id.trim() : "";
+  if (!clientId) return null;
+  const { data: client } = await supabase
+    .from("clients")
+    .select("nom, prenom, societe")
+    .eq("id", clientId)
+    .eq("entreprise_id", entrepriseId)
+    .maybeSingle();
+  if (!client) return null;
+  const clientNom = client.societe || [client.prenom, client.nom].filter(Boolean).join(" ") || "Client";
+
+  const objet = typeof input.objet === "string" ? input.objet.trim().slice(0, 200) : "";
+  if (!objet) return null;
+
+  const lignesBrutes = Array.isArray(input.lignes) ? input.lignes : [];
+  const lignes: LigneProposeeDevis[] = [];
+  for (const brut of lignesBrutes.slice(0, MAX_LIGNES_PROPOSITION_DEVIS)) {
+    if (typeof brut !== "object" || brut === null) continue;
+    const l = brut as Record<string, unknown>;
+    const designation = typeof l.designation === "string" ? l.designation.trim().slice(0, 200) : "";
+    if (!designation) continue;
+    const quantite = Number(l.quantite);
+    if (!Number.isFinite(quantite) || quantite <= 0) continue;
+    const prixBrut = l.prix_unitaire_ht;
+    const prixUnitaireHt = typeof prixBrut === "number" && Number.isFinite(prixBrut) && prixBrut >= 0 ? prixBrut : null;
+    const sourcePrixBrut = typeof l.source_prix === "string" ? l.source_prix : "absent";
+    lignes.push({
+      designation,
+      description: typeof l.description === "string" && l.description.trim() ? l.description.trim() : null,
+      type: cleLigneNormalisee(l.type) ?? "forfait",
+      quantite,
+      unite: (UNITES as readonly string[]).includes(l.unite as string) ? (l.unite as string) : "u",
+      // Aucun prix trouvable ne doit jamais se retrouver marqué "catalogue"/"historique" sans
+      // valeur associée — sinon la carte de proposition afficherait une fausse source pour un
+      // champ vide (§6/§7 : ne jamais faire passer une estimation pour un prix enregistré).
+      prixUnitaireHt,
+      sourcePrix: prixUnitaireHt === null ? "absent" : sourcePrixBrut === "catalogue" || sourcePrixBrut === "historique" ? sourcePrixBrut : "absent",
+      tauxTva: (TAUX_TVA as readonly number[]).includes(Number(l.taux_tva)) ? Number(l.taux_tva) : 20,
+      remiseLigne: Math.min(100, Math.max(0, Number(l.remise_ligne) || 0)),
+    });
+  }
+  if (!lignes.length) return null;
+
+  const hypotheses = (Array.isArray(input.hypotheses) ? input.hypotheses : [])
+    .filter((h): h is string => typeof h === "string" && h.trim().length > 0)
+    .map((h) => h.trim().slice(0, 300))
+    .slice(0, 20);
+
+  const notesClient = typeof input.notes_client === "string" && input.notes_client.trim() ? input.notes_client.trim().slice(0, 2000) : null;
+  const commentaire = typeof input.commentaire === "string" && input.commentaire.trim() ? input.commentaire.trim() : null;
+
+  return { clientId, clientNom, objet, lignes, hypotheses, notesClient, avertissement: commentaire };
+}
+
 async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string, prenomCompte: string | null): Promise<string> {
   const { data: employe } = await supabase
     .from("employes")
@@ -308,9 +459,10 @@ async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId:
 
 /**
  * Boucle agentique streamée : émet les morceaux de texte au fil de l'eau, exécute les
- * outils de lecture, et s'arrête dès que l'IA appelle un outil terminal (`proposer_affectation`
- * ou `proposer_demande_conge`) — jamais d'écriture en base directe, la proposition est
- * renvoyée pour validation manuelle.
+ * outils de lecture, et s'arrête dès que l'IA appelle un outil terminal (`proposer_affectation`,
+ * `proposer_modification_affectation`, `proposer_demande_conge`, `proposer_message_interne`,
+ * `proposer_message_support`, `proposer_devis` — IA-DEVIS-V1) — jamais d'écriture en base
+ * directe, la proposition est renvoyée pour validation manuelle.
  */
 export async function* demanderAssistantIAStream(
   supabase: SupabaseClient,
@@ -319,9 +471,26 @@ export async function* demanderAssistantIAStream(
   utilisateurId: string,
   prenomCompte: string | null,
   peutGererPlanning: boolean,
+  peutGererDevis: boolean,
+  devisIAActif: boolean,
+  permissions: string[] | null,
   historique: MessageChat[],
-): AsyncGenerator<EvenementAssistant, void, unknown> {
+): AsyncGenerator<EvenementAssistant, UsageIA | undefined, unknown> {
   const provider = obtenirProviderIA();
+  const outilsDisponibles = devisIAActif
+    ? outilsAutorisesCopilote(permissions)
+    : outilsAutorisesCopilote(permissions).filter((o) => !(NOMS_OUTILS_IA_DEVIS as readonly string[]).includes(o.nom));
+  // Cumule l'usage de chaque tour d'outils (jusqu'a MAX_TOURS_OUTILS appels au provider) :
+  // AI-LAUNCH-V1B, cf. journal_ia — avant ce lot, aucun appel a journaliserAppelIA ne
+  // transmettait de donnees de jetons/cout, malgre la documentation qui le laissait entendre.
+  const usageCumule: UsageIA = { jetonsEntree: 0, jetonsSortie: 0, jetonsTotal: 0, coutEstimeHT: 0 };
+  function cumuler(usage: UsageIA | undefined) {
+    if (!usage) return;
+    usageCumule.jetonsEntree += usage.jetonsEntree;
+    usageCumule.jetonsSortie += usage.jetonsSortie;
+    usageCumule.jetonsTotal += usage.jetonsTotal;
+    usageCumule.coutEstimeHT += usage.coutEstimeHT;
+  }
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
   const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId, prenomCompte);
 
@@ -333,29 +502,37 @@ export async function* demanderAssistantIAStream(
       `Pour une absence/congé, tu peux utiliser proposer_affectation (type_activite="conge", effet immédiat) OU proposer_demande_conge (passe par une approbation) — préfère proposer_affectation puisque cette personne peut déjà valider elle-même ce genre de demande, sauf si elle précise vouloir la soumettre formellement. ` +
       `Pour un rendez-vous ou un entretien entre l'utilisateur et un employé nommé (ex. « place-moi un rendez-vous avec l'employé X »), l'affectation se place sur la fiche de l'employé nommé (X), jamais sur celle de l'utilisateur qui fait la demande. ` +
       `Si PLUSIEURS employés sont concernés par la même affectation (ex. « X et Y sont sur le chantier Dupont », une réunion à trois, une équipe entière) — cherche chaque employé cité puis fais UN SEUL appel à proposer_affectation avec tous leurs identifiants dans employe_ids ; ne fais jamais un appel séparé par personne. ` +
-      `Corriger, déplacer ou remplacer une affectation qui existe déjà (visible via verifier_disponibilite_employe) : utilise proposer_modification_affectation, jamais proposer_affectation — sinon l'ancienne affectation reste active en même temps que la nouvelle et la personne se retrouve sur deux activités en même temps. `
+      `Corriger, déplacer ou remplacer une affectation qui existe déjà (visible via verifier_disponibilite_employe) : utilise proposer_modification_affectation, jamais proposer_affectation — sinon l'ancienne affectation reste active en même temps que la nouvelle et la personne se retrouve sur deux activités en même temps. ` +
+      `Quand l'utilisateur demande de TROUVER un moment/créneau libre pour une ou plusieurs personnes (sans date précise déjà donnée), utilise d'abord proposer_creneaux_planning (après avoir cherché chaque employé cité) — ce produit ne gère pas d'heure précise, uniquement des dates avec un nombre d'heures disponibles ce jour-là, donc présente les résultats comme des JOURS (ex. "mercredi tu as de la marge avec les deux"), jamais un horaire inventé. Une fois qu'une date convient à l'utilisateur, termine avec proposer_affectation pour cette date. `
     : `Cette personne n'a pas le droit de modifier le planning (droit réservé à certains postes) : n'utilise jamais proposer_affectation, tu n'as accès à aucun outil d'écriture sur le planning des autres. ` +
       `Pour une absence/congé sur elle-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — c'est le seul outil d'écriture qui lui est ouvert, et la demande sera soumise pour approbation à un responsable, jamais acceptée automatiquement. ` +
       `Pour toute autre demande de modification du planning (la sienne ou celle d'un collègue), explique que ce n'est pas possible avec ses droits actuels et qu'il faut passer par un responsable planning. `;
 
-  const system =
-    `Tu es l'assistant intégré de Liria Gestion Pro, un logiciel de gestion pour entreprises du BTP, pour l'entreprise "${entrepriseNom}". ` +
-    `Nous sommes le ${aujourdhui}. ${descriptionUtilisateur}` +
-    `Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
-    `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
-    `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
-    consigneAffectation +
-    `Tu n'as accès à aucun outil de recherche de lieu réel (pas de carte, pas d'annuaire) : si l'utilisateur cite un lieu vague ou qui peut désigner plusieurs endroits (ex. un nom de restaurant courant, sans ville ni quartier), ne devine pas et ne l'invente pas — propose 2-3 hypothèses plausibles à partir de ta connaissance générale et demande laquelle est la bonne avant de conclure la proposition ; si le lieu est déjà précis (adresse, ville, quartier, nom distinctif), pas besoin de demander. ` +
-    `Pour envoyer un message à un collègue nommé ou sur le fil d'un chantier, utilise proposer_message_interne (cherche d'abord le destinataire ou le chantier via chercher_employe / chercher_chantier_planning). Pour contacter le support Liria au sujet de l'application elle-même (bug, question technique, facturation de l'abonnement), utilise proposer_message_support — jamais pour une question métier BTP. Dans les deux cas, rien n'est envoyé sans validation manuelle. ` +
-    `Ne redirige jamais vers un menu que tu n'as pas vérifié. ` +
-    `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
+  const consigneDevis = !devisIAActif
+    ? ""
+    : peutGererDevis
+      ? `Pour préparer un devis à partir d'une description en langage naturel, termine avec proposer_devis — jamais d'écriture directe, c'est une proposition que l'utilisateur devra valider. ` +
+        `Avant cela : cherche le client via rechercher (si plusieurs correspondances homonymes, demande laquelle avant de continuer ; si aucune, dis-le clairement et ne propose rien). Pour chaque prestation distincte de la demande, une ligne séparée — ne fusionne jamais deux prestations différentes. ` +
+        `Pour le prix de chaque ligne, dans l'ordre : rechercher_prestations_devis (source "catalogue") puis, seulement si rien trouvé, rechercher_prix_historique_devis (source "historique", à présenter comme basé sur un devis précédent, jamais comme un tarif certain) ; si aucune des deux ne donne de prix exploitable, laisse le prix vide (source "absent") — n'invente JAMAIS un prix de marché. ` +
+        `Toute hypothèse que tu ajoutes toi-même (finition, épaisseur, méthode non précisée) doit aller dans hypotheses, jamais présentée comme fournie par l'utilisateur. Si la demande est trop vague pour être chiffrée, pose au maximum 2 à 4 questions prioritaires avant de proposer. ` +
+        `Si l'utilisateur demande de modifier la proposition avant de valider (ex. "passe la cloison à 130 m²", "enlève la ligne plafond"), rappelle-toi les lignes déjà proposées et rappelle proposer_devis avec l'ensemble des lignes mises à jour (pas seulement la ligne modifiée). ` +
+        `Le devis créé est toujours un brouillon : même si l'utilisateur dit "crée et envoie", précise que la création du brouillon est possible mais que l'envoi reste une action manuelle séparée depuis la fiche du devis. `
+      : `Cette personne n'a pas le droit de gérer les devis : n'utilise jamais proposer_devis ni les outils de recherche de prix associés (rechercher_prestations_devis, rechercher_prix_historique_devis) — explique qu'il faut passer par un responsable devis. `;
+
+  const system = construirePromptSystemeAssistant({
+    entrepriseNom,
+    aujourdhui,
+    descriptionUtilisateur,
+    consigneAffectation,
+    consigneDevis,
+  });
 
   const conversation: MessageIA[] = historique.map((m) =>
     m.role === "user" ? { role: "user", contenu: m.contenu, fichier: m.fichier } : { role: "assistant", contenu: m.contenu },
   );
 
   for (let tour = 0; tour < MAX_TOURS_OUTILS; tour++) {
-    const flux = provider.streamer({ system, historique: conversation, outils: OUTILS_COPILOTE, maxTokens: 1500 });
+    const flux = provider.streamer({ system, historique: conversation, outils: outilsDisponibles, maxTokens: 1500 });
     let texteTour = "";
     let resultat: ReponseCompletion = { texte: "", appelsOutils: [] };
     while (true) {
@@ -369,8 +546,9 @@ export async function* demanderAssistantIAStream(
         yield { type: "texte", delta: value.delta };
       }
     }
+    cumuler(resultat.usage);
 
-    if (resultat.appelsOutils.length === 0) return;
+    if (resultat.appelsOutils.length === 0) return usageCumule;
 
     const appelAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
     if (appelAffectation) {
@@ -383,7 +561,7 @@ export async function* demanderAssistantIAStream(
           : "\n\nTon poste n'a pas le droit de modifier le planning. Pour une absence te concernant, dis-le-moi directement (je peux soumettre une demande de congé pour approbation) ; sinon, il faut passer par un responsable planning.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelModificationAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_modification_affectation");
@@ -397,7 +575,7 @@ export async function* demanderAssistantIAStream(
           : "\n\nTon poste n'a pas le droit de modifier le planning.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelConge = resultat.appelsOutils.find((a) => a.nom === "proposer_demande_conge");
@@ -409,7 +587,7 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer cette demande : vérifie les dates, et que tu as bien une fiche employé liée à ton compte (sinon, va dans « Mon espace » → « Créer ma fiche employé »).";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelMessageInterne = resultat.appelsOutils.find((a) => a.nom === "proposer_message_interne");
@@ -421,7 +599,7 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer ce message : précise soit un collègue, soit un chantier (jamais les deux), et un texte à envoyer.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelMessageSupport = resultat.appelsOutils.find((a) => a.nom === "proposer_message_support");
@@ -433,15 +611,30 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer ce message : quel est le texte à envoyer au support ?";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
+    }
+
+    const appelDevis = devisIAActif ? resultat.appelsOutils.find((a) => a.nom === "proposer_devis") : undefined;
+    if (appelDevis) {
+      const proposition = await resoudrePropositionDevis(supabase, entrepriseId, peutGererDevis, appelDevis.entree);
+      if (proposition) {
+        yield { type: "proposition_devis", proposition };
+      } else {
+        const message = peutGererDevis
+          ? "\n\nJe n'ai pas pu préparer ce devis : vérifie qu'un client a bien été identifié et qu'au moins une ligne valide (désignation et quantité) est proposée."
+          : "\n\nTon poste n'a pas le droit de gérer les devis. Il faut passer par un responsable devis.";
+        yield { type: "texte", delta: message };
+      }
+      return usageCumule;
     }
 
     conversation.push({ role: "assistant", contenu: texteTour, appelsOutils: resultat.appelsOutils });
     for (const appel of resultat.appelsOutils) {
-      const resultatOutil = await executerOutilCopilote(supabase, entrepriseId, appel.nom, appel.entree);
+      const resultatOutil = await executerOutilCopilote(supabase, entrepriseId, permissions, appel.nom, appel.entree);
       conversation.push({ role: "outil", appelId: appel.id, resultat: JSON.stringify(resultatOutil) });
     }
   }
 
   yield { type: "texte", delta: "\n\nJe n'arrive pas à te répondre pour l'instant : reformule ta question plus précisément." };
+  return usageCumule;
 }

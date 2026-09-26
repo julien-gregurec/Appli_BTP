@@ -1,16 +1,19 @@
 import { activerCompteEmployeAction, createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { estCodeOffreTarifaire, offreTarifaireParCle } from "@/lib/tarification";
 
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; code?: string; numero?: string }>;
+  searchParams: Promise<{ error?: string; code?: string; numero?: string; offre?: string }>;
 }) {
-  const { error, code, numero } = await searchParams;
+  const { error, code, numero, offre: offreQuery } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const codeInvitation = (code || String(user?.user_metadata?.code_entreprise ?? "")).trim().toUpperCase();
   const numeroEmploye = (numero || String(user?.user_metadata?.numero_employe ?? "")).trim().toUpperCase();
+  const offreBrute = (offreQuery || String(user?.user_metadata?.offre ?? "")).trim().toLowerCase();
+  const offre = estCodeOffreTarifaire(offreBrute) ? offreBrute : null;
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -66,9 +69,11 @@ export default async function OnboardingPage({
         </div>
 
         <form action={createEntrepriseAction} className="space-y-4 rounded-md border p-4 dark:border-neutral-800">
+          {offre && <input type="hidden" name="offre" value={offre} />}
           <div>
             <h2 className="font-medium">Créer une nouvelle entreprise</h2>
             <p className="text-xs text-neutral-500">Vous deviendrez automatiquement Admin/Gérant avec tous les droits.</p>
+            {offre && <p className="mt-1 text-xs text-blue-700">Offre présélectionnée : <span className="font-semibold">{offreTarifaireParCle(offre).nom}</span></p>}
           </div>
           <div className="space-y-1">
             <label htmlFor="nom" className="text-sm font-medium">

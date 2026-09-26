@@ -14,10 +14,37 @@ const signatures = [
   { nom: "clé OpenAI", motif: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/ },
   { nom: "jeton GitHub", motif: /\bgh[opusr]_[A-Za-z0-9]{30,}\b/ },
   { nom: "JWT Supabase", motif: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/ },
+  {
+    nom: "secret déclaré NEXT_PUBLIC",
+    motif: /\bNEXT_PUBLIC_(?:[A-Z0-9_]*(?:SECRET|PRIVATE|SERVICE_ROLE)[A-Z0-9_]*|OPENAI_API_KEY|STRIPE_SECRET_KEY)\s*=/,
+  },
 ];
+
+// EXCEPTIONS NOMMÉES, une par une, jamais un motif large.
+//
+// Un fichier qui TESTE un détecteur de secrets contient forcément des chaînes qui
+// ressemblent à des secrets : c'est son objet même. Les exclure par chemin explicite
+// vaut mieux que d'affaiblir les signatures ci-dessus, ce qui rendrait le scanner
+// aveugle partout. Toute entrée ajoutée ici doit être justifiée en clair.
+const EXCEPTIONS = new Map([
+  [
+    "apps/colors/src/lib/public-env-guard.test.ts",
+    "Suite de tests du garde-fou d'environnement public de Colors : elle vérifie que "
+      + "`ressembleAUnSecret()` reconnaît une clé privée et un JWT de service. Les valeurs "
+      + "y sont factices (« AAAA », « signature ») et n'ouvrent aucun accès.",
+  ],
+  [
+    "apps/reserves/src/lib/public-env-guard.test.ts",
+    "Suite de tests du garde-fou d'environnement public de Réserves (jumelle de celle de "
+      + "Colors ci-dessus) : elle vérifie que `ressembleAUnSecret()` reconnaît une clé privée "
+      + "et un JWT de service. Les valeurs y sont factices (« AAAA », « signature ») et "
+      + "n'ouvrent aucun accès.",
+  ],
+]);
 
 const alertes = [];
 for (const fichier of fichiers) {
+  if (EXCEPTIONS.has(fichier)) continue;
   let contenu;
   try {
     contenu = readFileSync(fichier, "utf8");
@@ -34,4 +61,7 @@ if (alertes.length) {
   process.exit(1);
 }
 
-console.log(`${fichiers.length} fichiers suivis contrôlés, aucun secret reconnu.`);
+console.log(
+  `${fichiers.length} fichiers suivis contrôlés, aucun secret reconnu`
+    + (EXCEPTIONS.size ? ` (${EXCEPTIONS.size} exception${EXCEPTIONS.size > 1 ? "s" : ""} nommée${EXCEPTIONS.size > 1 ? "s" : ""}).` : "."),
+);

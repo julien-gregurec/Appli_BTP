@@ -1,8 +1,8 @@
 # Politique de confidentialité
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 21/08/2026_
 
-La présente politique explique comment **Liria Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
+La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC, entrepreneur individuel, exerçant sous le nom commercial ELSATIA** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
 
 ## 1. Deux rôles distincts
 
@@ -46,22 +46,24 @@ Vos données sont accessibles à l'Éditeur et à ses sous-traitants techniques,
 
 | Sous-traitant | Rôle | Localisation | Garanties |
 |---|---|---|---|
-| Supabase, Inc. | Base de données, stockage, authentification | UE visée (**à confirmer**) | Clauses contractuelles types (CCT) |
-| Vercel, Inc. | Hébergement de l'application | UE / États-Unis | CCT / Data Privacy Framework |
+| Supabase, Inc. | Base de données, stockage, authentification | Union européenne — `eu-west-3` (Paris, France) | Clauses contractuelles types (CCT) |
+| Vercel, Inc. | Hébergement de l'application | UE / États-Unis (fonctions exécutées en `fra1`, Francfort) | CCT / Data Privacy Framework |
 | Stripe Payments Europe, Ltd. | Paiement et facturation | Irlande (UE) | Conforme RGPD |
-| [Prestataire e-mail — ex. Resend] | Envoi d'e-mails transactionnels | UE / États-Unis | CCT |
+| Brevo (Sendinblue SAS) | Envoi d'e-mails transactionnels | France (UE) | Conforme RGPD |
+| Sentry (Functional Software, Inc.) | Surveillance des erreurs applicatives (aucune donnée personnelle envoyée volontairement) | À confirmer selon la région du projet Sentry configuré | Clauses contractuelles types |
+| OpenAI, L.L.C. | Assistant IA et préparation assistée de devis ; aucun historique de conversation n'est conservé sur nos serveurs ; le stockage des réponses par OpenAI est désactivé (`store: false`) | États-Unis (traitement API standard, pas de résidence de données UE configurée) | Conditions d'utilisation API OpenAI — DPA intégré automatiquement au Services Agreement |
 
 La liste détaillée est tenue dans notre `rgpd-sous-traitants.md`.
 
 ## 6. Transferts hors Union européenne
 
-Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un transfert hors UE a lieu, il est encadré par des **clauses contractuelles types** de la Commission européenne et/ou l'adhésion au **Data Privacy Framework**. Nous privilégions un hébergement des données dans l'Union européenne (**région d'hébergement à confirmer**).
+Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un transfert hors UE a lieu, il est encadré par des **clauses contractuelles types** de la Commission européenne et/ou l'adhésion au **Data Privacy Framework**. Les données métier sont hébergées dans l'Union européenne (Supabase `eu-west-3`, Paris) ; l'exécution applicative Vercel a lieu en `fra1` (Francfort, UE).
 
 ## 7. Vos droits
 
 Vous disposez des droits d'**accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité**, ainsi que du droit de définir des directives post-mortem.
 
-**Pour les exercer** : écrivez à **[contact@liria… — À COMPLÉTER]**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
+**Pour les exercer** : écrivez à **[EMAIL_SUPPORT]**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
 
 Vous pouvez introduire une réclamation auprès de la **CNIL** (www.cnil.fr).
 
@@ -75,4 +77,4 @@ Nous mettons en œuvre des mesures techniques et organisationnelles adaptées : 
 
 ## 10. Contact
 
-Responsable de traitement : **[Julien GREGUREC]** — **[contact@liria… — À COMPLÉTER]**.
+Responsable de traitement : **Julien GREGUREC** — **[EMAIL_SUPPORT]**.

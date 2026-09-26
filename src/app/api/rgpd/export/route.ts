@@ -18,7 +18,7 @@ export async function GET() {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 403 });
+    return NextResponse.json({ error: "Export non autorisé" }, { status: 403 });
   }
 
   const horodatage = new Date().toISOString().slice(0, 10);
@@ -26,7 +26,7 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="export-donnees-liria-${horodatage}.json"`,
+      "Content-Disposition": `attachment; filename="export-donnees-elsatia-gestion-pro-${horodatage}.json"`,
       "Cache-Control": "no-store",
     },
   });

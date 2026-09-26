@@ -1,0 +1,54 @@
+diff --git a/scripts/cutover/preflight-check.mjs b/scripts/cutover/preflight-check.mjs
+index 854973da..c8a6657f 100755
+--- a/scripts/cutover/preflight-check.mjs
++++ b/scripts/cutover/preflight-check.mjs
+@@ -7,15 +7,24 @@
+  *
+  *   node scripts/cutover/preflight-check.mjs
+  *   node scripts/cutover/preflight-check.mjs --target 996be15
++ *   node scripts/cutover/preflight-check.mjs --environment production --env-file <dump local>
++ *
++ * Variables d'environnement : contrôlées d'après config/env-manifest.json (aucun inventaire en
++ * dur ici). --env-file = dump LOCAL de l'environnement cible, jamais lu depuis Vercel. Les
++ * constats ne bloquent pas tant que le manifeste est en « report ». Aucune valeur affichée.
+  *
+  * Sortie : tableau de contrôles + code de sortie 0 (GO) / 1 (NO-GO).
+  */
+ import { execSync } from 'node:child_process';
+ import { existsSync, readdirSync, statSync } from 'node:fs';
+ import { resolve } from 'node:path';
++import { controlesEnvironnementOperateur } from '../lib/env-manifest-operator.mjs';
+ 
+ const args = process.argv.slice(2);
+-const TARGET = (args[args.indexOf('--target') + 1] || '996be15').replace(/[^0-9a-f]/gi, '');
++// Lecture d'une option nommée. (L'ancien `args[indexOf('--target') + 1]` prenait args[0] pour cible
++// quand --target était absent : « commit cible ee ».)
++const optArg = (nom) => { const i = args.indexOf(nom); return i === -1 ? null : (args[i + 1] ?? null); };
++const TARGET = (optArg('--target') || '996be15').replace(/[^0-9a-f]/gi, '');
+ const ROOT = resolve(import.meta.dirname, '..', '..');
+ const DISQUE_MINI_GI = 30;
+ const MIGRATIONS_ATTENDUES = 263;
+@@ -68,14 +77,15 @@ if (existsSync(migDir)) migs = readdirSync(migDir).filter((f) => f.endsWith('.sq
+ add('MIG-NB', `migrations du dépôt = ${MIGRATIONS_ATTENDUES}`, migs.length === MIGRATIONS_ATTENDUES, `${migs.length} trouvée(s)`);
+ add('MIG-MAX', 'dernière migration', migs.length > 0, migs.at(-1) || 'aucune', false);
+ 
+-// --- 5. Variables d'environnement (PRÉSENCE seule, jamais les valeurs) -------
+-const envAttendues = [
+-  'SUPABASE_DB_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ACCESS_TOKEN',
+-  'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
+-];
+-for (const k of envAttendues) {
+-  add(`ENV-${k}`, `variable ${k}`, !!process.env[k], process.env[k] ? 'définie (valeur non affichée)' : 'non définie dans ce shell', false);
+-}
++// --- 5. Variables d'environnement : SOURCE = config/env-manifest.json -------
++// Plus d'inventaire en dur ici. Présence, URL locale, environnement, drapeaux et clés
++// incohérentes viennent du manifeste ; aucune valeur n'est affichée. Non bloquant tant que
++// `preflight_enforcement` vaut « report » dans le manifeste.
++for (const c of controlesEnvironnementOperateur({
++  root: ROOT,
++  environment: optArg('--environment') ?? 'production',
++  envFile: optArg('--env-file'),
++})) add(c.code, c.libelle, c.ok, c.detail, c.bloquant);
+ 
+ // --- 6. Documents de cutover -------------------------------------------------
+ const docs = [

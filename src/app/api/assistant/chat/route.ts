@@ -3,11 +3,48 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
-import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { TAILLE_MAX_CORPS_ASSISTANT, validerRequeteAssistant } from "@/lib/ai/validation";
+import { erreurPublique, verifierTailleRequete } from "@/lib/security/validation";
+import { iaEstActive, iaDevisEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
-const TAILLE_MAX_PIECE_JOINTE_BASE64 = 8_000_000; // ~6 Mo de fichier une fois décodé
+// Plafond dedie a cette route : ne pas reutiliser un plafond generique de petite route
+// JSON, la piece jointe encodee en base64 (jusqu'a 6 Mo reels) ne rentrerait pas dedans.
+// Voir src/lib/ai/validation.ts pour le detail du calcul.
+async function lireJsonBorne(request: Request) {
+  if (!verifierTailleRequete(request.headers, TAILLE_MAX_CORPS_ASSISTANT)) return { tropVolumineux: true as const };
+  const lecteur = request.body?.getReader();
+  if (!lecteur) return { valeur: null, tropVolumineux: false as const };
+  const morceaux: Uint8Array[] = [];
+  let taille = 0;
+  while (true) {
+    const { done, value } = await lecteur.read();
+    if (done) break;
+    taille += value.byteLength;
+    if (taille > TAILLE_MAX_CORPS_ASSISTANT) {
+      await lecteur.cancel();
+      return { tropVolumineux: true as const };
+    }
+    morceaux.push(value);
+  }
+  const corps = new Uint8Array(taille);
+  let position = 0;
+  for (const morceau of morceaux) {
+    corps.set(morceau, position);
+    position += morceau.byteLength;
+  }
+  try {
+    return { valeur: JSON.parse(new TextDecoder().decode(corps)), tropVolumineux: false as const };
+  } catch {
+    return { valeur: null, tropVolumineux: false as const };
+  }
+}
 
 export async function POST(request: Request) {
+  if (!iaEstActive()) return Response.json({ error: MESSAGE_IA_INDISPONIBLE }, { status: 404 });
+  const corps = await lireJsonBorne(request);
+  if (corps.tropVolumineux) {
+    return Response.json({ error: "Requête trop volumineuse." }, { status: 413 });
+  }
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -15,24 +52,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Ton poste n'a pas accès aux fonctionnalités IA." }, { status: 403 });
   }
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
+  const peutGererDevis = permissions === null || permissions.includes("gerer_devis");
 
-  const body = (await request.json().catch(() => null)) as { historique?: MessageChat[] } | null;
+  const body = corps.valeur as { historique?: MessageChat[] } | null;
   const historique = body?.historique;
-  const dernierMessage = historique?.at(-1);
-  if (!Array.isArray(historique) || !dernierMessage || dernierMessage.role !== "user" || !dernierMessage.contenu.trim()) {
-    return Response.json({ error: "Écris une question." }, { status: 400 });
+  const validation = validerRequeteAssistant(historique);
+  if (!validation.ok) {
+    return Response.json({ error: validation.message }, { status: validation.statut });
   }
-  if (historique.length > 30) {
-    return Response.json({ error: "Conversation trop longue, démarre une nouvelle discussion." }, { status: 400 });
-  }
-  if (dernierMessage.fichier) {
-    if (!MIME_ANALYSABLES_IA.includes(dernierMessage.fichier.mimeType)) {
-      return Response.json({ error: "Format de pièce jointe non pris en charge (images JPEG/PNG/WebP ou PDF)." }, { status: 400 });
-    }
-    if (dernierMessage.fichier.base64.length > TAILLE_MAX_PIECE_JOINTE_BASE64) {
-      return Response.json({ error: "Pièce jointe trop volumineuse (6 Mo maximum)." }, { status: 400 });
-    }
-  }
+  // validerRequeteAssistant a deja verifie qu'il s'agit d'un tableau de MessageChat valide.
+  const historiqueValide = historique as MessageChat[];
 
   const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
   if (depassement) {
@@ -43,16 +72,25 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
+      // Iteration manuelle (pas for-await) pour recuperer la valeur de retour du generateur
+      // (usage jetons/cout cumule sur tous les tours d'outils) : for-await l'ignorerait.
+      const generateur = demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, peutGererDevis, iaDevisEstActive(), permissions, historiqueValide);
       try {
-        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, historique)) {
-          envoyer(evenement);
+        let usage: Awaited<ReturnType<typeof generateur.next>>["value"] | undefined;
+        while (true) {
+          const { value, done } = await generateur.next();
+          if (done) { usage = value; break; }
+          envoyer(value);
         }
         envoyer({ type: "fin" });
-        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes" });
+        journaliserAppelIA(supabase, {
+          entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes",
+          jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+        });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
-        envoyer({ type: "erreur", message });
-        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "erreur", messageErreur: message });
+        const messageInterne = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
+        envoyer({ type: "erreur", message: erreurPublique(err, "L'assistant est temporairement indisponible.") });
+        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "erreur", messageErreur: messageInterne });
       } finally {
         controller.close();
       }

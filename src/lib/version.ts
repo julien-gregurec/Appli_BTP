@@ -9,12 +9,12 @@ export type InformationsVersion = {
 
 export function informationsVersion(): InformationsVersion {
   return {
-    version: process.env.LIRIA_APP_VERSION || "indisponible",
-    commit: process.env.LIRIA_BUILD_COMMIT || "indisponible",
-    dateBuild: process.env.LIRIA_BUILD_DATE || "indisponible",
-    environnement: process.env.LIRIA_BUILD_ENVIRONMENT || process.env.NODE_ENV || "indisponible",
-    dateDeploiement: process.env.LIRIA_DEPLOYMENT_DATE || process.env.LIRIA_BUILD_DATE || "indisponible",
-    urlDeploiement: process.env.LIRIA_DEPLOYMENT_URL || null,
+    version: process.env.ELSATIA_APP_VERSION || "indisponible",
+    commit: process.env.ELSATIA_BUILD_COMMIT || "indisponible",
+    dateBuild: process.env.ELSATIA_BUILD_DATE || "indisponible",
+    environnement: process.env.ELSATIA_BUILD_ENVIRONMENT || process.env.NODE_ENV || "indisponible",
+    dateDeploiement: process.env.ELSATIA_DEPLOYMENT_DATE || process.env.ELSATIA_BUILD_DATE || "indisponible",
+    urlDeploiement: process.env.ELSATIA_DEPLOYMENT_URL || null,
   };
 }
 

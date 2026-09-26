@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+.git
+**/*.test.ts
+tests
+analysis
+.env
+.env.local
+*.log

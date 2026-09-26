@@ -1,9 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
+import { BrandWordmark } from "@/components/BrandWordmark";
+import { ChampMotDePasse } from "@/components/ChampMotDePasse";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default async function LoginPage({
   searchParams,
@@ -20,7 +22,8 @@ export default async function LoginPage({
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={220} height={246} priority className="h-32 w-auto" />
+          <BrandWordmark className="text-2xl text-[#0d1b2a] dark:text-white" />
+          <p className="text-sm text-neutral-500">{PRODUCT_NAME}</p>
           <h1 className="text-xl font-semibold">Connexion</h1>
         </div>
 
@@ -50,14 +53,7 @@ export default async function LoginPage({
               <label htmlFor="password" className="text-sm font-medium">Mot de passe</label>
               <Link href="/mot-de-passe-oublie" className="text-xs text-neutral-500 underline">Mot de passe oublié ?</Link>
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            />
+            <ChampMotDePasse id="password" name="password" required autoComplete="current-password" />
           </div>
           <button
             type="submit"
@@ -73,7 +69,7 @@ export default async function LoginPage({
 
         <p className="text-sm text-neutral-500">
           Pas encore de compte ?{" "}
-          <Link href="/signup" className="font-medium text-neutral-900 underline">
+          <Link href="/signup" className="font-medium text-neutral-900 underline dark:text-white">
             Créer un compte
           </Link>
         </p>
