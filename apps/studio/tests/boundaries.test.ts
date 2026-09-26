@@ -49,3 +49,16 @@ it("confine le credential Storage au module serveur", () => {
       expect(code).not.toMatch(/storage-admin|media-service|media-inspection/);
   }
 });
+it("confine la clé service Auth Studio au module d'identité serveur ; aucune clé plateforme", () => {
+  for (const file of sources(resolve("src"))) {
+    const code = readFileSync(file, "utf8");
+    if (code.includes("STUDIO_AUTH_SERVICE_KEY")) {
+      expect(file).toBe(resolve("src/lib/identity.ts"));
+      expect(code).toMatch(/import ["']server-only["']/);
+    }
+    // Studio ne détient que des clés PUBLIQUES de l'identité centrale.
+    expect(code, file).not.toMatch(/ELSATIA_IDENTITY_SIGNING_KEYS|SUPABASE_SERVICE_ROLE_KEY/);
+    if (code.includes('"use client"'))
+      expect(code).not.toMatch(/lib\/identity["']|identity-session/);
+  }
+});

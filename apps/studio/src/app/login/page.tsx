@@ -3,12 +3,44 @@ import { login } from "../actions";
 import Notice from "../../components/Notice";
 import Submit from "../../components/Submit";
 import { safeStudioDestination } from "@elsatia/studio-domain";
+import { identityMessage, identityMode } from "../../lib/identity-policy";
 export default async function Login({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; notice?: string; next?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    error_code?: string;
+    notice?: string;
+    next?: string;
+  }>;
 }) {
   const params = await searchParams;
+  const next = safeStudioDestination(params.next);
+  if (identityMode() === "elsatia")
+    return (
+      <main id="main" className="auth">
+        <div className="brand">
+          ELSATIA<span>Studio.</span>
+        </div>
+        <p className="eyebrow">BIENVENUE DANS VOTRE STUDIO</p>
+        <h1>
+          Vos histoires
+          <br />
+          commencent ici.
+        </h1>
+        <p>
+          Studio utilise votre compte ELSATIA : aucun mot de passe de plus, aucune
+          entreprise nécessaire.
+        </p>
+        <Notice message={identityMessage(params.error_code) ?? params.error} />
+        <a
+          className="button"
+          href={`/auth/elsatia/start?next=${encodeURIComponent(next)}`}
+        >
+          Continuer avec mon compte ELSATIA
+        </a>
+      </main>
+    );
   return (
     <main id="main" className="auth">
       <div className="brand">

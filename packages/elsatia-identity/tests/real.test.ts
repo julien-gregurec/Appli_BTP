@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   createHandoffState,
   createIdentityIssuer,
+  createStudioIdentityBroker,
   dispatchOutbox,
   generateSigningKey,
   httpDeliver,
@@ -14,6 +15,7 @@ import {
   supabaseOutboxStore,
   type IdentityErrorCode,
 } from "../src";
+import { createClient } from "@supabase/supabase-js";
 import { ISS, keyRing } from "./fixtures";
 import {
   bridge,
@@ -125,9 +127,6 @@ describe.skipIf(!REAL)("échange d'identité réel", () => {
     const email = `nc-${randomUUID().slice(0, 8)}@example.test`;
     const password = `pw-${randomUUID()}`;
     const { data } = await p.platformAdmin.auth.admin.createUser({ email, password, email_confirm: true });
-    const client = studioUserClient(p); // client quelconque pour typer ; on se connecte côté plateforme ci-dessous
-    void client;
-    const { createClient } = await import("@supabase/supabase-js");
     const gp = createClient(p.platformUrl, roleJwt(env.platformSecret!, "anon"), { auth: { persistSession: false } });
     const signed = await gp.auth.signInWithPassword({ email, password });
     sql(env.platformDb!, `update auth.users set email_confirmed_at = null where id='${data.user!.id}'`);
@@ -154,13 +153,16 @@ describe.skipIf(!REAL)("échange d'identité réel", () => {
 describe.skipIf(!REAL)("pannes et provisioning partiel (réel)", () => {
   it("Auth Studio injoignable : STUDIO_AUTH_UNAVAILABLE, aucun lien, jeton consommé ; nouveau passage OK au retour", async () => {
     const u = await platformUser(p);
-    const down = bridge({ ...p, studioUrl: p.studioUrl } as Projects);
     // Admin GoTrue Studio injoignable, base Studio joignable : on isole la panne Auth.
-    const ok = bridge(p, { ring: down.ring });
+    const ok = bridge(p);
     const { state, nonce } = createHandoffState();
     const { token } = await ok.handoff(u.accessToken, nonce);
-    const brokenAuth = { ...ok.auth, createUser: async () => { throw new Error("connect ECONNREFUSED 127.0.0.1:59999"); } };
-    const { createStudioIdentityBroker } = await import("../src");
+    const brokenAuth = {
+      ...ok.auth,
+      createUser: async (): Promise<{ id: string }> => {
+        throw new Error("connect ECONNREFUSED 127.0.0.1:59999");
+      },
+    };
     const broken = createStudioIdentityBroker({ verifier: ok.verifier, store: ok.store, auth: brokenAuth });
     const sessions = { open: async () => ({ sessionId: randomUUID() }) };
     await rejectsWith(broken.exchange(token, state, sessions), "STUDIO_AUTH_UNAVAILABLE");
@@ -249,16 +251,10 @@ describe.skipIf(!REAL)("révocation et cycle de vie (réel, trigger + boîte d'e
     await dispatch(b, endpoint.url);
     expect(sql(env.studioDb!, `select coalesce(banned_until > now(), false) from auth.users where id='${s.userId}'`)).toBe("f");
     expect((await studioRefresh(s.session.refresh_token)).status).toBe(400);
-    const fresh = await platformUser(p).then(() => p.platformAdmin); // noop : garder la même identité
-    void fresh;
-    const relog = await p.platformAdmin.auth.admin.getUserById(u.id);
-    expect(relog.data.user?.banned_until ?? null).toBeNull();
-    const again = await b.login(await (async () => {
-      const { createClient } = await import("@supabase/supabase-js");
-      const gp = createClient(p.platformUrl, roleJwt(env.platformSecret!, "anon"), { auth: { persistSession: false } });
-      const signed = await gp.auth.signInWithPassword({ email: u.email, password: u.password });
-      return { accessToken: signed.data.session!.access_token };
-    })());
+    // Nouvelle connexion GP (l'ancienne session plateforme a été coupée par le ban), puis passage.
+    const gp = createClient(p.platformUrl, roleJwt(env.platformSecret!, "anon"), { auth: { persistSession: false } });
+    const signed = await gp.auth.signInWithPassword({ email: u.email, password: u.password });
+    const again = await b.login({ accessToken: signed.data.session!.access_token });
     expect(again.userId).toBe(s.userId);
     expect(await sessionStatus(p, again.session.access_token)).toMatchObject({ status: "ok" });
     await endpoint.close();

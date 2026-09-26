@@ -171,7 +171,7 @@ if (action === "setup") {
     throw new Error(`Disposable signup policy seed failed: ${seed.stderr}`);
   writeFileSync(
     join(app, ".env.local"),
-    `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\n`,
+    `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\nSTUDIO_IDENTITY_MODE=local\n`,
     { mode: 0o600 },
   );
   console.log(

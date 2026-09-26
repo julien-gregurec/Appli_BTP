@@ -6,17 +6,19 @@ import { PiedLegal } from "@/components/PiedLegal";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { ChampMotDePasse } from "@/components/ChampMotDePasse";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { destinationIdentiteApresConnexion } from "@/lib/elsatia-identity/config";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; next?: string }>;
 }) {
   if (isEmailLoginDisabled()) {
     redirect("/dashboard");
   }
 
-  const { error, message } = await searchParams;
+  const { error, message, next } = await searchParams;
+  const retourIdentite = destinationIdentiteApresConnexion(next);
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -35,6 +37,7 @@ export default async function LoginPage({
         )}
 
         <form action={loginAction} className="space-y-4">
+          {retourIdentite && <input type="hidden" name="next" value={retourIdentite} />}
           <div className="space-y-1">
             <label htmlFor="email" className="text-sm font-medium">
               Email

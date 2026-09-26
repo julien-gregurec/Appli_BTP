@@ -154,7 +154,11 @@ export function memoryStore(auth: ReturnType<typeof memoryAuth>) {
     async purge() {
       guard();
       let handoffs = 0;
-      for (const [jti, exp] of consumed) if (exp < Date.now() - 3600_000) (consumed.delete(jti), handoffs++);
+      for (const [jti, exp] of consumed)
+        if (exp < Date.now() - 3600_000) {
+          consumed.delete(jti);
+          handoffs++;
+        }
       return { handoffs, events: 0 };
     },
   };

@@ -10,6 +10,11 @@ export async function proxy(request: NextRequest) {
     isDevelopment: process.env.NODE_ENV !== "production",
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    // Le passage d'identité poste le jeton vers Studio : seule cette route l'autorise.
+    formActionOrigins:
+      request.nextUrl.pathname === "/identity/studio/handoff" && process.env.ELSATIA_STUDIO_EXCHANGE_URL
+        ? [process.env.ELSATIA_STUDIO_EXCHANGE_URL]
+        : [],
   });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("content-security-policy", csp);
