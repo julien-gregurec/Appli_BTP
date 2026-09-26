@@ -16,11 +16,13 @@ const { GET } = await import("./route");
 
 let selectEntreprisesAppele = false;
 let rpcPaiePointageAppele = false;
+let rpcAppelees: string[] = [];
 
 beforeEach(() => {
   vi.clearAllMocks();
   selectEntreprisesAppele = false;
   rpcPaiePointageAppele = false;
+  rpcAppelees = [];
   createAdminClient.mockReturnValue({
     from: (table: string) => ({
       select: () => ({
@@ -29,7 +31,12 @@ beforeEach(() => {
         in: () => ({ data: [], error: null }),
       }),
     }),
-    rpc: vi.fn(async () => { rpcPaiePointageAppele = true; return { data: null, error: null }; }),
+    rpc: vi.fn(async (nom: string) => {
+      rpcAppelees.push(nom);
+      if (nom === "marquer_factures_en_retard") return { data: 2, error: null };
+      rpcPaiePointageAppele = true;
+      return { data: null, error: null };
+    }),
   });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -127,6 +134,50 @@ describe("cron abonnements — découplage des deux portes (RELANCES-AUTO-PROD-A
     });
     const reponse = await GET(requeteAvecSecret());
     expect(reponse.status).toBe(500);
+    expect(traiterRelancesAutomatiques).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("cron abonnements — FA-08 bascule quotidienne des factures en retard", () => {
+  it("porte relances seule ouverte -> la bascule s'exécute quand même (aucun appel Stripe)", async () => {
+    vi.stubEnv("FEATURE_CRONS_ENABLED", "false");
+    vi.stubEnv("FEATURE_RELANCES_AUTO_ENABLED", "true");
+    vi.stubEnv("CRON_SECRET", "le-vrai-secret");
+    const reponse = await GET(requeteAvecSecret());
+    expect(reponse.status).toBe(200);
+    expect(rpcAppelees).toEqual(["marquer_factures_en_retard"]);
+    expect(reconcilierAbonnementStripe).not.toHaveBeenCalled();
+    expect((await reponse.json()).facturesEnRetard).toEqual({ ok: true, basculees: 2 });
+  });
+
+  it("porte historique ouverte -> la bascule s'exécute, avant les jobs historiques", async () => {
+    vi.stubEnv("FEATURE_CRONS_ENABLED", "true");
+    vi.stubEnv("FEATURE_RELANCES_AUTO_ENABLED", "false");
+    vi.stubEnv("CRON_SECRET", "le-vrai-secret");
+    const reponse = await GET(requeteAvecSecret());
+    expect(reponse.status).toBe(200);
+    expect(rpcAppelees[0]).toBe("marquer_factures_en_retard");
+  });
+
+  it("auth invalide -> la bascule n'est jamais appelée", async () => {
+    vi.stubEnv("FEATURE_CRONS_ENABLED", "true");
+    vi.stubEnv("CRON_SECRET", "le-vrai-secret");
+    const reponse = await GET(new Request("http://localhost/api/cron/abonnements", { headers: { authorization: "Bearer faux" } }));
+    expect(reponse.status).toBe(401);
+    expect(rpcAppelees).toEqual([]);
+  });
+
+  it("erreur DB de la bascule -> signalée dans la réponse, sans bloquer les relances", async () => {
+    vi.stubEnv("FEATURE_CRONS_ENABLED", "false");
+    vi.stubEnv("FEATURE_RELANCES_AUTO_ENABLED", "true");
+    vi.stubEnv("CRON_SECRET", "le-vrai-secret");
+    createAdminClient.mockReturnValue({
+      from: () => ({ select: () => ({}) }),
+      rpc: vi.fn(async () => ({ data: null, error: { message: "boom" } })),
+    });
+    const reponse = await GET(requeteAvecSecret());
+    expect(reponse.status).toBe(200);
+    expect((await reponse.json()).facturesEnRetard).toEqual({ ok: false, basculees: 0, raison: "boom" });
     expect(traiterRelancesAutomatiques).toHaveBeenCalledTimes(1);
   });
 });

@@ -185,25 +185,30 @@ test.describe("CH-08: ouvrier accède au détail d'un chantier où il n'est pas 
 });
 
 test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
-  // KNOWN ISSUE, not yet resolved (see ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3 §NF-01):
-  // the real <form action={creerNoteFraisAction}> DOES submit (confirmed in
-  // the dev server log: "POST /notes-frais 303") but the server redirects to
-  // /login, i.e. getContexteEntreprise()'s supabase.auth.getUser() returns no
-  // user for that specific request even though the same session authenticates
-  // every GET on the same page fine and other server-action forms (ON-02) work
-  // from the same login() helper. Root cause not identified within this
-  // mission's time budget -- classified FAIL (automation evidence, not
-  // confirmed as a product bug) rather than silently skipped.
+  // ELSATIA_PILOT_REMAINING_FAILS_CLOSURE_V2 — root cause established by
+  // execution, NOT a product bug. Two harness defects stacked:
+  //   1. ENVIRONMENT_GAP: this suite targets http://127.0.0.1:3100 while
+  //      `next dev` only serves its dev resources (JS chunks, HMR) to localhost
+  //      unless the origin is listed in `allowedDevOrigins`. The pages
+  //      rendered server-side but no client component ever hydrated, so
+  //      ExpenseDocumentUploader's onChange never ran (file attached, 0
+  //      preview, no confirmation checkbox). Fixed in next.config.ts
+  //      (dev-only `allowedDevOrigins: ["127.0.0.1"]`).
+  //   2. TEST_BUG: "Montant TTC" is a required field; the V3 test never filled
+  //      it, so the browser's own constraint validation blocked the submit.
+  // The V3 note ("POST 303 then /login") could not be reproduced: with both
+  // fixed, the same ouvrier session creates the draft, uploads the receipt
+  // and submits it (statut 'soumis' + 1 storage object, checked in DB).
   test("brouillon créé, justificatif joint, note soumise", async ({ page }) => {
     await login(page, PROFILES.ouvrier);
     await page.goto("/notes-frais");
     await page.waitForLoadState("networkidle");
     const createBtn = page.getByRole("button", { name: "Créer le brouillon et ajouter le justificatif" });
-    if (!(await createBtn.isVisible().catch(() => false))) {
-      test.skip(true, "bouton de création indisponible (utilisateur sans fiche employé liée ?)");
-    }
+    await expect(createBtn).toBeEnabled();
+    const fournisseur = `TestNF01 ${Date.now()}`;
     await page.getByLabel("Date du justificatif").fill(new Date().toISOString().slice(0, 10));
-    await page.getByLabel("Fournisseur / commerçant").fill("TestNF01 Fournisseur");
+    await page.getByLabel("Fournisseur / commerçant").fill(fournisseur);
+    await page.getByLabel("Montant TTC").fill("18.40");
     // "Affectation" (SearchableSelect, required) already carries a valid
     // default value ("hors:sans_chantier") from the page itself -- leave it
     // untouched; typing into it clears the selected value until a fresh
@@ -216,6 +221,7 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
       "base64",
     );
     await page.getByLabel(/Importer PDF ou images/).setInputFiles({ name: "justificatif.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await expect(page.getByAltText("Aperçu page 1")).toBeVisible();
     const confirmCheckbox = page.getByLabel(/Je confirme que le document est visible en entier/);
     await confirmCheckbox.check();
     await page.getByRole("button", { name: "Valider le justificatif" }).click();
@@ -227,6 +233,9 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
     await soumettre.click();
     await page.waitForLoadState("networkidle");
     await expect(page.locator("body")).toContainText("Soumis");
+    // DB witness: the note really is 'soumis' and carries its receipt.
+    const ligne = psql(`select n.statut || '|' || (select count(*) from storage.objects o where o.name like '%' || n.id || '%') from notes_frais n where n.fournisseur='${fournisseur}'`);
+    expect(ligne).toBe("soumis|1");
   });
 });
 

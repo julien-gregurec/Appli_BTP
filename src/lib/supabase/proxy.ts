@@ -156,7 +156,25 @@ export async function updateSession(request: NextRequest) {
   const ctx = (acces ?? {}) as {
     compte_depot?: boolean; entreprise_id?: string | null;
     acces_support?: boolean; droit_acces?: boolean; droit_gestion?: boolean;
+    session_revoquee?: boolean;
   };
+
+  // PE-07 : l'appareil de cette session a été révoqué. La RLS la bloque déjà
+  // (est_membre_actif/a_permission renvoient false) ; ici on la termine
+  // proprement : signOut local (GoTrue invalide son refresh token, cookies
+  // effacés) puis retour à la connexion, même sur une page publique.
+  if (ctx.session_revoquee === true) {
+    await supabase.auth.signOut({ scope: "local" });
+    // Déjà sur /login (ex. signOut impossible, cookies conservés) : ne pas boucler.
+    if (chemin === "/login") return response;
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("error", "Cet appareil a été révoqué par votre entreprise. Reconnectez-vous pour continuer.");
+    const redirection = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => redirection.cookies.set(cookie));
+    return redirection;
+  }
 
   const limiteAuthentifiee = await verifierLimite(true, {
     utilisateurId: user.id,
