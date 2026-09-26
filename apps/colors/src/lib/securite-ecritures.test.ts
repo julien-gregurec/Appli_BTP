@@ -110,17 +110,29 @@ describe("cloisonnement par organisation", () => {
     expect(CONTENU).toMatch(/contexte\.entrepriseId|c\.entrepriseId/);
   });
 
+  it("la garde d'API qui convertit le refus en 403 exige bien l'accès Colors", () => {
+    const garde = readFileSync(join(racine, "lib/acces-colors.ts"), "utf8");
+    const corps = garde.slice(garde.indexOf("export async function refusAccesRouteApi"));
+    expect(corps).toContain("await exigerAccesApplication(contexte, CODE_APPLICATION_COLORS);");
+    expect(corps).toMatch(/instanceof AccesApplicationRefuseError\)\s*\{\s*return NextResponse\.json\([^)]*\{ status: 403 \}\);/);
+    expect(corps).toContain("throw error;");
+  });
+
   it("les routes d'API exigent toutes le contexte et l'accès applicatif", () => {
     const routes = APPLICATIVES.filter((fichier) => /\/app\/api\/.*route\.ts$/.test(fichier));
     expect(routes.length).toBeGreaterThanOrEqual(3);
     for (const route of routes) {
       const contenu = readFileSync(route, "utf8");
       expect(contenu, route).toContain("getContexteColors()");
-      // Deux formes de la même garde : `exigerAccesApplication` directement, ou
-      // `protegerRouteColors` qui l'appelle. La route de diagnostic /api/acces
-      // emploie la seconde et ne résout aucun rôle — elle ne renvoie qu'un
-      // booléen d'accès et ne lit aucune donnée métier.
-      expect(contenu, route).toMatch(/exigerAccesApplication\(contexte\s*,\s*"colors"\)|protegerRouteColors\(contexte\)/);
+      // Trois formes de la même garde : `exigerAccesApplication` directement,
+      // `protegerRouteColors` qui l'appelle, ou `refusAccesRouteApi` qui l'appelle et
+      // convertit le refus en 403 — à condition que la route RENDE ce refus. La route
+      // de diagnostic /api/acces emploie la deuxième et ne résout aucun rôle — elle ne
+      // renvoie qu'un booléen d'accès et ne lit aucune donnée métier.
+      expect(contenu, route).toMatch(/exigerAccesApplication\(contexte\s*,\s*"colors"\)|protegerRouteColors\(contexte\)|refusAccesRouteApi\(contexte\)/);
+      if (contenu.includes("refusAccesRouteApi(contexte)")) {
+        expect(contenu, route).toMatch(/const refus = await refusAccesRouteApi\(contexte\);\s*if \(refus\) return refus;/);
+      }
       const litDesDonnees = /from\(["']colors_|rpc\(["']colors_/.test(contenu);
       if (litDesDonnees) expect(contenu, route).toContain("resoudreRoleColors(contexte)");
     }

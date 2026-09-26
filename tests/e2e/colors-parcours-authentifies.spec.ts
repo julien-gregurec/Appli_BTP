@@ -32,13 +32,31 @@ test.describe("@colors-auth accès", () => {
     await page.waitForURL(new RegExp(`/inventaire/${SEAUX.aAvecPhoto}$`));
   });
 
-  test("une session terminée est annoncée, et la page demandée conservée", async ({ page, context }) => {
+  test("une session terminée est annoncée, et la page demandée conservée", async ({ page, browser }) => {
+    // La session est terminée AILLEURS : le même compte se déconnecte depuis un autre
+    // navigateur (portée globale, celle de `signOut`). Le premier garde ses cookies, mais
+    // le service d'authentification ne les reconnaît plus — c'est cette situation que
+    // l'écran doit annoncer. Effacer tous les cookies ne la reproduit pas : sans cookie,
+    // rien ne permet de distinguer une session expirée d'une première visite.
     await seConnecterParFormulaire(page, COMPTES.admin);
     await page.goto("/depots");
-    await context.clearCookies();
+    const ailleurs = await browser.newContext();
+    const autrePage = await ailleurs.newPage();
+    await seConnecterParFormulaire(autrePage, COMPTES.admin);
+    await seDeconnecter(autrePage);
+    await ailleurs.close();
+
     await page.goto("/depots");
     await page.waitForURL(/\/login\?next=%2Fdepots&error=session-expiree/);
     await expect(page.getByText(/Votre session a pris fin/)).toBeVisible();
+  });
+
+  test("sans aucun cookie, la page demandée est conservée sans annoncer de session expirée", async ({ page, context }) => {
+    await seConnecterParFormulaire(page, COMPTES.admin);
+    await context.clearCookies();
+    await page.goto("/depots");
+    await page.waitForURL(/\/login\?next=%2Fdepots$/);
+    await expect(page.getByText(/Votre session a pris fin/)).toHaveCount(0);
   });
 
   test("un compte sans habilitation Colors est refusé sans être présenté comme un mauvais mot de passe", async ({ page }) => {
@@ -82,7 +100,8 @@ test.describe("@colors-auth parcours métier", () => {
 
     await page.getByText("Modifier les informations").click();
     await page.getByLabel("Produit", { exact: true }).fill("Produit corrigé");
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    // `exact` : la fiche porte aussi « Enregistrer la finition ».
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
     await page.waitForURL(/ok=informations-mises-a-jour/);
     await expect(page.getByText("Informations mises à jour")).toBeVisible();
 
