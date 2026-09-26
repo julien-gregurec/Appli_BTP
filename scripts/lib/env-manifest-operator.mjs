@@ -7,14 +7,15 @@
 //
 // Règles :
 //   - AUCUNE valeur n'est écrite dans un détail (noms, règles et familles de forme seulement) ;
-//   - tant que le manifeste est en `preflight_enforcement: "report"`, RIEN ne bloque : les
-//     constats sortent en WARN. Ils ne bloquent qu'en « enforce » ;
+//   - tant que le manifeste est en « report » pour l'environnement contrôlé
+//     (`preflight_enforcement_by_target[environment]`, sinon `preflight_enforcement`), RIEN ne
+//     bloque : les constats sortent en WARN. Ils ne bloquent qu'en « enforce » ;
 //   - aucun accès distant : le dump de l'environnement cible est un FICHIER LOCAL fourni par
 //     l'opérateur (--env-file), jamais lu depuis Vercel.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson } from "./env-manifest-core.mjs";
+import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson, resolveEnforcement } from "./env-manifest-core.mjs";
 import { parseEnvFile, runPreflight } from "./env-manifest-preflight.mjs";
 
 /** Applications contrôlées par défaut pour un cutover de Gestion Pro + le shell de l'opérateur. */
@@ -37,7 +38,7 @@ export function controlesEnvironnementOperateur({
 }) {
   const manifest = loadJson(root, MANIFEST_PATH);
   const schema = loadJson(root, SCHEMA_PATH);
-  const enforce = (manifest.preflight_enforcement ?? "report") === "enforce";
+  const enforce = resolveEnforcement(manifest, environment) === "enforce";
   const lignes = [];
   const ligne = (code, libelle, ok, detail) => lignes.push({ code, libelle, ok, detail, bloquant: enforce });
 

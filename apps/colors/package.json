@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3010",
     "verify:public-env": "node scripts/verify-public-env.mjs",
-    "prebuild": "npm run verify:public-env",
+    "prebuild": "npm run verify:public-env && node ../../scripts/check-env-manifest.mjs --auto --app colors",
     "build": "next build",
     "start": "next start -p 3010",
     "lint": "eslint src scripts next.config.ts",

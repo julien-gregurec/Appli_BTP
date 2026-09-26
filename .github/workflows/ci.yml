@@ -55,6 +55,9 @@ jobs:
       - name: Tests du contrôle du manifeste (valeurs factices)
         run: npm run test:env-manifest
 
+      - name: Tests du smoke e-mail Preview (sans réseau)
+        run: npm run test:smoke-email
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 

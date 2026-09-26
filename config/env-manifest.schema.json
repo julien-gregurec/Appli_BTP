@@ -27,6 +27,14 @@
     "schema_version": { "type": "integer" },
     "description": { "type": "string" },
     "preflight_enforcement": { "enum": ["report", "enforce"] },
+    "preflight_enforcement_by_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preview": { "enum": ["report", "enforce"] },
+        "production": { "enum": ["report", "enforce"] }
+      }
+    },
     "applications": {
       "type": "object",
       "additionalProperties": {

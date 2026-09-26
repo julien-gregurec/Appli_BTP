@@ -17,7 +17,7 @@ import {
   estCulDeSacInformatif,
 } from "@/lib/supabase/routage-proxy";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/tools/monetization"];
 
 type LigneAbonnementSocle = {
   abonnement_offre?: string | null;
@@ -99,7 +99,11 @@ export async function updateSession(request: NextRequest) {
   // réseau pour servir un PDF ou une vidéo. La page d'accueil vérifie elle-même
   // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
   const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/guides", "/videos", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
-                                "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+                                "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import",
+                                // API de facturation Tools : appelée depuis l'origine Tools avec un jeton Bearer (vérifié par
+                                // authenticatedToolsUser) ou par Stripe (signature vérifiée par la route) — jamais par cookie.
+                                // Barre finale : le test par préfixe ci-dessous n'a pas de frontière de segment.
+                                "/api/tools/monetization/"];
   if (estAccueil || CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
     return response;
   }

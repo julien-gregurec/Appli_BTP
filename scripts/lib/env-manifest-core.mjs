@@ -101,6 +101,17 @@ export function validateSchema(root, schema, value, path, out) {
   }
 }
 
+/**
+ * Niveau d'application du preflight pour une cible donnée. Une valeur par cible
+ * (`preflight_enforcement_by_target`) l'emporte sur la valeur globale (`preflight_enforcement`),
+ * qui reste le défaut ; en l'absence des deux : « report ». Une cible inconnue retombe sur le
+ * défaut global — jamais sur « enforce » par surprise.
+ */
+export function resolveEnforcement(manifest, target) {
+  const byTarget = manifest.preflight_enforcement_by_target ?? {};
+  return byTarget[target] ?? manifest.preflight_enforcement ?? "report";
+}
+
 export function loadJson(root, relativePath) {
   return JSON.parse(readFileSync(`${root}/${relativePath}`, "utf8"));
 }

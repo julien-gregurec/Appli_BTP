@@ -5,12 +5,12 @@
 // encodage) pour ne jamais ressembler à un secret dans le source lui-même.
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { test } from "node:test";
-import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson } from "./lib/env-manifest-core.mjs";
+import { MANIFEST_PATH, SCHEMA_PATH, checkManifest, loadJson, resolveEnforcement } from "./lib/env-manifest-core.mjs";
 import { controlesEnvironnementOperateur } from "./lib/env-manifest-operator.mjs";
 import { parseEnvFile, runPreflight } from "./lib/env-manifest-preflight.mjs";
 import { createGitSource, createMemorySource, envBlockNames, runRepoChecks } from "./lib/env-manifest-scan.mjs";
@@ -472,12 +472,20 @@ test("indicateur d'environnement : ELSATIA_APPLICATION_ENV est requis en preview
 
 // ── Raccord au preflight opérateur du cutover ───────────────────────────────
 
-/** Racine temporaire avec une copie du manifeste, pour tester « report » et « enforce » sans toucher au dépôt. */
-function rootWithEnforcement(mode) {
+/**
+ * Racine temporaire avec une copie du manifeste, pour tester « report » et « enforce » sans toucher
+ * au dépôt. `byTarget` (facultatif) remplace `preflight_enforcement_by_target` ; par défaut il est
+ * retiré, pour que le mode global testé s'applique à toutes les cibles.
+ */
+function rootWithEnforcement(mode, byTarget = undefined) {
   const dir = mkdtempSync(`${tmpdir()}/elsatia-env-op-`);
   mkdirSync(`${dir}/config`);
+  mkdirSync(`${dir}/scripts/lib`, { recursive: true });
   cpSync(`${ROOT}/${SCHEMA_PATH}`, `${dir}/${SCHEMA_PATH}`);
-  writeFileSync(`${dir}/${MANIFEST_PATH}`, JSON.stringify({ ...realManifest, preflight_enforcement: mode }));
+  for (const f of ["scripts/check-env-manifest.mjs", "scripts/lib/env-manifest-core.mjs", "scripts/lib/env-manifest-scan.mjs", "scripts/lib/env-manifest-preflight.mjs"]) {
+    cpSync(`${ROOT}/${f}`, `${dir}/${f}`);
+  }
+  writeFileSync(`${dir}/${MANIFEST_PATH}`, JSON.stringify({ ...realManifest, preflight_enforcement: mode, preflight_enforcement_by_target: byTarget }));
   return dir;
 }
 function fakeTargetDump(dir) {
@@ -562,4 +570,95 @@ test("CLI : le mode --preflight n'affiche aucune valeur et sort en échec sur un
   assert.equal(output.includes(fake), false, "la clé ne doit pas apparaître dans la sortie");
   assert.match(output, /PF-URL-LOCALHOST/);
   assert.match(output, /NO-GO/);
+});
+
+// ── Application du preflight par cible (ELSATIA_PREVIEW_EXECUTION_PREP_V3) ──
+
+test("enforcement par cible : la valeur par cible l'emporte, le global reste le défaut, jamais « enforce » par surprise", () => {
+  assert.equal(resolveEnforcement({}, "preview"), "report");
+  assert.equal(resolveEnforcement({ preflight_enforcement: "enforce" }, "production"), "enforce");
+  const m = { preflight_enforcement: "report", preflight_enforcement_by_target: { preview: "enforce" } };
+  assert.equal(resolveEnforcement(m, "preview"), "enforce");
+  assert.equal(resolveEnforcement(m, "production"), "report", "cible absente de la table : défaut global");
+  assert.equal(resolveEnforcement(m, "inconnue"), "report");
+});
+
+test("manifeste réel : Preview bloquante, Production inchangée (report)", () => {
+  assert.equal(resolveEnforcement(realManifest, "preview"), "enforce");
+  assert.equal(resolveEnforcement(realManifest, "production"), "report");
+  assert.equal(realManifest.preflight_enforcement, "report", "le défaut global n'est pas durci");
+});
+
+test("manifeste réel : aucune variable build_time requise en Preview n'attend une décision propriétaire", () => {
+  // Garantit qu'« enforce » en Preview ne peut pas bloquer un build sur une question que seul
+  // Julien peut trancher (prix Stripe, hébergeur, etc.) : seules des URL / clés publiques.
+  const blocking = realManifest.variables.filter((x) => x.required && x.build_time && x.environments.includes("preview"));
+  assert.ok(blocking.length > 0);
+  for (const x of blocking) {
+    assert.doesNotMatch(x.name, /^STRIPE_/, `${x.name} : un prix ou une clé Stripe ne doit pas bloquer un build`);
+    assert.ok(["supabase_public", "url", "env_indicator"].includes(x.category), `${x.name} (${x.category}) : catégorie inattendue pour un blocage de build`);
+  }
+});
+
+function runAuto(dir, app, env) {
+  const r = spawnSync("node", [`${dir}/scripts/check-env-manifest.mjs`, "--auto", "--app", app], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
+  return { status: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
+test("CLI --auto : hors Vercel, toujours ignoré (postes locaux, CI, tests)", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce", production: "enforce" });
+  const r = runAuto(dir, "gestion_pro", {});
+  assert.equal(r.status, 0);
+  assert.match(r.out, /preflight ignoré/);
+  assert.equal(runAuto(dir, "colors", { VERCEL_ENV: "development" }).status, 0);
+});
+
+test("CLI --auto : Preview bloque sur une variable requise absente, Production reste en report", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce", production: "report" });
+  const preview = runAuto(dir, "reserves", { VERCEL_ENV: "preview" });
+  assert.equal(preview.status, 1);
+  assert.match(preview.out, /mode enforce/);
+  assert.match(preview.out, /NEXT_PUBLIC_RESERVES_URL/);
+  const production = runAuto(dir, "reserves", { VERCEL_ENV: "production" });
+  assert.equal(production.status, 0);
+  assert.match(production.out, /MODE REPORT/);
+});
+
+test("CLI --auto : Preview complète et cohérente = GO, sans afficher de valeur", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce" });
+  const key = "sb_publishable_" + "k".repeat(20);
+  const r = runAuto(dir, "reserves", {
+    VERCEL_ENV: "preview", ELSATIA_APPLICATION_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: key, NEXT_PUBLIC_RESERVES_URL: "https://reserves-preview.example.com",
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /GO : aucune erreur/);
+  assert.equal(r.out.includes(key), false);
+});
+
+test("CLI --auto : le coupe-circuit ne fait que désarmer, et le dit", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce" });
+  const off = runAuto(dir, "studio", { VERCEL_ENV: "preview", ELSATIA_PREFLIGHT_ENFORCEMENT: "report" });
+  assert.equal(off.status, 0);
+  assert.match(off.out, /COUPE-CIRCUIT/);
+  const dirReport = rootWithEnforcement("report", { preview: "report" });
+  const up = runAuto(dirReport, "studio", { VERCEL_ENV: "preview", ELSATIA_PREFLIGHT_ENFORCEMENT: "enforce" });
+  assert.equal(up.status, 0, "aucune valeur ne durcit par variable d'environnement");
+});
+
+test("applications Vercel à racine propre : le pré-build appelle le preflight du manifeste", () => {
+  for (const app of ["colors", "reserves", "studio", "tools"]) {
+    const pkg = JSON.parse(readFileSync(`${ROOT}/apps/${app}/package.json`, "utf8"));
+    assert.match(pkg.scripts.prebuild ?? "", new RegExp(`node \\.\\./\\.\\./scripts/check-env-manifest\\.mjs --auto --app ${app}`), app);
+  }
+  const root = JSON.parse(readFileSync(`${ROOT}/package.json`, "utf8"));
+  assert.match(root.scripts["prebuild:gestion-pro"], /check-env-manifest\.mjs --auto --app gestion_pro/);
+  assert.equal(root.scripts["build:gestion-pro"], "next build", "le build Vercel de Gestion Pro n'enchaîne pas celui de Tools");
+});
+
+test("CLI --auto : sur Vercel sans VERCEL_ENV exposée, avertit au lieu de s'ignorer en silence (sans bloquer)", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce" });
+  const r = runAuto(dir, "colors", { VERCEL: "1" });
+  assert.equal(r.status, 0);
+  assert.match(r.out, /Automatically expose System Environment Variables/);
 });
