@@ -136,7 +136,11 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
 
   // ── 8. A révoque B, l'historique reste intact ─────────────────────────────
   await page.goto(`${RESERVES}/intervenants`);
-  await page.getByRole("button", { name: "Révoquer l’accès" }).first().click();
+  // Ciblé sur la fiche de B : l'ordre de la liste suit la collation de la base (C.UTF-8
+  // sur une pile PostgreSQL nue, en_US sur la pile Docker) — `.first()` révoquait parfois
+  // « Menuiserie C » au lieu de B.
+  await page.locator("li", { hasText: "Étanchéité B" })
+    .getByRole("button", { name: "Révoquer l’accès" }).click();
   await expect(page.locator("body")).toContainText(/révoqué/i);
 
   const historique = await rpc(request, jetonA, "reserves_export_historique", {

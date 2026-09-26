@@ -304,15 +304,11 @@ test("le statut d'une réserve ne se force pas par écriture directe", async ({ 
 });
 
 /**
- * DÉFAUT CONNU, NON CORRIGÉ DANS CE LOT — correctif SQL bloqué par le train global.
- *
- * Marqué `fixme` à dessein : il énonce le comportement ATTENDU, échoue aujourd'hui, et
- * passera au vert le jour où la garde de rattachement proposée dans
- * `docs/reserves/ELSATIA_RESERVES_V6_SQL_PROPOSE_NON_INTEGRE.sql` sera numérotée et
- * jouée. Le laisser en échec silencieux, ou le supprimer, reviendrait à oublier le
- * défaut ; le laisser rouge rendrait la recette inutilisable comme garde-fou.
+ * DÉFAUT CONNU V6, CORRIGÉ par `20260926000401_reserves_qualification_correctifs_v1.sql`
+ * (R-05) — le `fixme` d'origine devient une garde active. Le porteur d'une réserve ne
+ * change plus que par les gestes métier tracés (invitation, désignation, révocation).
  */
-test.fixme(
+test(
   "le porteur d'une réserve ne change pas par écriture directe, sans trace",
   async ({ request }) => {
     const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
@@ -320,7 +316,7 @@ test.fixme(
       request, jetonA, `reserves_intervenants?id=eq.${INTERVENANT_B}`,
       { entreprise_intervenante_id: ENTREPRISE_B },
     );
-    // Aujourd'hui : 200, l'entreprise précédente est dessaisie sans révocation tracée.
+    // Avant R-05 : 200, l'entreprise précédente était dessaisie sans révocation tracée.
     expect(reponse.status()).toBeGreaterThanOrEqual(400);
   },
 );
