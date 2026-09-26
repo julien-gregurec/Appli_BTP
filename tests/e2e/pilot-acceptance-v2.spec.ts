@@ -11,6 +11,7 @@
 // local_supabase_proxy.mjs). Not part of `npm run test:e2e` (which targets the isolation_multitenant
 // fixture) -- run directly: npx playwright test tests/e2e/pilot-acceptance-v2.spec.ts
 import { expect, test, type Page } from "@playwright/test";
+import { spawnSync } from "node:child_process";
 
 const PASSWORD = "PiloteTest!2026";
 const PROFILES = {
@@ -20,6 +21,14 @@ const PROFILES = {
   chef_equipe: "pilote.rachid.belkacem@example.test",
   ouvrier: "pilote.sofiane.aitali@example.test",
 } as const;
+
+// The app's own anti-abuse limiter allows 10 logins / 10 min / IP (real product
+// protection). This suite logs in far more often than that; without a reset the
+// 11th login gets a 429 and the case would measure the limiter, not the product
+// (ELSATIA_PILOT_REMAINING_FAILS_CLOSURE_V2 §7). Test-only gesture.
+test.beforeEach(() => {
+  spawnSync("su", ["postgres", "-c", "psql -X -q -d pilot_gp -c 'truncate rate_limits_applicatifs;'"], { encoding: "utf8" });
+});
 
 async function login(page: Page, email: string) {
   await page.goto("/login");

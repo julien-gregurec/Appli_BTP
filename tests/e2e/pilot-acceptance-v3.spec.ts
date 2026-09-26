@@ -39,6 +39,14 @@ function runSql(token: string, sql: string) {
   return { ok: res.status === 0, stdout: (res.stdout || "").trim(), stderr: (res.stderr || "").trim() };
 }
 
+// The app's own anti-abuse limiter allows 10 logins / 10 min / IP (real product
+// protection). This suite logs in far more often than that; without a reset the
+// 11th login gets a 429 and the case would measure the limiter, not the product
+// (ELSATIA_PILOT_REMAINING_FAILS_CLOSURE_V2 §7). Test-only gesture.
+test.beforeEach(() => {
+  spawnSync("su", ["postgres", "-c", "psql -X -q -d pilot_gp -c 'truncate rate_limits_applicatifs;'"], { encoding: "utf8" });
+});
+
 async function login(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
@@ -225,7 +233,10 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
     const confirmCheckbox = page.getByLabel(/Je confirme que le document est visible en entier/);
     await confirmCheckbox.check();
     await page.getByRole("button", { name: "Valider le justificatif" }).click();
-    await page.waitForLoadState("networkidle");
+    // Wait for the upload to be acknowledged before submitting: clicking
+    // "Soumettre" while the upload is in flight raced it (2/5 runs) and exposed a
+    // real DB gap, now closed by 20260923000332 (see the V2 closure report).
+    await expect(page.getByRole("status")).toContainText("Document ajouté", { timeout: 15_000 });
     await expect(page.locator("body")).not.toContainText("Une erreur");
 
     const soumettre = page.getByRole("button", { name: "Soumettre la dépense" });
@@ -258,11 +269,19 @@ test.describe("PE-06: signature électronique de l'employé", () => {
   // instead of being re-diagnosed by guesswork.
   test("signature dessinée puis enregistrée, réutilisable", async ({ page }) => {
     const empId = psql(`select id from employes where entreprise_id='${ENT_A}' and email='${PROFILES.ouvrier}';`);
+    // Replayable: a previous run leaves a stored signature, which hides the canvas.
+    psql(`update employes set signature_storage_path=null where id='${empId}';`);
     await login(page, PROFILES.gerant);
     await page.goto(`/employes/${empId}`);
     await page.waitForLoadState("networkidle");
     const canvas = page.locator("canvas").first();
     await expect(canvas).toBeVisible();
+    // page.mouse works in viewport coordinates: the canvas sits below the fold of
+    // the employee page, so bring it into view before measuring it (otherwise the
+    // gesture lands outside the viewport and the stroke is never registered — the
+    // failure mode observed once hydration actually worked, see
+    // ELSATIA_PILOT_REMAINING_FAILS_CLOSURE_V2 §NF-01/§PE-06).
+    await canvas.scrollIntoViewIfNeeded();
     // Real pointer gesture over the canvas. The component draws on
     // pointerdown/pointermove and flips its `vide` ref on pointerdown, so a
     // multi-step drag is what a signature actually is.

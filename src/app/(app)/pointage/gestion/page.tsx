@@ -45,7 +45,8 @@ export default async function GestionPointagesPage({searchParams}:{searchParams:
     supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
   ]):[{data:[]},{data:[]}];
   const aujourdhui=new Date().toISOString().slice(0,10);
-  const limiteRegularisation=new Date(Date.now()-31*86400000).toISOString().slice(0,10);
+  const limite=new Date(`${aujourdhui}T00:00:00Z`);limite.setUTCDate(limite.getUTCDate()-31);
+  const limiteRegularisation=limite.toISOString().slice(0,10);
   const pointages=(pointagesData??[])as Pointage[];
   const sessions=(sessionsData??[])as Session[];
   const verifications=(verificationsData??[])as VerificationZone[];

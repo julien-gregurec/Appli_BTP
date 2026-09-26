@@ -97,6 +97,7 @@ update public.affectations set heures = 6 where id = 'a3030000-0000-0000-0000-00
 reset role;
 select is((select count(*)::int from public.affectations_historique where affectation_id='a3030000-0000-0000-0000-000000000001'), 2, '21. cross-tenant : dirigeant B ne peut pas modifier (donc pas historiser) une affectation de A');
 
+select set_config('request.jwt.claims', '', true);
 -- Changement de rôle en session : l'ouvrier passe conducteur -> vue globale immédiate.
 update public.utilisateurs_entreprises set poste_id = 'a1000000-0000-0000-0000-000000000004'
  where utilisateur_id = '10000000-0000-0000-0000-000000000002' and entreprise_id = 'a0000000-0000-0000-0000-000000000001';
@@ -105,6 +106,7 @@ select set_config('request.jwt.claims','{"sub":"10000000-0000-0000-0000-00000000
 select is((select count(*)::int from public.affectations_historique), 3, '22. changement de rôle (ouvrier -> conducteur) : vue globale sans reconnexion');
 reset role;
 
+select set_config('request.jwt.claims', '', true);
 -- Utilisateur désactivé : plus rien.
 update public.utilisateurs_entreprises set statut = 'desactive'
  where utilisateur_id = '10000000-0000-0000-0000-000000000002' and entreprise_id = 'a0000000-0000-0000-0000-000000000001';
@@ -113,6 +115,7 @@ select set_config('request.jwt.claims','{"sub":"10000000-0000-0000-0000-00000000
 select is((select count(*)::int from public.affectations_historique), 0, '23. utilisateur désactivé : plus aucune ligne d''historique');
 reset role;
 
+select set_config('request.jwt.claims', '', true);
 -- Entreprise suspendue : plus rien, même pour le dirigeant.
 update public.entreprises set abonnement_statut = 'suspendu' where id = 'a0000000-0000-0000-0000-000000000001';
 set local role authenticated;

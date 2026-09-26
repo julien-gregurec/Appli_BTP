@@ -57,6 +57,13 @@ revoke insert, update, delete, truncate on public.affectations_historique from a
 grant select on public.affectations_historique to authenticated;
 grant all on public.affectations_historique to service_role;
 
+-- Le prédicat de lecture (PL-05, 20260923000327) était resté exécutable par anon
+-- (EXECUTE PUBLIC par défaut) : détecté par isolation_multitenant_surface.test.sql
+-- et security_remediation_anon_execute_revocation_v1.test.sql lors de la suite
+-- pgTAP complète de ce lot. authenticated conserve l'accès (policies RLS).
+revoke all on function public.peut_consulter_affectation_employe(uuid, uuid) from public, anon;
+grant execute on function public.peut_consulter_affectation_employe(uuid, uuid) to authenticated, service_role;
+
 drop policy if exists affectations_historique_lecture on public.affectations_historique;
 create policy affectations_historique_lecture on public.affectations_historique
   for select to authenticated
@@ -108,6 +115,9 @@ $$;
 
 comment on function public.trg_historiser_affectation() is
   'PL-03 : historique append-only des modifications et suppressions directes d''affectations (avant/après, champs modifiés, auteur, horodatage). Les suppressions en cascade (employé, chantier, congé, entreprise) ne sont pas historisées.';
+
+-- Fonction de trigger uniquement : aucun rôle API n'a à l'appeler directement.
+revoke all on function public.trg_historiser_affectation() from public, anon, authenticated;
 
 drop trigger if exists trg_historiser_affectation on public.affectations;
 create trigger trg_historiser_affectation
