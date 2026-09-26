@@ -2,7 +2,7 @@
 // (Gestion Pro / hub compte). Il ne voit que l'identité et la décision d'accès, jamais
 // les données métier Studio. Clé privée asymétrique : Studio ne détient que la clé publique.
 import { generateKeyPairSync, randomUUID, createHash } from "node:crypto";
-import { signEs256 } from "./jws.mjs";
+import { signEs256, TYP_REVOCATION } from "./jws.mjs";
 
 export function createBroker({ issuer, now = () => Date.now(), ttlSeconds = 60 }) {
   const keys = new Map(); // kid -> { privateKey, publicJwk }
@@ -17,8 +17,12 @@ export function createBroker({ issuer, now = () => Date.now(), ttlSeconds = 60 }
   }
   rotate();
 
+  const subjectFor = (userId, audience) =>
+    createHash("sha256").update(`${issuer}|${audience}|${userId}`).digest("base64url");
+
   return {
     rotate,
+    subjectFor,
     retire(kid) { keys.delete(kid); },
     jwks() { return { keys: [...keys.values()].map((k) => k.publicJwk) }; },
     // `session` = utilisateur déjà authentifié sur le projet partagé (auth.getUser() côté serveur).
@@ -30,7 +34,7 @@ export function createBroker({ issuer, now = () => Date.now(), ttlSeconds = 60 }
         iss: issuer,
         aud: audience,
         // Sujet opaque, stable, propre à l'audience : Studio ne reçoit jamais l'UUID auth.users brut.
-        sub: createHash("sha256").update(`${issuer}|${audience}|${session.id}`).digest("base64url"),
+        sub: subjectFor(session.id, audience),
         email: session.email,
         email_verified: Boolean(session.email_verified),
         ent: entitlement,
@@ -42,6 +46,24 @@ export function createBroker({ issuer, now = () => Date.now(), ttlSeconds = 60 }
       };
       const k = keys.get(activeKid);
       return signEs256(payload, k.privateKey, activeKid);
+    },
+    // Événement de cycle de vie poussé plateforme → Studio (webhook signé, même JWKS, `typ` distinct).
+    // reason ∈ account_disabled | account_enabled | account_deleted | entitlement_revoked | entitlement_granted
+    revocationEvent({ userId, audience, reason, entitlement }) {
+      const iat = Math.floor(now() / 1000);
+      const payload = {
+        iss: issuer,
+        aud: audience,
+        sub: subjectFor(userId, audience),
+        reason,
+        ent: entitlement ?? null,
+        iat,
+        nbf: iat,
+        exp: iat + ttlSeconds,
+        jti: randomUUID(),
+      };
+      const k = keys.get(activeKid);
+      return signEs256(payload, k.privateKey, activeKid, TYP_REVOCATION);
     },
   };
 }

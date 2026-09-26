@@ -6,16 +6,20 @@ export const b64u = (buf) => Buffer.from(buf).toString("base64url");
 export const b64uJson = (obj) => b64u(JSON.stringify(obj));
 export const fromB64uJson = (s) => JSON.parse(Buffer.from(s, "base64url").toString("utf8"));
 
-export function signEs256(payload, privateKey, kid) {
-  const header = { alg: "ES256", typ: "elsatia-handoff+jwt", kid };
+export const TYP_HANDOFF = "elsatia-handoff+jwt";
+export const TYP_REVOCATION = "elsatia-revocation+jwt";
+
+export function signEs256(payload, privateKey, kid, typ = TYP_HANDOFF) {
+  const header = { alg: "ES256", typ, kid };
   const input = `${b64uJson(header)}.${b64uJson(payload)}`;
   const sig = createSign("SHA256").update(input).sign({ key: privateKey, dsaEncoding: "ieee-p1363" });
   return `${input}.${b64u(sig)}`;
 }
 
 // Vérifie la signature UNIQUEMENT avec l'algorithme épinglé (ES256) et une clé du JWKS.
+// `typ` attendu : un jeton de passage n'est jamais accepté comme événement de révocation, et inversement.
 // Retourne { header, payload } ou lève une erreur au code stable.
-export function verifyEs256(token, jwks) {
+export function verifyEs256(token, jwks, typ = TYP_HANDOFF) {
   if (typeof token !== "string" || token.length > 4096) throw codeError("MALFORMED");
   const parts = token.split(".");
   if (parts.length !== 3) throw codeError("MALFORMED");
@@ -27,7 +31,7 @@ export function verifyEs256(token, jwks) {
     throw codeError("MALFORMED");
   }
   if (header.alg !== "ES256") throw codeError("ALG_REJECTED"); // jamais "none", jamais HS256
-  if (header.typ !== "elsatia-handoff+jwt") throw codeError("TYP_REJECTED");
+  if (header.typ !== typ) throw codeError("TYP_REJECTED");
   const jwk = jwks.keys.find((k) => k.kid === header.kid);
   if (!jwk || jwk.kty !== "EC" || jwk.crv !== "P-256") throw codeError("UNKNOWN_KID");
   const key = createPublicKey({ key: jwk, format: "jwk" });
