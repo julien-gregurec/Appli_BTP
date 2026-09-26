@@ -1,4 +1,4 @@
--- RGPD × contrats acceptés — V1 (migration 20260926000402, rapport
+-- RGPD × contrats acceptés — V1 (migration 20260926000502, ex-20260926000402, rapport
 -- docs/qualification/ELSATIA_RGPD_ACCEPTED_CONTRACTS_RECONCILIATION_V1.md).
 --
 --   1. Politique par défaut `non_decidee` : la purge du tenant réaliste s'arrête sur les
@@ -36,12 +36,22 @@ create temporary table _factures_avant on commit drop as
 select f.id, public.empreinte_comptable_facture(f.id) as empreinte from public.factures f;
 
 -- ─── 1. Politique par défaut ───────────────────────────────────────────
-select is((select politique from platform.purge_politique_contrats), 'non_decidee',
-  'politique par défaut : non_decidee (aucune décision juridique prise par la migration)');
+-- Train V3 (20260926000504) : la politique retenue par le propriétaire est enregistrée
+-- (conserver_contrat_minimise) mais reste NON active faute de durée validée. Le chemin
+-- `non_decidee` (P1) reste couvert ci-dessous : la politique y est remise à non_decidee
+-- dans la transaction de test. Le chemin « durée requise » est couvert par
+-- rgpd_politique_contrats_conserver_minimise_v3.test.sql.
+select is((select politique || '/' || coalesce(duree_conservation::text, 'sans_duree') || '/' || platform.etat_politique_contrats()
+             from platform.purge_politique_contrats),
+  'conserver_contrat_minimise/sans_duree/duree_requise',
+  'politique V3 : conserver_contrat_minimise retenue, aucune durée inventée, état duree_requise (non active)');
 select ok((select count(*) from platform.purge_politique_contrats_journal where politique = 'non_decidee') >= 1,
   'le journal des politiques consigne l''état par défaut');
 select is((select count(*)::integer from _contrats_avant where entreprise_id = current_setting('t.a')::uuid), 4,
   'tenant A : 3 devis acceptés + 1 avenant accepté');
+
+-- Chemin P1 (non_decidee) : remis explicitement pour la suite de ce fichier.
+select platform.definir_politique_purge_contrats('non_decidee', null);
 
 -- Administrateur du tenant (avant la purge, qui supprime ses droits applicatifs).
 set local role authenticated;

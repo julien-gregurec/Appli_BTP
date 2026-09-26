@@ -84,8 +84,10 @@ function afficherRapport(lignes) {
 }
 
 // Contrats acceptés (devis, avenants) : leur sort dépend d'une décision juridique
-// (platform.purge_politique_contrats, migration 20260926000402). Sans décision, la purge
-// s'arrête sur eux avec DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE.
+// (platform.purge_politique_contrats, migrations 20260926000502 et 20260926000504). Sans
+// décision, la purge s'arrête sur eux avec DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE ;
+// politique conserver_contrat_minimise retenue mais durée non validée (état V3 livré) :
+// DECISION_REQUIRED:RGPD-DUREE-CONSERVATION-CONTRAT (fail-closed).
 async function afficherContratsAcceptes() {
   const { data, error } = await supabase.rpc("rapport_contrats_acceptes_purge", { p_entreprise_id: entrepriseId });
   if (error) {
@@ -95,9 +97,14 @@ async function afficherContratsAcceptes() {
   const r = (data ?? [])[0];
   if (!r) return;
   console.log(`\nContrats acceptés : ${r.devis_acceptes} devis, ${r.avenants_acceptes} avenant(s) actifs ; ${r.preuves} preuve(s) figée(s).`);
-  console.log(`  Politique : ${r.politique}${r.decision_ref ? ` (décision ${r.decision_ref})` : ""}`);
-  if (r.politique === "non_decidee" && r.devis_acceptes + r.avenants_acceptes > 0) {
-    console.log("  → DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE : la purge s'arrêtera sur ces contrats (échec sûr).");
+  const etat = r.etat ?? r.politique;
+  console.log(`  Politique : ${r.politique}${r.decision_ref ? ` (décision ${r.decision_ref})` : ""} — état effectif : ${etat}${r.duree_conservation ? `, durée ${r.duree_conservation}` : ""}`);
+  if (r.devis_acceptes + r.avenants_acceptes > 0) {
+    if (etat === "non_decidee") {
+      console.log("  → DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE : la purge s'arrêtera sur ces contrats (échec sûr).");
+    } else if (etat === "duree_requise") {
+      console.log("  → DECISION_REQUIRED:RGPD-DUREE-CONSERVATION-CONTRAT : conserver_contrat_minimise retenue, durée non validée ; la purge s'arrêtera sur ces contrats (échec sûr).");
+    }
   }
 }
 
