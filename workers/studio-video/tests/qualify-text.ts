@@ -11,8 +11,10 @@ import { renderTimeline, command } from "../src/render.ts";
 const require = createRequire(import.meta.url),
   root = "/tmp/elsatia-studio-lot-f/long-text",
   r = {
-    ffmpeg: require("ffmpeg-static") as string,
-    ffprobe: (require("ffprobe-static") as { path: string }).path,
+    ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static") as string),
+    ffprobe:
+    process.env.STUDIO_FFPROBE_PATH ||
+    (require("ffprobe-static") as { path: string }).path,
     signal: AbortSignal.timeout(600000),
     progress: async () => {},
   };

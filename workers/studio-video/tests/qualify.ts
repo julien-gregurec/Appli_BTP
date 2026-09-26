@@ -16,8 +16,10 @@ const require = createRequire(import.meta.url),
     (await mkdtemp(join(tmpdir(), "studio-render-qualification-")));
 await mkdir(root, { recursive: true });
 const r = {
-  ffmpeg: require("ffmpeg-static") as string,
-  ffprobe: (require("ffprobe-static") as { path: string }).path,
+  ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static") as string),
+  ffprobe:
+    process.env.STUDIO_FFPROBE_PATH ||
+    (require("ffprobe-static") as { path: string }).path,
   signal: AbortSignal.timeout(600000),
   progress: async () => {},
 };

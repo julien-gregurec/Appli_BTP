@@ -9,8 +9,8 @@ import { isNearDuplicate } from "../../../packages/studio-domain/src/analysis.ts
 const require = createRequire(import.meta.url),
   python = process.env.STUDIO_ANALYSIS_PYTHON || "python3";
 const runtime: Runtime = {
-  ffmpeg: require("ffmpeg-static"),
-  ffprobe: require("ffprobe-static").path,
+  ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static")),
+  ffprobe: process.env.STUDIO_FFPROBE_PATH || require("ffprobe-static").path,
   signal: AbortSignal.timeout(120000),
   progress: async () => {},
 };

@@ -13,8 +13,8 @@ if (!output) throw Error("Local output directory required");
 await mkdir(output, { recursive: true });
 const directory = await mkdtemp(join(tmpdir(), "studio-analysis-benchmark-"));
 const runtime: Runtime = {
-  ffmpeg: require("ffmpeg-static"),
-  ffprobe: require("ffprobe-static").path,
+  ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static")),
+  ffprobe: process.env.STUDIO_FFPROBE_PATH || require("ffprobe-static").path,
   signal: AbortSignal.timeout(20 * 60000),
   progress: async () => {},
 };

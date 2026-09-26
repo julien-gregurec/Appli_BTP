@@ -14,8 +14,10 @@ const require = createRequire(import.meta.url),
     process.env.STUDIO_RENDER_EVIDENCE ?? "/tmp/elsatia-studio-lot-f/renders";
 await mkdir(root, { recursive: true });
 const r = {
-  ffmpeg: require("ffmpeg-static") as string,
-  ffprobe: (require("ffprobe-static") as { path: string }).path,
+  ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static") as string),
+  ffprobe:
+    process.env.STUDIO_FFPROBE_PATH ||
+    (require("ffprobe-static") as { path: string }).path,
   signal: AbortSignal.timeout(3600000),
   progress: async () => {},
 };

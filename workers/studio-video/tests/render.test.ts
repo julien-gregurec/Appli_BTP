@@ -14,8 +14,10 @@ import {
 import type { TimelineDocument } from "../../../packages/studio-domain/src/timeline.ts";
 const require = createRequire(import.meta.url);
 const runtime = {
-  ffmpeg: require("ffmpeg-static") as string,
-  ffprobe: (require("ffprobe-static") as { path: string }).path,
+  ffmpeg: process.env.STUDIO_FFMPEG_PATH || (require("ffmpeg-static") as string),
+  ffprobe:
+    process.env.STUDIO_FFPROBE_PATH ||
+    (require("ffprobe-static") as { path: string }).path,
   signal: AbortSignal.timeout(120000),
   progress: async () => {},
 };
