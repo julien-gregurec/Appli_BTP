@@ -37,7 +37,7 @@ consigner, ne pas « continuer pour voir ».
 ```bash
 git fetch origin claude/fervent-dirac-eez6pk && git checkout claude/fervent-dirac-eez6pk
 npm ci && for a in tools colors reserves; do npm ci --prefix apps/$a; done
-npm run verify:migrations        # attendu : 335 migrations valides (train canonique V2 ; 321 sur la ref de préparation), noms et horodatages uniques
+npm run verify:migrations        # attendu : 337 migrations valides (train canonique V2 + RGPD 401/402 ; 335 sur le train V2 seul ; 321 sur la ref de préparation), noms et horodatages uniques
 npm run verify:secrets           # attendu : aucun secret reconnu
 npm run verify:env-manifest      # attendu : OK : aucune erreur (14 DECISION_REQUIRED non bloquantes)
 npm run test:env-manifest        # attendu : 67/67
@@ -92,7 +92,7 @@ npx supabase db push --linked --dry-run
 
 ```bash
 npx supabase db push --linked
-npx supabase migration list --linked      # train canonique V2 : 335 des deux côtés, dernière 20260923000400 (ref de préparation : 321, 20260922000330)
+npx supabase migration list --linked      # train canonique V2 + RGPD 401/402 : 337 des deux côtés, dernière 20260926000402 (train V2 seul : 335, 20260923000400) (ref de préparation : 321, 20260922000330)
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -f docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -c "set elsatia.preflight_environment='preview'" -f docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql
 ```
@@ -344,7 +344,7 @@ Puis un rendu complet (upload → job → sortie publiée). **Sortie** : image c
 
 - [ ] STEP 0 consigné ; STEP 1 vert ;
 - [ ] aucune commande n'a touché `exhvuzegsefmoguxoiak` ni une clé live ;
-- [ ] 335 migrations appliquées (train canonique V2 ; 321 sur la ref de préparation) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` 13/13 ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
+- [ ] 337 migrations appliquées (train canonique V2 + RGPD 401/402 ; 335 sur le train V2 seul ; 321 sur la ref de préparation) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` 13/13 ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
 - [ ] chaque build Preview affiche `mode enforce` puis `GO : aucune erreur.` ;
 - [ ] `preflight:preview -- --live --strict` 0 erreur, 18/18 buckets ;
 - [ ] un cycle Stripe Test complet reflété en base ; aucun webhook en échec répété ;

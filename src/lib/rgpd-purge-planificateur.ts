@@ -38,6 +38,8 @@ export type ConfigPlanificateur = {
 export const MAX_ENTREPRISES_DEFAUT = 1;
 export const MAX_ENTREPRISES_PLAFOND = 10;
 export const PASSES_RATTRAPAGE = 5;
+/** Relectures du rapport après anonymisation (lignes recréées par trigger). */
+export const BALAYAGES_FINAUX = 3;
 /** Délai de réversibilité des CGV (art. 10), déjà appliqué par demander_suppression_entreprise. */
 export const DELAI_SUPPRESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const TOLERANCE_DELAI_MS = 60 * 60 * 1000;
@@ -205,6 +207,19 @@ export async function executerPurgeEntreprise(
         return { ...resultat, statut: "incomplete" };
       }
       resultat.tablesAnonymisees += 1;
+    }
+
+    // Balayage final (comme scripts/purger-entreprise.mjs) : une suppression tardive
+    // (devis, chantiers…) peut recréer par trigger une ligne dans une table DELETE déjà
+    // vidée (entreprises_dashboard_cache) ; marquer_entreprise_purgee refuserait alors
+    // le marquage. On relit le rapport jusqu'à stabilité.
+    for (let balayage = 1; balayage <= BALAYAGES_FINAUX; balayage += 1) {
+      const restantes = (await port.rapport(entrepriseId)).filter((l) => l.categorie === "DELETE");
+      if (restantes.length === 0) break;
+      for (const l of restantes) {
+        const r = await port.purgerTable(entrepriseId, l.table_nom, runId);
+        if (r.ok) resultat.tablesPurgees += 1;
+      }
     }
 
     const fichiers = await port.fichiersStorage(entrepriseId);

@@ -30,8 +30,9 @@ type Table = { categorie: "DELETE" | "ANONYMIZE" | "RETAIN"; ordre: number; lign
 // Faux serveur en mémoire qui reproduit le contrat des RPC de purge : idempotence
 // (table vide → ok, 0 ligne), rapport qui n'affiche que les tables DELETE non vides,
 // classement Storage ORPHELIN/A_PURGER, garde de complétude du marquage.
-function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStorage?: number } = {}) {
+function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStorage?: number; cacheRecree?: boolean } = {}) {
   const tables: Record<string, Table> = {
+    ...(options.cacheRecree ? { entreprises_dashboard_cache: { categorie: "DELETE" as const, ordre: 0, lignes: 1 } } : {}),
     pointages: { categorie: "DELETE", ordre: 0, lignes: 3 },
     chantiers: { categorie: "DELETE", ordre: 1, lignes: 2 },
     clients: { categorie: "ANONYMIZE", ordre: 0, lignes: 2 },
@@ -84,6 +85,8 @@ function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStora
       }
       const n = tables[table].lignes;
       tables[table].lignes = 0;
+      // Trigger réel : supprimer des chantiers/devis recrée la ligne de cache du tableau de bord.
+      if (table === "chantiers" && n > 0 && tables.entreprises_dashboard_cache) tables.entreprises_dashboard_cache.lignes = 1;
       return { ok: true, lignes: n, erreur: null };
     },
     async anonymiserTable(_id, table) {
@@ -254,6 +257,15 @@ describe("planifierPurgesRgpd — exécution, idempotence, retry", () => {
     expect(serveur.audit.map((a) => a.detail.evenement)).toEqual(["debut", "fin"]);
     expect(serveur.audit.every((a) => a.detail.decision_ref === "D4/P1-6 test")).toBe(true);
     expect(serveur.audit.at(-1)?.ok).toBe(true);
+  });
+
+  it("balayage final : une ligne recréée par trigger après sa table (cache du tableau de bord) est purgée avant le marquage", async () => {
+    const serveur = fauxServeur({ cacheRecree: true });
+    const bilan = await planifierPurgesRgpd(serveur.port, EXECUTE, MAINTENANT);
+    expect(bilan.traitees[0].statut).toBe("complete");
+    expect(serveur.appels.filter((a) => a === "purger:entreprises_dashboard_cache")).toHaveLength(2);
+    expect(serveur.appels.lastIndexOf("purger:entreprises_dashboard_cache")).toBeGreaterThan(serveur.appels.indexOf("anonymiser:clients"));
+    expect(serveur.estPurgee()).toBe(true);
   });
 
   it("idempotence : rejouer la purge d'une entreprise déjà purgée ne supprime rien de plus", async () => {

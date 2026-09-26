@@ -4,6 +4,16 @@ Date : 2026-09-26 · Branche : `claude/great-curie-i94633`
 Base : `integration/elsatia-canonical-train-v1` @ `1c1fed66` (train canonique V1, le plus récent)
 Aucun texte légal modifié. Aucune décision juridique prise.
 
+> **Portage (2026-09-26, `claude/beautiful-archimedes-sc6t9g`)** — ce lot a été reporté sur le
+> train canonique V2 (`integration/elsatia-canonical-train-v2` @ `819ebe56`). La migration
+> `20260923000347` y porte le numéro **`20260926000401`** (SQL inchangé) pour garder une montée
+> de version monotone après `20260923000400`. Le prototype « contrats acceptés » de §6.3
+> (`docs/migrations-proposees/rgpd-purge-contrats-acceptes-v1.*.proposed`) et le harnais
+> `scripts/qualification/rgpd-invoice-immutability-v1.sh` sont remplacés par la migration
+> `20260926000402` et `scripts/qualification/rgpd-accepted-contracts-v1.sh` : voir
+> `ELSATIA_RGPD_ACCEPTED_CONTRACTS_RECONCILIATION_V1.md`. Le texte ci-dessous est celui du lot
+> d'origine (numéros et base V1).
+
 ## Verdict
 
 ```
