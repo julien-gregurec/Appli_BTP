@@ -136,7 +136,10 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
 
   // ── 8. A révoque B, l'historique reste intact ─────────────────────────────
   await page.goto(`${RESERVES}/intervenants`);
-  await page.getByRole("button", { name: "Révoquer l’accès" }).first().click();
+  // Ciblé sur la carte de B : le décor V4 ajoute « Menuiserie C », et l'ordre
+  // alphabétique (É après M) plaçait sa carte en premier — `.first()` révoquait C.
+  await page.locator("li.carte").filter({ hasText: "Étanchéité B" })
+    .getByRole("button", { name: "Révoquer l’accès" }).click();
   await expect(page.locator("body")).toContainText(/révoqué/i);
 
   const historique = await rpc(request, jetonA, "reserves_export_historique", {

@@ -404,6 +404,22 @@ export async function creerChantierAction(formData: FormData) {
   redirect(`/chantiers/${data.id}`);
 }
 
+/**
+ * Reprise d'un chantier Gestion Pro. La base exige les deux habilitations (Réserves :
+ * gérer les chantiers ; Gestion Pro : accès chantiers) sur l'organisation du chantier.
+ */
+export async function importerChantierGpAction(formData: FormData) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reserves_importer_chantier_gp", {
+    p_chantier_gp_id: texte(formData, "chantier_gp_id"),
+  });
+  if (error || !data) {
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent(error?.message ?? "Reprise impossible")}`);
+  }
+  revalidatePath("/chantiers");
+  redirect(`/chantiers/${data as string}`);
+}
+
 export async function modifierChantierAction(formData: FormData) {
   const id = texte(formData, "chantier_id");
   const supabase = await createClient();

@@ -9,7 +9,15 @@
 # URL Supabase locale explicite et un conteneur de base nommé.
 set -euo pipefail
 
-CONTENEUR="${RESERVES_DB_CONTAINER:?Définir RESERVES_DB_CONTAINER (conteneur Postgres de la stack jetable)}"
+# Deux cibles possibles, toutes deux jetables :
+#   - RESERVES_DB_CONTAINER : conteneur Postgres d'une stack Supabase Docker ;
+#   - RESERVES_DB_URL       : base locale sans Docker (pile de
+#     scripts/e2e/pile-locale-reserves.sh), URL postgresql://…@127.0.0.1…
+CONTENEUR="${RESERVES_DB_CONTAINER:-}"
+URL_BASE="${RESERVES_DB_URL:-}"
+if [ -z "$CONTENEUR" ] && [ -z "$URL_BASE" ]; then
+  echo "Définir RESERVES_DB_CONTAINER (Docker) ou RESERVES_DB_URL (base locale 127.0.0.1)." >&2; exit 1
+fi
 : "${E2E_SUPABASE_URL:?Définir E2E_SUPABASE_URL (http://127.0.0.1:PORT)}"
 : "${E2E_SUPABASE_SERVICE_ROLE_KEY:?Définir E2E_SUPABASE_SERVICE_ROLE_KEY}"
 
@@ -20,10 +28,20 @@ esac
 case "$CONTENEUR" in
   *btp-platform*) echo "Refus : ce conteneur est la stack de développement principale." >&2; exit 1 ;;
 esac
+case "$URL_BASE" in
+  ""|postgresql://*@127.0.0.1:*) ;;
+  *) echo "Recette strictement locale : RESERVES_DB_URL doit viser 127.0.0.1." >&2; exit 1 ;;
+esac
+
+# Un seul point d'entrée SQL, quelle que soit la cible.
+psql_cible() {
+  if [ -n "$URL_BASE" ]; then psql "$URL_BASE" -X -q -v ON_ERROR_STOP=1 "$@";
+  else docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1 "$@"; fi
+}
 
 RACINE="$(cd "$(dirname "$0")/../.." && pwd)"
 psql_fichier() {
-  docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1 < "$1"
+  psql_cible < "$1"
 }
 
 # Le jeu multi-tenant insère un MOUVEMENT DE STOCK de sortie. Ses insertions sont en
@@ -37,7 +55,7 @@ psql_fichier() {
 # en-tête l'annonce. Aucun autre article n'est touché — la clause porte sur les seuls
 # identifiants du jeu de test.
 echo "0/5 · Remise à niveau du stock du jeu de test"
-docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+psql_cible <<'SQL'
 update public.articles_stock set quantite_stock = 10
  where id = 'ad000000-0000-0000-0000-000000000001' and quantite_stock < 10;
 update public.articles_stock set quantite_stock = 20
@@ -46,7 +64,7 @@ SQL
 
 echo "1/5 · Jeu métier multi-tenant"
 { echo "begin;"; cat "$RACINE/supabase/tests/fixtures/isolation_multitenant.inc"; echo "commit;"; } \
-  | docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1
+  | psql_cible
 
 echo "2/5 · Représentation Auth locale"
 psql_fichier "$RACINE/scripts/e2e/prepare-local-recipe.sql"

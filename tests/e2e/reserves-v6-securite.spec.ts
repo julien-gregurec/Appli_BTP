@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { connexion, jetonSupabase, RESERVES, rpc } from "./reserves-aides";
 
 /**
@@ -34,6 +34,29 @@ test.skip(
   "Définir E2E_RESERVES_URL pour exécuter la recette ELSATIA Réserves",
 );
 test.describe.configure({ mode: "serial", timeout: 300_000 });
+
+/** Organisation du gérant de l'entreprise intervenante (décor V3), distincte de B ci-dessus. */
+const ENTREPRISE_GERANT_B = "f0000000-0000-0000-0000-000000000001";
+
+/**
+ * Condition d'entrée des tests qui font agir l'intervenant : l'intervention « Étanchéité B »
+ * doit être RATTACHÉE. Le décor la laisse « invitée » et le parcours V3 la révoque en fin de
+ * course ; comme la V5, le test l'établit lui-même au lieu de dépendre de l'ordre des specs.
+ */
+async function rattacherIntervenantB(request: APIRequestContext, jetonA: string, jetonB: string) {
+  await rpc(request, jetonA, "reserves_reactiver_intervenant", { p_intervenant_id: INTERVENANT_B });
+  const visibles = await rpc(request, jetonB, "reserves_export_chantier", { p_chantier_id: CHANTIER_A });
+  if (((await visibles.json()) as unknown[]).length > 0) return;
+  const clair = `recette-v6-${randomUUID()}`;
+  const empreinte = createHash("sha256").update(clair).digest("hex");
+  expect((await rpc(request, jetonA, "reserves_inviter_intervenant", {
+    p_intervenant_id: INTERVENANT_B, p_token_hash: empreinte,
+    p_email: "gerant-b@invalid.local", p_contact_nom: "Bernard É.",
+  })).status()).toBeLessThan(300);
+  expect((await rpc(request, jetonB, "reserves_invitation_accepter", {
+    p_token_hash: empreinte, p_entreprise_id: ENTREPRISE_GERANT_B,
+  })).status()).toBeLessThan(300);
+}
 
 /** Budget large : la recette mesure des REFUS, pas la latence d'un poste chargé. */
 const BUDGET = 60_000;
@@ -304,26 +327,23 @@ test("le statut d'une réserve ne se force pas par écriture directe", async ({ 
 });
 
 /**
- * DÉFAUT CONNU, NON CORRIGÉ DANS CE LOT — correctif SQL bloqué par le train global.
- *
- * Marqué `fixme` à dessein : il énonce le comportement ATTENDU, échoue aujourd'hui, et
- * passera au vert le jour où la garde de rattachement proposée dans
- * `docs/reserves/ELSATIA_RESERVES_V6_SQL_PROPOSE_NON_INTEGRE.sql` sera numérotée et
- * jouée. Le laisser en échec silencieux, ou le supprimer, reviendrait à oublier le
- * défaut ; le laisser rouge rendrait la recette inutilisable comme garde-fou.
+ * Défaut connu de la V6, CORRIGÉ par la migration 20260926000347 (D6) : le rattachement
+ * d'une entreprise intervenante ne se réécrit plus par l'API de données. Le trigger
+ * `reserves_intervenants_garde_rattachement` refuse toute écriture directe des colonnes
+ * de rattachement par un rôle d'API ; seules les actions métier, qui tracent, le peuvent.
  */
-test.fixme(
-  "le porteur d'une réserve ne change pas par écriture directe, sans trace",
-  async ({ request }) => {
-    const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
-    const reponse = await patch(
-      request, jetonA, `reserves_intervenants?id=eq.${INTERVENANT_B}`,
-      { entreprise_intervenante_id: ENTREPRISE_B },
-    );
-    // Aujourd'hui : 200, l'entreprise précédente est dessaisie sans révocation tracée.
-    expect(reponse.status()).toBeGreaterThanOrEqual(400);
-  },
-);
+test("le porteur d'une réserve ne change pas par écriture directe, sans trace", async ({ request }) => {
+  const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
+  const avant = await rest(request, jetonA, `reserves_intervenants?id=eq.${INTERVENANT_B}&select=entreprise_intervenante_id,statut`);
+  const etatAvant = (await avant.json()) as unknown[];
+  const reponse = await patch(
+    request, jetonA, `reserves_intervenants?id=eq.${INTERVENANT_B}`,
+    { entreprise_intervenante_id: ENTREPRISE_B },
+  );
+  expect(reponse.status()).toBeGreaterThanOrEqual(400);
+  const apres = await rest(request, jetonA, `reserves_intervenants?id=eq.${INTERVENANT_B}&select=entreprise_intervenante_id,statut`);
+  expect(await apres.json()).toEqual(etatAvant);
+});
 
 test("l'historique ne peut être ni réécrit ni effacé", async ({ request }) => {
   const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
@@ -356,6 +376,7 @@ test("l'historique ne peut être ni réécrit ni effacé", async ({ request }) =
 test("un intervenant ne valide pas sa propre levée", async ({ request }) => {
   const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
   const jetonB = await jetonSupabase(request, "gerant-b@invalid.local");
+  await rattacherIntervenantB(request, jetonA, jetonB);
 
   const creation = await rpc(request, jetonA, "reserves_creer", {
     p_chantier_id: CHANTIER_A, p_titre: `Auto-levée ${randomUUID().slice(0, 8)}`,

@@ -2,13 +2,31 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { exigerShellReserves, peutGererChantiers } from "@/lib/acces-reserves";
-import { creerChantierAction } from "@/app/actions";
+import { creerChantierAction, importerChantierGpAction } from "@/app/actions";
+import { createClient } from "@/lib/supabase/server";
+
+type ChantierGestionPro = { id: string; nom: string; ville: string | null };
 
 export const metadata: Metadata = { title: "Nouveau chantier" };
 
 export default async function PageNouveauChantier() {
   const contexte = await exigerShellReserves();
   if (!peutGererChantiers(contexte.roleReserves)) redirect("/chantiers");
+
+  // Chantiers Gestion Pro de l'organisation, lus sous la RLS de Gestion Pro : quelqu'un
+  // sans accès chantiers dans Gestion Pro n'en lit aucun, et le bloc disparaît. L'import
+  // lui-même revérifie les DEUX habilitations en base (reserves_importer_chantier_gp).
+  let chantiersGp: ChantierGestionPro[] = [];
+  if (contexte.entrepriseId) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("chantiers")
+      .select("id, nom, ville")
+      .eq("entreprise_id", contexte.entrepriseId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    chantiersGp = (data ?? []) as ChantierGestionPro[];
+  }
 
   return (
     <>
@@ -45,6 +63,27 @@ export default async function PageNouveauChantier() {
           <Link className="bouton secondaire" href="/chantiers">Annuler</Link>
         </div>
       </form>
+
+      {chantiersGp.length > 0 && (
+        <section className="carte" data-test="import-gestion-pro">
+          <h2 style={{ marginTop: 0 }}>Reprendre un chantier Gestion Pro</h2>
+          <p className="mention">
+            Le nom et l’adresse sont repris ; reprendre à nouveau un chantier déjà lié les
+            resynchronise, sans créer de doublon. Les réserves restent propres à Réserves.
+          </p>
+          <ul className="liste">
+            {chantiersGp.map((c) => (
+              <li key={c.id}>
+                <form action={importerChantierGpAction} className="actions">
+                  <input type="hidden" name="chantier_gp_id" value={c.id} />
+                  <span>{c.nom}{c.ville ? ` — ${c.ville}` : ""}</span>
+                  <button className="bouton secondaire" type="submit">Reprendre {c.nom}</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

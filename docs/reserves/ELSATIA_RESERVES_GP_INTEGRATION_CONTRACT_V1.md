@@ -27,8 +27,8 @@ Crée ou met à jour le chantier Réserves miroir d'un chantier Gestion Pro.
 Aucun droit n'est déduit d'une application vers l'autre. Quelqu'un qui gère les chantiers
 dans Réserves mais n'a aucun accès chantiers dans Gestion Pro **ne peut pas** importer.
 
-L'opération est idempotente : réimporter un chantier déjà lié met à jour son nom et
-`synchronise_at` sans créer de doublon (index unique partiel sur
+L'opération est idempotente : réimporter un chantier déjà lié met à jour son nom, son
+adresse et `synchronise_at` sans créer de doublon (index unique partiel sur
 `(entreprise_id, chantier_gp_id)`).
 
 ### Données reprises en V1
@@ -37,11 +37,11 @@ L'opération est idempotente : réimporter un chantier déjà lié met à jour s
 | --- | --- | --- |
 | `chantiers.id` | `chantier_gp_id` | ✅ livré |
 | `chantiers.nom` | `nom` | ✅ livré |
-| adresse, code postal, ville | idem | ⛔ à faire |
+| adresse, code postal, ville | idem | ✅ livré (migration `20260926000347`, D4 ; valeur hors contrainte laissée vide) |
 | plans / `documents_chantier` | `reserves_plans` | ⛔ à faire |
 | entreprises et contacts | `reserves_intervenants` | ⛔ à faire |
 
-Les trois dernières lignes sont **le contrat, pas la livraison** : les colonnes existent
+Les deux dernières lignes sont **le contrat, pas la livraison** : les colonnes existent
 et sont prêtes à recevoir ces données, mais aucune reprise automatique n'est écrite dans
 ce lot. La reprise des plans en particulier suppose une décision sur le stockage partagé
 (bucket `chantier-documents` de Gestion Pro contre bucket propre à Réserves) qui n'a pas
@@ -81,11 +81,16 @@ Réserves en dur à maintenir.
 `'interne'` : l'application est active au catalogue (condition de l'accès du propriétaire
 global) sans être annoncée comme commercialisée.
 
-## 4. Ce qui n'est pas branché dans ce lot
+## 4. Ce qui est branché, ce qui ne l'est pas
 
-Aucun appel croisé n'est câblé dans les interfaces : Gestion Pro n'affiche pas encore le
-bloc réserves sur sa fiche chantier, et Réserves n'a pas d'écran d'import. Les deux
-fonctions ci-dessus existent, sont testées, et attendent leur lot d'intégration.
+**Réserves → import** (qualification locale V1) : l'écran « Nouveau chantier » propose
+« Reprendre un chantier Gestion Pro » lorsque l'utilisateur lit des chantiers GP sous la RLS
+de Gestion Pro ; le bouton appelle `reserves_importer_chantier_gp`, qui revérifie les deux
+habilitations. Prouvé en e2e (`tests/e2e/reserves-qualification-v1.spec.ts`, test 13).
+
+**Gestion Pro → bloc réserves** : toujours non câblé. Gestion Pro n'affiche pas le résumé
+sur sa fiche chantier ; `reserves_resume_chantier_gp` existe, est testée (pgTAP 10.7–10.10,
+e2e 13) et attend son lot côté Gestion Pro.
 
 C'est un choix : coupler les deux interfaces maintenant reviendrait à faire dépendre la
 mise en service de Réserves d'une modification de Gestion Pro, qui est en phase

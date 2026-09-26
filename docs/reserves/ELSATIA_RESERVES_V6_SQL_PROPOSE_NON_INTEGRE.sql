@@ -1,5 +1,12 @@
 -- ELSATIA RÉSERVES V6 — SQL PROPOSÉ, **NON INTÉGRÉ**
 --
+-- MISE À JOUR (qualification locale V1, 2026-09-26) : le §1 (garde de rattachement) est
+-- désormais INTÉGRÉ par `supabase/migrations/20260926000347_reserves_qualification_locale_v1.sql`
+-- (D6), sous une forme sans drapeau : la garde refuse l'écriture directe aux rôles d'API
+-- (`authenticated`/`anon`) et laisse passer les fonctions SECURITY DEFINER, sans modifier
+-- aucune d'elles. Le `test.fixme` correspondant de la recette V6 est devenu un test actif.
+-- Les §2 à §4 restent des propositions non intégrées (voir le rapport de qualification).
+--
 -- ┌───────────────────────────────────────────────────────────────────────────┐
 -- │  BLOQUÉE PAR TRAIN GLOBAL                                                 │
 -- │                                                                           │

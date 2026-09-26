@@ -1,9 +1,9 @@
 -- ELSATIA-RESERVES-FULL-LOCAL-QUALIFICATION-V1 — correctifs trouvés par la recette
 --
--- Cinq défauts prouvés par `supabase/tests/reserves_full_local_qualification_v1.test.sql`
+-- Sept défauts prouvés par `supabase/tests/reserves_full_local_qualification_v1.test.sql`
 -- (rouges sur le train sans ce fichier, verts avec). Aucune table, colonne ni policy n'est
--- créée ou supprimée : cinq fonctions sont redéfinies à signature identique, une fonction
--- interne est ajoutée. Rapport : docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md
+-- créée ou supprimée : six fonctions sont redéfinies à signature identique, deux fonctions
+-- internes et un trigger sont ajoutés. Rapport : docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md
 --
 --   D1 (intégrité, historique) — la garde de workflow se contentait d'un drapeau de session
 --      (`elsatia.reserves_transition`) que N'IMPORTE QUEL client SQL peut poser lui-même.
@@ -33,6 +33,11 @@
 --
 --   D5 (historique) — voir en fin de fichier : organisation auteur des transitions jouées
 --      par l'entreprise intervenante.
+--
+--   D6 (cloisonnement, traçabilité) — voir en fin de fichier : le rattachement d'une
+--      entreprise intervenante ne se modifie plus par écriture directe (défaut connu V6).
+--
+--   D7 (annuaire) — voir en fin de fichier : jokers de recherche échappés.
 
 -- ── D1 ───────────────────────────────────────────────────────────────────────
 create or replace function public.reserves_garde_workflow()
@@ -340,3 +345,125 @@ end;
 $function$;
 
 revoke all on function public.reserves_appliquer_transition(uuid, text, text, uuid) from public, anon, authenticated;
+
+-- ── D6 ───────────────────────────────────────────────────────────────────────
+-- Rattachement d'une entreprise intervenante : uniquement par les actions métier.
+--
+-- Défaut connu depuis la recette V6 (`test.fixme` de reserves-v6-securite.spec.ts, SQL
+-- proposé dans docs/reserves/ELSATIA_RESERVES_V6_SQL_PROPOSE_NON_INTEGRE.sql §1, jamais
+-- numéroté) : la policy d'écriture de `reserves_intervenants` ne vérifie que le droit
+-- `gerer_intervenants` de l'HÔTE. Un `PATCH` PostgREST sur `entreprise_intervenante_id`
+-- dessaisissait donc instantanément l'entreprise porteuse (plus aucun accès, aucune
+-- révocation tracée), et un `POST` pouvait créer une intervention déjà « active » pour une
+-- organisation qui n'avait rien accepté. Prouvé par les tests pgTAP 5.32 à 5.35.
+--
+-- Correctif : même principe que D1, sans drapeau. Une action métier est une fonction
+-- SECURITY DEFINER, exécutée sous son propriétaire ; un client d'API l'est sous
+-- `authenticated`. Ce dernier garde la main sur les champs descriptifs (nom, contact,
+-- corps d'état…) mais ne touche plus aux colonnes qui portent le rattachement : elles ne
+-- changent que par invitation, désignation, adhésion, révocation ou réactivation — qui
+-- tracent toutes leur geste. Aucune fonction du domaine n'a besoin d'être modifiée.
+create or replace function public.reserves_garde_rattachement()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if current_user not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.entreprise_intervenante_id is not null or new.statut <> 'invitee'
+       or new.rejoint_at is not null or new.revoque_at is not null then
+      raise exception 'Une entreprise intervenante se déclare « invitée » : son rattachement passe par l''invitation';
+    end if;
+    return new;
+  end if;
+  if new.entreprise_intervenante_id is distinct from old.entreprise_intervenante_id
+     or new.statut is distinct from old.statut
+     or new.rejoint_at is distinct from old.rejoint_at
+     or new.revoque_at is distinct from old.revoque_at
+     or new.entreprise_id is distinct from old.entreprise_id
+     or new.chantier_id is distinct from old.chantier_id
+  then
+    raise exception 'Rattachement d''une entreprise intervenante interdit en écriture directe : passez par l''invitation, la révocation ou la réactivation';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.reserves_garde_rattachement() from public, anon, authenticated;
+
+drop trigger if exists reserves_intervenants_garde_rattachement on public.reserves_intervenants;
+create trigger reserves_intervenants_garde_rattachement
+  before insert or update on public.reserves_intervenants
+  for each row execute function public.reserves_garde_rattachement();
+
+
+-- ── D7 ───────────────────────────────────────────────────────────────────────
+-- Recherche à l'annuaire : les jokers de `ilike` n'étaient pas échappés. Un terme « %%% »
+-- franchissait la borne des trois caractères et rendait TOUTES les organisations publiées
+-- (proposition §3 de docs/reserves/ELSATIA_RESERVES_V6_SQL_PROPOSE_NON_INTEGRE.sql ; la
+-- recette V6 ne le voyait pas, son décor ne publiant aucune organisation). Prouvé par les
+-- tests pgTAP 2.18 et 2.19. Corps repris à l'identique du train, seul le motif change.
+create or replace function public.reserves_annuaire_rechercher(p_entreprise_id uuid, p_terme text)
+ RETURNS TABLE(entreprise_id uuid, nom text, ville text, corps_etat text, zone_intervention text, deja_utilisatrice boolean, origine text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_terme text := btrim(coalesce(p_terme, ''));
+  v_siret text := public.reserves_siret_normalise(v_terme);
+  -- D7 : `%` et `_` sont des jokers de `ilike` ; échappés, ils redeviennent des caractères.
+  v_motif text := replace(replace(replace(btrim(coalesce(p_terme, '')), '\', '\\'), '%', '\%'), '_', '\_');
+begin
+  if not public.reserves_action_autorisee(p_entreprise_id, 'inviter_entreprise') then
+    raise exception 'Recherche à l''annuaire non autorisée';
+  end if;
+
+  -- SIRET exact : 14 chiffres, rien d'autre. Un préfixe ne suffit pas — ce serait une
+  -- énumération déguisée du registre des organisations ELSATIA.
+  if v_siret is not null and length(v_siret) = 14 then
+    return query
+      select e.id,
+             coalesce(nullif(btrim(e.raison_sociale), ''), e.nom),
+             e.ville,
+             a.corps_etat,
+             a.zone_intervention,
+             coalesce(acc.autorise, false),
+             'siret'::text
+      from public.entreprises e
+      left join public.reserves_annuaire_publication a on a.entreprise_id = e.id
+      left join public.acces_applications_entreprises acc
+        on acc.entreprise_id = e.id and acc.application_code = 'reserves'
+      where public.reserves_siret_normalise(e.siret) = v_siret
+        and e.id <> p_entreprise_id
+      limit 5;
+    return;
+  end if;
+
+  -- Recherche par nom : uniquement parmi les organisations publiées, et à partir de
+  -- trois caractères pour qu'une lettre isolée ne balaie pas l'annuaire.
+  if length(v_terme) < 3 then return; end if;
+
+  return query
+    select e.id,
+           coalesce(nullif(btrim(e.raison_sociale), ''), e.nom),
+           e.ville,
+           a.corps_etat,
+           a.zone_intervention,
+           coalesce(acc.autorise, false),
+           'annuaire'::text
+    from public.reserves_annuaire_publication a
+    join public.entreprises e on e.id = a.entreprise_id
+    left join public.acces_applications_entreprises acc
+      on acc.entreprise_id = e.id and acc.application_code = 'reserves'
+    where a.publiee
+      and e.id <> p_entreprise_id
+      and (
+        coalesce(e.raison_sociale, '') ilike '%' || v_motif || '%' escape '\'
+        or e.nom ilike '%' || v_motif || '%' escape '\'
+      )
+    order by e.nom
+    limit 20;
+end;
+$function$;
+
+notify pgrst, 'reload schema';

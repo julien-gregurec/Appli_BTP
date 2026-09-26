@@ -23,7 +23,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(220);
+select plan(227);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -152,6 +152,15 @@ select is(public.reserves_role_courant(:'C'), 'reserves_admin_organisation',
   '2.16 son rôle payant n''est PAS rétrogradé par l''invitation');
 select is((select source from public.acces_applications_entreprises where entreprise_id = :'C' and application_code = 'reserves'),
   'abonnement', '2.17 son abonnement n''est pas réécrit en accès gratuit');
+
+-- Annuaire : C s'y publie ; les jokers de recherche ne balaient pas le registre publié.
+select lives_ok($$select public.reserves_annuaire_publier('c7000000-0000-0000-0000-000000000001', true, 'Plomberie', 'Haut-Rhin')$$,
+  '2.17b C se publie à l''annuaire ELSATIA');
+select set_config('request.jwt.claim.sub', :'ADMIN_A', true);
+select is((select count(*)::int from public.reserves_annuaire_rechercher(:'A', '%%%')), 0,
+  '2.18 un terme composé de jokers ne rend pas l''annuaire publié');
+select is((select nom from public.reserves_annuaire_rechercher(:'A', 'plomberie')), 'PLOMBERIE C SAS',
+  '2.19 une vraie recherche trouve l''organisation publiée');
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- 3. SCÉNARIO MÉTIER
@@ -421,6 +430,20 @@ select throws_like($$select public.reserves_creer('e7100000-0000-0000-0000-00000
   '5.30 mais ne peut rien créer');
 select set_config('request.jwt.claim.sub', :'PLATEFORME', true);
 select is((select count(*)::int from public.reserves), 0, '5.31 l''admin plateforme ne lit rien sans session support ouverte');
+-- Le rattachement d'une entreprise ne se réécrit pas par l'API de données (défaut V6).
+select set_config('request.jwt.claim.sub', :'RESP_A', true);
+select throws_like($$update public.reserves_intervenants set entreprise_intervenante_id = 'c7000000-0000-0000-0000-000000000001'
+  where id = 'e7200000-0000-0000-0000-00000000000b'$$, '%Rattachement%interdit%',
+  '5.32 l''hôte ne peut pas dessaisir B en réécrivant le porteur de l''intervention');
+select throws_like($$update public.reserves_intervenants set statut = 'revoquee', revoque_at = now()
+  where id = 'e7200000-0000-0000-0000-00000000000b'$$, '%Rattachement%interdit%',
+  '5.33 ni révoquer B hors du geste métier tracé');
+select throws_like($$insert into public.reserves_intervenants (entreprise_id, chantier_id, nom, entreprise_intervenante_id, statut, rejoint_at)
+  values ('a0000000-0000-0000-0000-000000000001','e7100000-0000-0000-0000-000000000001','Rattachée d''office',
+          'c7000000-0000-0000-0000-000000000001','active', now())$$, '%invitée%',
+  '5.34 ni déclarer une intervention déjà « active » pour une organisation qui n''a rien accepté');
+select lives_ok($$update public.reserves_intervenants set telephone_contact = '03 89 00 00 00'
+  where id = 'e7200000-0000-0000-0000-00000000000b'$$, '5.35 les champs descriptifs restent modifiables par l''hôte');
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- 6. INTERVENANT GRATUIT : COLLABORE, MAIS AUCUNE FONCTION PAYANTE
