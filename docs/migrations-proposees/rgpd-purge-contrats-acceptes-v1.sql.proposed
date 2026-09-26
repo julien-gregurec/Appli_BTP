@@ -1,0 +1,152 @@
+-- PROTOTYPE NON ACTIVÉ — ne pas copier dans supabase/migrations sans décision.
+-- DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE
+-- Rapport : docs/qualification/ELSATIA_RGPD_INVOICE_IMMUTABILITY_RECONCILIATION_V1.md §6
+--
+-- Question juridique : un devis accepté ou un avenant accepté (document contractuel,
+-- souvent signé électroniquement) peut-il être SUPPRIMÉ par la purge RGPD d'une
+-- entreprise, comme le prévoit la classification V2 (devis, avenants = DELETE) ?
+-- Ou doit-il être CONSERVÉ comme preuve du contrat (prescription, garantie décennale,
+-- contrats électroniques conclus avec un consommateur) ?
+--
+-- Ce fichier implémente la réponse « supprimer » (classification V2 inchangée) :
+-- pendant une purge, et seulement avec l'autorisation déposée par
+-- purger_table_entreprise() (migration 20260923000347, R1), les verrous
+-- `verrouiller_devis_accepte` et `verrouiller_avenant_accepte` laissent :
+--   - supprimer la ligne (elle appartient à une table DELETE de l'entreprise purgée) ;
+--   - recalculer ses montants quand ses lignes sont supprimées en cascade ;
+--   - délier son chantier (chantier_id → NULL) une fois le chantier supprimé.
+-- Aucune autre modification : statut, numéro, client, dates, conditions, notes
+-- restent verrouillés, y compris pendant la purge. Hors purge, rien ne change.
+--
+-- La réponse « conserver » demande un autre prototype (rétention partielle par ligne
+-- dans rapport_purge_entreprise et purger_table_entreprise, rétention des lignes,
+-- avenants et pièces jointes du contrat, délien du chantier avec instantané) : voir
+-- le rapport §6.3. Les deux réponses s'appuient sur la même autorisation de purge.
+--
+-- Numéro à attribuer lors de l'activation (après 20260923000347).
+
+-- Autorisation de purge valable pour cette transaction et cette entreprise.
+create or replace function public._purge_rgpd_autorisee(p_entreprise_id uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from platform.purge_autorisations_facture a
+    where a.txid = txid_current() and a.entreprise_id = p_entreprise_id
+  )
+$$;
+revoke all on function public._purge_rgpd_autorisee(uuid) from public, anon, authenticated, service_role;
+
+-- Modification tolérée pendant la purge d'un contrat accepté : uniquement les montants
+-- (recalcul après suppression des lignes) et le délien d'un chantier supprimé.
+create or replace function public._purge_rgpd_modif_contrat_toleree(p_old jsonb, p_new jsonb)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select
+    (p_old - 'montant_ht' - 'montant_tva' - 'montant_ttc' - 'updated_at' - 'chantier_id')
+      = (p_new - 'montant_ht' - 'montant_tva' - 'montant_ttc' - 'updated_at' - 'chantier_id')
+    and (
+      (p_new -> 'chantier_id') is not distinct from (p_old -> 'chantier_id')
+      or (
+        jsonb_typeof(p_new -> 'chantier_id') = 'null'
+        and not exists (select 1 from public.chantiers c where c.id = (p_old ->> 'chantier_id')::uuid)
+      )
+    )
+$$;
+revoke all on function public._purge_rgpd_modif_contrat_toleree(jsonb, jsonb) from public, anon, authenticated, service_role;
+
+-- Corps identique à la version en production hors des deux blocs « purge RGPD ».
+create or replace function public.verrouiller_devis_accepte()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.statut = 'accepte' then
+      -- Purge RGPD (réponse « supprimer ») : la ligne appartient à une table DELETE.
+      if public._purge_rgpd_autorisee(old.entreprise_id) then
+        return old;
+      end if;
+      raise exception 'Ce devis est accepté et ne peut plus être supprimé.';
+    end if;
+    return old;
+  end if;
+
+  if old.statut = 'accepte' then
+    if new.statut is distinct from old.statut
+       or new.montant_ht is distinct from old.montant_ht
+       or new.montant_tva is distinct from old.montant_tva
+       or new.montant_ttc is distinct from old.montant_ttc
+       or new.client_id is distinct from old.client_id
+       or new.chantier_id is distinct from old.chantier_id
+       or new.remise_globale is distinct from old.remise_globale
+       or new.conditions is distinct from old.conditions
+       or new.notes_client is distinct from old.notes_client
+       or new.date_emission is distinct from old.date_emission
+       or new.date_validite is distinct from old.date_validite
+       or new.numero is distinct from old.numero
+       or new.entreprise_id is distinct from old.entreprise_id
+    then
+      if public._purge_rgpd_autorisee(old.entreprise_id)
+         and public._purge_rgpd_modif_contrat_toleree(to_jsonb(old), to_jsonb(new)) then
+        return new;
+      end if;
+      raise exception 'Ce devis est accepté et ne peut plus être modifié.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.verrouiller_avenant_accepte()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.statut = 'accepte' then
+      if public._purge_rgpd_autorisee(old.entreprise_id) then
+        return old;
+      end if;
+      raise exception 'Cet avenant est accepté et ne peut plus être supprimé.';
+    end if;
+    return old;
+  end if;
+
+  if new.statut = 'envoye' and old.statut <> 'envoye' then
+    new.date_envoi := now();
+  end if;
+  if new.statut = 'accepte' and old.statut <> 'accepte' then
+    new.date_acceptation := now();
+    new.accepte_par := auth.uid();
+  end if;
+  if new.statut = 'refuse' and old.statut <> 'refuse' then
+    new.date_refus := now();
+  end if;
+
+  if old.statut = 'accepte' then
+    if new.statut is distinct from old.statut
+       or new.entreprise_id is distinct from old.entreprise_id
+       or new.chantier_id is distinct from old.chantier_id
+       or new.devis_origine_id is distinct from old.devis_origine_id
+       or new.ordre is distinct from old.ordre
+       or new.montant_ht is distinct from old.montant_ht
+       or new.montant_tva is distinct from old.montant_tva
+       or new.montant_ttc is distinct from old.montant_ttc
+       or new.date_acceptation is distinct from old.date_acceptation
+       or new.accepte_par is distinct from old.accepte_par
+       or new.notes_client is distinct from old.notes_client
+    then
+      if public._purge_rgpd_autorisee(old.entreprise_id)
+         and public._purge_rgpd_modif_contrat_toleree(to_jsonb(old), to_jsonb(new)) then
+        return new;
+      end if;
+      raise exception 'Cet avenant est accepté et ne peut plus être modifié.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
