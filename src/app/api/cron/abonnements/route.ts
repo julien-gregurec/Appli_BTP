@@ -4,6 +4,7 @@ import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement,
 import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
 import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
 import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
+import { creerPortPurgeSupabase, lireConfigPlanificateurPurge, planifierPurgesRgpd } from "@/lib/rgpd-purge-planificateur";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -116,7 +117,14 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   const suspensionsImpayes = suspensionsErreur
     ? { ok: false as const, raison: suspensionsErreur.message }
     : { ok: true as const, nombre: suspensionsAppliquees };
-  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes };
+  // Purge RGPD après l'échéance de 30 jours : DÉSACTIVÉE par défaut (variable
+  // RGPD_PURGE_PLANIFICATEUR_MODE absente = aucun accès base). Greffée ici, en dernier,
+  // pour la même raison que les fonctions ci-dessus. Train canonique V2 : placée DANS les
+  // jobs historiques, donc derrière FEATURE_CRONS_ENABLED en plus de sa propre porte
+  // (choix conservateur, double verrou). Activation soumise à décision propriétaire :
+  // voir docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md.
+  const purgeRgpd = await planifierPurgesRgpd(creerPortPurgeSupabase(admin), lireConfigPlanificateurPurge(process.env), new Date());
+  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes, purgeRgpd };
 }
 
 export async function GET(request: Request) {

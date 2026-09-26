@@ -6139,6 +6139,75 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false
+    },
+    {
+      "name": "RGPD_PURGE_PLANIFICATEUR_MODE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "legal",
+      "description": "Planificateur de purge RGPD greffé sur /api/cron/abonnements (derrière FEATURE_CRONS_ENABLED) : absent/vide/inconnu = off (aucun accès base), dry-run = lecture seule, execute = exige RGPD_PURGE_DECISION_REF. DÉSACTIVÉ tant qu'aucune décision propriétaire écrite n'existe (ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "RGPD_PURGE_DECISION_REF",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "legal",
+      "description": "Référence de la décision écrite du propriétaire autorisant la purge automatique ; consignée dans platform.purge_audit. Absente : le mode execute retombe sur off.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "RGPD_PURGE_MAX_ENTREPRISES",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "legal",
+      "description": "Nombre maximal d'entreprises purgées par passage quotidien du planificateur RGPD (défaut 1, plafond 10).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
     }
   ]
 }
