@@ -221,7 +221,10 @@ select is((select count(*) from public.colors_seaux),1::bigint,'D · suspension 
 -- Le gestionnaire (sans gerer_parametres) est filtré par RLS (0 ligne) ; l'admin S, qui
 -- détient gerer_parametres côté Gestion Pro, est arrêté par proteger_facturation_entreprise
 -- (migration 20260923000330 — avant elle, UPDATE 1 et suspension annulée).
-select lives_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'D · gestionnaire : update suspension silencieusement filtré par RLS');
+-- Convergence avec le train canonique : 20260923000332 retire l'UPDATE de colonne aux rôles
+-- d'API, le gestionnaire reçoit donc un refus franc (42501) au lieu d'un filtrage à 0 ligne.
+-- La garantie est plus forte, pas plus faible ; l'état est revérifié ci-dessous.
+select throws_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501',null,'D · gestionnaire : update suspension refusé (colonnes commerciales verrouillées)');
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000001');
 select ok(public.a_permission('e5000000-0000-0000-0000-000000000001','gerer_parametres'),'D · admin S détient bien gerer_parametres (précondition du contournement)');
 select throws_ok($$update public.entreprises set suspension_prevue_at=null where id='e5000000-0000-0000-0000-000000000001'$$,'42501',null,'D · admin tenant ne peut pas annuler sa suspension programmée');
