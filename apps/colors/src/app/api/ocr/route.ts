@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getContexteColors } from "@/lib/contexte";
-import { exigerAccesApplication } from "@/lib/applications-elsatia";
-import { resoudreRoleColors } from "@/lib/acces-colors";
+import { resoudreRoleColors, refusAccesRouteApi } from "@/lib/acces-colors";
 import { peutEffectuerColors } from "@/lib/permissions-colors";
 import { validerPhotoColors, validerSignaturePhotoColors } from "@/lib/media-colors";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +37,8 @@ import { journaliserEchecTechnique } from "@/lib/journal-securite";
  */
 export async function POST(request: Request) {
   const contexte = await getContexteColors();
-  await exigerAccesApplication(contexte, "colors");
+  const refus = await refusAccesRouteApi(contexte);
+  if (refus) return refus;
   if (!contexte.entrepriseId) return NextResponse.json({ erreur: "Organisation requise" }, { status: 403 });
   const role = await resoudreRoleColors(contexte);
   if (!peutEffectuerColors(role, "ocr")) return NextResponse.json({ erreur: "Action non autorisée" }, { status: 403 });

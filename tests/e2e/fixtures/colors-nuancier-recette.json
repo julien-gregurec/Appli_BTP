@@ -1,0 +1,12 @@
+{
+  "source": "Nuancier fictif de recette ELSATIA",
+  "version": "recette-2026-09",
+  "licence": "Valeurs inventées pour la recette. Aucune donnée RAL ni fabricant.",
+  "referentiel": "fabricant",
+  "references": [
+    { "code": "TEST-BLANC", "nom": "Blanc de recette", "hex": "#F4F1EC" },
+    { "code": "TEST-NOIR", "nom": "Noir de recette", "hex": "#0A0A0A" },
+    { "code": "TEST-BLEU", "nom": "Bleu de recette", "hex": "#2E5B8A" },
+    { "code": "TEST-VERT", "nom": "Vert de recette", "hex": "#1F7A4C" }
+  ]
+}

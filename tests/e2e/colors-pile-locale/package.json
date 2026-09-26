@@ -1,0 +1,12 @@
+{
+  "name": "elsatia-colors-pile-locale",
+  "private": true,
+  "type": "module",
+  "description": "Passerelle locale GoTrue/PostgREST/Storage (sous-ensemble Colors) au-dessus d'un vrai PostgreSQL — recette e2e sans Docker.",
+  "scripts": {
+    "start": "node passerelle.mjs"
+  },
+  "dependencies": {
+    "pg": "8.16.3"
+  }
+}

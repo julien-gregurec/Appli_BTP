@@ -8,6 +8,7 @@ import { exigerAccesApplication } from "@/lib/applications-elsatia";
 import { resoudreRoleColors } from "@/lib/acces-colors";
 import { peutEffectuerColors, type ActionColors } from "@/lib/permissions-colors";
 import { validerQuantite } from "@/lib/quantites";
+import { identifiantEnvoi } from "@/lib/identifiant-envoi";
 import { journaliserEchecTechnique } from "@/lib/journal-securite";
 import {
   CODE_EMPLACEMENT_AJOUTE,
@@ -69,13 +70,24 @@ export async function creerSeauAction(formData:FormData){
   const erreur=validerQuantite(saisie);
   if(erreur)retour("/inventaire",erreur,"erreur");
   const supabase=await createClient();
+  // Identifiant fixé au rendu du formulaire (champ caché) : un second envoi du MÊME formulaire
+  // — double clic, renvoi réseau — heurte la clé primaire au lieu de créer un doublon.
+  const seauIdDemande=identifiantEnvoi(formData.get("seau_id"));
   const {data,error:erreurDb}=await supabase.from("colors_seaux").insert({
+    ...(seauIdDemande?{id:seauIdDemande}:{}),
     entreprise_id:contexte.entrepriseId,emplacement_id:nullable(formData,"emplacement_id"),
     marque:texte(formData,"marque",120),produit:texte(formData,"produit",180),reference_produit:nullable(formData,"reference_produit",120),
     teinte_nom:nullable(formData,"teinte_nom",180),teinte_reference:nullable(formData,"teinte_reference",120),couleur_hex:nullable(formData,"couleur_hex",7)?.toUpperCase(),
     mode_quantite:mode,unite,quantite_nominale:mode==="pourcentage"?null:saisie.nominale,quantite_restante:mode==="pourcentage"?null:saisie.restante,
     pourcentage_saisi:mode==="pourcentage"?saisie.pourcentage:null,etat:texte(formData,"etat")||"ferme",notes:nullable(formData,"notes",4000),
   }).select("id").single();
+  const doublonEnvoi=erreurDb?.code==="23505"&&seauIdDemande!==null;
+  if(doublonEnvoi){
+    // Doublon d'envoi : on ne renvoie vers le seau que s'il est lisible par cette session
+    // (RLS). Un identifiant étranger reçoit l'erreur générique, jamais un indice d'existence.
+    const {data:existant}=await supabase.from("colors_seaux").select("id").eq("id",seauIdDemande).maybeSingle();
+    if(existant)retour(`/inventaire/${seauIdDemande}`,CODE_SEAU_AJOUTE);
+  }
   if(erreurDb||!data)retour("/inventaire",echecBase("colors_seaux.insert",erreurDb),"erreur");
   const seauId=(data as {id:string}).id;
   revalidatePath("/inventaire");revalidatePath("/dashboard");retour(`/inventaire/${seauId}`,CODE_SEAU_AJOUTE);

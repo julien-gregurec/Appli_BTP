@@ -13,6 +13,7 @@
     "test": "vitest run && npm --prefix apps/tools run test && npm --prefix apps/reserves run test && npm --prefix apps/colors run test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:colors": "E2E_APP=colors playwright test",
     "typecheck": "tsc --noEmit --incremental false && npm --prefix apps/tools run typecheck && npm --prefix apps/reserves run typecheck && npm --prefix apps/colors run typecheck",
     "verify:migrations": "node scripts/verify-migrations.mjs",
     "verify:secrets": "node scripts/verify-secrets.mjs",
