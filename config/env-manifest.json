@@ -212,6 +212,14 @@
       {
         "path": "apps/colors/scripts/verify-public-env.mjs",
         "justification": "Garde de pré-build de Colors : elle CONTIENT le contrat public de Colors (noms) et l'ancien nom rejeté, sans lire d'application. Sa cohérence avec le manifeste est contrôlée à part (COLORS-GUARD-CONTRACT)."
+      },
+      {
+        "path": "scripts/local-postgres-bootstrap/",
+        "justification": "Banc de recette pilote local (Pilot Acceptance V2/V3, train canonique V1) : proxy/GoTrue/stockage simulés sur PostgreSQL natif. Jamais déployé ni lu par une application ; ses variables (PORT, DB, GOTRUE_*, *_URL, STORAGE_ROOT) sont propres au banc."
+      },
+      {
+        "path": ".qualification-tools/",
+        "justification": "Serveur Supabase simulé de la qualification RGPD Purge V2 (MOCK_*). Outil de preuve local, jamais déployé."
       }
     ],
     "literal_prefixes": [
@@ -321,6 +329,10 @@
       {
         "path": "apps/colors/src/lib/ocr/fournisseurs.ts",
         "justification": "Lit l'activation/le fournisseur OCR par des noms constants internes (VARIABLE_OCR_ACTIF/FOURNISSEUR), jamais une entrée utilisateur."
+      },
+      {
+        "path": "scripts/configurer-portail-stripe.mjs",
+        "justification": "Script manuel Billing Security V3 : lit les STRIPE_PRICE_<OFFRE>_{MENSUEL,ANNUEL} des offres commercialisées via une table de noms littérale ; chaque nom figure au manifeste."
       }
     ]
   },
@@ -5840,6 +5852,50 @@
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STRIPE_PORTAL_CONFIGURATION_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "category": "payments",
+      "description": "Id de la Configuration du Portail client Stripe Billing (bpc_…), créée par scripts/configurer-portail-stripe.mjs. Absente : le Portail utilise la configuration par défaut du compte.",
+      "fail_mode": "default",
+      "example_required": true
+    },
+    {
+      "name": "PW_CHROME_PATH",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "category": "tooling",
+      "description": "Chemin d'un Chromium local pour le projet Playwright desktop-chromium (banc de recette pilote). Absente : navigateur Playwright par défaut.",
+      "fail_mode": "default",
       "example_required": false
     }
   ]
