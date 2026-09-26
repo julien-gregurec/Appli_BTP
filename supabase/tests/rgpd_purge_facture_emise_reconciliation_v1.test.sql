@@ -1,5 +1,5 @@
 -- RGPD × immutabilité des factures émises — réconciliation V1
--- (migration 20260923000347, rapport
+-- (migration 20260926000401, ex-20260923000347, rapport
 -- docs/qualification/ELSATIA_RGPD_INVOICE_IMMUTABILITY_RECONCILIATION_V1.md).
 --
 --   1. Sécurité : l'exception de purge est inatteignable pour authenticated,
@@ -8,7 +8,7 @@
 --   2. Tenant réaliste A (fixtures/rgpd_tenant_facture_emise.inc) : les factures ne
 --      bloquent plus la purge ; seuls les verrous des contrats acceptés (devis,
 --      avenants) la bloquent encore (DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE,
---      prototype dans docs/migrations-proposees/) — et aucune facture n'a bougé.
+--      politique non décidée par défaut, 20260926000402) — et aucune facture n'a bougé.
 --   3. Tenant C (factures émises, pas de contrat accepté) : garde-fou comptable, purge
 --      complète, intégrité comptable de chaque facture conservée, immutabilité après
 --      purge, rejeu idempotent.
@@ -214,11 +214,13 @@ select is(
   'tenant A : aucune étape n''échoue plus à cause d''une facture émise'
 );
 select is(
-  (select array_agg(distinct erreur order by erreur) from platform.purge_audit
-    where run_id = 'c9000000-0000-0000-0000-00000000000a' and not ok and erreur not like 'update or delete on table%violates foreign key%'),
-  array['Ce devis est accepté et ne peut plus être modifié.', 'Ce devis est accepté et ne peut plus être supprimé.',
-        'Cet avenant est accepté et ne peut plus être supprimé.'],
-  'tenant A : les seuls blocages restants sont les verrous des devis et avenants acceptés'
+  -- Depuis 20260926000402 (politique non décidée par défaut), le blocage est un refus
+  -- explicite avant écriture, et non plus l'erreur des verrous.
+  (select array_agg(distinct table_nom order by table_nom) from platform.purge_audit
+    where run_id = 'c9000000-0000-0000-0000-00000000000a' and not ok
+      and erreur not like 'DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE%'),
+  null::text[],
+  'tenant A : les seuls blocages restants sont les contrats acceptés (DECISION_REQUIRED)'
 );
 select is(
   (select count(*)::integer from _avant a where a.entreprise_id = current_setting('t.a')::uuid

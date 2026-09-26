@@ -83,6 +83,24 @@ function afficherRapport(lignes) {
   console.log("\nLa ligne `entreprises` n'est jamais supprimée : elle est anonymisée (voir marquer_entreprise_purgee).\n");
 }
 
+// Contrats acceptés (devis, avenants) : leur sort dépend d'une décision juridique
+// (platform.purge_politique_contrats, migration 20260926000402). Sans décision, la purge
+// s'arrête sur eux avec DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE.
+async function afficherContratsAcceptes() {
+  const { data, error } = await supabase.rpc("rapport_contrats_acceptes_purge", { p_entreprise_id: entrepriseId });
+  if (error) {
+    console.error(`Rapport des contrats acceptés impossible : ${error.message}`);
+    return;
+  }
+  const r = (data ?? [])[0];
+  if (!r) return;
+  console.log(`\nContrats acceptés : ${r.devis_acceptes} devis, ${r.avenants_acceptes} avenant(s) actifs ; ${r.preuves} preuve(s) figée(s).`);
+  console.log(`  Politique : ${r.politique}${r.decision_ref ? ` (décision ${r.decision_ref})` : ""}`);
+  if (r.politique === "non_decidee" && r.devis_acceptes + r.avenants_acceptes > 0) {
+    console.log("  → DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE : la purge s'arrêtera sur ces contrats (échec sûr).");
+  }
+}
+
 function afficherStorage(fichiers) {
   const parCategorie = { ORPHELIN: [], RETAIN: [], A_PURGER: [] };
   for (const f of fichiers) (parCategorie[f.categorie] ??= []).push(f);
@@ -270,6 +288,7 @@ async function verifier() {
   console.log(`\n=== Vérification post-purge — entreprise ${entrepriseId} ===`);
   const lignes = await rapport();
   afficherRapport(lignes);
+  await afficherContratsAcceptes();
   const fichiers = await fichiersStorage();
   const parCategorie = afficherStorage(fichiers);
 
@@ -299,6 +318,7 @@ async function verifier() {
 if (mode === "dry-run") {
   const lignes = await rapport();
   afficherRapport(lignes);
+  await afficherContratsAcceptes();
   afficherStorage(await fichiersStorage());
   console.log("Mode dry-run : rien n'a été modifié. Relancez avec `execute` pour la purge réelle.");
 } else if (mode === "verify") {
