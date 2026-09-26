@@ -14,6 +14,8 @@
 // UI, since that setup itself isn't what these cases are testing.
 import { expect, test, type Page } from "@playwright/test";
 import { spawnSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const PASSWORD = "PiloteTest!2026";
 const PROFILES = {
@@ -29,11 +31,11 @@ function psql(sql: string): string {
   const res = spawnSync("su", ["postgres", "-c", `psql -X -q -t -A -d ${DB} -c "${sql.replace(/"/g, '\\"')}"`], { encoding: "utf8" });
   return (res.stdout || "").trim();
 }
-const BRIDGE = require("path").join(__dirname, "..", "..", "scripts", "local-postgres-bootstrap", "jwt_bridge.mjs");
+const BRIDGE = join(__dirname, "..", "..", "scripts", "local-postgres-bootstrap", "jwt_bridge.mjs");
 // jwt_bridge.mjs needs GOTRUE_JWT_SECRET to verify the token; don't rely on
 // it being set in whatever shell launched `npx playwright test` -- read it
 // straight from the build dir, same file gotrue_pilot_bootstrap.sh writes.
-const GOTRUE_JWT_SECRET = require("node:fs").readFileSync("/tmp/gotrue-build/jwt_secret.txt", "utf8").trim();
+const GOTRUE_JWT_SECRET = readFileSync("/tmp/gotrue-build/jwt_secret.txt", "utf8").trim();
 function runSql(token: string, sql: string) {
   const res = spawnSync("node", [BRIDGE, "run", token, DB, "-"], { input: sql, encoding: "utf8", env: { ...process.env, GOTRUE_JWT_SECRET } });
   return { ok: res.status === 0, stdout: (res.stdout || "").trim(), stderr: (res.stderr || "").trim() };
@@ -274,7 +276,7 @@ test.describe("PE-06: signature électronique de l'employé", () => {
 
 test.describe("PA-02: dossier de paie individuel (admin)", () => {
   test.beforeAll(async () => {
-    const gerantToken = require("node:fs").readFileSync("/tmp/gotrue-build/tokens/gerant.access_token", "utf8").trim();
+    const gerantToken = readFileSync("/tmp/gotrue-build/tokens/gerant.access_token", "utf8").trim();
     // "payroll" is FEATURE_CATALOGUE's BETA (visibleByDefault: false) --
     // ModuleAccessBoundary shows "Fonctionnalité non disponible" for /paie/*
     // without an explicit entreprise_feature_flags override, regardless of
@@ -326,7 +328,7 @@ test.describe("EX-01: export comptable (ventes/achats/TVA)", () => {
     expect(download.suggestedFilename()).toMatch(/\.xlsx$/i);
     const streamPath = await download.path();
     expect(streamPath).toBeTruthy();
-    const size = require("node:fs").statSync(streamPath!).size;
+    const size = statSync(streamPath!).size;
     expect(size).toBeGreaterThan(0);
   });
 });
