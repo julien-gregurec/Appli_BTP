@@ -6,7 +6,7 @@ import {
   type ClientAccesApplications,
 } from "@elsatia/application-access";
 import { createClient } from "@/lib/supabase/server";
-import { construireSelecteurApplications, type ApplicationCatalogue } from "@/lib/multi-app";
+import { construireSelecteurApplications, urlApplication, type ApplicationCatalogue } from "@/lib/multi-app";
 
 const controle = creerControleAccesApplications(async () => (
   await createClient() as unknown as ClientAccesApplications
@@ -83,6 +83,20 @@ type LectureEntrepriseMembre = {
 export async function listerApplicationsPourSwitcher(entrepriseId: string) {
   const autorisees = await controle.listerApplicationsAutorisees({ entrepriseId });
   return construireSelecteurApplications(autorisees, "gestion_pro");
+}
+
+/**
+ * URL de base d'ELSATIA Réserves pour l'utilisateur courant, depuis le catalogue (jamais en
+ * dur). `null` si l'application ne lui est pas ouverte ou n'a pas d'URL dans cet environnement.
+ */
+export async function urlReservesPourUtilisateur(entrepriseId: string): Promise<string | null> {
+  try {
+    const autorisees = await controle.listerApplicationsAutorisees({ entrepriseId });
+    const reserves = autorisees.find((application) => application.applicationCode === "reserves");
+    return reserves ? urlApplication(reserves) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function chargerCatalogueApplications(): Promise<ApplicationPlateforme[]> {
