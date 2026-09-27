@@ -1,5 +1,7 @@
 # ELSATIA — Réconciliation RGPD × immutabilité des factures émises — V1
 
+> **Train canonique V3** : la migration de ce lot est `20260926000501` (ex-`…401`, ex-`…347`). Voir `ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE.md`.
+
 Date : 2026-09-26 · Branche : `claude/great-curie-i94633`
 Base : `integration/elsatia-canonical-train-v1` @ `1c1fed66` (train canonique V1, le plus récent)
 Aucun texte légal modifié. Aucune décision juridique prise.

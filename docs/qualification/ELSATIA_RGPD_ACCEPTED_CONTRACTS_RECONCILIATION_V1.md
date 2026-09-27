@@ -1,5 +1,7 @@
 # ELSATIA — Réconciliation RGPD × contrats acceptés (devis, avenants) — V1
 
+> **Train canonique V3** : migrations renumérotées `…401` → `20260926000501`, `…402` → `20260926000502` ; politique retenue par le propriétaire (`conserver_contrat_minimise`, durée non validée, fail-closed) par `20260926000504` ; export `lignes_avenants` (§12) corrigé par `20260926000505`. Voir `ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE.md`.
+
 Date : 2026-09-26 · Branche : `claude/beautiful-archimedes-sc6t9g`
 Base : `integration/elsatia-canonical-train-v2` @ `819ebe56` (train canonique V2, 335 migrations)
 \+ portage du lot « factures émises » (`e0de3dd8`, migration renumérotée `20260926000401`).

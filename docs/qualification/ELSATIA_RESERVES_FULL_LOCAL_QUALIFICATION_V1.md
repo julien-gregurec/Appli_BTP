@@ -1,5 +1,7 @@
 # ELSATIA Réserves — Full Local Qualification V1
 
+> **Train canonique V3** : le correctif est `20260926000503_reserves_qualification_correctifs_v1.sql` (ex-`…401`, numéro partagé avec deux autres lots). Requalifié sur V3 : pgTAP 594/594, Playwright 59/59, Colors 73/73. Voir `ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE.md`.
+
 | | |
 |---|---|
 | Date | 2026-09-26 |

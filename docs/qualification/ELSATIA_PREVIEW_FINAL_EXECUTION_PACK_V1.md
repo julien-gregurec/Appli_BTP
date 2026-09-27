@@ -44,12 +44,13 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | `scripts/preview/lib/preview-guard.mjs` | Garde-fous communs (réf. Preview, Production refusée, Stripe test, origines HTTPS) |
 | `scripts/preview/env-inventory.mjs` | Inventaire depuis le manifeste (hors ligne) |
 | `scripts/preview/env-check.mjs` | Preflight manifeste **+ cohérence entre applications** (hors ligne) |
-| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, 13 contrôles, préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
+| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->17<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
 | `scripts/preview/http-smoke.mjs` | Smoke HTTP anonyme des 5 apps (GET/OPTIONS, redirections non suivies) |
 | `scripts/preview/stripe-test-verify.mjs` | Stripe Test : endpoints, événements, portail, prix (GET uniquement) |
 | `scripts/preview/storage-smoke.mjs` | Buckets, drapeaux public, refus anonyme ; `--write` = safe-run dépôt/lecture signée/suppression |
+| `scripts/preview/train-expectations.mjs` | **V3** — attendus du train (nombre, dernière migration, contrôles DB) générés depuis `supabase/migrations` ; `npm run verify:train-expectations` en CI |
 | `scripts/preview/redis-check.mjs` | Redis du worker sans dépendance : PING, version, `noeviction`, TLS, files BullMQ ; `--roundtrip` safe-run |
-| `scripts/preview/preview-pack.test.mjs` | 24 tests hors réseau, branchés en CI (`npm run test:preview-pack`) |
+| `scripts/preview/preview-pack.test.mjs` | 27 tests hors réseau (V3 : 24 + attendus du train + inventaire généré), branchés en CI (`npm run test:preview-pack`) |
 | `config/env-manifest.json` | +2 variables opérateur (`ELSATIA_PREVIEW_DB_URL`, `VERCEL_AUTOMATION_BYPASS_SECRET`), +1 accès dynamique justifié |
 
 ---
