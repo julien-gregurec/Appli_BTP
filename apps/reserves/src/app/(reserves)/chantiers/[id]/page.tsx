@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { exigerShellReserves, peutEmettre, peutGererChantiers } from "@/lib/acces-reserves";
 import {
-  BUCKET_PLANS, lireChantier, listerIntervenants, listerPlansComplets,
+  estCompteIntervenant, exigerShellReserves, peutEmettre, peutGererChantiers,
+} from "@/lib/acces-reserves";
+import {
+  BUCKET_PLANS, lireChantier, lireChantierLectureSeuleHote, listerIntervenants, listerPlansComplets,
   listerReserves, signerFichiers,
 } from "@/lib/donnees";
 import { EtiquetteStatut } from "@/components/Etiquette";
+import { BandeauLectureSeule } from "@/components/BandeauLectureSeule";
 import { PlanChantier } from "@/components/PlanChantier";
 import { enregistrerPaginationAction } from "@/app/actions";
 import { estEnRetard } from "@/lib/workflow";
@@ -19,10 +22,12 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
   const chantier = await lireChantier(id);
   if (!chantier) notFound();
 
-  const [reserves, intervenants, plans] = await Promise.all([
+  const [reserves, intervenants, plans, lectureSeule] = await Promise.all([
     listerReserves({ chantierId: id }),
     listerIntervenants(id),
     listerPlansComplets(id),
+    // D-01 : seul un intervenant peut être mis en lecture seule par la suspension de l'hôte.
+    estCompteIntervenant(contexte.roleReserves) ? lireChantierLectureSeuleHote(id) : false,
   ]);
 
   const liens = await signerFichiers(
@@ -60,6 +65,8 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
         {" — "}{reserves.length} réserve{reserves.length > 1 ? "s" : ""},
         {" "}{intervenants.length} entreprise{intervenants.length > 1 ? "s" : ""}.
       </p>
+
+      {lectureSeule && <BandeauLectureSeule />}
 
       <div className="actions">
         {emission && (

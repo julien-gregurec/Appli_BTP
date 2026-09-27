@@ -4,6 +4,7 @@ import {
   estCleIdempotence, VERSION_PAYLOAD, type TypeMutation,
 } from "@/lib/offline/contrat";
 import { resoudreIdentite } from "@/lib/offline/identite";
+import { motifRefusMutation } from "@/lib/suspension-hote";
 
 export const runtime = "nodejs";
 
@@ -165,7 +166,7 @@ async function appliquer(
         p_origine_client_id: id,
         p_plan_page: nombre(payload, "planPage"),
       });
-      if (error) return { id, issue: "refus", motif: error.message };
+      if (error) return { id, issue: "refus", motif: motifRefusMutation(error, "Rejeu impossible.") };
       return { id, issue: "applique", identifiant: (data as string) ?? null };
     }
 
@@ -181,7 +182,7 @@ async function appliquer(
         p_photo_id: null,
         p_origine_client_id: id,
       });
-      if (error) return { id, issue: "refus", motif: error.message };
+      if (error) return { id, issue: "refus", motif: motifRefusMutation(error, "Rejeu impossible.") };
       // `reserves_commenter` rend la CONVERSATION, pas le message : c'est elle qui permet
       // d'ouvrir le fil, et le rejeu rend exactement la même valeur que l'envoi initial.
       return { id, issue: "applique", identifiant: (data as string) ?? null };
@@ -201,7 +202,7 @@ async function appliquer(
           p_origine_client_id: id,
         })
         .maybeSingle();
-      if (error) return { id, issue: "refus", motif: error.message };
+      if (error) return { id, issue: "refus", motif: motifRefusMutation(error, "Rejeu impossible.") };
       const issue = data as { issue: string; statut_courant: string; motif: string | null } | null;
       if (!issue) return { id, issue: "refus", motif: "Réponse serveur vide." };
       if (issue.issue === "conflit") {

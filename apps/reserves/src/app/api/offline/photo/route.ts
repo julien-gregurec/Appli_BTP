@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BUCKET_PHOTOS } from "@/lib/donnees";
 import { MIMES_PHOTO, TAILLE_MAX_PHOTO } from "@/lib/images";
 import { estCleIdempotence } from "@/lib/offline/contrat";
+import { motifRefusMutation } from "@/lib/suspension-hote";
 import { resoudreIdentite } from "@/lib/offline/identite";
 import { deposerObjet } from "@/lib/depot-photo";
 
@@ -90,7 +91,9 @@ export async function POST(requete: Request) {
     .maybeSingle();
   if (error || !data) {
     return NextResponse.json({
-      issue: "refus", motif: error?.message ?? "Photo refusée.",
+      // Hôte suspendu (D-01) compris : refus définitif pour ce passage, la photo reste
+      // sur l'appareil et pourra être renvoyée au rétablissement de l'accès.
+      issue: "refus", motif: motifRefusMutation(error, "Photo refusée."),
     }, { status: 409 });
   }
   const { photo_id: photoId, storage_path: chemin } = data as {

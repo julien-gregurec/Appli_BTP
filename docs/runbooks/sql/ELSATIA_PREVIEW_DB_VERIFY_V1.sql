@@ -18,7 +18,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (340, '20260926000505')),
+attendu_train(nb, derniere) as (values (341, '20260927000506')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -165,6 +165,22 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select bool_or(pg_get_functiondef(p.oid) like '%lignes_avenants%') from pg_proc p
                    join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'exporter_donnees_entreprise'), false), true
+  union all
+  -- D-01 : hôte suspendu → intervenant en lecture seule (506). Garde sur les 10 tables de
+  -- l'hôte, prédicat commercial non exposé aux clients.
+  select 18, 'Réserves : hôte suspendu → intervenant en lecture seule (506)',
+         '10 tables gardées, prédicat non exposé',
+         (select count(distinct t.tgrelid) from pg_trigger t
+          where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname = 'reserves_garde_hote_suspendu')::text
+           || '/10 tables, prédicat exposé : '
+           || coalesce((select has_function_privilege('authenticated', p.oid, 'execute')::text from pg_proc p
+                        join pg_namespace n on n.oid = p.pronamespace
+                        where n.nspname = 'public' and p.proname = 'reserves_hote_ecriture_ouverte'), 'ABSENT'),
+         (select count(distinct t.tgrelid) from pg_trigger t
+          where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname = 'reserves_garde_hote_suspendu') = 10
+           and coalesce((select not has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p
+                         join pg_namespace n on n.oid = p.pronamespace
+                         where n.nspname = 'public' and p.proname = 'reserves_hote_ecriture_ouverte'), false), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

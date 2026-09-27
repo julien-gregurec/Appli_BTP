@@ -66,6 +66,8 @@ psql_fichier "$RACINE/scripts/e2e/prepare-local-recipe.sql"
 echo "4/5 · Remise à zéro du parcours + décor des listes V4"
 psql_fichier "$RACINE/scripts/e2e/reset-reserves-recipe.sql"
 psql_fichier "$RACINE/scripts/e2e/prepare-reserves-v4-listes.sql"
+# Décor isolé de la politique de suspension de l'hôte (D-01) : hôte H, intervenant S.
+psql_fichier "$RACINE/scripts/e2e/prepare-reserves-suspension-hote.sql"
 
 echo "5/5 · Dépôt des objets (plan et photos)"
 node "$RACINE/scripts/e2e/amorcer-recette-v4.mjs"

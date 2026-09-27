@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { exigerShellReserves, estCompteIntervenant, peutValiderLevee } from "@/lib/acces-reserves";
 import {
-  BUCKET_PHOTOS, listerIntervenants, listerPhotosReserve, signerFichiers,
+  BUCKET_PHOTOS, lireLectureSeuleHote, listerIntervenants, listerPhotosReserve, signerFichiers,
 } from "@/lib/donnees";
+import { BandeauLectureSeule } from "@/components/BandeauLectureSeule";
+import { commandesReserve } from "@/lib/suspension-hote";
 import { GaleriePhotos } from "@/components/GaleriePhotos";
 import { ChampPhoto } from "@/components/ChampPhoto";
 import { EtiquetteStatut } from "@/components/Etiquette";
@@ -69,7 +71,7 @@ export default async function PageReserve({
   if (!data) notFound();
   const reserve = data as Detail;
 
-  const [{ data: historique }, photos, { data: messages }, intervenants] = await Promise.all([
+  const [{ data: historique }, photos, { data: messages }, intervenants, lectureSeule] = await Promise.all([
     supabase.from("reserves_historique")
       .select("id, action, statut_avant, statut_apres, commentaire, created_at")
       .eq("reserve_id", id).order("created_at", { ascending: true }),
@@ -77,7 +79,10 @@ export default async function PageReserve({
     supabase.from("reserves_messages").select("id, contenu, created_at")
       .order("created_at", { ascending: true }),
     listerIntervenants(reserve.chantier_id),
+    // D-01 : hôte suspendu → l'intervenant consulte, n'agit plus.
+    lireLectureSeuleHote(id),
   ]);
+  const commandes = commandesReserve(lectureSeule);
 
   // Aucun fichier n'est public : chaque vignette reçoit une URL signée de courte durée.
   const liens = await signerFichiers(BUCKET_PHOTOS, photos.map((p) => p.storage_path));
@@ -113,10 +118,13 @@ export default async function PageReserve({
         {reserve.photo_obligatoire_levee && <span className="etiquette attente">Photo exigée pour la levée</span>}
       </p>
 
+      {lectureSeule && <BandeauLectureSeule />}
+
       {reserve.description && <div className="carte">{reserve.description}</div>}
 
       {/* ── Actions de l'entreprise intervenante ─────────────────────────── */}
-      {intervenant && transitionAutorisee(reserve.statut, "acceptee", "intervenant") && (
+      {intervenant && commandes.repondreResponsabilite
+        && transitionAutorisee(reserve.statut, "acceptee", "intervenant") && (
         <form className="carte" action={repondreResponsabiliteAction}>
           <h2 style={{ marginTop: 0 }}>Prenez-vous cette réserve à votre charge ?</h2>
           <input type="hidden" name="reserve_id" value={id} />
@@ -135,7 +143,8 @@ export default async function PageReserve({
         </form>
       )}
 
-      {intervenant && transitionAutorisee(reserve.statut, "levee_demandee", "intervenant") && (
+      {intervenant && commandes.demanderLevee
+        && transitionAutorisee(reserve.statut, "levee_demandee", "intervenant") && (
         <form className="carte" action={demanderLeveeAction}>
           <h2 style={{ marginTop: 0 }}>Demander la levée</h2>
           <input type="hidden" name="reserve_id" value={id} />
@@ -254,6 +263,7 @@ export default async function PageReserve({
       <h2>Photos</h2>
       <GaleriePhotos photos={photosAffichees} />
 
+      {commandes.joindrePhoto && (
       <form className="carte" action={televerserPhotoAction} encType="multipart/form-data">
         {/* Un double envoi sur un réseau de chantier ne doit pas créer deux photos. */}
         <CleIdempotence nom="origine_client_id_photo" />
@@ -282,8 +292,9 @@ export default async function PageReserve({
           <button className="bouton secondaire" type="submit">Joindre la photo</button>
         </div>
       </form>
+      )}
 
-      {photosAffichees.length > 0 && (
+      {commandes.retirerPhoto && photosAffichees.length > 0 && (
         <details className="carte">
           <summary>Retirer une photo</summary>
           <p className="mention">
@@ -319,6 +330,7 @@ export default async function PageReserve({
           ))}
         </ul>
       )}
+      {commandes.commenter && (
       <form className="carte" action={commenterAction} encType="multipart/form-data">
         {/* Même protection pour le message et sa pièce jointe éventuelle. */}
         <CleIdempotence />
@@ -340,6 +352,7 @@ export default async function PageReserve({
           <button className="bouton secondaire" type="submit">Envoyer</button>
         </div>
       </form>
+      )}
 
       {/* ── Historique ──────────────────────────────────────────────────── */}
       <h2>Historique</h2>
