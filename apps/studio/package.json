@@ -14,6 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@elsatia/identity": "file:../../packages/elsatia-identity",
     "@elsatia/studio-domain": "file:../../packages/studio-domain",
     "@supabase/ssr": "0.12.0",
     "@supabase/supabase-js": "2.110.2",

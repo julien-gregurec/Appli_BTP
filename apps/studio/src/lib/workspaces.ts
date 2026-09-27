@@ -9,11 +9,17 @@ import {
   type StudioWorkspaceType,
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "./supabase";
+import { studioSessionDecision } from "./identity-session";
 export const getCurrentStudioUser = cache(async () => {
   const client = await createStudioClient();
   const user = await verifiedUser(() => client.auth.getUser());
   if (!user) redirect("/login");
-  return { id: user.id, email: user.email ?? null };
+  // Compte ELSATIA commun : session ouverte par le pont, compte central toujours actif.
+  const decision = await studioSessionDecision(client, true);
+  if (decision.kind === "revoke")
+    redirect(`/auth/elsatia/signout?reason=${decision.reason}`);
+  if (decision.kind === "revalidate") redirect("/auth/elsatia/start");
+  return { id: user.id, email: user.email ?? null, access: decision.access };
 });
 export async function getUserStudioWorkspaces() {
   await getCurrentStudioUser();

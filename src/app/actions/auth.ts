@@ -9,6 +9,7 @@ import { destinationInterneSure } from "@/lib/security/redirects";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { destinationIdentiteApresConnexion } from "@/lib/elsatia-identity/config";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -71,11 +72,16 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
 
+  // Retour vers le passage d'identité (Studio) uniquement : aucune autre destination acceptée.
+  const retourIdentite = destinationIdentiteApresConnexion(String(formData.get("next") ?? ""));
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
+    const suite = retourIdentite ? `&next=${encodeURIComponent(retourIdentite)}` : "";
+    redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}${suite}`);
   }
+  if (retourIdentite) redirect(retourIdentite);
 
   // Un admin plateforme n'est rattaché à aucune entreprise cliente : l'envoyer
   // vers le tableau de bord entreprise n'aurait aucun sens pour lui.

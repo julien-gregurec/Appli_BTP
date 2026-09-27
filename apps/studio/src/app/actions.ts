@@ -13,6 +13,7 @@ import {
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "../lib/supabase";
 import { studioOrigin } from "../lib/config";
+import { identityMode } from "../lib/identity-policy";
 import {
   createPersonalStudioWorkspace,
   createStudioWorkspace,
@@ -28,6 +29,8 @@ function failure(path: string, message: string): never {
   );
 }
 export async function login(form: FormData) {
+  // Projet dédié : aucune connexion par mot de passe, uniquement le pont d'identité ELSATIA.
+  if (identityMode() === "elsatia") redirect("/auth/elsatia/start");
   const email = field(form, "email").trim();
   const password = field(form, "password");
   if (!email || email.length > 254 || password.length > 256)
@@ -42,6 +45,7 @@ export async function login(form: FormData) {
   redirect(safeStudioDestination(field(form, "next")));
 }
 export async function signup(form: FormData) {
+  if (identityMode() === "elsatia") redirect("/login");
   const email = field(form, "email").trim();
   const password = field(form, "password");
   if (

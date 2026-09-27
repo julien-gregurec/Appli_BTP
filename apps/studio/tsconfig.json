@@ -18,7 +18,8 @@
       }
     ],
     "paths": {
-      "@elsatia/studio-domain": ["../../packages/studio-domain/src/index.ts"]
+      "@elsatia/studio-domain": ["../../packages/studio-domain/src/index.ts"],
+      "@elsatia/identity": ["../../packages/elsatia-identity/src/index.ts"]
     },
     "allowJs": false
   },

@@ -2,12 +2,16 @@ import Link from "next/link";
 import { signup } from "../actions";
 import Notice from "../../components/Notice";
 import Submit from "../../components/Submit";
+import { redirect } from "next/navigation";
+import { identityMode } from "../../lib/identity-policy";
 export default async function Signup({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error } = await searchParams; // rend la page dynamique : le mode est lu à l'exécution
+  // Compte ELSATIA commun : le compte Studio naît au premier passage, jamais par inscription.
+  if (identityMode() === "elsatia") redirect("/login");
   return (
     <main id="main" className="auth">
       <div className="brand">

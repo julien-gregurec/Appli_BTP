@@ -26,6 +26,8 @@ import {
 } from "../src/lib/media-service";
 const id = "10000000-0000-4000-8000-000000000001";
 beforeEach(() => {
+  // Autorisation média testée seule ; le contrôle d'identité a ses propres tests (identity-guard).
+  process.env.STUDIO_IDENTITY_MODE = "local";
   mock.row.mockReset();
   mock.role.mockReset();
   mock.limits.mockReset();

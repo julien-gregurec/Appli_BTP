@@ -4,6 +4,7 @@ import "server-only";
 import { cache } from "react";
 import { isStudioId } from "@elsatia/studio-domain";
 import { createStudioClient } from "./supabase";
+import { studioSessionDecision } from "./identity-session";
 import { storageAdmin, STUDIO_BUCKET, PREVIEW_SECONDS } from "./storage-admin";
 import { supabaseConfig } from "./config";
 import { inspectMedia } from "./media-inspection";
@@ -32,11 +33,17 @@ export const mediaContext = cache(async () => {
     },
   );
   if (!user) throw new MediaError("Connexion requise.", 401);
-  return { client, user };
+  const decision = await studioSessionDecision(client, false).catch(() => {
+    throw new MediaError(new StudioAuthUnavailable().message, 503);
+  });
+  if (decision.kind === "revoke") throw new MediaError("Session Studio fermée. Reconnectez-vous.", 401);
+  return { client, user, access: decision.access };
 });
 export async function authorizeProject(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Projet inaccessible.", 404);
-  const { client, user } = await mediaContext();
+  const { client, user, access } = await mediaContext();
+  if (write && access === "read_only")
+    throw new MediaError("Accès Studio en lecture seule : aucun droit actif.", 403);
   const {
     data: project,
     error: projectError,
@@ -75,7 +82,9 @@ export async function authorizeProject(id: string, write = false) {
 }
 export async function authorizeAsset(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Média inaccessible.", 404);
-  const { client, user } = await mediaContext();
+  const { client, user, access } = await mediaContext();
+  if (write && access === "read_only")
+    throw new MediaError("Accès Studio en lecture seule : aucun droit actif.", 403);
   const {
     data: asset,
     error: assetError,
