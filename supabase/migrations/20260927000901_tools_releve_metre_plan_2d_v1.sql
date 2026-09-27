@@ -19,7 +19,7 @@
 --      des plans (aucun droit INSERT / UPDATE direct pour `authenticated`) :
 --        `tools_releve_plan_creer`       création (initial unique et premier ; dérivé = copie du plan de base) ;
 --        `tools_releve_plan_enregistrer` sauvegarde atomique par lot (murs, ouvertures, suppressions,
---                                        contours, cadre, réglages) avec révision attendue (40001 si conflit) ;
+--                                        contours, cadre, réglages) avec révision attendue (PT409 → HTTP 409 si conflit) ;
 --        `tools_releve_plan_figer`       gel + empreinte SHA-256 + version du relevé quand la chaîne le permet.
 --   5. Cascade : la suppression douce (et la restauration) d'un étage emporte ses plans.
 --   6. Versions du relevé : l'instantané (`tools_releve_creer_version`) inclut désormais les plans.
@@ -358,7 +358,8 @@ $$;
 --   cadre:       { minX, minY, maxX, maxY } | absent
 --   reglages:    { … } | absent
 -- }
--- Révision attendue ≠ révision du plan → 40001 (conflit : rien n'est écrit).
+-- Révision attendue ≠ révision du plan → SQLSTATE PT409 (HTTP 409 via PostgREST ; conflit : rien n'est écrit).
+-- Pas 40001 : PostgREST (hasql-transaction) rejoue indéfiniment une transaction en échec de sérialisation.
 create or replace function public.tools_releve_plan_enregistrer(p_plan_id uuid, p_revision bigint, p_modifications jsonb)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -379,7 +380,7 @@ begin
     raise exception 'Plan figé : créez un plan corrigé, projeté ou tel que construit' using errcode = '42501';
   end if;
   if v_plan.revision <> p_revision then
-    raise exception 'Plan modifié ailleurs entre-temps : rien n''a été écrasé' using errcode = '40001', detail = v_plan.revision::text;
+    raise exception 'Plan modifié ailleurs entre-temps : rien n''a été écrasé' using errcode = 'PT409', detail = v_plan.revision::text;
   end if;
   if jsonb_array_length(coalesce(v_mods->'murs', '[]'::jsonb)) > 5000
      or jsonb_array_length(coalesce(v_mods->'ouvertures', '[]'::jsonb)) > 5000
@@ -510,7 +511,7 @@ begin
   if v_plan.deleted_at is not null then raise exception 'Plan supprimé' using errcode = '42501'; end if;
   if v_plan.fige_le is not null then raise exception 'Plan déjà figé' using errcode = '42501'; end if;
   if v_plan.revision <> p_revision then
-    raise exception 'Plan modifié ailleurs entre-temps : rien n''a été figé' using errcode = '40001', detail = v_plan.revision::text;
+    raise exception 'Plan modifié ailleurs entre-temps : rien n''a été figé' using errcode = 'PT409', detail = v_plan.revision::text;
   end if;
 
   update public.tools_releves_plans set

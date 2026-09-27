@@ -50,7 +50,11 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
   async loadPlan(planId: string): Promise<LoadedPlan> {
     const plan = this.plans.get(planId);
     if (!plan) throw new PlanRuleError("Plan introuvable.", "forbidden");
-    const strip = <T extends { deleted: boolean; planId: string }>(value: T) => { const { deleted: _d, planId: _p, ...rest } = value; return rest; };
+    const strip = <T extends { deleted: boolean; planId: string }>(value: T): Omit<T, "deleted" | "planId"> => {
+      const rest: Partial<T> = { ...value };
+      delete rest.deleted; delete rest.planId;
+      return rest as Omit<T, "deleted" | "planId">;
+    };
     return {
       plan,
       document: {

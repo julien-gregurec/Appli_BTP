@@ -51,6 +51,9 @@ type Drag =
   | { kind: "wall"; murId: string; grab: Point2D; base: PlanDocument; a: Point2D };
 
 const HISTORY_LIMIT = 100;
+const DERIVE_LABELS: Record<Exclude<PlanEtat, "initial">, string> = {
+  corrige: "Nouveau plan corrigé", projete: "Nouveau plan projeté", as_built: "Nouveau plan tel que construit",
+};
 const MARKER_HIT_PX = 18;
 
 export type PlanEditorProps = {
@@ -360,7 +363,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       {canEdit && !plan.figeLe && <SaveStatus api={autosave} label="plan" />}
       {canEdit && editable && <button type="button" className={releveStyles.secondary} disabled={busy} onClick={() => void freeze()}>Figer ce plan</button>}
       {canEdit && (["corrige", "projete", "as_built"] as const).filter((etat) => planCreationRule(plans, etat, plan.id).ok).map((etat) =>
-        <button key={etat} type="button" className={releveStyles.secondary} disabled={busy} onClick={() => void derive(etat)}>Nouveau plan {PLAN_ETAT_LABELS[etat].toLowerCase()}</button>)}
+        <button key={etat} type="button" className={releveStyles.secondary} disabled={busy} onClick={() => void derive(etat)}>{DERIVE_LABELS[etat]}</button>)}
       <button type="button" className={releveStyles.secondary} onClick={exportSvg}>Exporter SVG</button>
     </div>
 

@@ -33,9 +33,9 @@ export function planFromRow(row: PlanRow): Plan {
 
 type RemoteError = { code?: string; message?: string; details?: string | null };
 
-/** Erreur serveur → erreur du domaine : conflit (40001, révision courante en détail), refus, validation. */
+/** Erreur serveur → erreur du domaine : conflit (PT409 = HTTP 409, révision courante en détail), refus, validation. */
 function fail(action: string, error: RemoteError): never {
-  if (error.code === "40001") throw new ReleveConflictError(Number(error.details ?? 0) || 0);
+  if (error.code === "PT409") throw new ReleveConflictError(Number(error.details ?? 0) || 0);
   if (error.code === "42501") throw new ReleveRemoteError(`${action} : ${error.message ?? "action non autorisée pour votre compte."}`, error.code);
   if (error.code === "22023" || error.code === "23505" || error.code === "23514") throw new ReleveRemoteError(`${action} : ${error.message ?? "valeur refusée par le serveur."}`, error.code);
   throw new ReleveRemoteError(`${action} impossible. Vérifiez votre connexion.`, error.code);

@@ -4,7 +4,8 @@
 .scopes a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font-weight: 800; }
 .scopes a[aria-current="page"] { border-color: var(--navy); background: var(--navy); color: white; }
 
-.editor { display: grid; gap: 10px; padding: 18px 0 60px; min-width: 0; }
+/* Marge basse : la page peut toujours défiler jusqu'à mettre la toile entière sous la barre d'outils. */
+.editor { display: grid; gap: 10px; padding: 18px 0 max(60px, 25vh); min-width: 0; }
 .planBar { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .etat { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px; background: #eef1ef; font-size: 12px; font-weight: 900; letter-spacing: .04em; }
 .etat[data-fige="true"] { background: #fff4d6; color: #7a5200; }
@@ -31,6 +32,10 @@
 .empty { display: grid; gap: 10px; justify-items: start; margin: 24px 0 60px; padding: 28px; border: 1px dashed #cfd4d1; border-radius: 13px; }
 
 /* ---- Toile -------------------------------------------------------------- */
+/* La désignation est géométrique (tolérance en pixels) : aucun élément SVG ne doit capter le
+   pointeur, sinon `pointerdown` (sur un trait) et `pointerup` (sur la toile, capturé) n'ont pas
+   la même cible et le navigateur n'émet pas de `click` après un toucher. */
+.layers, .stage svg { pointer-events: none; }
 .cadre { fill: none; stroke: #c7cdd1; stroke-dasharray: 6 6; }
 .contour { fill: #dce9ff; fill-opacity: .55; stroke: #6b8fd6; stroke-width: 1; }
 .contour[data-scope="false"] { fill: #eef0f2; fill-opacity: .5; stroke: #c9cfd4; }

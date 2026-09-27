@@ -61,7 +61,7 @@ export const PlanLayers = memo(function PlanLayers({
   const cadreB = project({ x: document.cadre.maxX, y: document.cadre.minY });
 
   return <g className={styles.layers}>
-    <rect className={styles.cadre} x={cadreA.x} y={cadreA.y} width={Math.max(0, cadreB.x - cadreA.x)} height={Math.max(0, cadreB.y - cadreA.y)} />
+    <rect data-testid="plan-cadre" className={styles.cadre} x={cadreA.x} y={cadreA.y} width={Math.max(0, cadreB.x - cadreA.x)} height={Math.max(0, cadreB.y - cadreA.y)} />
 
     {/* Pièces associées (Lot 3) */}
     {document.contours.map((contour) => {

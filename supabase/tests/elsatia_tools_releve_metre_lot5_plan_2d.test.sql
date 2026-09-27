@@ -5,7 +5,7 @@
 --   C1–C9   création : plan initial unique et premier, adoption des murs antérieurs, états refusés,
 --           droits (consultation, non habilité, autre tenant, anonyme) ;
 --   E1–E20  enregistrement par lot : murs, ouvertures, contours (surface calculée par le serveur),
---           révision attendue (conflit 40001, rien d'écrit), validations, éléments étrangers, suppression
+--           révision attendue (conflit PT409 → HTTP 409, rien d'écrit), validations, éléments étrangers, suppression
 --           douce et restauration (annuler), écritures inchangées ignorées, journal sans coordonnées ;
 --   F1–F12  gel : empreinte, version du relevé du même type, immuabilité (RPC, écriture directe,
 --           service_role), plan dérivé (copie, lignée origineId, contours remappés), états successifs ;
@@ -167,7 +167,7 @@ select is((select (contours->0->>'surfaceMm2')::numeric from public.tools_releve
   12000000.0, 'E4. surface du contour calculée par le serveur (12 m²), jamais celle du client');
 select is((select cadre->>'maxX' from public.tools_releves_plans where id = (select id from _p)), '9000', 'E5. cadre enregistré');
 select throws_ok(format($$ select public.tools_releve_plan_enregistrer(%L, 1, '{"murs":[]}') $$, (select id from _p)),
-  '40001', null, 'E6. révision attendue périmée : conflit détecté (40001)');
+  'PT409', null, 'E6. révision attendue périmée : conflit détecté (PT409 → HTTP 409)');
 select is(pg_temp.rev((select id::text from _p)), 2::bigint, 'E7. conflit : rien n''a été écrit (révision inchangée)');
 select throws_ok(format($$ select public.tools_releve_plan_enregistrer(%L, 2, jsonb_build_object('murs', jsonb_build_array(pg_temp.mur('d5600000-0000-0000-0000-000000000009', 10, 10, 10, 10)))) $$, (select id from _p)),
   '22023', null, 'E8. mur de longueur nulle refusé');
@@ -229,7 +229,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000003', true);
 select throws_ok(format($$ select public.tools_releve_plan_figer(%L, 1) $$, (select id from _p)),
-  '40001', null, 'F1. gel sur une révision périmée : conflit');
+  'PT409', null, 'F1. gel sur une révision périmée : conflit');
 create temporary table _fige on commit drop as select * from public.tools_releve_plan_figer((select id from _p), 6, 'Existant');
 select ok((select fige_le is not null and empreinte ~ '^[0-9a-f]{64}$' and version_id is not null from _fige),
   'F2. plan figé : horodatage, empreinte SHA-256, version du relevé');

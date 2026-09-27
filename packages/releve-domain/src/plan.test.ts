@@ -15,7 +15,7 @@ const mur = (id: string, ax: number, ay: number, bx: number, by: number, extra: 
 const porte = (id: string, murId: string, decalageMm = 500, largeurMm = 900): PlanOuverture => ({
   id, murId, decalageMm, largeurMm, hauteurMm: 2040, allegeMm: null, typeOuverture: "porte", sens: "gauche",
 });
-const doc = (murs: PlanMur[], ouvertures: PlanOuverture[] = []): PlanDocument => ({ ...EMPTY_PLAN_DOCUMENT, murs, ouvertures });
+const doc = (murs: readonly PlanMur[], ouvertures: readonly PlanOuverture[] = []): PlanDocument => ({ ...EMPTY_PLAN_DOCUMENT, murs, ouvertures });
 const plan = (numero: number, etat: "initial" | "corrige" | "projete" | "as_built", fige = false, supprime = false) => ({
   id: `p${numero}`, numero, etatDocumente: etat, figeLe: fige ? "2026-09-27T10:00:00Z" : null, deletedAt: supprime ? "2026-09-27T11:00:00Z" : null,
 });

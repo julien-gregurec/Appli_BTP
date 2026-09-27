@@ -59,10 +59,17 @@ function PlanLoader({ service, actor, selection, onNavigate }: {
     const [structure, plans] = await Promise.all([service.get(releveId), repository.listPlans(selection.etageId)]);
     const chosen = (planId ? plans.find((plan) => plan.id === planId) : null) ?? defaultPlan(plans);
     const current = chosen ? await repository.loadPlan(chosen.id) : null;
-    // Photos : facultatives pour le plan (un échec de signature ne bloque pas l'édition).
-    const library = await media.library(releveId).catch(() => null);
-    return { structure, plans, current, library };
-  }, [service, repository, media, releveId, selection.etageId]);
+    return { structure, plans, current, library: null };
+  }, [service, repository, releveId, selection.etageId]);
+
+  // Photos (Lot 4) : chargées APRÈS le plan, sans le bloquer — la bibliothèque relit tous les
+  // éléments du relevé, et un échec de signature ne doit jamais empêcher l'édition.
+  const [library, setLibrary] = useState<PhotoLibrary | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    media.library(releveId).then((next) => { if (!cancelled) setLibrary(next); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [media, releveId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +128,7 @@ function PlanLoader({ service, actor, selection, onNavigate }: {
     <div className="shell">
       {loaded.current
         ? <PlanEditor key={`${loaded.current.plan.id}:${loaded.current.plan.revision}`} repository={repository} media={media} structure={structure} etage={etage}
-          plans={loaded.plans} loaded={loaded.current} library={loaded.library} canEdit={canEdit} scope={{ zoneId: zone?.id ?? null, pieceId: piece?.id ?? null }}
+          plans={loaded.plans} loaded={loaded.current} library={library} canEdit={canEdit} scope={{ zoneId: zone?.id ?? null, pieceId: piece?.id ?? null }}
           onSwitchPlan={(planId) => { onNavigate({ ...selection, planId }); void reload(planId); }}
           onReloadPlan={() => reload(loaded.current!.plan.id)} />
         : <section className={styles.empty} aria-label="Aucun plan">

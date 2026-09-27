@@ -46,10 +46,10 @@ describe("SupabasePlanRepository", () => {
     expect(calls.find((c) => c.name === "tools_releves_elements")!.filters).toEqual(expect.arrayContaining([`eq:plan_id,${U(1)}`, "is:deleted_at,"]));
   });
 
-  it("écritures par RPC uniquement ; conflit 40001 → ReleveConflictError avec la révision serveur", async () => {
+  it("écritures par RPC uniquement ; conflit PT409 (HTTP 409) → ReleveConflictError avec la révision serveur", async () => {
     const calls: Call[] = [];
     const repo = new SupabasePlanRepository(fakeClient({
-      tools_releve_plan_enregistrer: { data: null, error: { code: "40001", message: "Plan modifié ailleurs", details: "7" } },
+      tools_releve_plan_enregistrer: { data: null, error: { code: "PT409", message: "Plan modifié ailleurs", details: "7" } },
       tools_releve_plan_creer: { data: row, error: null },
       tools_releve_plan_figer: { data: null, error: { code: "42501", message: "Plan figé : créez un plan corrigé" } },
     }, calls));
