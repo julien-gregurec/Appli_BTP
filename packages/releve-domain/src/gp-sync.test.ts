@@ -37,10 +37,11 @@ const aggregate: ReleveAggregate = {
 const version: Version = { id: "e8000000-0000-0000-0000-000000000001" as never, entrepriseId: TENANT_A, releveId: releve.id, numero: 3, typeVersion: "corrige", versionBaseId: "e8000000-0000-0000-0000-000000000002" as never, libelle: null, revisionSource: 12, empreinte: "f".repeat(64), createdAt: "2026-09-26T12:00:00Z", createdBy: USER_OWNER };
 
 describe("contrat GP v1 (non branché)", () => {
-  it("couvre les treize sections du contrat et reste au statut contract-only", () => {
+  it("couvre les dix-sept sections du contrat produit et reste au statut contract-only", () => {
     expect(GP_SYNC_SECTIONS).toEqual([
       "client", "chantier", "building", "floor", "room", "walls", "openings", "measurements",
       "quantities", "photos", "annotations", "materials", "exports",
+      "zone", "coverings", "equipments", "versions",
     ]);
     expect(GP_SYNC_READINESS.status).toBe("contract-only");
     expect(GP_SYNC_READINESS.targets.import_rpc).toBe("missing");
@@ -84,5 +85,45 @@ describe("contrat GP v1 (non branché)", () => {
 
   it("convertit les unités à la frontière (3 décimales, numeric(12,3))", () => {
     expect([mmToM(1234.56), mmToM(-0.4), mm2ToM2(18_456_789), toGpUnite("m3"), toGpUnite("ml")]).toEqual([1.235, 0, 18.457, "m³", "ml"]);
+  });
+
+  it("Recovery V2 : zones à plat, revêtements, lignée de versions, volumes en m³, champs facultatifs", () => {
+    const zoneId = "e4000000-0000-0000-0000-000000000001";
+    const enrichi: ReleveAggregate = {
+      ...aggregate,
+      zones: [{ ...meta, id: zoneId, releveId: releve.id, etageId: ids.etage, nom: "Logement 1", type: "logement", ordre: 0 }] as never,
+      elements: [
+        ...aggregate.elements.filter((item) => !["m1", "mat1", "q1", "an1", "o1"].includes(item.id)),
+        element("m1", "mur", { a: { x: 0, y: 0 }, b: { x: 4200, y: 0 }, epaisseurMm: 200, hauteurMm: 2500, typeMur: "porteur", piecesAdjacentesIds: [ids.piece], materiauId: "mat1" }),
+        element("o1", "ouverture", { decalageMm: 600, largeurMm: 900, hauteurMm: 2150, allegeMm: null, typeOuverture: "porte", sens: "gauche", metadata: { vitrage: "double" } }, { parentElementId: "m1" as never }),
+        element("mat1", "materiau", { libelle: "Faïence 20×20", categorie: "mur", unite: "m2", pertePourcent: 8, gpPrestationRef: null, revetement: "faience" }),
+        element("q1", "quantite", { cle: "faience", libelle: "Faïence", valeur: 6.2, unite: "m2", formule: "perimetre*hauteur", qualite: "estimee", materiauId: "mat1", sources: [{ kind: "element", id: "m1" }], gpOuvrageRef: null }),
+        element("an1", "annotation", { ancre: { kind: "entite", ref: { kind: "element", id: "m1" } }, texte: "", forme: "fleche", geometrie: { points: [{ x: 0, y: 0 }, { x: 500, y: 0 }] }, mediaAudioId: null }),
+        element("v1", "mesure", { cible: { kind: "piece", id: ids.piece }, typeMesure: "volume", valeur: 46_000_000_000, unite: "mm3", source: "calcule", precisionMm: null, priseLe: "2026-09-26T10:00:00Z" }),
+      ],
+    };
+    const base: Version = { ...version, id: "e8000000-0000-0000-0000-000000000002" as never, numero: 1, typeVersion: "initial", versionBaseId: null };
+    const result = buildGpEnvelope(enrichi, version, "2026-09-26T12:30:00Z", undefined, [base, version]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const { envelope } = result;
+    expect(envelope.zone).toEqual([{ ref: zoneId, floorRef: ids.etage, nom: "Logement 1", type: "logement" }]);
+    expect(envelope.walls[0]).toMatchObject({ adjacentRoomRefs: [ids.piece], materialRef: "mat1" });
+    expect(envelope.openings[0].metadata).toEqual({ vitrage: "double" });
+    expect(envelope.coverings).toEqual([{ ref: "mat1", materialRef: "mat1", revetement: "faience", support: "mur", libelle: "Faïence 20×20", quantityRefs: ["q1"] }]);
+    expect(envelope.quantities[0]).toMatchObject({ sources: [{ kind: "element", ref: "m1" }], gpOuvrageRef: null });
+    expect(envelope.annotations[0]).toMatchObject({ forme: "fleche", texte: "", geometrie: { points: [{ x: 0, y: 0 }, { x: 500, y: 0 }] } });
+    expect(envelope.measurements.find((item) => item.ref === "v1")).toMatchObject({ valeur: 46, unite: "m³", mode: "calcule" });
+    expect(envelope.versions.map((item) => `${item.numero}:${item.type}:${item.baseRef ?? "-"}`)).toEqual([`3:corrige:${base.id}`, "1:initial:-"]);
+    expect(JSON.stringify(envelope)).not.toMatch(/prix|price|montant/i);
+  });
+
+  it("Recovery V2 : sans historique, la lignée se limite à la version transmise ; défauts rétro-compatibles", () => {
+    const result = buildGpEnvelope(aggregate, version, "2026-09-26T12:30:00Z");
+    if (!result.ok) throw new Error("enveloppe attendue");
+    expect(result.envelope.versions).toHaveLength(1);
+    expect(result.envelope.annotations[0]).toMatchObject({ forme: "texte", geometrie: null });
+    expect(result.envelope.coverings).toEqual([]);
+    expect(result.envelope.walls[0]).toMatchObject({ adjacentRoomRefs: [], materialRef: null });
   });
 });

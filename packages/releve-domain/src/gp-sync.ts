@@ -17,13 +17,15 @@
  *   multi-chantiers produit une enveloppe par chantier lié.
  */
 
-import type { Chantier, ReleveAggregate, ReleveElement, Version, QuantiteUnite, Point2D } from "./model";
+import { mesureMode, type Chantier, type MesureMode, type ReleveAggregate, type ReleveElement, type Version, type QuantiteUnite, type Point2D } from "./model";
 
 export const GP_SYNC_CONTRACT_VERSION = 1 as const;
 
 export const GP_SYNC_SECTIONS = [
   "client", "chantier", "building", "floor", "room", "walls", "openings", "measurements",
   "quantities", "photos", "annotations", "materials", "exports",
+  // Recovery V2 : sections du contrat produit absentes de la première version (additives).
+  "zone", "coverings", "equipments", "versions",
 ] as const;
 export type GpSyncSection = (typeof GP_SYNC_SECTIONS)[number];
 
@@ -53,6 +55,8 @@ export function toGpUnite(unite: QuantiteUnite): GpUnite { return GP_UNITES[unit
 export function mmToM(valueMm: number): number { return round3(valueMm / 1000); }
 /** mm² → m². */
 export function mm2ToM2(valueMm2: number): number { return round3(valueMm2 / 1_000_000); }
+/** mm³ → m³. */
+export function mm3ToM3(valueMm3: number): number { return round3(valueMm3 / 1_000_000_000); }
 function round3(value: number): number { return Math.round(value * 1000) / 1000 || 0; }
 const pointToM = (point: Point2D) => ({ x: mmToM(point.x), y: mmToM(point.y) });
 const nullableM = (value: number | null) => (value === null ? null : mmToM(value));
@@ -83,19 +87,25 @@ export type ReleveGpEnvelope = {
     readonly altitudeM: number | null; readonly hauteurSousPlafondM: number | null;
     readonly zones: ReadonlyArray<{ readonly ref: string; readonly nom: string; readonly type: string }>;
   }>;
+  /** Zones à plat (aussi imbriquées dans `floor[].zones` pour compatibilité). */
+  readonly zone: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly nom: string; readonly type: string }>;
   readonly room: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly zoneRef: string | null; readonly nom: string; readonly usage: string; readonly hauteurSousPlafondM: number | null }>;
-  readonly walls: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly roomRef: string | null; readonly a: GpPoint; readonly b: GpPoint; readonly epaisseurM: number; readonly hauteurM: number | null; readonly type: string }>;
+  readonly walls: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly roomRef: string | null; readonly a: GpPoint; readonly b: GpPoint; readonly epaisseurM: number; readonly hauteurM: number | null; readonly type: string; readonly adjacentRoomRefs: readonly string[]; readonly materialRef: string | null }>;
   /** Portes et fenêtres : `family` distingue door / window / other (trémie, passage). */
-  readonly openings: ReadonlyArray<{ readonly ref: string; readonly wallRef: string; readonly family: "door" | "window" | "other"; readonly type: string; readonly decalageM: number; readonly largeurM: number; readonly hauteurM: number; readonly allegeM: number | null; readonly sens: string }>;
-  readonly measurements: ReadonlyArray<{ readonly ref: string; readonly cible: { kind: string; ref: string }; readonly type: string; readonly valeur: number; readonly unite: "m" | "m²" | "rad"; readonly source: string; readonly precisionM: number | null; readonly priseLe: string }>;
+  readonly openings: ReadonlyArray<{ readonly ref: string; readonly wallRef: string; readonly family: "door" | "window" | "other"; readonly type: string; readonly decalageM: number; readonly largeurM: number; readonly hauteurM: number; readonly allegeM: number | null; readonly sens: string; readonly metadata: Readonly<Record<string, unknown>> | null }>;
+  readonly measurements: ReadonlyArray<{ readonly ref: string; readonly cible: { kind: string; ref: string }; readonly type: string; readonly valeur: number; readonly unite: "m" | "m²" | "m³" | "rad"; readonly source: string; readonly mode: MesureMode; readonly precisionM: number | null; readonly priseLe: string }>;
   /** Lignes compatibles `lignes_metres` (designation, formule, resultat, unite). Jamais de prix. */
-  readonly quantities: ReadonlyArray<{ readonly ref: string; readonly cle: string; readonly designation: string; readonly floorRef: string | null; readonly roomRef: string | null; readonly formule: string; readonly resultat: number; readonly unite: GpUnite; readonly qualite: string; readonly materialRef: string | null; readonly gpPrestationRef: string | null }>;
+  readonly quantities: ReadonlyArray<{ readonly ref: string; readonly cle: string; readonly designation: string; readonly floorRef: string | null; readonly roomRef: string | null; readonly formule: string; readonly resultat: number; readonly unite: GpUnite; readonly qualite: string; readonly materialRef: string | null; readonly gpPrestationRef: string | null; readonly sources: ReadonlyArray<{ readonly kind: string; readonly ref: string }>; readonly gpOuvrageRef: string | null }>;
   readonly photos: ReadonlyArray<{ readonly ref: string; readonly mediaRef: string; readonly storagePath: string; readonly mimeType: string; readonly bytes: number; readonly ancre: GpAncre; readonly legende: string | null }>;
-  readonly annotations: ReadonlyArray<{ readonly ref: string; readonly texte: string; readonly ancre: GpAncre; readonly audioStoragePath: string | null }>;
-  readonly materials: ReadonlyArray<{ readonly ref: string; readonly libelle: string; readonly categorie: string; readonly unite: GpUnite; readonly pertePourcent: number; readonly gpPrestationRef: string | null }>;
+  readonly annotations: ReadonlyArray<{ readonly ref: string; readonly forme: string; readonly texte: string; readonly geometrie: Readonly<Record<string, unknown>> | null; readonly ancre: GpAncre; readonly audioStoragePath: string | null }>;
+  readonly materials: ReadonlyArray<{ readonly ref: string; readonly libelle: string; readonly categorie: string; readonly unite: GpUnite; readonly pertePourcent: number; readonly gpPrestationRef: string | null; readonly revetement: string | null }>;
+  /** Revêtements : matériaux typés par un revêtement, avec les quantités qui les portent. */
+  readonly coverings: ReadonlyArray<{ readonly ref: string; readonly materialRef: string; readonly revetement: string; readonly support: string; readonly libelle: string; readonly quantityRefs: readonly string[] }>;
   readonly exports: ReadonlyArray<{ readonly mediaRef: string; readonly kind: "plan_pdf" | "plan_dxf" | "plan_svg" | "metre_csv"; readonly storagePath: string; readonly mimeType: string; readonly bytes: number }>;
   /** Hors liste contractuelle : mobilier et équipements (informatif pour GP). */
   readonly equipments: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly roomRef: string | null; readonly categorie: string; readonly libelle: string; readonly position: GpPoint; readonly rotationRad: number }>;
+  /** Lignée de la version transmise (elle-même puis ses bases connues), la plus récente d'abord. */
+  readonly versions: ReadonlyArray<{ readonly ref: string; readonly numero: number; readonly type: Version["typeVersion"]; readonly baseRef: string | null; readonly empreinte: string; readonly createdAt: string }>;
 };
 
 export type GpEnvelopeIssue = {
@@ -134,8 +144,9 @@ function openingFamily(type: string): "door" | "window" | "other" {
  *
  * `chantierId` peut être omis quand le projet n'a qu'un chantier actif. Le chantier GP cible
  * est celui du chantier Tools, à défaut celui du site principal du projet.
+ * `history` (facultatif) : versions connues du relevé, pour transmettre la lignée.
  */
-export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, exportedAt: string, chantierId?: string): GpEnvelopeResult {
+export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, exportedAt: string, chantierId?: string, history: readonly Version[] = []): GpEnvelopeResult {
   const { releve } = aggregate;
   const issues: GpEnvelopeIssue[] = [];
   const alive = <T extends { deletedAt: string | null }>(items: readonly T[]) => items.filter((item) => !item.deletedAt);
@@ -172,6 +183,10 @@ export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, ex
   const materiaux = ofType(elements, "materiau");
   const materiauxById = new Map(materiaux.map((materiau) => [materiau.id as string, materiau]));
   const hspEtage = new Map(etages.map((etage) => [etage.id as string, etage.hauteurSousPlafondMm]));
+  const quantites = ofType(elements, "quantite");
+  const versionsById = new Map(history.filter((item) => item.releveId === version.releveId).map((item) => [item.id as string, item]));
+  const lignee: Version[] = [version];
+  for (let base = version.versionBaseId ? versionsById.get(version.versionBaseId) : undefined; base && !lignee.includes(base); base = base.versionBaseId ? versionsById.get(base.versionBaseId) : undefined) lignee.push(base);
   const envelope: ReleveGpEnvelope = {
     contractVersion: GP_SYNC_CONTRACT_VERSION,
     idempotencyKey: gpIdempotencyKey(releve.id, version.numero, gpChantierId),
@@ -185,26 +200,29 @@ export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, ex
       altitudeM: nullableM(etage.altitudeMm), hauteurSousPlafondM: nullableM(etage.hauteurSousPlafondMm),
       zones: zones.filter((zone) => zone.etageId === etage.id).map((zone) => ({ ref: zone.id, nom: zone.nom, type: zone.type })),
     })),
+    zone: zones.map((zone) => ({ ref: zone.id, floorRef: zone.etageId, nom: zone.nom, type: zone.type })),
     room: pieces.map((piece) => ({ ref: piece.id, floorRef: piece.etageId, zoneRef: piece.zoneId, nom: piece.nom, usage: piece.usage, hauteurSousPlafondM: nullableM(piece.hauteurSousPlafondMm ?? hspEtage.get(piece.etageId) ?? null) })),
-    walls: murs.map((mur) => ({ ref: mur.id, floorRef: mur.etageId!, roomRef: mur.pieceId, a: pointToM(mur.donnees.a), b: pointToM(mur.donnees.b), epaisseurM: mmToM(mur.donnees.epaisseurMm), hauteurM: nullableM(mur.donnees.hauteurMm), type: mur.donnees.typeMur })),
-    openings: ouvertures.map((item) => ({ ref: item.id, wallRef: item.parentElementId!, family: openingFamily(item.donnees.typeOuverture), type: item.donnees.typeOuverture, decalageM: mmToM(item.donnees.decalageMm), largeurM: mmToM(item.donnees.largeurMm), hauteurM: mmToM(item.donnees.hauteurMm), allegeM: nullableM(item.donnees.allegeMm), sens: item.donnees.sens })),
+    walls: murs.map((mur) => ({ ref: mur.id, floorRef: mur.etageId!, roomRef: mur.pieceId, a: pointToM(mur.donnees.a), b: pointToM(mur.donnees.b), epaisseurM: mmToM(mur.donnees.epaisseurMm), hauteurM: nullableM(mur.donnees.hauteurMm), type: mur.donnees.typeMur, adjacentRoomRefs: [...(mur.donnees.piecesAdjacentesIds ?? [])], materialRef: mur.donnees.materiauId ?? null })),
+    openings: ouvertures.map((item) => ({ ref: item.id, wallRef: item.parentElementId!, family: openingFamily(item.donnees.typeOuverture), type: item.donnees.typeOuverture, decalageM: mmToM(item.donnees.decalageMm), largeurM: mmToM(item.donnees.largeurMm), hauteurM: mmToM(item.donnees.hauteurMm), allegeM: nullableM(item.donnees.allegeMm), sens: item.donnees.sens, metadata: item.donnees.metadata ?? null })),
     measurements: ofType(elements, "mesure").map((item) => {
       const { unite, valeur } = item.donnees;
-      return { ref: item.id, cible: { kind: item.donnees.cible.kind, ref: item.donnees.cible.id }, type: item.donnees.typeMesure, valeur: unite === "mm" ? mmToM(valeur) : unite === "mm2" ? mm2ToM2(valeur) : valeur, unite: unite === "mm" ? "m" as const : unite === "mm2" ? "m²" as const : "rad" as const, source: item.donnees.source, precisionM: nullableM(item.donnees.precisionMm), priseLe: item.donnees.priseLe };
+      return { ref: item.id, cible: { kind: item.donnees.cible.kind, ref: item.donnees.cible.id }, type: item.donnees.typeMesure, valeur: unite === "mm" ? mmToM(valeur) : unite === "mm2" ? mm2ToM2(valeur) : unite === "mm3" ? mm3ToM3(valeur) : valeur, unite: unite === "mm" ? "m" as const : unite === "mm2" ? "m²" as const : unite === "mm3" ? "m³" as const : "rad" as const, source: item.donnees.source, mode: mesureMode(item.donnees.source), precisionM: nullableM(item.donnees.precisionMm), priseLe: item.donnees.priseLe };
     }),
-    quantities: ofType(elements, "quantite").map((item) => {
+    quantities: quantites.map((item) => {
       const materiau = item.donnees.materiauId ? materiauxById.get(item.donnees.materiauId) : undefined;
       const piece = item.pieceId ? pieces.find((candidate) => candidate.id === item.pieceId) : undefined;
-      return { ref: item.id, cle: item.donnees.cle, designation: [piece?.nom, item.donnees.libelle, materiau?.donnees.libelle].filter(Boolean).join(" — "), floorRef: item.etageId, roomRef: item.pieceId, formule: item.donnees.formule, resultat: round3(item.donnees.valeur), unite: toGpUnite(item.donnees.unite), qualite: item.donnees.qualite, materialRef: item.donnees.materiauId, gpPrestationRef: materiau?.donnees.gpPrestationRef ?? null };
+      return { ref: item.id, cle: item.donnees.cle, designation: [piece?.nom, item.donnees.libelle, materiau?.donnees.libelle].filter(Boolean).join(" — "), floorRef: item.etageId, roomRef: item.pieceId, formule: item.donnees.formule, resultat: round3(item.donnees.valeur), unite: toGpUnite(item.donnees.unite), qualite: item.donnees.qualite, materialRef: item.donnees.materiauId, gpPrestationRef: materiau?.donnees.gpPrestationRef ?? null, sources: (item.donnees.sources ?? []).map((ref) => ({ kind: ref.kind, ref: ref.id })), gpOuvrageRef: item.donnees.gpOuvrageRef ?? null };
     }),
     photos: photos.map((item) => {
       const media = medias.get(item.donnees.mediaId)!;
       return { ref: item.id, mediaRef: media.id, storagePath: media.storagePath, mimeType: media.mimeType, bytes: media.tailleOctets, ancre: ancreToGp(item.donnees.ancre), legende: item.donnees.legende };
     }),
-    annotations: ofType(elements, "annotation").map((item) => ({ ref: item.id, texte: item.donnees.texte, ancre: ancreToGp(item.donnees.ancre), audioStoragePath: item.donnees.mediaAudioId ? medias.get(item.donnees.mediaAudioId)?.storagePath ?? null : null })),
-    materials: materiaux.map((item) => ({ ref: item.id, libelle: item.donnees.libelle, categorie: item.donnees.categorie, unite: toGpUnite(item.donnees.unite), pertePourcent: item.donnees.pertePourcent, gpPrestationRef: item.donnees.gpPrestationRef })),
+    annotations: ofType(elements, "annotation").map((item) => ({ ref: item.id, forme: item.donnees.forme ?? "texte", texte: item.donnees.texte, geometrie: item.donnees.geometrie ?? null, ancre: ancreToGp(item.donnees.ancre), audioStoragePath: item.donnees.mediaAudioId ? medias.get(item.donnees.mediaAudioId)?.storagePath ?? null : null })),
+    materials: materiaux.map((item) => ({ ref: item.id, libelle: item.donnees.libelle, categorie: item.donnees.categorie, unite: toGpUnite(item.donnees.unite), pertePourcent: item.donnees.pertePourcent, gpPrestationRef: item.donnees.gpPrestationRef, revetement: item.donnees.revetement ?? null })),
+    coverings: materiaux.filter((item) => item.donnees.revetement).map((item) => ({ ref: item.id, materialRef: item.id, revetement: item.donnees.revetement!, support: item.donnees.categorie, libelle: item.donnees.libelle, quantityRefs: quantites.filter((quantite) => quantite.donnees.materiauId === item.id).map((quantite) => quantite.id as string) })),
     exports: alive(aggregate.medias).filter((media) => media.categorie === "exports" && EXPORT_KINDS[media.mimeType]).map((media) => ({ mediaRef: media.id, kind: EXPORT_KINDS[media.mimeType], storagePath: media.storagePath, mimeType: media.mimeType, bytes: media.tailleOctets })),
     equipments: ofType(elements, "equipement").map((item) => ({ ref: item.id, floorRef: item.etageId!, roomRef: item.pieceId, categorie: item.donnees.categorie, libelle: item.donnees.libelle, position: pointToM(item.donnees.position), rotationRad: item.donnees.rotationRad })),
+    versions: lignee.map((item) => ({ ref: item.id, numero: item.numero, type: item.typeVersion, baseRef: item.versionBaseId, empreinte: item.empreinte, createdAt: item.createdAt })),
   };
   return { ok: true, envelope };
 }

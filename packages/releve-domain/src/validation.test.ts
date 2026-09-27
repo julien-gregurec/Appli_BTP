@@ -80,3 +80,45 @@ describe("éléments métier", () => {
     expect(validateElementDraft({ type: "mur", etageId: ETAGE, donnees: { ...mur, b: { x: 2_000_000, y: 0 } } }).ok).toBe(false);
   });
 });
+
+describe("Recovery V2 : compléments de contrat (additifs)", () => {
+  const cible = { kind: "piece", id: "e5000000-0000-0000-0000-000000000001" };
+  const mesure = (typeMesure: string, unite: string, source = "manuel") =>
+    validateElementDraft({ type: "mesure", donnees: { cible, typeMesure, valeur: 1, unite, source, precisionMm: null, priseLe: "2026-09-26T10:00:00Z" } }).ok;
+  const ancre = { kind: "entite", ref: cible };
+
+  it("mesures : largeur, distance libre, volume (mm3) et source calculée", () => {
+    expect(mesure("largeur", "mm")).toBe(true);
+    expect(mesure("distance", "mm")).toBe(true);
+    expect(mesure("volume", "mm3", "calcule")).toBe(true);
+    expect(mesure("volume", "mm2")).toBe(false);
+    expect(mesure("longueur", "mm", "devine")).toBe(false);
+  });
+
+  it("annotations : forme facultative, texte exigé pour texte/commentaire seulement", () => {
+    expect(validateElementDraft({ type: "annotation", donnees: { ancre, texte: "Fissure", mediaAudioId: null } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "annotation", donnees: { ancre, texte: "", forme: "fleche", geometrie: { points: [] }, mediaAudioId: null } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "annotation", donnees: { ancre, texte: "", forme: "commentaire", mediaAudioId: null } }).ok).toBe(false);
+    expect(validateElementDraft({ type: "annotation", donnees: { ancre, texte: "x", forme: "hexagone", mediaAudioId: null } }).ok).toBe(false);
+    expect(validateElementDraft({ type: "annotation", donnees: { ancre, texte: "x", forme: "zone", geometrie: [1], mediaAudioId: null } }).ok).toBe(false);
+  });
+
+  it("ouverture : metadata objet facultative ; mur : pièces adjacentes et matériau", () => {
+    const ouverture = { decalageMm: 0, largeurMm: 900, hauteurMm: 2150, allegeMm: null, typeOuverture: "baie", sens: "coulissant" };
+    expect(validateElementDraft({ type: "ouverture", etageId: ETAGE, parentElementId: MUR, donnees: { ...ouverture, metadata: { vitrage: "double" } } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "ouverture", etageId: ETAGE, parentElementId: MUR, donnees: { ...ouverture, metadata: "double" } }).ok).toBe(false);
+    const mur = { a: { x: 0, y: 0 }, b: { x: 1000, y: 0 }, epaisseurMm: 100, hauteurMm: null, typeMur: "cloison" };
+    expect(validateElementDraft({ type: "mur", etageId: ETAGE, donnees: { ...mur, piecesAdjacentesIds: [ETAGE], materiauId: MUR } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "mur", etageId: ETAGE, donnees: { ...mur, piecesAdjacentesIds: ["x"] } }).ok).toBe(false);
+  });
+
+  it("matériau : revêtement typé ; quantité : sources et poste de travaux GP", () => {
+    const materiau = { libelle: "Parquet chêne", categorie: "sol", unite: "m2", pertePourcent: 10, gpPrestationRef: null };
+    expect(validateElementDraft({ type: "materiau", donnees: { ...materiau, revetement: "parquet" } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "materiau", donnees: { ...materiau, revetement: "marbre-rose" } }).ok).toBe(false);
+    const quantite = { cle: "sol", libelle: "Sol", valeur: 12, unite: "m2", formule: "a*b", qualite: "exacte", materiauId: null };
+    expect(validateElementDraft({ type: "quantite", donnees: { ...quantite, sources: [cible], gpOuvrageRef: MUR } }).ok).toBe(true);
+    expect(validateElementDraft({ type: "quantite", donnees: { ...quantite, sources: [{ kind: "ouvrage", id: MUR }] } }).ok).toBe(false);
+  });
+});
+

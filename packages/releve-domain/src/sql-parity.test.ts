@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_CAPABILITIES, expandOfferCapabilities, offerCapabilities } from "./entitlement";
 import {
-  ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
+  ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
   MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
   RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES,
 } from "./model";
@@ -25,15 +25,17 @@ const complements = readFileSync(
   "utf8",
 ).replace(/\s+/g, " ");
 
+const contratElements = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260927000604_tools_releve_metre_contrat_elements_v2.sql", import.meta.url)),
+  "utf8",
+).replace(/\s+/g, " ");
+
 const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`).join(",");
 
 describe("parité domaine ↔ migration tools_releve_metre_foundation_v1", () => {
   it.each([
     ["statuts", RELEVE_STATUTS], ["visibilités", RELEVE_VISIBILITES], ["états d'étage", ETAGE_ETATS],
     ["types de zone", ZONE_TYPES], ["usages de pièce", PIECE_USAGES], ["types d'élément", ELEMENT_TYPES],
-    ["types de mur", MUR_TYPES], ["types d'ouverture", OUVERTURE_TYPES], ["catégories d'équipement", EQUIPEMENT_CATEGORIES],
-    ["types de mesure", MESURE_TYPES], ["unités de mesure", MESURE_UNITES], ["sources de mesure", MESURE_SOURCES],
-    ["catégories de matériau", MATERIAU_CATEGORIES], ["unités de quantité", QUANTITE_UNITES], ["qualités", QUANTITE_QUALITES],
     ["catégories de média", MEDIA_CATEGORIES], ["rôles", RELEVE_ROLES], ["capabilities add-on", TOOLS_ADDON_CAPABILITIES],
   ] as const)("énumération %s identique", (_label, values) => {
     expect(sql.replace(/, /g, ",")).toContain(quoted(values));
@@ -78,5 +80,30 @@ describe("parité domaine ↔ migration tools_releve_metre_lot2_complements", ()
     expect(expandOfferCapabilities(["releve-metre"])).toEqual(offerCapabilities("releve_pro"));
     expect(expandOfferCapabilities(TOOLS_PRO_CAPABILITIES)).toEqual([...TOOLS_PRO_CAPABILITIES].sort());
     expect(expandOfferCapabilities(["basic-calculation"])).toEqual(["basic-calculation"]);
+  });
+});
+
+describe("parité domaine ↔ migration tools_releve_metre_contrat_elements_v2 (validateur courant des éléments)", () => {
+  it.each([
+    ["types de mur", MUR_TYPES], ["types d'ouverture", OUVERTURE_TYPES], ["catégories d'équipement", EQUIPEMENT_CATEGORIES],
+    ["types de mesure", MESURE_TYPES], ["unités de mesure", MESURE_UNITES], ["sources de mesure", MESURE_SOURCES],
+    ["catégories de matériau", MATERIAU_CATEGORIES], ["unités de quantité", QUANTITE_UNITES], ["qualités", QUANTITE_QUALITES],
+    ["formes d'annotation", ANNOTATION_FORMES], ["revêtements", REVETEMENT_TYPES],
+  ] as const)("énumération %s identique", (_label, values) => {
+    expect(contratElements.replace(/, /g, ",")).toContain(quoted(values));
+  });
+
+  it("la définition 604 est un sur-ensemble de 601 : chaque ancienne valeur reste admise", () => {
+    const anciennes = [["longueur", "hauteur", "diagonale", "angle", "surface"], ["mm", "rad", "mm2"], ["manuel", "laser", "photo", "ar", "lidar"]];
+    for (const liste of anciennes) {
+      expect(sql.replace(/, /g, ",")).toContain(quoted(liste));
+      for (const valeur of liste) expect(contratElements).toContain(`'${valeur}'`);
+    }
+  });
+
+  it("unité attendue par type de mesure (appliquée par le domaine)", () => {
+    expect(MESURE_TYPES.map((type) => `${type}:${mesureUniteAttendue(type)}`)).toEqual([
+      "longueur:mm", "largeur:mm", "hauteur:mm", "diagonale:mm", "distance:mm", "angle:rad", "surface:mm2", "volume:mm3",
+    ]);
   });
 });

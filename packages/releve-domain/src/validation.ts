@@ -9,6 +9,7 @@
 
 import { isUuid } from "./ids";
 import {
+  ANNOTATION_FORMES, ANNOTATION_FORMES_TEXTUELLES, REVETEMENT_TYPES, mesureUniteAttendue,
   ELEMENT_ATTACHMENT, ELEMENT_TYPES, ENTITY_REF_KINDS, EQUIPEMENT_CATEGORIES, ETAGE_ETATS, ETAGE_NIVEAU_MAX,
   ETAGE_NIVEAU_MIN, MATERIAU_CATEGORIES, MESURE_SOURCES, MESURE_TYPES, MESURE_UNITES, MUR_TYPES, OUVERTURE_SENS,
   OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_COORDINATE_LIMIT_MM, RELEVE_STATUTS,
@@ -53,6 +54,10 @@ export const RELEVE_LIMITS = {
   epaisseurMaxMm: 2_000,
   libelle: 200,
   texteAnnotation: 2_000,
+  /** Recovery V2 : listes facultatives (pièces adjacentes, sources d'une quantité). */
+  listeMax: 50,
+  /** Recovery V2 : objets JSON libres (metadata d'ouverture, géométrie d'annotation). */
+  metadataJson: 8_000,
   formule: 500,
   cleQuantite: 120,
 } as const;
@@ -259,6 +264,22 @@ function validateRef(c: Collector, path: string, value: unknown) {
   c.uuid(`${path}.id`, value.id, false);
 }
 
+/** Champ facultatif (Recovery V2) : absent ou `null` = non renseigné. */
+const present = (value: unknown) => value !== undefined && value !== null;
+
+function validateObject(c: Collector, path: string, value: unknown, maxJsonLength: number) {
+  if (!present(value)) return;
+  if (!isRecord(value)) { c.add(path, "invalid_type", "Objet attendu."); return; }
+  if (JSON.stringify(value).length > maxJsonLength) c.add(path, "out_of_range", `${maxJsonLength} caractères JSON maximum.`);
+}
+
+function validateUuidList(c: Collector, path: string, value: unknown, max: number) {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) { c.add(path, "invalid_type", "Liste attendue."); return; }
+  if (value.length > max) c.add(path, "out_of_range", `${max} éléments maximum.`);
+  value.forEach((item, index) => c.uuid(`${path}.${index}`, item, false));
+}
+
 function validateAncre(c: Collector, path: string, value: unknown) {
   if (!isRecord(value)) { c.add(path, "invalid_type", "Ancre attendue."); return; }
   if (value.kind === "point") { c.uuid(`${path}.etageId`, value.etageId, false); c.point(`${path}.point`, value.point); return; }
@@ -273,6 +294,8 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     c.number("donnees.epaisseurMm", d.epaisseurMm, 0, RELEVE_LIMITS.epaisseurMaxMm, { exclusiveMin: true });
     c.number("donnees.hauteurMm", d.hauteurMm, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true });
     c.enumeration("donnees.typeMur", d.typeMur, MUR_TYPES);
+    validateUuidList(c, "donnees.piecesAdjacentesIds", d.piecesAdjacentesIds, RELEVE_LIMITS.listeMax);
+    c.uuid("donnees.materiauId", d.materiauId, true);
   },
   ouverture(c, d) {
     c.number("donnees.decalageMm", d.decalageMm, 0, RELEVE_COORDINATE_LIMIT_MM);
@@ -281,6 +304,7 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     c.number("donnees.allegeMm", d.allegeMm, 0, RELEVE_LIMITS.hauteurMaxMm, { nullable: true });
     c.enumeration("donnees.typeOuverture", d.typeOuverture, OUVERTURE_TYPES);
     c.enumeration("donnees.sens", d.sens, OUVERTURE_SENS);
+    validateObject(c, "donnees.metadata", d.metadata, RELEVE_LIMITS.metadataJson);
   },
   equipement(c, d) {
     c.enumeration("donnees.categorie", d.categorie, EQUIPEMENT_CATEGORIES);
@@ -293,7 +317,7 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     validateRef(c, "donnees.cible", d.cible);
     const type = c.enumeration("donnees.typeMesure", d.typeMesure, MESURE_TYPES);
     const unite = c.enumeration("donnees.unite", d.unite, MESURE_UNITES);
-    const expected = type === "angle" ? "rad" : type === "surface" ? "mm2" : "mm";
+    const expected = mesureUniteAttendue(type);
     if (unite !== expected) c.add("donnees.unite", "invariant_violated", `Unité ${expected} attendue pour une mesure « ${type} ».`);
     c.number("donnees.valeur", d.valeur, 0, Number.MAX_SAFE_INTEGER);
     c.enumeration("donnees.source", d.source, MESURE_SOURCES);
@@ -308,7 +332,10 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
   },
   annotation(c, d) {
     validateAncre(c, "donnees.ancre", d.ancre);
-    c.text("donnees.texte", d.texte, RELEVE_LIMITS.texteAnnotation, true);
+    const forme = present(d.forme) ? c.enumeration("donnees.forme", d.forme, ANNOTATION_FORMES) : "texte";
+    c.text("donnees.texte", d.texte, RELEVE_LIMITS.texteAnnotation, (ANNOTATION_FORMES_TEXTUELLES as readonly string[]).includes(forme));
+    if (!present(d.texte) && !(ANNOTATION_FORMES_TEXTUELLES as readonly string[]).includes(forme)) c.add("donnees.texte", "invalid_type", "Texte attendu (chaîne vide admise).");
+    validateObject(c, "donnees.geometrie", d.geometrie, RELEVE_LIMITS.metadataJson);
     c.uuid("donnees.mediaAudioId", d.mediaAudioId, true);
   },
   materiau(c, d) {
@@ -317,6 +344,7 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     c.enumeration("donnees.unite", d.unite, QUANTITE_UNITES);
     c.number("donnees.pertePourcent", d.pertePourcent, 0, 100);
     c.uuid("donnees.gpPrestationRef", d.gpPrestationRef, true);
+    if (present(d.revetement)) c.enumeration("donnees.revetement", d.revetement, REVETEMENT_TYPES);
   },
   quantite(c, d) {
     c.text("donnees.cle", d.cle, RELEVE_LIMITS.cleQuantite, true);
@@ -326,6 +354,14 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     c.text("donnees.formule", d.formule, RELEVE_LIMITS.formule, true);
     c.enumeration("donnees.qualite", d.qualite, QUANTITE_QUALITES);
     c.uuid("donnees.materiauId", d.materiauId, true);
+    if (d.sources !== undefined) {
+      if (!Array.isArray(d.sources)) c.add("donnees.sources", "invalid_type", "Liste attendue.");
+      else {
+        if (d.sources.length > RELEVE_LIMITS.listeMax) c.add("donnees.sources", "out_of_range", `${RELEVE_LIMITS.listeMax} éléments maximum.`);
+        d.sources.forEach((ref, index) => validateRef(c, `donnees.sources.${index}`, ref));
+      }
+    }
+    c.uuid("donnees.gpOuvrageRef", d.gpOuvrageRef, true);
   },
 };
 

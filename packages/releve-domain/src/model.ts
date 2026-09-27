@@ -207,6 +207,10 @@ export type MurDonnees = {
   readonly epaisseurMm: number;
   readonly hauteurMm: number | null;
   readonly typeMur: MurType;
+  /** Recovery V2 (facultatif) : pièces bordées par le mur, en plus de `pieceId` (mur mitoyen). */
+  readonly piecesAdjacentesIds?: readonly PieceId[];
+  /** Recovery V2 (facultatif) : matériau / revêtement du mur (élément `materiau`). */
+  readonly materiauId?: ElementId | null;
 };
 
 export const OUVERTURE_TYPES = ["porte", "fenetre", "porte_fenetre", "baie", "tremie", "passage"] as const;
@@ -221,7 +225,11 @@ export type OuvertureDonnees = {
   readonly allegeMm: number | null;
   readonly typeOuverture: OuvertureType;
   readonly sens: OuvertureSens;
+  /** Recovery V2 (facultatif) : attributs métier libres (menuiserie, vitrage…), objet JSON. */
+  readonly metadata?: Readonly<Record<string, unknown>>;
 };
+/** Catégories métier d'ouverture demandées par le contrat produit. */
+export const OUVERTURE_FAMILLES = { porte: ["porte", "porte_fenetre"], fenetre: ["fenetre"], baie: ["baie"], ouverture_libre: ["tremie", "passage"] } as const satisfies Record<string, readonly OuvertureType[]>;
 
 export const EQUIPEMENT_CATEGORIES = ["mobilier", "electricite", "plomberie", "cvc", "eclairage", "autre"] as const;
 export type EquipementCategorie = (typeof EQUIPEMENT_CATEGORIES)[number];
@@ -235,13 +243,26 @@ export type EquipementDonnees = {
   readonly hauteurMm: number | null;
 };
 
-export const MESURE_TYPES = ["longueur", "hauteur", "diagonale", "angle", "surface"] as const;
+/** Recovery V2 : `largeur`, `distance` (distance libre) et `volume` ajoutés, sans retrait. */
+export const MESURE_TYPES = ["longueur", "largeur", "hauteur", "diagonale", "distance", "angle", "surface", "volume"] as const;
 export type MesureType = (typeof MESURE_TYPES)[number];
-export const MESURE_UNITES = ["mm", "rad", "mm2"] as const;
+export const MESURE_UNITES = ["mm", "rad", "mm2", "mm3"] as const;
 export type MesureUnite = (typeof MESURE_UNITES)[number];
-/** Provenance d'une mesure. `ar` et `lidar` sont réservés : aucune capture n'existe au lot 2. */
-export const MESURE_SOURCES = ["manuel", "laser", "photo", "ar", "lidar"] as const;
+/** Unité imposée par type de mesure (miroir du CHECK SQL). */
+export function mesureUniteAttendue(type: MesureType): MesureUnite {
+  return type === "angle" ? "rad" : type === "surface" ? "mm2" : type === "volume" ? "mm3" : "mm";
+}
+/**
+ * Provenance d'une mesure. `calcule` : déduite de la géométrie. `ar` et `lidar` sont réservés :
+ * aucune capture n'existe au lot 2.
+ */
+export const MESURE_SOURCES = ["manuel", "calcule", "laser", "photo", "ar", "lidar"] as const;
 export type MesureSource = (typeof MESURE_SOURCES)[number];
+export type MesureMode = "manuel" | "calcule" | "capture";
+/** Classement manuel / calculé / capturé demandé par le contrat produit. */
+export function mesureMode(source: MesureSource): MesureMode {
+  return source === "manuel" ? "manuel" : source === "calcule" ? "calcule" : "capture";
+}
 export type MesureDonnees = {
   readonly cible: EntityRef;
   readonly typeMesure: MesureType;
@@ -259,15 +280,29 @@ export type PhotoAnchorDonnees = {
   readonly legende: string | null;
 };
 
+/** Recovery V2 : forme d'annotation (absente = `texte`, rétro-compatible). Aucun éditeur au lot 2. */
+export const ANNOTATION_FORMES = ["texte", "fleche", "cercle", "zone", "cote", "symbole", "commentaire"] as const;
+export type AnnotationForme = (typeof ANNOTATION_FORMES)[number];
+/** Formes qui exigent un texte ; les autres le rendent facultatif (chaîne vide admise). */
+export const ANNOTATION_FORMES_TEXTUELLES = ["texte", "commentaire"] as const satisfies readonly AnnotationForme[];
 export type AnnotationDonnees = {
   readonly ancre: Ancre;
   readonly texte: string;
+  readonly forme?: AnnotationForme;
+  /** Géométrie de la forme (points en mm dans le repère de l'étage) : contrat ouvert, lot éditeur. */
+  readonly geometrie?: Readonly<Record<string, unknown>> | null;
   /** Note vocale (catégorie de stockage `annotations`), lot 11. */
   readonly mediaAudioId: MediaId | null;
 };
 
 export const MATERIAU_CATEGORIES = ["sol", "mur", "plafond", "plinthe", "menuiserie", "autre"] as const;
 export type MateriauCategorie = (typeof MATERIAU_CATEGORIES)[number];
+/** Recovery V2 : nature du revêtement (facultative). Pas de catalogue : simple typage. */
+export const REVETEMENT_TYPES = [
+  "peinture", "carrelage", "faience", "parquet", "stratifie", "moquette", "pvc", "panneau_decoratif",
+  "papier_peint", "enduit", "beton", "autre",
+] as const;
+export type RevetementType = (typeof REVETEMENT_TYPES)[number];
 /** Unités de quantité : sous-ensemble des unités Gestion Pro (`lignes_metres.unite`). */
 export const QUANTITE_UNITES = ["m2", "ml", "m3", "u"] as const;
 export type QuantiteUnite = (typeof QUANTITE_UNITES)[number];
@@ -278,6 +313,7 @@ export type MateriauDonnees = {
   readonly pertePourcent: number;
   /** `prestations_catalogue.id` GP : suggestion uniquement, jamais un prix. */
   readonly gpPrestationRef: string | null;
+  readonly revetement?: RevetementType | null;
 };
 
 export const QUANTITE_QUALITES = ["exacte", "estimee"] as const;
@@ -294,6 +330,10 @@ export type QuantiteDonnees = {
   readonly formule: string;
   readonly qualite: QuantiteQualite;
   readonly materiauId: ElementId | null;
+  /** Recovery V2 (facultatif) : objets mesurés (pièce, mur, ouverture…) dont la quantité dérive. */
+  readonly sources?: readonly EntityRef[];
+  /** Recovery V2 (facultatif) : ouvrage GP visé (`modeles_devis.id`, bibliothèque d'ouvrages), jamais un prix. */
+  readonly gpOuvrageRef?: string | null;
 };
 
 export type ElementDonneesByType = {
