@@ -402,3 +402,62 @@ describe.skipIf(!REAL)("isolation des bases (service_role)", () => {
     expect(direct.status).not.toBe(200); // même service_role n'a aucun privilège de table : RPC seulement
   });
 });
+
+// Chaîne DÉDIÉE complète sur la base Studio (copies gelées des migrations métier + identité +
+// admission 20260927110000) : l'admission au premier espace suit le pont, pas la politique
+// d'inscription héritée du projet partagé.
+describe.skipIf(!REAL)("admission Studio dédiée (migrations métier + pont)", () => {
+  const createWorkspace = (token: string, name = "Mon Studio", type = "personal") =>
+    studioUserClient(p, token).rpc("studio_create_workspace", { p_name: name, p_type: type });
+
+  it("compte lié par le pont, droit accordé : premier espace créé malgré studio_signup_policy « closed »", async () => {
+    expect(sql(env.studioDb!, "select mode from public.studio_signup_policy")).toBe("closed");
+    const s = await bridge(p).login(await platformUser(p));
+    const { data, error } = await createWorkspace(s.session.access_token);
+    expect(error).toBeNull();
+    expect(sql(env.studioDb!, `select count(*) from public.studio_workspace_members where user_id='${s.userId}' and role='owner'`)).toBe("1");
+    expect((await createWorkspace(s.session.access_token)).data).toBe(data); // idempotent (espace personnel)
+  });
+
+  it("droit retiré (lecture seule) : aucun espace créé par RPC directe ; l'espace existant reste lisible", async () => {
+    const s = await bridge(p).login(await platformUser(p));
+    const first = await createWorkspace(s.session.access_token, "Pro", "professional");
+    expect(first.error).toBeNull();
+    const subject = sql(env.studioDb!, `select subject from studio_identity.links where user_id='${s.userId}'`);
+    sql(env.studioDb!, `update studio_identity.subject_state set granted = false where subject='${subject}'`);
+    expect(await sessionStatus(p, s.session.access_token)).toMatchObject({ status: "ok", access: "read_only" });
+    const refused = await createWorkspace(s.session.access_token, "Encore", "professional");
+    expect(refused.error?.code).toBe("42501");
+    expect(refused.error?.message).toBe("Accès Studio en lecture seule");
+    const read = await studioUserClient(p, s.session.access_token).from("studio_workspaces").select("id").eq("id", first.data as string);
+    expect(read.data).toHaveLength(1);
+  });
+
+  it("compte désactivé côté central : refus même si le jeton d'accès vit encore", async () => {
+    const s = await bridge(p).login(await platformUser(p));
+    const subject = sql(env.studioDb!, `select subject from studio_identity.links where user_id='${s.userId}'`);
+    sql(env.studioDb!, `update studio_identity.subject_state set account = 'disabled' where subject='${subject}'`);
+    expect((await createWorkspace(s.session.access_token)).error?.code).toBe("42501");
+  });
+
+  it("compte hors pont (création par clé service) : politique héritée fail-closed « Inscription fermée »", async () => {
+    const email = `local-${randomUUID().slice(0, 8)}@example.test`;
+    const password = `pw-${randomUUID()}`;
+    const created = await p.studioAdmin.auth.admin.createUser({ email, password, email_confirm: true });
+    expect(created.error).toBeNull();
+    const client = studioUserClient(p);
+    const signed = await client.auth.signInWithPassword({ email, password });
+    expect(signed.error).toBeNull();
+    const refused = await createWorkspace(signed.data.session!.access_token);
+    expect(refused.error?.message).toBe("Inscription fermée");
+    // Inscription publique fermée à la frontière GoTrue du projet dédié.
+    const signup = await client.auth.signUp({ email: `x-${email}`, password });
+    expect(signup.error).not.toBeNull();
+  });
+
+  it("fonction d'accès interne non exposée : authenticated ne peut pas l'appeler (pas d'oracle)", async () => {
+    const s = await bridge(p).login(await platformUser(p));
+    const { error } = await studioUserClient(p, s.session.access_token).rpc("studio_identity_caller_access");
+    expect(error).not.toBeNull();
+  });
+});

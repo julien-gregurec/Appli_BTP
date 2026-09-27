@@ -77,7 +77,14 @@ start() {
 
   # Migrations applicatives (après le schéma auth de GoTrue).
   psql -q -h 127.0.0.1 -p 55432 -U postgres -v ON_ERROR_STOP=1 -f "$ROOT/supabase/migrations/20260927100000_elsatia_identity_broker.sql"
-  psql -q -h 127.0.0.1 -p 55433 -U postgres -v ON_ERROR_STOP=1 -f "$ROOT/apps/studio/supabase/migrations/20260926120000_studio_identity_foundation.sql"
+  # Projet Studio : chaîne DÉDIÉE complète (copies gelées des migrations métier + identité +
+  # admission), sur un substitut minimal de Storage (celui du banc local-postgres-bootstrap).
+  { echo "create schema if not exists storage;"
+    sed -n '/^-- storage stub/,/^-- pgsodium stub/p' "$ROOT/scripts/local-postgres-bootstrap/pg_bootstrap.sql"
+  } | psql -q -h 127.0.0.1 -p 55433 -U postgres -v ON_ERROR_STOP=1
+  for f in "$ROOT"/apps/studio/supabase/migrations/*.sql; do
+    psql -q -h 127.0.0.1 -p 55433 -U postgres -v ON_ERROR_STOP=1 -f "$f"
+  done
   # Sentinelles d'isolation : une donnée « GP » et une donnée « Studio », lisibles par le
   # service_role de LEUR projet uniquement.
   psql -q -h 127.0.0.1 -p 55432 -U postgres -v ON_ERROR_STOP=1 -c "create table public.gp_isolation_sentinel(id int primary key, secret text); insert into public.gp_isolation_sentinel values (1,'bulletin-de-paie'); grant select on public.gp_isolation_sentinel to service_role;"
