@@ -4,6 +4,7 @@
 **Branche** : `claude/funny-knuth-ykfc0j`
 **Base** : train canonique V2 (`integration/elsatia-canonical-train-v2` @ `819ebe56`) + Lot 1 (`88a2b794`) + première passe de fondation Lot 2 (`d3c39068`, branche `claude/dazzling-gates-uzfkvz`)
 **Entrées lues** : [Audit Lot 1](./ELSATIA_TOOLS_RELEVE_METRE_EXISTING_AUDIT_V1.md) · [Roadmap V1](./ELSATIA_TOOLS_RELEVE_METRE_ROADMAP_V1.md) · [Première passe Lot 2](./ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md)
+**Remplacé comme référence par** [ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_RECOVERY_V2.md](./ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_RECOVERY_V2.md) (train V3 ; migrations renumérotées `20260927000601`/`602` ; défaut RLS corrigé par `603`).
 **Hors périmètre, volontairement** : LiDAR, AR, scan automatique, plan automatique complet, chiffrage, paiement, SKU, activation commerciale, écriture dans Gestion Pro.
 
 ---
