@@ -108,6 +108,21 @@ async function afficherContratsAcceptes() {
   }
 }
 
+// Commandes fournisseurs engagées (envoyées, confirmées, reçues) : figées en instantané
+// immuable minimisé (sans donnée personnelle) puis supprimées par la purge (migration
+// 20260926000506). Aucune décision requise : affichage informatif.
+async function afficherCommandesFournisseurs() {
+  const { data, error } = await supabase.rpc("rapport_commandes_fournisseurs_purge", { p_entreprise_id: entrepriseId });
+  if (error) {
+    console.error(`Rapport des commandes fournisseurs impossible : ${error.message}`);
+    return;
+  }
+  const r = (data ?? [])[0];
+  if (!r) return;
+  console.log(`\nCommandes fournisseurs : ${r.commandes_engagees} engagée(s) (instantané minimisé avant suppression), `
+    + `${r.commandes_brouillon_ou_annulees} brouillon(s)/annulée(s) ; ${r.instantanes} instantané(s) figé(s).`);
+}
+
 function afficherStorage(fichiers) {
   const parCategorie = { ORPHELIN: [], RETAIN: [], A_PURGER: [] };
   for (const f of fichiers) (parCategorie[f.categorie] ??= []).push(f);
@@ -296,6 +311,7 @@ async function verifier() {
   const lignes = await rapport();
   afficherRapport(lignes);
   await afficherContratsAcceptes();
+  await afficherCommandesFournisseurs();
   const fichiers = await fichiersStorage();
   const parCategorie = afficherStorage(fichiers);
 
@@ -326,6 +342,7 @@ if (mode === "dry-run") {
   const lignes = await rapport();
   afficherRapport(lignes);
   await afficherContratsAcceptes();
+  await afficherCommandesFournisseurs();
   afficherStorage(await fichiersStorage());
   console.log("Mode dry-run : rien n'a été modifié. Relancez avec `execute` pour la purge réelle.");
 } else if (mode === "verify") {
