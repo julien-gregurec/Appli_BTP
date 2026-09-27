@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { exigerShellReserves, peutEmettre, peutGererChantiers } from "@/lib/acces-reserves";
 import {
-  BUCKET_PLANS, lireChantier, listerIntervenants, listerPlansComplets,
+  BUCKET_PLANS, lireChantier, listerContacts, listerIntervenants, listerPlansComplets,
   listerReserves, signerFichiers,
 } from "@/lib/donnees";
 import { EtiquetteStatut } from "@/components/Etiquette";
@@ -19,10 +19,11 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
   const chantier = await lireChantier(id);
   if (!chantier) notFound();
 
-  const [reserves, intervenants, plans] = await Promise.all([
+  const [reserves, intervenants, plans, contacts] = await Promise.all([
     listerReserves({ chantierId: id }),
     listerIntervenants(id),
     listerPlansComplets(id),
+    listerContacts(id),
   ]);
 
   const liens = await signerFichiers(
@@ -59,6 +60,7 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
         {[chantier.ville, chantier.reference].filter(Boolean).join(" · ") || "Chantier Réserves"}
         {" — "}{reserves.length} réserve{reserves.length > 1 ? "s" : ""},
         {" "}{intervenants.length} entreprise{intervenants.length > 1 ? "s" : ""}.
+        {chantier.source === "gestion_pro" && <span className="etiquette"> Repris de Gestion Pro</span>}
       </p>
 
       <div className="actions">
@@ -104,6 +106,26 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
             </li>
           ))}
         </ul>
+      )}
+
+      {contacts.length > 0 && (
+        <>
+          <h2>Contacts</h2>
+          <ul className="liste">
+            {contacts.map((c) => (
+              <li key={c.id}>
+                <span className="reserve-tete">
+                  <span className="reserve-titre">{c.nom}</span>
+                </span>
+                <span className="reserve-meta">
+                  <span>{c.role === "client" ? "Client" : c.role === "entreprise" ? "Entreprise" : "Autre"}{c.fonction ? ` · ${c.fonction}` : ""}</span>
+                  {c.telephone && <a href={`tel:${c.telephone}`}>{c.telephone}</a>}
+                  {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </>
   );

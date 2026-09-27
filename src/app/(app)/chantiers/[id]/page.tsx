@@ -19,6 +19,9 @@ import { associerDevisDepuisChantierAction } from "@/app/actions/devis";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
+import { BlocReservesChantier } from "@/components/BlocReservesChantier";
+import { lireEtatReserves } from "@/lib/reserves-gp";
+import { urlReservesPourUtilisateur } from "@/lib/multi-app-server";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -84,6 +87,11 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     peutVoirNotesEquipe?supabase.from("notes_frais").select("id,reference,date_frais,fournisseur,categorie,statut,montant_ttc,employe:employes(prenom,nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_frais",{ascending:false}):Promise.resolve({data:[]}),
     peutVoirSousTraitants?supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,fournisseur:fournisseurs(id,nom,specialite)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("created_at",{ascending:false}):Promise.resolve({data:[]}),
   ]);
+  // ELSATIA Réserves : la base décide si le bloc existe (abonnement, rôle Réserves,
+  // chantier consultable) ; une erreur de lecture ne casse jamais la fiche chantier.
+  const { data: etatReservesBrut } = await supabase.rpc("reserves_etat_chantier_gp", { p_chantier_gp_id: id });
+  const etatReserves = lireEtatReserves(etatReservesBrut);
+  const urlReserves = etatReserves?.lie ? await urlReservesPourUtilisateur(ctx.entrepriseId) : null;
   const devisDuClient = peutCreerDevis
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
     : [];
@@ -158,6 +166,8 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             </div>
           )}
         </section>
+
+        {etatReserves&&<BlocReservesChantier chantierId={id} etat={etatReserves} urlReserves={urlReserves} />}
 
         {(documents??[]).length>0&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Plans et pièces jointes autorisées</h2><p className="text-sm text-neutral-500">Seuls les documents autorisés pour votre rôle sont affichés.</p></div><Link href={`/chantiers/${id}/documents`} className="text-sm font-medium text-blue-800 hover:underline">Tout consulter</Link></div><div className="grid gap-2 sm:grid-cols-2">{(documents??[]).slice().sort((a,b)=>(a.categorie==="plan"?0:1)-(b.categorie==="plan"?0:1)).slice(0,6).map(document=><a key={document.id} href={`/api/documents/${document.id}`} target="_blank" rel="noopener" className="rounded-md border bg-white p-3 text-sm hover:border-blue-400"><strong className="block truncate">{document.categorie==="plan"?"📐 Plan · ":"📎 "}{document.nom}</strong>{document.note&&<span className="mt-1 block text-xs text-neutral-500">{document.note}</span>}</a>)}</div></section>}
 
