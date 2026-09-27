@@ -50,7 +50,11 @@ export default async function PagePlans({
               <div className="reserve-meta">
                 <span>{plan.nom_fichier ?? "Document"}</span>
                 <span>{formaterOctets(plan.taille_octets)}</span>
-                {!plan.storage_path && <span className="etiquette refus">Document manquant</span>}
+                {!plan.storage_path && <span className="etiquette refus">{plan.source === "gestion_pro" ? "Transmission depuis Gestion Pro en attente" : "Document manquant"}</span>}
+                {plan.source === "gestion_pro" && plan.gp_version && <span>Gestion Pro · version {plan.gp_version}</span>}
+                {plan.gp_maj_disponible && (
+                  <span className="etiquette">Version plus récente dans Gestion Pro — non appliquée : ce plan est déjà utilisé ici</span>
+                )}
               </div>
               <div className="actions">
                 {plan.storage_path && liens.get(plan.storage_path) && (

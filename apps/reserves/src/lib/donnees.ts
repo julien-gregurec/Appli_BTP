@@ -204,6 +204,31 @@ export async function listerIntervenants(chantierId?: string): Promise<Intervena
   return toutesLesLignes<IntervenantReserves>(tranche);
 }
 
+/**
+ * Annuaire du chantier (contacts client et entreprises, saisis ou repris de Gestion Pro).
+ * Une coordonnée, jamais un accès : la RLS le réserve à l'organisation hôte, une entreprise
+ * invitée obtient une liste vide.
+ */
+export type ContactChantier = {
+  id: string;
+  role: "client" | "entreprise" | "autre";
+  nom: string;
+  fonction: string | null;
+  email: string | null;
+  telephone: string | null;
+};
+
+export async function listerContacts(chantierId: string): Promise<ContactChantier[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reserves_contacts")
+    .select("id, role, nom, fonction, email, telephone")
+    .eq("chantier_id", chantierId)
+    .order("role")
+    .order("nom");
+  return (data ?? []) as ContactChantier[];
+}
+
 export async function listerPlans(chantierId: string): Promise<PlanReserves[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -272,7 +297,7 @@ export async function listerPlansComplets(chantierId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("reserves_plans")
-    .select("id, nom, niveau, zone, storage_path, mime_type, nom_fichier, taille_octets, ordre, nb_pages")
+    .select("id, nom, niveau, zone, storage_path, mime_type, nom_fichier, taille_octets, ordre, nb_pages, source, gp_version, gp_maj_disponible")
     .eq("chantier_id", chantierId)
     .order("ordre");
   return (data ?? []) as {
@@ -280,6 +305,7 @@ export async function listerPlansComplets(chantierId: string) {
     storage_path: string | null; mime_type: string | null;
     nom_fichier: string | null; taille_octets: number | null; ordre: number;
     nb_pages: number | null;
+    source: "reserves" | "gestion_pro"; gp_version: number | null; gp_maj_disponible: boolean;
   }[];
 }
 
