@@ -172,7 +172,7 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000004
 select lives_ok($$
   insert into public.tools_releves_medias(id, releve_id, categorie, storage_path, mime_type, taille_octets, metadata)
   select 'c4500000-0000-0000-0000-000000000003', 'c4000000-0000-0000-0000-000000000001', 'photos',
-         'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000003.jpg', 'image/jpeg', 700000, m from _meta;
+         'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000003.jpg', 'image/jpeg', 700000, m || jsonb_build_object('empreinteSha256', repeat('cd', 32)) from _meta;
   insert into storage.objects(bucket_id, name, owner, metadata) values
   ('tools-releves', 'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000003.jpg', auth.uid(), '{"size":700000}') $$,
   'S2. second métreur : dépôt sur un relevé partagé');
@@ -211,7 +211,7 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000005
 select throws_ok($$ select public.tools_releve_retirer_photo('c4500000-0000-0000-0000-000000000001') $$,
   'P0002', null, 'R2. consultation : retrait impossible');
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000003', true);
-select is(public.tools_releve_retirer_photo('c4500000-0000-0000-0000-000000000001'),
+select is(public.tools_releve_retirer_photo('c4500000-0000-0000-0000-000000000001')->>'chemin',
   'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000001.jpg',
   'R3. propriétaire : retrait, chemin du fichier renvoyé pour suppression');
 select is(
@@ -244,10 +244,10 @@ insert into public.tools_releves_elements(id, releve_id, type, etage_id, donnees
 insert into public.tools_releves_medias(id, releve_id, categorie, storage_path, mime_type, taille_octets, metadata)
 select 'c4500000-0000-0000-0000-000000000004', 'c4000000-0000-0000-0000-000000000001', 'photos',
        'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000004.jpg', 'image/jpeg', 900000,
-       m || '{"remplaceMediaId":"c4500000-0000-0000-0000-000000000002"}' from _meta;
+       m || jsonb_build_object('remplaceMediaId', 'c4500000-0000-0000-0000-000000000002', 'empreinteSha256', repeat('ef', 32)) from _meta;
 select throws_ok($$ select public.tools_releve_remplacer_photo('c4500000-0000-0000-0000-000000000002', 'c4500000-0000-0000-0000-000000000002') $$,
   '22023', null, 'P1. une photo ne se remplace pas par elle-même');
-select is(public.tools_releve_remplacer_photo('c4500000-0000-0000-0000-000000000002', 'c4500000-0000-0000-0000-000000000004'),
+select is(public.tools_releve_remplacer_photo('c4500000-0000-0000-0000-000000000002', 'c4500000-0000-0000-0000-000000000004')->>'chemin',
   'a0000000-0000-0000-0000-000000000001/c4000000-0000-0000-0000-000000000001/photos/c4500000-0000-0000-0000-000000000002.jpg',
   'P2. remplacement : chemin de l''ancien fichier renvoyé');
 select is(

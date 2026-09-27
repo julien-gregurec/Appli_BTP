@@ -1,7 +1,10 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 4 — CAPTURE TERRAIN PHOTO & MÉDIAS V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md
 --
--- Strictement ADDITIF par rapport à 601–604 (aucune ligne existante invalidée, aucune donnée migrée) :
+-- Posée APRÈS le Lot 3 (20260927000701). Reprise du travail Lot 4 commencé sur le Lot 2 (ex-605,
+-- jamais appliquée ailleurs) puis adaptée à la hiérarchie terrain du Lot 3 (§7 à §10).
+--
+-- Strictement ADDITIF par rapport à 601–701 (aucune ligne existante invalidée, aucune donnée migrée) :
 --   1. `tools_releves_medias.metadata` : métadonnées de preuve d'une photo (date, heure, orientation,
 --      dimensions, source, compression, empreinte SHA-256, lignée de remplacement). Liste de clés
 --      FERMÉE : aucune géolocalisation ne peut être stockée. Défaut '{}' (lignes antérieures valides).
@@ -16,6 +19,19 @@
 --   5. Policy Storage DELETE : en plus de `delete` sur le relevé, l'auteur d'un dépôt (`owner`) peut
 --      supprimer SON fichier tant qu'il peut écrire dans le relevé.
 --   6. RGPD : `manifeste_fichiers_entreprise` inclut le bucket `tools-releves` (reste à faire du Lot 2, D5).
+--   7. Colonnes Lot 4 sur la hiérarchie Lot 3 : commentaire de photo (distinct des annotations),
+--      état documenté (initial / corrige / projete / as_built), version de référence au dépôt
+--      (imposée par le serveur), miniature ; une photo identique (même SHA-256) n'est déposée
+--      qu'une fois par relevé.
+--   8. Intégrité des rattachements : un PhotoAnchor désigne une cible ACTIVE du même relevé
+--      (relevé, chantier, bâtiment, étage, zone, pièce, mur, équipement, point du plan) et ses
+--      colonnes etage_id / piece_id sont exactement celles de la cible ; une annotation sur photo
+--      est portée par un PhotoAnchor actif. Aucun rattachement générique ambigu.
+--   9. Cascade : la suppression douce (et la restauration) d'un chantier, bâtiment, zone, mur,
+--      équipement ou PhotoAnchor emporte les rattachements / annotations qui en dépendent
+--      (étage et pièce : cascade existante par etage_id / piece_id).
+--  10. Versions : un fichier photo référencé par une version figée ne peut plus être supprimé
+--      physiquement par un utilisateur (seule la purge RGPD service_role le supprime).
 -- Miroir TypeScript : packages/releve-domain/src/{media,photo,validation,media-service}.ts (parité testée).
 
 -- ── 1. Métadonnées de photo ─────────────────────────────────────────────────
@@ -74,7 +90,9 @@ returns trigger language plpgsql set search_path = public as $$
 begin
   if new.categorie is distinct from old.categorie or new.storage_path is distinct from old.storage_path
      or new.mime_type is distinct from old.mime_type or new.taille_octets is distinct from old.taille_octets
-     or new.metadata is distinct from old.metadata then
+     or new.metadata is distinct from old.metadata
+     or to_jsonb(new)->'version_reference_id' is distinct from to_jsonb(old)->'version_reference_id'
+     or to_jsonb(new)->'miniature_storage_path' is distinct from to_jsonb(old)->'miniature_storage_path' then
     raise exception 'Un média déposé est immuable : déposez un nouveau fichier (remplacement)' using errcode = '42501';
   end if;
   return new;
@@ -83,6 +101,214 @@ $$;
 revoke all on function public.tools_releve_media_immuable() from public, anon, authenticated;
 create trigger tools_releves_medias_immuable before update on public.tools_releves_medias
   for each row execute function public.tools_releve_media_immuable();
+
+-- ── 2 bis. Colonnes Lot 4 sur la hiérarchie du Lot 3 (§7) ─────────────────────
+-- commentaire     : note libre sur la photo (≠ annotation graphique), modifiable, journalisée
+--                   (nom du champ seulement, jamais le contenu) ;
+-- etat_documente  : état du bâtiment que la photo documente (existant = 'initial', corrigé,
+--                   projeté, tel que construit) — base de la future comparaison de versions ;
+-- version_reference_id : dernière version figée au moment du dépôt (la photo appartient à
+--                   l'état qui la suit), IMPOSÉE par le serveur, immuable ;
+-- miniature_storage_path  : miniature JPEG (galerie), même dossier `photos`, immuable.
+alter table public.tools_releves_medias
+  add column commentaire text
+    check (commentaire is null or (btrim(commentaire) <> '' and char_length(commentaire) <= 2000)),
+  add column etat_documente text not null default 'initial'
+    check (etat_documente in ('initial','corrige','projete','as_built')),
+  add column version_reference_id uuid,
+  add column miniature_storage_path text check (miniature_storage_path is null or char_length(miniature_storage_path) <= 300);
+alter table public.tools_releves_medias
+  add constraint tools_releves_medias_version_reference_fkey foreign key (version_reference_id, releve_id)
+    references public.tools_releves_versions(id, releve_id) on delete set null (version_reference_id),
+  add constraint tools_releves_medias_miniature_canonique check (
+    miniature_storage_path is null or (categorie = 'photos' and miniature_storage_path <> storage_path
+      and miniature_storage_path ~ ('^' || entreprise_id::text || '/' || releve_id::text
+                            || '/photos/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$')));
+create unique index tools_releves_medias_miniature_unique on public.tools_releves_medias (miniature_storage_path)
+  where miniature_storage_path is not null;
+-- Doublon : une même photo (mêmes octets déposés) n'est active qu'une fois par relevé.
+create unique index tools_releves_medias_empreinte_unique
+  on public.tools_releves_medias (releve_id, (metadata->>'empreinteSha256'))
+  where deleted_at is null and categorie = 'photos' and metadata ? 'empreinteSha256';
+create index tools_releves_medias_version_reference_idx on public.tools_releves_medias (version_reference_id)
+  where version_reference_id is not null;
+comment on column public.tools_releves_medias.commentaire is 'Lot 4 : commentaire de la photo (distinct des annotations graphiques).';
+comment on column public.tools_releves_medias.etat_documente is 'Lot 4 : état documenté par la photo (initial, corrige, projete, as_built).';
+comment on column public.tools_releves_medias.version_reference_id is 'Lot 4 : dernière version figée au dépôt (imposée par le serveur).';
+
+create or replace function public.tools_releve_media_avant_insertion()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  -- Version de référence : jamais déclarative.
+  new.version_reference_id := (select v.id from public.tools_releves_versions v
+                                where v.releve_id = new.releve_id order by v.numero desc limit 1);
+  -- Une miniature ne désigne jamais le fichier d'un autre média.
+  if new.miniature_storage_path is not null and exists (
+    select 1 from public.tools_releves_medias m
+    where m.storage_path = new.miniature_storage_path or m.miniature_storage_path = new.miniature_storage_path
+  ) then
+    raise exception 'Miniature déjà utilisée' using errcode = '23505';
+  end if;
+  if exists (select 1 from public.tools_releves_medias m where m.miniature_storage_path = new.storage_path) then
+    raise exception 'Chemin déjà utilisé' using errcode = '23505';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.tools_releve_media_avant_insertion() from public, anon, authenticated;
+create trigger tools_releves_medias_avant_insertion before insert on public.tools_releves_medias
+  for each row execute function public.tools_releve_media_avant_insertion();
+
+-- ── 2 ter. Fichiers figés par une version (§10) ───────────────────────────────
+-- Une version est un instantané immuable qui liste les médias actifs : leurs fichiers ne
+-- doivent plus disparaître, sinon la version « casse ». Le retrait d'une telle photo reste
+-- possible (suppression douce), mais le fichier est conservé ; seule la purge RGPD de
+-- l'entreprise (service_role, hors RLS) le supprime.
+create or replace function public.tools_releve_media_fige(p_media_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.tools_releves_medias m
+    join public.tools_releves_versions v on v.releve_id = m.releve_id
+    where m.id = p_media_id and v.contenu->'medias' @> jsonb_build_array(jsonb_build_object('id', m.id))
+  );
+$$;
+
+create or replace function public.tools_releve_fichier_fige(p_chemin text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.tools_releves_medias m
+    join public.tools_releves_versions v on v.releve_id = m.releve_id
+    where (m.storage_path = p_chemin or m.miniature_storage_path = p_chemin)
+      and v.contenu->'medias' @> jsonb_build_array(jsonb_build_object('id', m.id))
+  );
+$$;
+
+-- ── 2 quater. Intégrité des rattachements sur la hiérarchie Lot 3 (§8) ────────
+-- Cible d'un PhotoAnchor : active, du même relevé ; etage_id / piece_id = ceux de la cible.
+-- Annotation dessinée sur une photo : portée par un PhotoAnchor actif, mêmes colonnes.
+create or replace function public.tools_releve_rattachement_photo_garde()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_ancre jsonb := new.donnees->'ancre';
+  v_kind text; v_id uuid; v_etage uuid; v_piece uuid; v_trouve boolean := false; v_media record;
+  v_support record;
+begin
+  if tg_op = 'UPDATE' and new.deleted_at is not null then return new; end if;
+  if tg_op = 'UPDATE' and new.donnees is not distinct from old.donnees and new.etage_id is not distinct from old.etage_id
+     and new.piece_id is not distinct from old.piece_id and old.deleted_at is null then
+    return new;
+  end if;
+
+  if new.type = 'photo_anchor' then
+    select m.releve_id, m.categorie, m.deleted_at into v_media
+      from public.tools_releves_medias m where m.id = (new.donnees->>'mediaId')::uuid;
+    if not found or v_media.releve_id <> new.releve_id or v_media.categorie <> 'photos' then
+      raise exception 'Photo introuvable dans ce relevé' using errcode = '23514';
+    end if;
+    if v_media.deleted_at is not null and (tg_op = 'INSERT' or old.deleted_at is null) then
+      raise exception 'Photo retirée : restaurez-la d''abord' using errcode = '23514';
+    end if;
+    v_kind := coalesce(v_ancre->>'kind', '');
+    if v_kind = 'plan' or v_kind = 'point' then
+      v_id := (v_ancre->>'etageId')::uuid;
+      select true, e.id, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves_etages e
+       where e.id = v_id and e.releve_id = new.releve_id and e.deleted_at is null;
+    elsif v_kind = 'entite' then
+      v_kind := v_ancre->'ref'->>'kind';
+      v_id := (v_ancre->'ref'->>'id')::uuid;
+      case v_kind
+        when 'releve' then
+          select true, null::uuid, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves r
+           where r.id = v_id and r.id = new.releve_id and r.deleted_at is null;
+        when 'chantier' then
+          select true, null::uuid, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves_chantiers c
+           where c.id = v_id and c.releve_id = new.releve_id and c.deleted_at is null;
+        when 'batiment' then
+          select true, null::uuid, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves_batiments b
+           where b.id = v_id and b.releve_id = new.releve_id and b.deleted_at is null;
+        when 'etage' then
+          select true, e.id, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves_etages e
+           where e.id = v_id and e.releve_id = new.releve_id and e.deleted_at is null;
+        when 'zone' then
+          select true, z.etage_id, null::uuid into v_trouve, v_etage, v_piece from public.tools_releves_zones z
+           where z.id = v_id and z.releve_id = new.releve_id and z.deleted_at is null;
+        when 'piece' then
+          select true, p.etage_id, p.id into v_trouve, v_etage, v_piece from public.tools_releves_pieces p
+           where p.id = v_id and p.releve_id = new.releve_id and p.deleted_at is null;
+        when 'element' then
+          select true, x.etage_id, x.piece_id into v_trouve, v_etage, v_piece from public.tools_releves_elements x
+           where x.id = v_id and x.releve_id = new.releve_id and x.deleted_at is null and x.type in ('mur','equipement');
+        else v_trouve := false;
+      end case;
+    end if;
+    if not coalesce(v_trouve, false) then
+      raise exception 'Cible de la photo introuvable, retirée ou d''un autre relevé' using errcode = '23514';
+    end if;
+    if new.etage_id is distinct from v_etage or new.piece_id is distinct from v_piece then
+      raise exception 'Rattachement incohérent : étage / pièce différents de ceux de la cible' using errcode = '23514';
+    end if;
+  elsif new.type = 'annotation' and new.donnees->'geometrie'->>'espace' = 'photo' then
+    if v_ancre->>'kind' is distinct from 'entite' or v_ancre->'ref'->>'kind' is distinct from 'element' then
+      raise exception 'Une annotation sur photo est portée par un rattachement photo' using errcode = '23514';
+    end if;
+    select x.etage_id, x.piece_id into v_support from public.tools_releves_elements x
+     where x.id = (v_ancre->'ref'->>'id')::uuid and x.releve_id = new.releve_id and x.type = 'photo_anchor' and x.deleted_at is null;
+    if not found then
+      raise exception 'Rattachement photo introuvable ou retiré' using errcode = '23514';
+    end if;
+    if new.etage_id is distinct from v_support.etage_id or new.piece_id is distinct from v_support.piece_id then
+      raise exception 'Annotation incohérente avec la photo annotée' using errcode = '23514';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.tools_releve_rattachement_photo_garde() from public, anon, authenticated;
+create trigger tools_releves_elements_rattachement_photo before insert or update on public.tools_releves_elements
+  for each row when (new.type in ('photo_anchor','annotation'))
+  execute function public.tools_releve_rattachement_photo_garde();
+
+-- ── 2 quinquies. Cascade des rattachements photo (§9) ─────────────────────────
+-- Étage et pièce : cascade existante (etage_id / piece_id). Ici : chantier, bâtiment, zone,
+-- mur / équipement → PhotoAnchor qui les désignent ; PhotoAnchor → annotations dessinées dessus.
+-- Même règle que `tools_releve_cascade_suppression` : restauration des seuls descendants
+-- supprimés par la même cascade (même horodatage).
+create or replace function public.tools_releve_cascade_photos()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_supprime boolean := new.deleted_at is not null;
+  -- Accès par jsonb : PL/pgSQL ne résout `new.type` que pour la table qui la possède.
+  v_type text := to_jsonb(new)->>'type';
+  v_kind text := case tg_table_name when 'tools_releves_chantiers' then 'chantier' when 'tools_releves_batiments' then 'batiment'
+                                    when 'tools_releves_zones' then 'zone' else 'element' end;
+begin
+  if new.deleted_at is not distinct from old.deleted_at then return null; end if;
+  if v_type = 'photo_anchor' then
+    update public.tools_releves_elements set deleted_at = new.deleted_at
+     where releve_id = new.releve_id and type = 'annotation' and donnees->'geometrie'->>'espace' = 'photo'
+       and donnees->'ancre'->'ref'->>'kind' = 'element' and donnees->'ancre'->'ref'->>'id' = new.id::text
+       and (case when v_supprime then deleted_at is null else deleted_at = old.deleted_at end);
+    return null;
+  end if;
+  if tg_table_name = 'tools_releves_elements' and v_type not in ('mur','equipement') then return null; end if;
+  update public.tools_releves_elements set deleted_at = new.deleted_at
+   where releve_id = new.releve_id and type = 'photo_anchor' and donnees->'ancre'->>'kind' = 'entite'
+     and donnees->'ancre'->'ref'->>'kind' = v_kind and donnees->'ancre'->'ref'->>'id' = new.id::text
+     and (case when v_supprime then deleted_at is null else deleted_at = old.deleted_at end);
+  return null;
+end;
+$$;
+revoke all on function public.tools_releve_cascade_photos() from public, anon, authenticated;
+do $$
+declare v_table text;
+begin
+  foreach v_table in array array['tools_releves_chantiers','tools_releves_batiments','tools_releves_zones','tools_releves_elements'] loop
+    execute format('create trigger %I after update of deleted_at on public.%I for each row execute function public.tools_releve_cascade_photos()',
+                   v_table || '_cascade_photos', v_table);
+  end loop;
+end $$;
+create index tools_releves_elements_photo_media_idx on public.tools_releves_elements (releve_id, (donnees->>'mediaId'))
+  where type = 'photo_anchor';
 
 -- ── 3. Validateur d'éléments : repères, ancre plan, annotations sur photo ────
 create or replace function public.tools_releve_nombre_unitaire(p_valeur jsonb)
@@ -189,37 +415,32 @@ $$;
 
 -- ── 4. Retrait et remplacement atomiques (SECURITY INVOKER : la RLS s'applique) ──
 -- Retire une photo : le média, les PhotoAnchor qui la portent et les annotations dessinées
--- dessus. Renvoie le chemin du fichier, que le client supprime s'il en a le droit (policy 5).
+-- dessus (cascade §9). Renvoie les chemins du fichier et de sa miniature, et `fige` : vrai si
+-- une version figée référence la photo (le fichier doit alors être conservé, §10).
 create or replace function public.tools_releve_retirer_photo(p_media_id uuid)
-returns text language plpgsql security invoker set search_path = public as $$
-declare v_releve uuid; v_chemin text; v_ancres uuid[];
+returns jsonb language plpgsql security invoker set search_path = public as $$
+declare v_releve uuid; v_chemin text; v_miniature text;
 begin
   update public.tools_releves_medias set deleted_at = now()
    where id = p_media_id and categorie = 'photos' and deleted_at is null
-  returning releve_id, storage_path into v_releve, v_chemin;
+  returning releve_id, storage_path, miniature_storage_path into v_releve, v_chemin, v_miniature;
   if v_releve is null then raise exception 'Photo introuvable ou non modifiable' using errcode = 'P0002'; end if;
-  with retirees as (
-    update public.tools_releves_elements set deleted_at = now()
-     where releve_id = v_releve and type = 'photo_anchor' and deleted_at is null and donnees->>'mediaId' = p_media_id::text
-    returning id
-  ) select coalesce(array_agg(id), '{}') into v_ancres from retirees;
+  -- Les annotations suivent leur PhotoAnchor (trigger de cascade §9).
   update public.tools_releves_elements set deleted_at = now()
-   where releve_id = v_releve and type = 'annotation' and deleted_at is null
-     and donnees->'geometrie'->>'espace' = 'photo' and donnees->'ancre'->'ref'->>'kind' = 'element'
-     and (donnees->'ancre'->'ref'->>'id')::uuid = any(v_ancres);
-  return v_chemin;
+   where releve_id = v_releve and type = 'photo_anchor' and deleted_at is null and donnees->>'mediaId' = p_media_id::text;
+  return jsonb_build_object('chemin', v_chemin, 'miniature', v_miniature, 'fige', public.tools_releve_media_fige(p_media_id));
 end;
 $$;
 
 -- Remplace une photo par une autre DÉJÀ déposée dans le même relevé : les ancres pointent sur la
 -- nouvelle (repères remis à zéro), les annotations de l'ancienne image sont retirées, l'ancienne
--- photo est retirée. Renvoie le chemin de l'ancien fichier.
+-- photo est retirée. Le commentaire est repris s'il n'y en a pas sur la nouvelle.
 create or replace function public.tools_releve_remplacer_photo(p_ancien uuid, p_nouveau uuid)
-returns text language plpgsql security invoker set search_path = public as $$
-declare v_releve uuid; v_chemin text; v_ancres uuid[];
+returns jsonb language plpgsql security invoker set search_path = public as $$
+declare v_releve uuid; v_chemin text; v_miniature text; v_commentaire text; v_ancres uuid[];
 begin
   if p_ancien = p_nouveau then raise exception 'Une photo ne se remplace pas par elle-même' using errcode = '22023'; end if;
-  select a.releve_id, a.storage_path into v_releve, v_chemin
+  select a.releve_id, a.storage_path, a.miniature_storage_path, a.commentaire into v_releve, v_chemin, v_miniature, v_commentaire
     from public.tools_releves_medias a join public.tools_releves_medias n on n.releve_id = a.releve_id
    where a.id = p_ancien and n.id = p_nouveau and a.categorie = 'photos' and n.categorie = 'photos'
      and a.deleted_at is null and n.deleted_at is null;
@@ -234,16 +455,18 @@ begin
    where releve_id = v_releve and type = 'annotation' and deleted_at is null
      and donnees->'geometrie'->>'espace' = 'photo' and donnees->'ancre'->'ref'->>'kind' = 'element'
      and (donnees->'ancre'->'ref'->>'id')::uuid = any(v_ancres);
+  update public.tools_releves_medias set commentaire = coalesce(commentaire, v_commentaire) where id = p_nouveau and v_commentaire is not null;
   update public.tools_releves_medias set deleted_at = now() where id = p_ancien;
-  return v_chemin;
+  return jsonb_build_object('chemin', v_chemin, 'miniature', v_miniature, 'fige', public.tools_releve_media_fige(p_ancien));
 end;
 $$;
 
 -- ── 5. Storage : l'auteur d'un dépôt peut supprimer son propre fichier ─────────
+-- (jamais un fichier figé par une version : §10, fonctions définies plus haut)
 drop policy if exists tools_releves_storage_delete on storage.objects;
 create policy tools_releves_storage_delete on storage.objects
   for delete to authenticated
-  using (bucket_id = 'tools-releves' and (
+  using (bucket_id = 'tools-releves' and not public.tools_releve_fichier_fige(name) and (
     public.tools_releve_storage_autorise(name, 'suppression')
     or (owner = auth.uid() and public.tools_releve_storage_autorise(name, 'ecriture'))
   ));
@@ -325,6 +548,16 @@ begin
       'created_at', m.created_at
     )
     from public.tools_releves_medias m where m.entreprise_id = p_entreprise_id
+    union all
+    -- Miniatures des photos (même bucket, même propriétaire).
+    select jsonb_build_object(
+      'table', 'tools_releves_medias.miniature', 'bucket', 'tools-releves', 'id', m.id,
+      'storage_path', m.miniature_storage_path, 'nom_fichier', null,
+      'mime_type', 'image/jpeg', 'taille_octets', null,
+      'proprietaire', jsonb_build_object('type', 'releve', 'id', m.releve_id),
+      'created_at', m.created_at
+    )
+    from public.tools_releves_medias m where m.entreprise_id = p_entreprise_id and m.miniature_storage_path is not null
   ) x;
   return v_fichiers;
 exception
@@ -353,6 +586,8 @@ begin
     'public.tools_releve_reperes_valides(jsonb)',
     'public.tools_releve_geometrie_photo_valide(text,jsonb)',
     'public.tools_releve_retirer_photo(uuid)',
+    'public.tools_releve_media_fige(uuid)',
+    'public.tools_releve_fichier_fige(text)',
     'public.tools_releve_remplacer_photo(uuid,uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon', v_signature);
