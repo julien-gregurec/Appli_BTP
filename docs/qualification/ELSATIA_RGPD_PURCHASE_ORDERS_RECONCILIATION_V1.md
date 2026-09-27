@@ -329,8 +329,8 @@ Aucun test n'est supprimé ni désactivé.
 | Confirmation `reglements_fournisseurs` RETAIN | propriétaire, non bloquante | à confirmer | alternative : aucune qui ne falsifie la facture fournisseur conservée (§6) |
 | Durée de conservation des instantanés de commandes | non requise au titre du RGPD (aucune donnée personnelle) | `conserver_jusqu_au = NULL` : régime des pièces comptables, non daté (point préexistant « conservation des factures par l'éditeur », rapport factures V1 §10) | si une durée est fixée pour les pièces comptables, une migration pourra la poser (le trigger d'immutabilité admet déjà la suppression après échéance) |
 | Désignations libres des lignes | résiduel | signalé | même résidu que `lignes_factures` (RETAIN) |
-| Le bon de commande imprimé lit la fiche **vivante** du fournisseur et de l'entreprise | préexistant, hors purge | signalé | une réimpression après modification de la fiche fournisseur ne reproduit pas le bon envoyé ; un instantané à l'envoi (comme les devis/factures) serait le correctif produit |
-| `affectations_historique` après purge incomplète | préexistant | signalé | §9 ¹ |
+| Le bon de commande imprimé lit la fiche **vivante** du fournisseur et de l'entreprise | préexistant, hors purge | **fermé** par `…507` (`ELSATIA_RGPD_PURGE_RESIDUAL_DEBT_CLOSURE_V1.md`) | identité imprimée figée à la sortie du brouillon |
+| `affectations_historique` après purge incomplète | préexistant | **fermé** par `…507` (`ELSATIA_RGPD_PURGE_RESIDUAL_DEBT_CLOSURE_V1.md`) | §9 ¹ : la purge n'historise plus ses propres suppressions ; balayage final aussi en cas d'échec |
 | Fichiers Storage binaires, GoTrue, Supabase hébergé | exécution distante | NOT PROVEN localement | même réserve que les lots précédents |
 | Numérotation | à noter pour la suite | — | `…506` suit `…505` ; les branches en vol listées par V3 (`…401` Tools, `…347` Réserves) devront être renumérotées **après `…506`** |
 

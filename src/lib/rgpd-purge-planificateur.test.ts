@@ -30,9 +30,13 @@ type Table = { categorie: "DELETE" | "ANONYMIZE" | "RETAIN"; ordre: number; lign
 // Faux serveur en mémoire qui reproduit le contrat des RPC de purge : idempotence
 // (table vide → ok, 0 ligne), rapport qui n'affiche que les tables DELETE non vides,
 // classement Storage ORPHELIN/A_PURGER, garde de complétude du marquage.
-function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStorage?: number; cacheRecree?: boolean } = {}) {
+function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStorage?: number; cacheRecree?: boolean; historiqueRecree?: boolean } = {}) {
   const tables: Record<string, Table> = {
     ...(options.cacheRecree ? { entreprises_dashboard_cache: { categorie: "DELETE" as const, ordre: 0, lignes: 1 } } : {}),
+    // Table vide au rapport initial (donc non listée), remplie par trigger quand une
+    // étape suivante supprime ses lignes sources (cas affectations → affectations_historique
+    // avant 20260927000507).
+    ...(options.historiqueRecree ? { affectations_historique: { categorie: "DELETE" as const, ordre: 0, lignes: 0 } } : {}),
     pointages: { categorie: "DELETE", ordre: 0, lignes: 3 },
     chantiers: { categorie: "DELETE", ordre: 1, lignes: 2 },
     clients: { categorie: "ANONYMIZE", ordre: 0, lignes: 2 },
@@ -87,6 +91,7 @@ function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStora
       tables[table].lignes = 0;
       // Trigger réel : supprimer des chantiers/devis recrée la ligne de cache du tableau de bord.
       if (table === "chantiers" && n > 0 && tables.entreprises_dashboard_cache) tables.entreprises_dashboard_cache.lignes = 1;
+      if (table === "pointages" && n > 0 && tables.affectations_historique) tables.affectations_historique.lignes += n;
       return { ok: true, lignes: n, erreur: null };
     },
     async anonymiserTable(_id, table) {
@@ -303,6 +308,26 @@ describe("planifierPurgesRgpd — exécution, idempotence, retry", () => {
     expect(bilan.traitees[0].runId).toBe(premier.traitees[0].runId);
     expect(new Set(serveur.audit.map((a) => a.runId)).size).toBe(1);
     expect(serveur.estPurgee()).toBe(true);
+  });
+
+  it("purge incomplète : une table re-remplie par trigger est vidée dans le même passage, le rejeu ne supprime plus rien", async () => {
+    const serveur = fauxServeur({ historiqueRecree: true, echecsPurge: { chantiers: 99 } });
+    const runId = runIdPlanifie(ID_A, candidatEchu().suppression_prevue_at as string);
+    const premiere = await executerPurgeEntreprise(serveur.port, ID_A, runId, "execute");
+    expect(premiere.statut).toBe("incomplete");
+    expect(premiere.echecs.map((e) => e.cible)).toEqual(["chantiers"]);
+    expect(serveur.tables.affectations_historique.lignes).toBe(0);
+    // Le balayage n'insiste pas sur la table en échec et ne touche ni RETAIN ni ANONYMIZE.
+    const apresPremiere = serveur.appels.length;
+    expect(serveur.appels.filter((a) => a === "purger:chantiers")).toHaveLength(2);
+    expect(serveur.appels).not.toContain("purger:factures");
+    expect(serveur.appels).not.toContain("anonymiser:clients");
+    expect(serveur.tables.factures.lignes).toBe(5);
+
+    const rejeu = await executerPurgeEntreprise(serveur.port, ID_A, runId, "execute");
+    expect(rejeu.statut).toBe("incomplete");
+    expect(serveur.appels.slice(apresPremiere).filter((a) => a.startsWith("purger:") && a !== "purger:chantiers")).toEqual([]);
+    expect(serveur.tables.affectations_historique.lignes).toBe(0);
   });
 
   it("retry Storage : un échec de suppression de fichier n'aboutit jamais au marquage, le passage suivant termine", async () => {

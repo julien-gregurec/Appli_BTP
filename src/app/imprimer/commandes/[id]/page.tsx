@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { identiteBonCommande } from "@/lib/commande-document";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
 import { AutoPrint } from "@/components/AutoPrint";
 
@@ -16,5 +17,7 @@ export default async function ImprimerCommandePage({ params }: { params: Promise
   ]);
   if (!commande) notFound();
   const fournisseur = Array.isArray(commande.fournisseur) ? commande.fournisseur[0] : commande.fournisseur;
-  return <><AutoPrint /><DocumentImprimable typeDoc="Bon de commande" numero={commande.numero} dateEmission={commande.date_commande} dateSecondaire={commande.date_livraison_prevue ? { label: "Livraison souhaitée le", valeur: commande.date_livraison_prevue } : null} entreprise={entreprise ?? { nom: ctx.entrepriseNom }} client={{ nom_affiche: fournisseur?.nom ?? "—", adresse_facturation: fournisseur?.adresse, code_postal: fournisseur?.code_postal, ville: fournisseur?.ville, siret: fournisseur?.siret }} lignes={(lignes ?? []).map((ligne) => ({ designation: ligne.designation, description: ligne.description, quantite: ligne.quantite, unite: ligne.unite, prix_unitaire_ht: ligne.prix_unitaire_ht, remise_ligne: 0, taux_tva: ligne.taux_tva }))} montantHt={commande.montant_ht} montantTva={commande.montant_tva} montantTtc={commande.montant_ttc} estFacture={false} signatures={signatures ?? []} /></>;
+  // Commande sortie du brouillon : identités figées à l'envoi (20260927000507), jamais les fiches courantes.
+  const identite = identiteBonCommande({ commande, ficheFournisseur: fournisseur, ficheEntreprise: entreprise, nomEntrepriseParDefaut: ctx.entrepriseNom });
+  return <><AutoPrint /><DocumentImprimable typeDoc="Bon de commande" numero={commande.numero} dateEmission={commande.date_commande} dateSecondaire={commande.date_livraison_prevue ? { label: "Livraison souhaitée le", valeur: commande.date_livraison_prevue } : null} entreprise={identite.emetteur} client={identite.destinataire} lignes={(lignes ?? []).map((ligne) => ({ designation: ligne.designation, description: ligne.description, quantite: ligne.quantite, unite: ligne.unite, prix_unitaire_ht: ligne.prix_unitaire_ht, remise_ligne: 0, taux_tva: ligne.taux_tva }))} montantHt={commande.montant_ht} montantTva={commande.montant_tva} montantTtc={commande.montant_ttc} estFacture={false} signatures={signatures ?? []} /></>;
 }

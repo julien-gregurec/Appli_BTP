@@ -154,6 +154,20 @@ async function anonymiserUneTable(tableNom, runId) {
   return data?.[0] ?? { ok: false, lignes_anonymisees: null, erreur: "réponse RPC vide" };
 }
 
+// Relit le rapport et repurge les tables DELETE encore non vides (hors `exclues`, déjà en
+// échec dans ce passage), jusqu'à stabilité.
+async function balayageFinal(runId, exclues) {
+  for (let balayage = 1; balayage <= 3; balayage += 1) {
+    const restantes = (await rapport()).filter((l) => l.categorie === "DELETE" && !exclues.has(l.table_nom));
+    if (restantes.length === 0) break;
+    for (const l of restantes) {
+      const res = await purgerUneTable(l.table_nom, runId);
+      if (res.ok) console.log(`OK  ${l.table_nom} (${res.lignes_supprimees} ligne(s), balayage final ${balayage})`);
+      else console.error(`ÉCHEC ${l.table_nom} (balayage final ${balayage}) : ${res.erreur}`);
+    }
+  }
+}
+
 async function executer(runId) {
   console.log(`\n=== Purge réelle — run_id=${runId} ===`);
   console.log("En cas d'interruption, reprendre avec :");
@@ -195,6 +209,10 @@ async function executer(runId) {
   }
 
   if (echecs.size > 0) {
+    // Balayage final aussi quand la purge s'arrête : une table déjà vidée dans ce passage
+    // peut avoir été re-remplie par un trigger d'une étape suivante. Le passage laisse
+    // alors le même état qu'un rejeu (seules les tables en échec restent).
+    await balayageFinal(runId, new Set(echecs.keys()));
     console.error(`\n${echecs.size} table(s) restent en échec après rattrapage :`);
     for (const [t, e] of echecs) console.error(`  - ${t} : ${e}`);
     const pasEchue = [...echecs.values()].every((e) => e.includes("aucune suppression programmee echue"));
@@ -223,15 +241,7 @@ async function executer(runId) {
   // trigger une ligne dans une table DELETE déjà vidée (ex. entreprises_dashboard_cache).
   // marquer_entreprise_purgee refuserait alors le marquage : on relit le rapport
   // jusqu'à stabilité avant de passer au Storage.
-  for (let balayage = 1; balayage <= 3; balayage += 1) {
-    const restantes = (await rapport()).filter((l) => l.categorie === "DELETE");
-    if (restantes.length === 0) break;
-    for (const l of restantes) {
-      const res = await purgerUneTable(l.table_nom, runId);
-      if (res.ok) console.log(`OK  ${l.table_nom} (${res.lignes_supprimees} ligne(s), balayage final ${balayage})`);
-      else console.error(`ÉCHEC ${l.table_nom} (balayage final ${balayage}) : ${res.erreur}`);
-    }
-  }
+  await balayageFinal(runId, new Set());
 
   // Storage (F7) : seuls les fichiers ORPHELINs (plus référencés par aucune ligne) sont
   // physiquement supprimés. Les RETAIN (ex. signatures_documents, notes_frais
