@@ -5,6 +5,7 @@ import { cache } from "react";
 import { isStudioId } from "@elsatia/studio-domain";
 import { createStudioClient } from "./supabase";
 import { studioSessionDecision } from "./identity-session";
+import { canWrite, READ_ONLY_MESSAGE } from "./identity-policy";
 import { storageAdmin, STUDIO_BUCKET, PREVIEW_SECONDS } from "./storage-admin";
 import { supabaseConfig } from "./config";
 import { inspectMedia } from "./media-inspection";
@@ -39,11 +40,25 @@ export const mediaContext = cache(async () => {
   if (decision.kind === "revoke") throw new MediaError("Session Studio fermée. Reconnectez-vous.", 401);
   return { client, user, access: decision.access };
 });
+/**
+ * Politique lecture seule (droit Studio retiré côté ELSATIA, compte toujours actif) : toute
+ * écriture passe par ici — `authorizeProject/authorizeAsset(…, true)` ou `writableContext()`.
+ * Garde statique : tests/read-only-policy.test.ts. Défense en profondeur côté base :
+ * migration dédiée 20260927110000_studio_dedicated_admission.sql (création d'espace).
+ */
+export function assertWritable(access: "full" | "read_only") {
+  if (!canWrite(access)) throw new MediaError(READ_ONLY_MESSAGE, 403);
+}
+/** Contexte d'une écriture qui ne vise pas un projet existant (création). */
+export async function writableContext() {
+  const context = await mediaContext();
+  assertWritable(context.access);
+  return context;
+}
 export async function authorizeProject(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Projet inaccessible.", 404);
   const { client, user, access } = await mediaContext();
-  if (write && access === "read_only")
-    throw new MediaError("Accès Studio en lecture seule : aucun droit actif.", 403);
+  if (write) assertWritable(access);
   const {
     data: project,
     error: projectError,
@@ -83,8 +98,7 @@ export async function authorizeProject(id: string, write = false) {
 export async function authorizeAsset(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Média inaccessible.", 404);
   const { client, user, access } = await mediaContext();
-  if (write && access === "read_only")
-    throw new MediaError("Accès Studio en lecture seule : aucun droit actif.", 403);
+  if (write) assertWritable(access);
   const {
     data: asset,
     error: assetError,

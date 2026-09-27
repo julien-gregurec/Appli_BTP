@@ -8,8 +8,38 @@ export type StudioIdentityMode = "elsatia" | "local";
  * `local` : connexion par mot de passe GoTrue, réservé aux instances de test jetables
  * (apps/studio/scripts/local-test.mjs) ; jamais en Preview ni en Production.
  */
-export function identityMode(value = process.env.STUDIO_IDENTITY_MODE): StudioIdentityMode {
-  return value?.trim().toLowerCase() === "local" ? "local" : "elsatia";
+export function identityMode(
+  value = process.env.STUDIO_IDENTITY_MODE,
+  env: Record<string, string | undefined> = process.env,
+): StudioIdentityMode {
+  if (value?.trim().toLowerCase() !== "local") return "elsatia";
+  // Interdit en Preview/Production : le mode mot de passe y est ignoré (FAIL-CLOSED vers le pont).
+  return studioIdentityModeViolation(value, env) ? "elsatia" : "local";
+}
+
+const HOSTED = new Set(["preview", "production"]);
+/**
+ * `local` est réservé aux instances jetables. Refusé dès qu'un indicateur d'environnement désigne
+ * une Preview ou la Production (ELSATIA_APPLICATION_ENV, indicateur canonique, ou VERCEL_ENV posé
+ * par Vercel sur tout déploiement). Retourne le motif, ou null si la configuration est admise.
+ */
+export function studioIdentityModeViolation(
+  value = process.env.STUDIO_IDENTITY_MODE,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  if (value?.trim().toLowerCase() !== "local") return null;
+  const hosted = [env.ELSATIA_APPLICATION_ENV, env.VERCEL_ENV]
+    .map((v) => v?.trim().toLowerCase())
+    .find((v) => v && HOSTED.has(v));
+  return hosted
+    ? `STUDIO_IDENTITY_MODE=local interdit en ${hosted} : seul « Continuer avec mon compte ELSATIA » est admis.`
+    : null;
+}
+
+/** Droit Studio retiré côté ELSATIA, compte toujours actif : lecture conservée, aucune écriture. */
+export const READ_ONLY_MESSAGE = "Accès Studio en lecture seule : aucun droit actif.";
+export function canWrite(access: "full" | "read_only" | undefined): boolean {
+  return access === "full";
 }
 
 export interface SessionStatus {

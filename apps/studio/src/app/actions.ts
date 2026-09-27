@@ -13,11 +13,12 @@ import {
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "../lib/supabase";
 import { studioOrigin } from "../lib/config";
-import { identityMode } from "../lib/identity-policy";
+import { canWrite, identityMode, READ_ONLY_MESSAGE } from "../lib/identity-policy";
 import {
   createPersonalStudioWorkspace,
   createStudioWorkspace,
   getActiveStudioWorkspace,
+  StudioReadOnlyError,
 } from "../lib/workspaces";
 const field = (form: FormData, key: string) => {
   const value = form.get(key);
@@ -93,10 +94,12 @@ export async function onboarding() {
   let id: string;
   try {
     id = await createPersonalStudioWorkspace();
-  } catch {
+  } catch (error) {
     failure(
       "/onboarding",
-      "Création impossible. Réessayez dans quelques instants.",
+      error instanceof StudioReadOnlyError
+        ? READ_ONLY_MESSAGE
+        : "Création impossible. Réessayez dans quelques instants.",
     );
   }
   redirect(`/dashboard?workspace=${id}`);
@@ -105,19 +108,22 @@ export async function createProfessional(form: FormData) {
   let id: string;
   try {
     id = await createStudioWorkspace(field(form, "name"), "professional");
-  } catch {
+  } catch (error) {
     failure(
       "/settings",
-      "Création impossible : nom de 1 à 100 caractères et 20 espaces maximum.",
+      error instanceof StudioReadOnlyError
+        ? READ_ONLY_MESSAGE
+        : "Création impossible : nom de 1 à 100 caractères et 20 espaces maximum.",
     );
   }
   redirect(`/dashboard?workspace=${id}`);
 }
 export async function renameWorkspace(form: FormData) {
-  const { workspace, membership } = await getActiveStudioWorkspace(
+  const { user, workspace, membership } = await getActiveStudioWorkspace(
     field(form, "workspace"),
   );
   const path = `/settings?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
   if (!canManageWorkspace(membership.role)) failure(path, "Accès refusé.");
   let name: string;
   try {
@@ -135,10 +141,11 @@ export async function renameWorkspace(form: FormData) {
   redirect(path);
 }
 export async function archiveWorkspace(form: FormData) {
-  const { workspace, membership } = await getActiveStudioWorkspace(
+  const { user, workspace, membership } = await getActiveStudioWorkspace(
     field(form, "workspace"),
   );
   const path = `/settings?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
   if (membership.role !== "owner" || field(form, "confirm") !== workspace.name)
     failure(path, "Saisissez le nom exact de l’espace pour confirmer.");
   const client = await createStudioClient();
@@ -150,10 +157,11 @@ export async function archiveWorkspace(form: FormData) {
   redirect("/dashboard");
 }
 export async function changeMember(form: FormData) {
-  const { workspace, membership } = await getActiveStudioWorkspace(
+  const { user, workspace, membership } = await getActiveStudioWorkspace(
     field(form, "workspace"),
   );
   const path = `/settings/members?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
   const userId = field(form, "user");
   const role = field(form, "role");
   if (

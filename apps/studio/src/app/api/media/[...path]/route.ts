@@ -2,7 +2,7 @@ import { isTransportError, restErrorStatus } from "../../../../lib/rest-status";
 import { projectMedia } from "../../../../lib/projects";
 import { studioOrigin } from "../../../../lib/config";
 import {
-  mediaContext,
+  writableContext,
   MediaError,
   reserveMedia,
   authorizeUpload,
@@ -125,7 +125,7 @@ async function handle(
           )
         )
           throw new MediaError("Projet invalide.");
-        const { client } = await mediaContext();
+        const { client } = await writableContext();
         const { data, error, status } = await client.rpc(
           "studio_create_project",
           {

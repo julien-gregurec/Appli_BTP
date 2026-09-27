@@ -10,6 +10,7 @@ import {
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "./supabase";
 import { studioSessionDecision } from "./identity-session";
+import { canWrite, READ_ONLY_MESSAGE } from "./identity-policy";
 export const getCurrentStudioUser = cache(async () => {
   const client = await createStudioClient();
   const user = await verifiedUser(() => client.auth.getUser());
@@ -53,11 +54,22 @@ export async function getActiveStudioWorkspace(requested?: string) {
   if (!membership) notFound();
   return { user, workspace, workspaces, membership };
 }
+export class StudioReadOnlyError extends Error {
+  constructor() {
+    super(READ_ONLY_MESSAGE);
+  }
+}
+/** Politique lecture seule des Server Actions : lève si le droit Studio est retiré. */
+export async function requireWritableStudioUser() {
+  const user = await getCurrentStudioUser();
+  if (!canWrite(user.access)) throw new StudioReadOnlyError();
+  return user;
+}
 export async function createStudioWorkspace(
   name: string,
   type: StudioWorkspaceType,
 ) {
-  await getCurrentStudioUser();
+  await requireWritableStudioUser();
   const client = await createStudioClient();
   const { data, error } = await client.rpc("studio_create_workspace", {
     p_name: workspaceName(name),

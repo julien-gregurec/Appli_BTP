@@ -6,13 +6,42 @@ import {
   identityMessage,
   identityMode,
   sessionAges,
+  studioIdentityModeViolation,
+  canWrite,
 } from "../src/lib/identity-policy";
+import { violation as buildViolation } from "../scripts/verify-identity-mode.mjs";
 
 it("mode d'identité : pont ELSATIA par défaut (fail-closed), mot de passe seulement si « local » explicite", () => {
   expect(identityMode(undefined)).toBe("elsatia");
   expect(identityMode("")).toBe("elsatia");
   expect(identityMode("n'importe")).toBe("elsatia");
-  expect(identityMode("local")).toBe("local");
+  expect(identityMode("local", {})).toBe("local");
+});
+
+it("mode local INTERDIT en Preview/Production : ignoré à l'exécution (pont imposé) et refusé au build", () => {
+  for (const env of [
+    { ELSATIA_APPLICATION_ENV: "preview" },
+    { ELSATIA_APPLICATION_ENV: "production" },
+    { VERCEL_ENV: "preview" },
+    { VERCEL_ENV: "production" },
+    { ELSATIA_APPLICATION_ENV: "local", VERCEL_ENV: " Production " },
+  ]) {
+    expect(identityMode("local", env)).toBe("elsatia");
+    expect(studioIdentityModeViolation("local", env)).toMatch(/interdit/);
+    expect(buildViolation({ ...env, STUDIO_IDENTITY_MODE: "LOCAL" })).toMatch(/interdit/);
+  }
+  for (const env of [{}, { ELSATIA_APPLICATION_ENV: "local" }, { ELSATIA_APPLICATION_ENV: "test" }, { VERCEL_ENV: "development" }]) {
+    expect(identityMode("local", env)).toBe("local");
+    expect(studioIdentityModeViolation("local", env)).toBeNull();
+    expect(buildViolation({ ...env, STUDIO_IDENTITY_MODE: "local" })).toBeNull();
+  }
+  expect(studioIdentityModeViolation("elsatia", { VERCEL_ENV: "production" })).toBeNull();
+});
+
+it("écriture : seulement avec un droit Studio actif (lecture seule sinon, jamais « complet » par défaut)", () => {
+  expect(canWrite("full")).toBe(true);
+  expect(canWrite("read_only")).toBe(false);
+  expect(canWrite(undefined)).toBe(false);
 });
 
 it("décision de session : ok, revalidation des navigations, API servies jusqu'à l'âge maximal, révocations", () => {
