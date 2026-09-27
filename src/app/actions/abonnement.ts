@@ -12,15 +12,13 @@ import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/co
 import {
   AbonnementStripeDejaRattache,
   ajouterOptionIAAbonnement,
-  creerOuRecupererClientStripe,
-  creerSessionAbonnementStripe,
   creerSessionPortailStripe,
   estOffreAbonnement,
   estPalierOptionIA,
   estPeriodiciteAbonnement,
   modifierOptionIAAbonnement,
   OFFRES_ABONNEMENT_COMMERCIALISEES,
-  preparerCheckoutAbonnement,
+  ouvrirCheckoutAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
 import {
@@ -66,17 +64,12 @@ export async function demarrerAbonnementAction(formData: FormData) {
   let destination: string;
   try {
     // Essai Stripe = reliquat de l'essai local ELSATIA, jamais un second essai.
-    const essai = await preparerCheckoutAbonnement(ctx.entrepriseId);
-    const customerId = await creerOuRecupererClientStripe({
+    // Refus si une subscription vit déjà (base ou Stripe) ; session unique.
+    const { session } = await ouvrirCheckoutAbonnement({
       entrepriseId: ctx.entrepriseId,
       email: user.email,
-    });
-    const session = await creerSessionAbonnementStripe({
-      entrepriseId: ctx.entrepriseId,
-      customerId,
       offre,
       periodicite,
-      essai,
     });
     if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
     destination = session.url;

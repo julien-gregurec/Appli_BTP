@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { analyserArguments, analyserCle, autoriserExecution, essaiCheckout, matriceJours } from "./stripe-trial-test-mode.mjs";
+import { analyserArguments, analyserCle, autoriserExecution, essaiCheckout, executer, matriceJours } from "./stripe-trial-test-mode.mjs";
 
 const ENTREPRISE = "11111111-1111-4111-8111-111111111111";
 const PRIX = { STRIPE_PRICE_PRO_MENSUEL: "price_pro_test" };
@@ -75,4 +75,102 @@ test("CLI : sans argument, plan affiché, sortie 0, aucun appel réseau", () => 
   const r = spawnSync(process.execPath, ["scripts/qualification/stripe-trial-test-mode.mjs"], { env: { PATH: process.env.PATH }, encoding: "utf8" });
   assert.equal(r.status, 0);
   assert.match(r.stdout, /Aucun appel réseau : plan_seul/);
+});
+
+/** Faux Stripe (hors réseau) : règle 48 h, idempotence qui rejoue la réponse d'origine, expiration. */
+function fauxStripe(trialEndSubscription) {
+  const sessions = new Map();
+  const cles = new Map();
+  const appels = [];
+  let n = 0;
+  const maintenant = () => Math.floor(Date.now() / 1000);
+  const rep = (status, json) => ({ ok: status < 400, status, json: async () => structuredClone(json) });
+  const fetchImpl = async (url, options = {}) => {
+    const [chemin, requete = ""] = url.replace("https://api.stripe.com/v1/", "").split("?");
+    const methode = options.method ?? "GET";
+    appels.push(`${methode} ${chemin}`);
+    assert.ok(url.startsWith("https://api.stripe.com/v1/"));
+    const cle = options.headers?.["Idempotency-Key"];
+    if (cle && cles.has(cle)) return rep(200, cles.get(cle));
+    const corps = Object.fromEntries(new URLSearchParams(options.body?.toString() ?? ""));
+    const q = new URLSearchParams(requete);
+    let r;
+    if (methode === "POST" && chemin === "checkout/sessions") {
+      const te = corps["subscription_data[trial_end]"];
+      if (te && Number(te) < maintenant() + 48 * 3600) return rep(400, { error: { message: "trial_end must be at least 48 hours in the future" } });
+      const s = { id: `cs_f${++n}`, url: `https://checkout.invalid/${n}`, status: "open", customer: corps.customer, metadata: { entreprise_id: corps["metadata[entreprise_id]"], elsatia_qualification: corps["metadata[elsatia_qualification]"] }, livemode: false };
+      sessions.set(s.id, s);
+      r = { ...s };
+    } else if (methode === "POST" && /\/expire$/.test(chemin)) {
+      const s = sessions.get(chemin.split("/")[2]);
+      if (!s || s.status !== "open") return rep(400, { error: { message: "Only open sessions can be expired" } });
+      s.status = "expired";
+      r = { ...s };
+    } else if (methode === "GET" && chemin === "checkout/sessions") {
+      r = { data: [...sessions.values()].filter((s) => s.customer === q.get("customer") && s.status === q.get("status")) };
+    } else if (methode === "GET" && chemin.startsWith("checkout/sessions/")) {
+      r = { ...sessions.get(chemin.split("/")[2]) };
+    } else if (methode === "GET" && chemin === "subscriptions") {
+      r = { data: [] };
+    } else if (methode === "GET" && chemin.startsWith("subscriptions/")) {
+      r = { id: chemin.split("/")[1], status: "trialing", trial_end: trialEndSubscription, livemode: false };
+    } else {
+      throw new Error(`appel non prévu ${methode} ${chemin}`);
+    }
+    if (cle) cles.set(cle, r);
+    return rep(200, r);
+  };
+  return { fetchImpl, sessions, appels };
+}
+
+test("exécution simulée (faux Stripe, aucun réseau) : scénario complet conforme, une seule session réelle ouverte", async () => {
+  const debut = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+  const fin = new Date(Date.parse(`${debut}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
+  // La subscription issue du Checkout réel porte trial_end = fin locale T23:59:59Z.
+  const faux = fauxStripe(Date.parse(`${fin}T23:59:59Z`) / 1000);
+  const args = analyserArguments([...ARGS.map((a) => (a === "2026-10-01" ? debut : a === "2026-10-31" ? fin : a)), "--subscription", "sub_Test1"]);
+  const logs = [];
+  const { log, table, error } = console;
+  console.log = (...m) => logs.push(m.join(" "));
+  console.table = (t) => logs.push(JSON.stringify(t));
+  console.error = (...m) => logs.push(m.join(" "));
+  const sortie = process.exit;
+  let code = null;
+  process.exit = (c) => { code = c; throw new Error("exit"); };
+  try {
+    await executer(args, { STRIPE_SECRET_KEY: cleTest, ...PRIX }, faux.fetchImpl);
+  } catch (e) {
+    if (e.message !== "exit") throw e;
+  } finally {
+    Object.assign(console, { log, table, error });
+    process.exit = sortie;
+  }
+  assert.equal(code, null, logs.join("\n"));
+  const tableau = JSON.parse(logs.find((l) => l.startsWith("[")));
+  assert.ok(tableau.every((ligne) => ligne.conforme), JSON.stringify(tableau));
+  assert.ok(tableau.some((l) => l.cas === "2 sessions simultanées → balayage" && /avant: 2, après: 1/.test(l.stripe)));
+  assert.ok(tableau.some((l) => l.cas === "clé rejouée après expiration" && /état relu: expired/.test(l.stripe)));
+  // Seule la session du Checkout réel de l'entreprise reste ouverte.
+  assert.equal([...faux.sessions.values()].filter((s) => s.status === "open").length, 1);
+});
+
+test("exécution simulée : une subscription dont le trial dépasse la fin locale fait échouer le scénario (sortie 1)", async () => {
+  const debut = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+  const fin = new Date(Date.parse(`${debut}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
+  const faux = fauxStripe(Date.parse(`${fin}T23:59:59Z`) / 1000 + 86_400);
+  const args = analyserArguments([...ARGS.map((a) => (a === "2026-10-01" ? debut : a === "2026-10-31" ? fin : a)), "--subscription", "sub_Test1"]);
+  const { log, table, error } = console;
+  console.log = console.table = console.error = () => {};
+  const sortie = process.exit;
+  let code = null;
+  process.exit = (c) => { code = c; throw new Error("exit"); };
+  try {
+    await executer(args, { STRIPE_SECRET_KEY: cleTest, ...PRIX }, faux.fetchImpl);
+  } catch (e) {
+    if (e.message !== "exit") throw e;
+  } finally {
+    Object.assign(console, { log, table, error });
+    process.exit = sortie;
+  }
+  assert.equal(code, 1);
 });

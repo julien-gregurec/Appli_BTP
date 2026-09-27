@@ -20,6 +20,12 @@
 //      (checkout.session.expired = journal sans effet côté webhook) ;
 //   2. sonde négative : trial_end à 47 h → Stripe doit REFUSER (valide le seuil
 //      DELAI_MINIMUM_TRIAL_END_CHECKOUT_SECONDES) ;
+//   2b. exclusivité Checkout (ouvrirCheckoutAbonnement, §7 du rapport) :
+//      clé d'idempotence rejouée après expiration (la réponse rejouée et l'état
+//      relu sont imprimés : justifie la relecture GET), expiration d'une
+//      session déjà expirée refusée (ignorée par l'application), deux sessions
+//      créées SIMULTANÉMENT puis balayées → une seule reste ouverte, lecture
+//      `subscriptions?status=all` du client ;
 //   3. essai réel de l'entreprise : session Checkout avec le trial_end calculé
 //      depuis --essai-debut/--essai-fin ; l'URL est imprimée pour une complétion
 //      manuelle (carte 4242…) OU utiliser le bouton « S'abonner » de la Preview ;
@@ -141,18 +147,23 @@ export const PLAN = [
   "matrice Checkout jour 29/30/expiré → aucun trial ; Stripe accepte",
   "chaque session de la matrice est expirée aussitôt (checkout.session.expired → journal sans effet)",
   "sonde négative : trial_end = maintenant + 47 h → Stripe REFUSE (seuil 48 h confirmé)",
+  "exclusivité : clé rejouée après expiration (état relu), expire refusé sur session expirée, 2 sessions simultanées → balayage → 1 ouverte",
   "Checkout réel de l'entreprise (trial_end calculé depuis --essai-debut/--essai-fin) → URL imprimée",
   "compléter avec 4242 4242 4242 4242 (ou bouton « S'abonner » de la Preview)",
   "--subscription sub_… : trial_end Stripe ≤ essai_fin locale (ou absent) ; SQL de contrôle",
   "attendu webhooks : customer.subscription.created/updated 200, aucune ligne stripe_essai_ecarts",
 ];
 
-async function executer(args, env) {
+export async function executer(args, env, fetchImpl = fetch) {
   const secret = env.STRIPE_SECRET_KEY;
-  const appel = async (chemin, corps, methode = "POST") => {
-    const reponse = await fetch(`https://api.stripe.com/v1/${chemin}`, {
+  const appel = async (chemin, corps, methode = "POST", idempotence = null) => {
+    const reponse = await fetchImpl(`https://api.stripe.com/v1/${chemin}`, {
       method: methode,
-      headers: { Authorization: `Bearer ${secret}`, ...(corps ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        ...(corps ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+        ...(idempotence ? { "Idempotency-Key": idempotence } : {}),
+      },
       body: corps ? new URLSearchParams(corps) : undefined,
     });
     const donnees = await reponse.json();
@@ -191,6 +202,37 @@ async function executer(args, env) {
     await appel(`checkout/sessions/${sonde.donnees.id}/expire`, {});
   }
   resultats.push({ cas: "sonde 47 h", stripe: sonde.ok ? "ACCEPTÉ (inattendu)" : "refusé (attendu)", conforme: !sonde.ok });
+
+  // 2b. Exclusivité Checkout.
+  const sansEssai = base({ mode: "aucun" });
+  const cle = `elsatia-qualif-trial-${args.entreprise}-${maintenant}`;
+  const s1 = await appel("checkout/sessions", sansEssai, "POST", cle);
+  if (s1.ok) {
+    await appel(`checkout/sessions/${s1.donnees.id}/expire`, {});
+    const rejoue = await appel("checkout/sessions", sansEssai, "POST", cle);
+    const relu = await appel(`checkout/sessions/${s1.donnees.id}`, null, "GET");
+    resultats.push({ cas: "clé rejouée après expiration", stripe: `réponse rejouée: ${rejoue.donnees.status ?? "?"} / état relu: ${relu.donnees.status ?? "?"}`, conforme: relu.ok && relu.donnees.status === "expired" });
+    if (!(relu.ok && relu.donnees.status === "expired")) echecs += 1;
+    const reexpire = await appel(`checkout/sessions/${s1.donnees.id}/expire`, {});
+    resultats.push({ cas: "expire sur session expirée", stripe: reexpire.ok ? "ACCEPTÉ" : "refusé (ignoré par l'application)", conforme: true });
+  } else {
+    echecs += 1;
+    resultats.push({ cas: "clé rejouée après expiration", stripe: s1.donnees.error?.message ?? "refusé", conforme: false });
+  }
+  const [sa, sb] = await Promise.all([appel("checkout/sessions", sansEssai), appel("checkout/sessions", sansEssai)]);
+  const ouvertes = await appel(`checkout/sessions?customer=${encodeURIComponent(args.customer)}&status=open&limit=100`, null, "GET");
+  const nosOuvertes = (ouvertes.donnees.data ?? []).filter((s) => s.metadata?.elsatia_qualification === "stripe_trial_v1");
+  const garder = sb.ok ? sb.donnees.id : null;
+  for (const s of nosOuvertes) if (s.id !== garder) await appel(`checkout/sessions/${s.id}/expire`, {});
+  const apres = await appel(`checkout/sessions?customer=${encodeURIComponent(args.customer)}&status=open&limit=100`, null, "GET");
+  const restantes = (apres.donnees.data ?? []).filter((s) => s.metadata?.elsatia_qualification === "stripe_trial_v1").length;
+  const exclusif = sa.ok && sb.ok && nosOuvertes.length >= 2 && restantes === 1;
+  if (!exclusif) echecs += 1;
+  resultats.push({ cas: "2 sessions simultanées → balayage", stripe: `ouvertes avant: ${nosOuvertes.length}, après: ${restantes}`, conforme: exclusif });
+  if (garder) await appel(`checkout/sessions/${garder}/expire`, {});
+  const subs = await appel(`subscriptions?customer=${encodeURIComponent(args.customer)}&status=all&limit=100`, null, "GET");
+  resultats.push({ cas: "subscriptions?status=all", stripe: subs.ok ? `${(subs.donnees.data ?? []).map((s) => s.status).join(",") || "aucune"}` : "illisible", conforme: subs.ok });
+  if (!subs.ok) echecs += 1;
   console.table(resultats);
 
   const essaiReel = essaiCheckout(args.essaiDebut, args.essaiFin, maintenant);
