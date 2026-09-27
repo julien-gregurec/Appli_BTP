@@ -1,3 +1,11 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- LEGACY — NE PLUS EXÉCUTER (seed compatibility hardening V1, 2026-09-27)
+-- Nettoyage ponctuel du 14-07-2026 à identifiants en dur, dont un identifiant ELSATIA obsolète
+-- (écarté par P11, docs/organisation/REGISTRE_CENTRAL.md).
+-- Refusé par scripts/executer-script-production.mjs (SCRIPTS_LEGACY) ; conservé comme archive.
+-- Classement : scripts/seeds/registry.mjs.
+-- ═══════════════════════════════════════════════════════════════════════
+
 -- Nettoyage production demandé le 14 juillet 2026.
 -- Conserve exclusivement ELSATIA et supprime les deux sociétés de test juju.
 -- Le contrôle par ID + nom évite toute suppression accidentelle.

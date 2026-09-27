@@ -36,6 +36,8 @@
     "test:preview-pack": "node --test scripts/preview/preview-pack.test.mjs",
     "sync:train-expectations": "node scripts/preview/train-expectations.mjs --write",
     "verify:train-expectations": "node scripts/preview/train-expectations.mjs --check",
+    "test:seeds": "node --test scripts/seeds/registry.test.mjs scripts/seed-elsatia-preview-year.test.mjs scripts/garde-scripts-production.test.mjs",
+    "verify:seeds": "node scripts/seeds/verify-seeds.mjs",
     "prebuild": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:gestion-pro": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:reserves": "node scripts/check-env-manifest.mjs --auto --app reserves",

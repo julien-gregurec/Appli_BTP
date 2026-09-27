@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -18,8 +20,6 @@ const DOCUMENT_MARKER = "DOCUMENT FICTIF — RECETTE ELSATIA — SANS VALEUR CON
 const CONFIRMATION = `PEUPLER_${PROJECT_REF}_${COMPANY_ID}`;
 const MAX_GENERATED_REFERENCE = 2_147_483_647;
 const SEED_COMMAND_NUMBER_BASE = 3_000_000_000;
-const READ_BATCH_SIZE = 50;
-const INSERT_BATCH_SIZE = 100;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const BUSINESS_ROLES = [
@@ -34,15 +34,6 @@ const BUSINESS_ROLES = [
   "Gérant",
 ];
 const ALL_ROLES = [...BUSINESS_ROLES, "Compte dépôt"];
-const REQUIRED_TABLES = [
-  "entreprises", "utilisateurs", "utilisateurs_entreprises", "postes", "permissions_poste",
-  "employes", "clients", "contacts_clients", "types_chantier", "chantiers", "taches",
-  "prestations_catalogue", "devis", "lignes_devis", "factures", "lignes_factures", "paiements",
-  "fournisseurs", "commandes_fournisseurs", "lignes_commande", "depenses_fournisseurs",
-  "reglements_fournisseurs", "articles_stock", "mouvements_stock", "affectations", "pointages",
-  "vehicules", "releves_kilometrage", "affectations_vehicules", "outils", "mouvements_outillage",
-  "notes_frais", "notifications_utilisateurs",
-];
 
 function abort(message) {
   throw new Error(`ARRÊT SÛR: ${message}`);
@@ -55,17 +46,23 @@ function parseArgs(argv) {
     const [key, ...rest] = value.slice(2).split("=");
     args.set(key, rest.length ? rest.join("=") : true);
   }
+  const allowed = new Set(["dry-run", "live-readonly", "execute", "confirm", "json", "emit-sql"]);
+  for (const key of args.keys()) if (!allowed.has(key)) abort(`option interdite: --${key}`);
+  const emitSql = args.has("emit-sql") ? args.get("emit-sql") : null;
+  if (emitSql !== null) {
+    if (typeof emitSql !== "string" || !emitSql) abort("--emit-sql exige un chemin de fichier");
+    if ([...args.keys()].some((key) => key !== "emit-sql")) abort("--emit-sql s'utilise seul");
+    return { dryRun: false, liveReadonly: false, execute: false, json: false, emitSql };
+  }
   const dryRun = args.has("dry-run");
   const execute = args.has("execute");
-  if (dryRun === execute) abort("utiliser exactement un mode parmi --dry-run et --execute");
-  const allowed = new Set(["dry-run", "live-readonly", "execute", "confirm", "json"]);
-  for (const key of args.keys()) if (!allowed.has(key)) abort(`option interdite: --${key}`);
+  if (dryRun === execute) abort("utiliser exactement un mode parmi --dry-run, --execute et --emit-sql");
   if (execute && args.get("confirm") !== CONFIRMATION) {
     abort(`confirmation d'exécution absente ou incorrecte`);
   }
   if (dryRun && args.has("confirm")) abort("--confirm est interdit avec --dry-run");
   if (args.has("live-readonly") && !dryRun) abort("--live-readonly exige --dry-run");
-  return { dryRun, liveReadonly: args.has("live-readonly"), execute, json: args.has("json") };
+  return { dryRun, liveReadonly: args.has("live-readonly"), execute, json: args.has("json"), emitSql: null };
 }
 
 function stableId(kind, key) {
@@ -104,6 +101,12 @@ function marker(label) {
   return `${MARKER} — ${label}`;
 }
 
+// Référence résolue par la base au moment de l'exécution (UUID du compte Gérant, postes de
+// l'entreprise) : le plan reste déterministe et ne suppose aucun identifiant distant.
+function contextRef(key) {
+  return `{{${key}}}`;
+}
+
 function buildPlan() {
   const employeesSpec = [
     ["GERANT", "Julien", "Gregurec", "Gérant", "cdi", "2025-08-01", null, "actif"],
@@ -119,14 +122,28 @@ function buildPlan() {
     ["POSE5", "Nolan", "Faure", "Ouvrier", "cdd", "2025-08-01", "2026-04-30", "sorti"],
     ["APP", "Zoé", "Blanc", "Ouvrier", "apprenti", "2025-09-01", null, "actif"],
   ];
+  // Un salarié sorti ne peut plus recevoir d'affectation (trg_affectation_employe_actif) : il
+  // est créé actif, reçoit son historique pendant son contrat, puis sort par transition métier
+  // (module employeeExits) — jamais l'inverse.
   const employees = employeesSpec.map(([key, prenom, nom, role, type, entry, exit, status], index) => ({
     id: stableId("employe", key), entreprise_id: COMPANY_ID, reference_interne: `REC-EMP-${String(index + 1).padStart(3, "0")}`,
     prenom, nom, email: key === "GERANT" ? MANAGER_EMAIL : `${prenom.toLowerCase()}.${nom.toLowerCase()}@example.invalid`,
     telephone: `+33 0 00 00 ${String(index).padStart(2, "0")} ${String(index + 10).padStart(2, "0")}`,
-    poste: role, type_contrat: type, date_entree: entry, date_sortie: exit, statut: status,
-    taux_horaire: round(13.5 + index * 0.85), cout_horaire: round(22 + index * 1.25),
+    poste: role, type_contrat: type, date_entree: entry, date_sortie: null, statut: "actif",
+    __targetStatus: status, __targetExit: exit,
+    // poste_id / utilisateur_id sont résolus par la base au moment de l'exécution (préflight).
+    poste_id: contextRef(`poste:${role}`), utilisateur_id: key === "GERANT" ? contextRef("gerant") : null,
     notes: marker(key === "GERANT" ? "fiche Gérant reliée au compte existant" : "salarié fictif sans compte Auth"),
     __key: key, __role: role,
+    // Depuis 20260818000205 et 20260922000328, le coût horaire et le taux facturé vivent dans
+    // des tables dédiées à lecture restreinte (employes_cout_horaire, employes_taux_facture).
+    __taux_horaire: round(13.5 + index * 0.85), __cout_horaire: round(22 + index * 1.25),
+  }));
+  const employeeRates = employees.map((employee) => ({
+    employe_id: employee.id, entreprise_id: COMPANY_ID, taux_horaire: employee.__taux_horaire,
+  }));
+  const employeeCosts = employees.map((employee) => ({
+    employe_id: employee.id, entreprise_id: COMPANY_ID, cout_horaire: employee.__cout_horaire,
   }));
 
   const clients = Array.from({ length: 23 }, (_, index) => {
@@ -188,9 +205,12 @@ function buildPlan() {
     const issue = addDays(PERIOD_START, index * 9);
     return {
       id: stableId("devis", index), entreprise_id: COMPANY_ID, client_id: clients[index % clients.length].id,
-      chantier_id: chantiers[index % chantiers.length].id, statut, date_emission: issue, date_validite: addDays(issue, 30),
+      // Créé en brouillon : un devis accepté verrouille ses lignes (verrouiller_lignes_devis_accepte).
+      // Les lignes sont posées, puis le devis suit ses transitions métier jusqu'à __targetStatus.
+      chantier_id: chantiers[index % chantiers.length].id, statut: "brouillon", date_emission: issue, date_validite: addDays(issue, 30),
       conditions: "Document de recette — validité 30 jours", notes_client: DOCUMENT_MARKER,
       notes_internes: marker(`devis ${index + 1}`), remise_globale: index % 9 === 0 ? 3 : 0, __key: `DEV${index + 1}`,
+      __targetStatus: statut,
     };
   });
   const lignesDevis = devis.flatMap((quote, quoteIndex) => Array.from({ length: 3 }, (_, lineIndex) => ({
@@ -247,17 +267,22 @@ function buildPlan() {
     const yearlySequence = (index % 9) + 1;
     return {
       id: stableId("commande", index), entreprise_id: COMPANY_ID, fournisseur_id: suppliers[index % 9].id,
-      chantier_id: chantiers[index % 16].id, statut: ["recue", "recue_partiel", "confirmee", "annulee"][index % 4],
+      // Créée en brouillon : une commande envoyée est verrouillée (20260926000506, PO-1) et son
+      // identité imprimée est figée en quittant le brouillon (20260927000507). Les lignes sont
+      // posées en brouillon, puis la commande suit les transitions métier (envoi, confirmation,
+      // réception par le moteur canonique) jusqu'à __targetStatus.
+      chantier_id: chantiers[index % 16].id, statut: "brouillon",
       numero: `CMD-${businessYear}-${SEED_COMMAND_NUMBER_BASE + yearlySequence}`,
       date_commande: dateCommande, notes: marker(`commande ${index + 1}`), __key: `CMD${index + 1}`,
+      __targetStatus: ["recue", "recue_partiel", "confirmee", "annulee"][index % 4],
     };
   });
   const lignesCommande = commandes.flatMap((order, orderIndex) => Array.from({ length: 3 }, (_, lineIndex) => ({
     id: stableId("ligne-commande", `${orderIndex}-${lineIndex}`), entreprise_id: COMPANY_ID, commande_id: order.id,
     designation: `Matériau ${orderIndex + 1}.${lineIndex + 1} TEST`, quantite: 5 + lineIndex * 4,
     unite: lineIndex === 1 ? "m²" : "u", prix_unitaire_ht: 18 + orderIndex * 3 + lineIndex * 9,
-    taux_tva: 20, quantite_recue: order.statut === "recue" ? 5 + lineIndex * 4 : order.statut === "recue_partiel" ? 2 : 0,
-    ordre: lineIndex,
+    taux_tva: 20, quantite_recue: 0, ordre: lineIndex,
+    __targetRecue: order.__targetStatus === "recue" ? 5 + lineIndex * 4 : order.__targetStatus === "recue_partiel" ? 2 : 0,
   })));
   const supplierExpenses = Array.from({ length: 30 }, (_, index) => {
     const command = index < commandes.length ? commandes[index] : null;
@@ -285,22 +310,28 @@ function buildPlan() {
 
   const workdays = weekdays(PERIOD_START, PERIOD_END);
   const activeEmployees = employees.filter((employee) => employee.__key !== "ADMIN" && employee.__key !== "GERANT");
+  // Historique borné au contrat : aucune activité avant l'entrée ni après la sortie.
+  const underContract = (employee, date) => employee.date_entree <= date && (!employee.__targetExit || date <= employee.__targetExit);
+  const fieldStaffOn = (date) => activeEmployees.filter((employee) => underContract(employee, date));
+  const staffOn = (date) => employees.filter((employee) => underContract(employee, date));
+  // Couples (jour ouvré, salarié sous contrat) répartis uniformément sur l'année, sans doublon.
+  const spreadPairs = (count) => {
+    const pairs = workdays.flatMap((date) => fieldStaffOn(date).map((employee) => ({ date, employee })));
+    if (pairs.length < count) abort("historique de planning impossible à répartir");
+    return Array.from({ length: count }, (_, index) => pairs[Math.floor(index * pairs.length / count)]);
+  };
+  const affectationPairs = spreadPairs(780);
   const affectations = Array.from({ length: 780 }, (_, index) => {
-    const employee = activeEmployees[index % activeEmployees.length];
-    const group = Math.floor(index / activeEmployees.length);
-    const groups = Math.ceil(780 / activeEmployees.length);
-    const date = workdays[Math.floor(group * workdays.length / groups)];
+    const { date, employee } = affectationPairs[index];
     return {
       id: stableId("affectation", index), entreprise_id: COMPANY_ID, chantier_id: chantiers[index % 18].id,
       employe_id: employee.id, date, heures: employee.__key === "APP" || index % 19 === 0 ? 7 : 8,
       tache: `Affectation chantier RECETTE ${1 + (index % 18)}`, notes: marker(index % 97 === 0 ? "conflit limité volontaire" : "planning annuel"),
     };
   });
+  const pointagePairs = spreadPairs(1500);
   const pointages = Array.from({ length: 1500 }, (_, index) => {
-    const employee = activeEmployees[index % activeEmployees.length];
-    const group = Math.floor(index / activeEmployees.length);
-    const groups = Math.ceil(1500 / activeEmployees.length);
-    const date = workdays[Math.floor(group * workdays.length / groups)];
+    const { date, employee } = pointagePairs[index];
     const incomplete = index % 137 === 0;
     return {
       id: stableId("pointage", index), entreprise_id: COMPANY_ID, employe_id: employee.id,
@@ -311,14 +342,18 @@ function buildPlan() {
     };
   });
 
-  const absences = Array.from({ length: 30 }, (_, index) => ({
+  const absences = Array.from({ length: 30 }, (_, index) => {
+    const date = workdays[Math.floor((index + 1) * workdays.length / 31)];
+    const eligible = staffOn(date).filter((employee) => employee.__key !== "GERANT");
+    return {
     id: stableId("absence-affectation", index), entreprise_id: COMPANY_ID, chantier_id: null,
-    employe_id: employees[1 + (index % 11)].id,
-    date: workdays[Math.floor((index + 1) * workdays.length / 31)], heures: index % 6 === 0 ? 4 : 7,
+    employe_id: eligible[index % eligible.length].id,
+    date, heures: index % 6 === 0 ? 4 : 7,
     tache: ["Congé payé RECETTE", "Formation RECETTE", "Récupération RECETTE", "Absence TEST"][index % 4],
     notes: marker("absence administrative; aucune demande personnelle simulée"),
     type_activite: ["conge", "formation", "autre"][index % 3], lieu_activite: null,
-  }));
+    };
+  });
 
   const vehicles = Array.from({ length: 6 }, (_, index) => ({
     id: stableId("vehicule", index), entreprise_id: COMPANY_ID,
@@ -343,26 +378,30 @@ function buildPlan() {
       categorie: ["electroportatif", "manuel", "mesure", "securite", "levage", "autre"][index % 6],
       marque: "MARQUE TEST", modele: `REC-${index + 1}`, numero_serie: `SERIE-TEST-${String(index + 1).padStart(4, "0")}`,
       statut, etat: statut === "maintenance" ? "abime" : statut === "perdu" ? "usage" : "bon",
-      employe_id: statut === "affecte" ? activeEmployees[index % activeEmployees.length].id : null,
+      employe_id: statut === "affecte" ? fieldStaffOn(PERIOD_END)[index % fieldStaffOn(PERIOD_END).length].id : null,
       chantier_id: null, date_achat: addDays("2024-01-01", index * 12), prix_achat_ht: 45 + index * 23,
       prochaine_verification: addDays(PERIOD_END, index - 15), notes: marker("outillage fictif"),
     };
   });
-  const toolMovements = Array.from({ length: 75 }, (_, index) => ({
-    id: stableId("mouvement-outil", index), entreprise_id: COMPANY_ID, outil_id: tools[index % 50].id,
-    type: ["affectation", "retour", "maintenance"][index % 3], statut_avant: index % 3 === 0 ? "disponible" : "affecte",
-    statut_apres: index % 3 === 0 ? "affecte" : index % 3 === 1 ? "disponible" : "maintenance",
-    employe_id: activeEmployees[index % activeEmployees.length].id, chantier_id: index % 2 ? chantiers[index % 18].id : null,
-    etat: index % 3 === 2 ? "abime" : "bon", note: marker("historique outillage"), date_mouvement: addDays(PERIOD_START, index * 4),
-  }));
+  const toolMovements = Array.from({ length: 75 }, (_, index) => {
+    const date = addDays(PERIOD_START, index * 4);
+    return {
+      id: stableId("mouvement-outil", index), entreprise_id: COMPANY_ID, outil_id: tools[index % 50].id,
+      type: ["affectation", "retour", "maintenance"][index % 3], statut_avant: index % 3 === 0 ? "disponible" : "affecte",
+      statut_apres: index % 3 === 0 ? "affecte" : index % 3 === 1 ? "disponible" : "maintenance",
+      employe_id: fieldStaffOn(date)[index % fieldStaffOn(date).length].id, chantier_id: index % 2 ? chantiers[index % 18].id : null,
+      etat: index % 3 === 2 ? "abime" : "bon", note: marker("historique outillage"), date_mouvement: date,
+    };
+  });
 
   const expenses = Array.from({ length: 80 }, (_, index) => ({
-    id: stableId("note-frais", index), entreprise_id: COMPANY_ID, employe_id: employees[index % employees.length].id,
+    id: stableId("note-frais", index), entreprise_id: COMPANY_ID,
+    employe_id: staffOn(addDays(PERIOD_START, index * 4))[index % staffOn(addDays(PERIOD_START, index * 4)).length].id,
     date_frais: addDays(PERIOD_START, index * 4), montant_ttc: round(8 + (index % 13) * 7.45),
     categorie: ["repas", "carburant", "peage", "stationnement", "fournitures", "petit_materiel"][index % 6],
     description: marker(index % 17 === 0 ? "justificatif manquant — import administratif" : "import administratif historique"),
     statut: ["validee", "remboursee", "soumise", "refusee"][index % 4],
-    cree_par_utilisateur_id: null,
+    cree_par_utilisateur_id: contextRef("gerant"),
   }));
 
   const tasks = Array.from({ length: 60 }, (_, index) => ({
@@ -373,7 +412,7 @@ function buildPlan() {
     priorite: ["basse", "normale", "haute", "urgente"][index % 4],
   }));
   const notifications = Array.from({ length: 20 }, (_, index) => ({
-    id: stableId("notification", index), entreprise_id: COMPANY_ID, utilisateur_id: null,
+    id: stableId("notification", index), entreprise_id: COMPANY_ID, utilisateur_id: contextRef("gerant"),
     type: "recette_interne", titre: `Contrôle RECETTE ${index + 1}`, message: marker("notification strictement interne"),
     lien: "/tableau-de-bord", niveau: ["information", "attention", "critique"][index % 3],
     ressource_type: "chantier", ressource_id: chantiers[index % 20].id,
@@ -384,7 +423,7 @@ function buildPlan() {
   }));
 
   return {
-    employees, clients, contacts, chantiers, prestations, devis, lignesDevis, factures, lignesFactures, paiements,
+    employees, employeeRates, employeeCosts, clients, contacts, chantiers, prestations, devis, lignesDevis, factures, lignesFactures, paiements,
     suppliers, commandes, lignesCommande, supplierExpenses, articles, stockMovements,
     affectations, pointages, absences, vehicles, vehicleHistory, tools, toolMovements, expenses, tasks, notifications, documents,
   };
@@ -427,7 +466,29 @@ function validatePlan(plan) {
   const depositAssignments = plan.employees.filter((row) => row.__role === "Compte dépôt");
   if (depositAssignments.length) abort("Compte dépôt attribué à une fiche salarié");
   if (plan.employees.filter((row) => row.email === MANAGER_EMAIL).length !== 1) abort("fiche Gérant non unique");
-  const quoteCounts = Object.groupBy(plan.devis, (row) => row.statut);
+  if (plan.employeeRates.length !== plan.employees.length || plan.employeeCosts.length !== plan.employees.length) {
+    abort("taux ou coûts horaires non alignés sur les salariés");
+  }
+  if (plan.devis.some((row) => row.statut !== "brouillon") || plan.commandes.some((row) => row.statut !== "brouillon")
+      || plan.factures.some((row) => row.statut !== "brouillon")) {
+    abort("devis, factures et commandes doivent être insérés en brouillon avant leurs lignes");
+  }
+  if (plan.lignesCommande.some((row) => row.quantite_recue !== 0 || row.__targetRecue > row.quantite)) {
+    abort("réception de commande préparée hors transition métier");
+  }
+  const employeesById = new Map(plan.employees.map((row) => [row.id, row]));
+  const historyDates = [
+    ...plan.affectations.map((row) => [row.employe_id, row.date]), ...plan.absences.map((row) => [row.employe_id, row.date]),
+    ...plan.pointages.map((row) => [row.employe_id, row.date]), ...plan.toolMovements.map((row) => [row.employe_id, row.date_mouvement]),
+    ...plan.expenses.map((row) => [row.employe_id, row.date_frais]),
+  ];
+  for (const [employeeId, date] of historyDates) {
+    const employee = employeesById.get(employeeId);
+    if (!employee || date < employee.date_entree || (employee.__targetExit && date > employee.__targetExit)) {
+      abort("activité préparée hors du contrat du salarié");
+    }
+  }
+  const quoteCounts = Object.groupBy(plan.devis, (row) => row.__targetStatus);
   if (quoteCounts.accepte?.length !== 22 || quoteCounts.refuse?.length !== 6 || quoteCounts.expire?.length !== 4 || quoteCounts.envoye?.length !== 3) {
     abort("répartition des devis incorrecte");
   }
@@ -563,15 +624,24 @@ function sameStoredValue(stored, planned) {
   return stored === planned;
 }
 
-function assertStoredRowMatches(row, planned, columns, label) {
-  if (!planned || columns.some((column) => !sameStoredValue(row[column], planned[column]))) abort(label);
-}
-
 function cleanRows(rows) {
   return rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key, value]) => !key.startsWith("__") && value !== undefined)));
 }
 
-function safeEnvironment(env) {
+function linkedProjectRef(root = ROOT) {
+  const file = path.join(root, "supabase", ".temp", "project-ref");
+  if (!fs.existsSync(file)) return null;
+  return fs.readFileSync(file, "utf8").trim();
+}
+
+function vercelProjectName(root = ROOT) {
+  const projectFile = path.join(root, ".vercel", "project.json");
+  if (!fs.existsSync(projectFile)) return null;
+  return JSON.parse(fs.readFileSync(projectFile, "utf8")).projectName ?? null;
+}
+
+// Liaisons locales injectables pour les tests ; en exécution réelle elles sont lues sur disque.
+function safeEnvironment(env, { linkedRef = linkedProjectRef(), vercelProject = vercelProjectName() } = {}) {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) abort("NEXT_PUBLIC_SUPABASE_URL absent");
   let parsed;
@@ -586,530 +656,628 @@ function safeEnvironment(env) {
   for (const [key, value] of Object.entries(env)) {
     if (key.includes("STRIPE") && typeof value === "string" && /^(?:sk|pk)_live_/.test(value)) abort("secret Stripe Live détecté");
   }
-  const projectFile = path.join(ROOT, ".vercel", "project.json");
-  if (!fs.existsSync(projectFile)) abort("liaison Vercel locale absente");
-  const project = JSON.parse(fs.readFileSync(projectFile, "utf8"));
-  if (project.projectName !== PROJECT_NAME) abort("worktree lié à un autre projet Vercel");
+  if (!vercelProject) abort("liaison Vercel locale absente");
+  if (vercelProject !== PROJECT_NAME) abort("worktree lié à un autre projet Vercel");
+  // L'exécution passe par `supabase db query --linked` : le projet réellement lié par la CLI
+  // doit être la Preview, indépendamment des variables d'environnement (même règle que
+  // scripts/garde-scripts-production.mjs).
+  if (linkedRef !== PROJECT_REF) abort("projet lié par la CLI Supabase absent ou différent de la Preview");
 }
 
-async function readOne(client, table, configure, label) {
-  let query = client.from(table).select("*");
-  query = configure(query);
-  const { data, error } = await query;
-  if (error) abort(`${label}: ${error.message}`);
-  return data ?? [];
-}
+// ═══════════════════════════════════════════════════════════════════════
+// Exécution SQL
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Depuis la réconciliation ACL canonique (20260902000255), `service_role` n'a plus aucun
+// droit sur les tables métier (employes, clients, devis, factures, commandes…) : l'ancien
+// peuplement par PostgREST en service_role est refusé dès la lecture. Rendre ces droits
+// pour un seed serait une régression de sécurité. Le seed produit donc un script SQL
+// déterministe, exécuté comme les autres scripts de recette Preview par
+// `supabase db query --linked` (rôle postgres), après les mêmes gardes de cible.
+//
+// Contrat du script :
+//   - préflight en lecture seule (entreprise, postes, compte Gérant, capacité, collisions)
+//     avant toute écriture, rejoué à chaque exécution ;
+//   - un module = une transaction : une interruption laisse des modules entiers, jamais
+//     un module à moitié écrit ; la reprise ré-exécute le script complet ;
+//   - insertion seulement des UUID déterministes absents (jamais d'UPDATE de donnée
+//     existante), puis contrôle de chaque ligne présente (entreprise, marqueur, valeurs) ;
+//   - les documents sont créés en brouillon, lignes posées, puis suivent leurs transitions
+//     métier (devis envoyé → accepté/refusé/expiré, facture émise, commande envoyée →
+//     confirmée → réceptionnée par le moteur canonique) : aucun trigger n'est désactivé,
+//     aucun garde n'est contourné.
 
-async function listAuthUsersByEmail(client, email) {
-  const normalized = email.trim().toLowerCase();
-  const matches = [];
-  const perPage = 1000;
-  for (let page = 1; page <= 1000; page += 1) {
-    const { data, error } = await client.auth.admin.listUsers({ page, perPage });
-    if (error) abort(`lecture Auth Gérant: ${error.message}`);
-    const users = data?.users ?? [];
-    matches.push(...users.filter((user) => String(user.email ?? "").trim().toLowerCase() === normalized));
-    if (users.length < perPage) return matches;
-  }
-  abort("pagination Auth anormalement volumineuse ou non terminée");
-}
+const JSON_TAG = "$seed_json$";
 
-async function verifyManagerIdentity(client, managerRoleId) {
-  const authUsers = await listAuthUsersByEmail(client, MANAGER_EMAIL);
-  if (authUsers.length !== 1) abort(`compte Auth Gérant ${authUsers.length === 0 ? "absent" : "dupliqué"}`);
-  const userId = authUsers[0].id;
-  if (!userId) abort("UUID Auth du Gérant absent");
+const MODULE_DEFINITIONS = [
+  // clé du plan, table, colonne clé, [colonne marqueur, marqueur], entreprise ?, colonnes comparées
+  ["employees", "employes", "id", ["notes", MARKER], true, ["reference_interne", "email", "date_entree"]],
+  ["employeeRates", "employes_taux_facture", "employe_id", null, true, ["taux_horaire"]],
+  ["employeeCosts", "employes_cout_horaire", "employe_id", null, true, ["cout_horaire"]],
+  ["clients", "clients", "id", ["notes", MARKER], true, ["reference_interne"]],
+  ["contacts", "contacts_clients", "id", ["nom", "TEST"], false, ["client_id"]],
+  ["prestations", "prestations_catalogue", "id", ["designation", "RECETTE"], true, null],
+  ["suppliers", "fournisseurs", "id", ["notes", MARKER], true, ["reference"]],
+  ["articles", "articles_stock", "id", ["reference", "REC-ART-"], true, null],
+  ["vehicles", "vehicules", "id", ["notes", MARKER], true, ["immatriculation"]],
+  ["tools", "outils", "id", ["notes", MARKER], true, ["reference"]],
+  ["chantiers", "chantiers", "id", ["reference_interne", "REC-CHA-"], true, ["client_id"]],
+  ["tasks", "taches", "id", ["description", MARKER], false, ["chantier_id"]],
+  ["devis", "devis", "id", ["notes_internes", MARKER], true, ["client_id", "chantier_id", "date_emission"]],
+  ["lignesDevis", "lignes_devis", "id", ["description", MARKER], false, ["devis_id", "quantite", "prix_unitaire_ht", "taux_tva"]],
+  ["devisTransitions"],
+  ["factures", "factures", "id", ["notes_internes", MARKER], true, ["client_id", "devis_origine_id", "type", "date_emission"]],
+  ["lignesFactures", "lignes_factures", "id", ["description", MARKER], false, ["facture_id", "quantite", "prix_unitaire_ht", "taux_tva"]],
+  ["invoiceEmission"],
+  ["paiements", "paiements", "id", ["reference", MARKER], false, ["facture_id", "montant", "date"]],
+  ["commandes", "commandes_fournisseurs", "id", ["notes", MARKER], true, ["fournisseur_id", "chantier_id", "numero", "date_commande"]],
+  ["lignesCommande", "lignes_commande", "id", ["designation", "TEST"], true,
+    ["commande_id", "designation", "quantite", "unite", "prix_unitaire_ht", "taux_tva", "ordre"]],
+  ["commandeTransitions"],
+  ["supplierExpenses", "depenses_fournisseurs", "id", ["notes", MARKER], true, "strict"],
+  ["employeeReentry"],
+  ["stockMovements", "mouvements_stock", "id", ["motif", MARKER], true, "strict"],
+  ["affectations", "affectations", "id", ["notes", MARKER], true, "strict"],
+  ["absences", "affectations", "id", ["notes", MARKER], true, "strict"],
+  ["pointages", "pointages", "id", ["commentaire", MARKER], true, "strict"],
+  ["vehicleHistory", "releves_kilometrage", "id", ["note", MARKER], true, "strict"],
+  ["toolMovements", "mouvements_outillage", "id", ["note", MARKER], true, "strict"],
+  ["expenses", "notes_frais", "id", ["description", MARKER], true, "strict"],
+  ["notifications", "notifications_utilisateurs", "id", ["message", MARKER], true, "strict"],
+  ["employeeExits"],
+  ["verification"],
+];
 
-  const publicUsers = await readOne(client, "utilisateurs", (q) => q.eq("id", userId), "lecture profil public Gérant");
-  if (publicUsers.length !== 1 || publicUsers[0].id !== userId) abort("profil public Gérant absent ou ambigu");
-
-  const userMemberships = await readOne(client, "utilisateurs_entreprises", (q) => q.eq("utilisateur_id", userId), "lecture appartenances Gérant");
-  const activeUserMemberships = userMemberships.filter((membership) => membership.statut === "actif");
-  if (activeUserMemberships.length !== 1) abort("appartenance active du Gérant absente ou multiple");
-  const membership = activeUserMemberships[0];
-  if (membership.entreprise_id !== COMPANY_ID || membership.poste_id !== managerRoleId) {
-    abort("appartenance du Gérant associée à une autre entreprise ou un autre poste");
-  }
-
-  const companyMemberships = await readOne(client, "utilisateurs_entreprises", (q) => q.eq("entreprise_id", COMPANY_ID), "lecture appartenances entreprise");
-  const activeCompanyMemberships = companyMemberships.filter((candidate) => candidate.statut === "actif");
-  if (activeCompanyMemberships.length !== 1 || activeCompanyMemberships[0].utilisateur_id !== userId || activeCompanyMemberships[0].poste_id !== managerRoleId) {
-    abort("appartenance active unique de l'entreprise non conforme");
-  }
-  return { userId, membership, companyMemberships };
-}
-
-async function livePreflight(client, env) {
-  safeEnvironment(env);
-  const companies = await readOne(client, "entreprises", (q) => q.eq("nom", COMPANY_NAME), "lecture entreprise");
-  if (companies.length !== 1 || companies[0].id !== COMPANY_ID || companies[0].nom !== COMPANY_NAME) abort("entreprise cible non unique ou non conforme");
-  const roles = await readOne(client, "postes", (q) => q.eq("entreprise_id", COMPANY_ID), "lecture postes");
-  if (roles.length !== 10 || roles.map((row) => row.nom).sort().join("|") !== [...ALL_ROLES].sort().join("|")) abort("modèle des dix postes non conforme");
-  const managerRole = roles.find((row) => row.nom === "Gérant");
-  const identity = await verifyManagerIdentity(client, managerRole.id);
-  const depositRole = roles.find((row) => row.nom === "Compte dépôt");
-  const depositMembers = await readOne(client, "utilisateurs_entreprises", (q) => q.eq("entreprise_id", COMPANY_ID).eq("poste_id", depositRole.id), "lecture Compte dépôt");
-  if (depositMembers.length) abort("Compte dépôt attribué");
-  const depositEmployees = await readOne(client, "employes", (q) => q.eq("entreprise_id", COMPANY_ID).eq("poste_id", depositRole.id), "lecture fiches Compte dépôt");
-  if (depositEmployees.length) abort("Compte dépôt attribué à une fiche salarié");
-  const managerPermissions = await readOne(client, "permissions_poste", (q) => q.eq("entreprise_id", COMPANY_ID).eq("poste_id", managerRole.id), "lecture permissions Gérant");
-  if (managerPermissions.length !== 99) abort("le rôle Gérant ne possède plus exactement 99 permissions");
-  const depositMode = managerPermissions.find((row) => row.cle_permission === "mode_compte_depot");
-  if (!depositMode || depositMode.autorise !== false) abort("mode_compte_depot doit rester désactivé pour le Gérant");
-  const managerEmployees = await readOne(client, "employes", (q) => q.eq("entreprise_id", COMPANY_ID).eq("email", MANAGER_EMAIL), "lecture fiche salarié Gérant");
-  if (managerEmployees.length > 1) abort("plusieurs fiches salarié portent l'adresse du Gérant");
-  if (managerEmployees.length === 1 && managerEmployees[0].id !== stableId("employe", "GERANT")) {
-    abort("une fiche Gérant manuelle incompatible existe déjà; aucune fusion automatique autorisée");
-  }
-  for (const table of REQUIRED_TABLES) {
-    const { error } = await client.from(table).select("*", { head: true, count: "exact" }).limit(0);
-    if (error) abort(`schéma/privilège manquant pour ${table}: ${error.message}`);
-  }
-  return { userId: identity.userId, managerRoleId: managerRole.id, roles: Object.fromEntries(roles.map((row) => [row.nom, row.id])) };
-}
-
-const TABLE_MARKERS = {
-  employes: ["notes", MARKER], clients: ["notes", MARKER], chantiers: ["reference_interne", "REC-CHA-"],
-  contacts_clients: ["nom", "TEST"], taches: ["description", MARKER],
-  prestations_catalogue: ["designation", "RECETTE"], devis: ["notes_internes", MARKER], factures: ["notes_internes", MARKER],
-  lignes_devis: ["description", MARKER], lignes_factures: ["description", MARKER], paiements: ["reference", MARKER],
-  fournisseurs: ["notes", MARKER], commandes_fournisseurs: ["notes", MARKER], depenses_fournisseurs: ["notes", MARKER],
-  lignes_commande: ["designation", "TEST"], articles_stock: ["reference", "REC-ART-"],
-  mouvements_stock: ["motif", MARKER], affectations: ["notes", MARKER], pointages: ["commentaire", MARKER],
-  vehicules: ["notes", MARKER], releves_kilometrage: ["note", MARKER], outils: ["notes", MARKER],
-  mouvements_outillage: ["note", MARKER], notes_frais: ["description", MARKER],
-  notifications_utilisateurs: ["message", MARKER],
+// Colonnes strictes calculées par un trigger métier au moment de l'insertion : elles ne font
+// pas partie du contrat de comparaison (la base, pas le seed, en est la source de vérité).
+const TRIGGER_DERIVED_COLUMNS = {
+  depenses_fournisseurs: ["date_echeance", "montant_tva"],
 };
 
-const COMPANY_SCOPED_TABLES = new Set([
-  "employes", "clients", "prestations_catalogue", "fournisseurs", "articles_stock", "vehicules", "outils",
-  "chantiers", "devis", "factures", "commandes_fournisseurs", "lignes_commande", "depenses_fournisseurs",
-  "mouvements_stock", "affectations", "pointages", "releves_kilometrage", "mouvements_outillage",
-  "notes_frais", "notifications_utilisateurs",
-]);
+const DEVIS_PATHS = {
+  envoye: ["envoye"],
+  accepte: ["envoye", "accepte"],
+  refuse: ["envoye", "refuse"],
+  expire: ["envoye", "expire"],
+};
 
-const STRICT_INSERT_ONLY_TABLES = new Set([
-  "depenses_fournisseurs", "mouvements_stock", "affectations", "pointages", "releves_kilometrage",
-  "mouvements_outillage", "notes_frais", "notifications_utilisateurs",
-]);
+const COMMAND_PATHS = {
+  // statut cible → statuts traversés depuis le brouillon (réception incluse).
+  confirmee: ["envoyee", "confirmee"],
+  recue_partiel: ["envoyee", "confirmee", "reception"],
+  recue: ["envoyee", "confirmee", "reception"],
+  annulee: ["envoyee", "annulee"],
+};
 
-function chunks(values, size) {
-  if (!Number.isSafeInteger(size) || size <= 0) abort("taille de lot invalide");
-  const result = [];
-  for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
-  return result;
+function jsonLiteral(value) {
+  const text = JSON.stringify(value);
+  if (text.includes(JSON_TAG)) abort("marqueur de citation SQL présent dans les données");
+  return `${JSON_TAG}${text}${JSON_TAG}`;
 }
 
-function selectedColumnsForRows(table, rows) {
-  const columns = new Set(["id"]);
-  const [markerColumn] = TABLE_MARKERS[table] ?? [];
-  if (markerColumn) columns.add(markerColumn);
-  if (COMPANY_SCOPED_TABLES.has(table)) columns.add("entreprise_id");
-  if (STRICT_INSERT_ONLY_TABLES.has(table)) {
-    for (const row of rows) for (const column of Object.keys(row)) columns.add(column);
-  }
-  return [...columns].join(",");
+function sqlText(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function validateExistingOwnedRows(table, plannedRows, existingRows) {
-  const plannedById = new Map(plannedRows.map((row) => [row.id, row]));
-  const [markerColumn, expectedMarker] = TABLE_MARKERS[table] ?? [];
-  for (const existing of existingRows) {
-    const planned = plannedById.get(existing.id);
-    if (!planned) abort(`lecture inattendue pendant le contrôle de ${table}`);
-    if (COMPANY_SCOPED_TABLES.has(table) && existing.entreprise_id !== COMPANY_ID) {
-      abort(`ligne ${table} rattachée à une autre entreprise`);
-    }
-    if (!markerColumn || !String(existing[markerColumn] ?? "").includes(expectedMarker)) {
-      abort(`collision avec une donnée manuelle dans ${table}`);
-    }
-    if (STRICT_INSERT_ONLY_TABLES.has(table)) {
-      for (const [column, value] of Object.entries(planned)) {
-        if (!sameStoredValue(existing[column], value)) abort(`donnée déterministe existante incompatible dans ${table}`);
-      }
-    }
-  }
+function sqlTextArray(values) {
+  return `array[${values.map(sqlText).join(", ")}]::text[]`;
 }
 
-async function insertRowsInBatches(client, table, rows, batchSize = INSERT_BATCH_SIZE) {
-  const batches = chunks(rows, batchSize);
-  let inserted = 0;
-  for (let index = 0; index < batches.length; index += 1) {
-    const batch = batches[index];
-    const { error } = await client.from(table).insert(batch);
-    if (error) abort(`insertion ${table} lot ${index + 1}/${batches.length}: ${error.message}`);
-    inserted += batch.length;
-  }
-  return { inserted, batches: batches.length };
+function plannedColumns(rows) {
+  const columns = new Set();
+  for (const row of rows) for (const column of Object.keys(row)) columns.add(column);
+  return [...columns];
 }
 
-async function writeOwned(client, table, rows, { insertOnly = false } = {}) {
-  const clean = cleanRows(rows);
-  if (!clean.length) return;
-  const ids = clean.map((row) => row.id).filter(Boolean);
-  if (new Set(ids).size !== ids.length) abort(`UUID déterministe dupliqué dans ${table}`);
-  if (ids.length) {
-    const existing = await readRowsByIds(client, table, ids, selectedColumnsForRows(table, clean));
-    validateExistingOwnedRows(table, clean, existing);
-    if (insertOnly) {
-      const existingIds = new Set(existing.map((row) => row.id));
-      const missing = clean.filter((row) => !existingIds.has(row.id));
-      if (!missing.length) return;
-      await insertRowsInBatches(client, table, missing);
-      return;
-    }
-  }
-  abort(`écriture non insert-only interdite pour ${table}`);
-}
-
-function executionSteps(plan, context) {
+function executionModules(plan) {
   validateSupplierExpenses(plan);
-  const managerEmployee = plan.employees.find((row) => row.__key === "GERANT");
-  managerEmployee.utilisateur_id = context.userId;
-  managerEmployee.poste_id = context.managerRoleId;
-  for (const employee of plan.employees) employee.poste_id ??= context.roles[employee.__role] ?? context.roles.Ouvrier;
-  for (const row of plan.expenses) row.cree_par_utilisateur_id = context.userId;
-  for (const row of plan.notifications) row.utilisateur_id = context.userId;
-
-  return [
-    ["employees", "employes", plan.employees],
-    ["clients", "clients", plan.clients],
-    ["contacts", "contacts_clients", plan.contacts],
-    ["prestations", "prestations_catalogue", plan.prestations],
-    ["suppliers", "fournisseurs", plan.suppliers],
-    ["articles", "articles_stock", plan.articles],
-    ["vehicles", "vehicules", plan.vehicles],
-    ["tools", "outils", plan.tools],
-    ["chantiers", "chantiers", plan.chantiers],
-    ["tasks", "taches", plan.tasks],
-    ["devis", "devis", plan.devis],
-    ["lignesDevis", "lignes_devis", plan.lignesDevis],
-    ["factures", "factures", plan.factures],
-    ["lignesFactures", "lignes_factures", plan.lignesFactures],
-    ["invoiceEmission", "factures", plan.factures, "emit"],
-    ["paiements", "paiements", plan.paiements],
-    ["commandes", "commandes_fournisseurs", plan.commandes],
-    ["lignesCommande", "lignes_commande", plan.lignesCommande],
-    ["supplierExpenses", "depenses_fournisseurs", plan.supplierExpenses],
-    ["stockMovements", "mouvements_stock", plan.stockMovements],
-    ["affectations", "affectations", plan.affectations],
-    ["absences", "affectations", plan.absences],
-    ["pointages", "pointages", plan.pointages],
-    ["vehicleHistory", "releves_kilometrage", plan.vehicleHistory],
-    ["toolMovements", "mouvements_outillage", plan.toolMovements],
-    ["expenses", "notes_frais", plan.expenses],
-    ["notifications", "notifications_utilisateurs", plan.notifications],
-  ].map(([key, table, rows, operation = "insert"]) => ({ key, table, rows, operation, insertOnly: operation === "insert" }));
-}
-
-async function emitSeedInvoices(client, invoices) {
-  const existing = await readRowsByIds(
-    client,
-    "factures",
-    invoices.map((invoice) => invoice.id),
-    "id,notes_internes,statut,montant_ttc,montant_paye,type,date_echeance",
-  );
-  if (existing.length !== invoices.length) abort("émission impossible: factures déterministes manquantes");
-  const plannedById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
-  for (const row of existing) {
-    if (!String(row.notes_internes ?? "").includes(MARKER)) abort("collision avec une facture manuelle");
-    const target = plannedById.get(row.id).__emissionStatus;
-    const compatibleFinalStatuses = target === "avoir_emis"
-      ? new Set(["avoir_emis"])
-      : new Set(["envoyee", "en_retard", "payee_partiel", "payee"]);
-    if (row.statut !== "brouillon") {
-      if (!compatibleFinalStatuses.has(row.statut)) abort(`statut existant incompatible pour la facture ${row.id}`);
-      continue;
+  return MODULE_DEFINITIONS.map(([key, table, keyColumn, markerSpec, scoped, compare]) => {
+    if (!table) return { key, kind: key };
+    const rows = cleanRows(plan[key]);
+    const columns = plannedColumns(rows);
+    let compared = compare;
+    if (compare === "strict") {
+      const derived = new Set(TRIGGER_DERIVED_COLUMNS[table] ?? []);
+      compared = columns.filter((column) => !derived.has(column));
     }
-    if (Number(row.montant_ttc) <= 0 || Number(row.montant_paye) !== 0) {
-      abort("émission impossible: total nul ou règlement prématuré");
-    }
-    const { data, error } = await client.from("factures")
-      .update({ statut: target })
-      .eq("id", row.id)
-      .eq("statut", "brouillon")
-      .select("id");
-    if (error || data?.length !== 1) abort(`émission contrôlée de facture impossible: ${error?.message ?? "ligne non mise à jour"}`);
-  }
-}
-
-async function executePlan(client, plan, context) {
-  for (const step of executionSteps(plan, context)) {
-    if (step.operation === "emit") await emitSeedInvoices(client, step.rows);
-    else await writeOwned(client, step.table, step.rows, { insertOnly: true });
-  }
-}
-
-async function readRowsByIds(client, table, ids, columns) {
-  const uniqueIds = [...new Set(ids)];
-  if (uniqueIds.some((id) => typeof id !== "string" || !id)) abort(`UUID invalide pendant la lecture de ${table}`);
-  if (!uniqueIds.length) return [];
-  const selected = new Set(columns.split(",").map((column) => column.trim()).filter(Boolean));
-  selected.add("id");
-  if (COMPANY_SCOPED_TABLES.has(table)) selected.add("entreprise_id");
-  const batches = chunks(uniqueIds, READ_BATCH_SIZE);
-  const rows = [];
-  const returnedIds = new Set();
-  for (let index = 0; index < batches.length; index += 1) {
-    const batch = batches[index];
-    const batchIds = new Set(batch);
-    const { data, error } = await client.from(table).select([...selected].join(",")).in("id", batch);
-    if (error) abort(`inspection de reprise ${table} lot ${index + 1}/${batches.length}: ${error.message}`);
-    if (!Array.isArray(data)) abort(`réponse de lecture invalide pour ${table} lot ${index + 1}/${batches.length}`);
-    for (const row of data) {
-      if (!batchIds.has(row.id)) abort(`UUID inattendu retourné par ${table}`);
-      if (returnedIds.has(row.id)) abort(`UUID retourné en doublon par ${table}`);
-      if (COMPANY_SCOPED_TABLES.has(table) && row.entreprise_id !== COMPANY_ID) {
-        abort(`ligne ${table} retournée pour une autre entreprise`);
-      }
-      returnedIds.add(row.id);
-      rows.push(row);
-    }
-  }
-  return rows;
-}
-
-async function inspectRemoteResume(client, plan, context) {
-  const steps = executionSteps(plan, context);
-  const existingCommandIds = await readRowsByIds(
-    client,
-    "commandes_fournisseurs",
-    plan.commandes.map((row) => row.id),
-    "id,entreprise_id,fournisseur_id,chantier_id,statut,numero,date_commande,notes",
-  );
-  const commandById = new Map(plan.commandes.map((row) => [row.id, row]));
-  for (const row of existingCommandIds) {
-    assertStoredRowMatches(
-      row,
-      commandById.get(row.id),
-      ["entreprise_id", "fournisseur_id", "chantier_id", "statut", "numero", "date_commande", "notes"],
-      "commande déterministe existante non conforme",
-    );
-  }
-  const { data: numberCollisions, error: numberCollisionError } = await client.from("commandes_fournisseurs")
-    .select("id,numero")
-    .eq("entreprise_id", COMPANY_ID)
-    .in("numero", plan.commandes.map((row) => row.numero));
-  if (numberCollisionError) abort(`contrôle des numéros de commandes: ${numberCollisionError.message}`);
-  const commandNumbering = validateCommandNumbers(plan.commandes, numberCollisions ?? []);
-  const { data: commandCounters, error: counterError } = await client.from("compteurs_reference")
-    .select("type,dernier_numero")
-    .eq("entreprise_id", COMPANY_ID)
-    .in("type", ["commande-2025", "commande-2026"])
-    .order("type");
-  if (counterError) abort(`lecture des compteurs de commandes: ${counterError.message}`);
-  const existingExpenseIds = await readRowsByIds(
-    client,
-    "depenses_fournisseurs",
-    plan.supplierExpenses.map((row) => row.id),
-    "id,entreprise_id,fournisseur_id,chantier_id,commande_id,numero_piece,categorie,date_piece,date_echeance,montant_ht,montant_tva,notes",
-  );
-  const { data: expenseUniqueCollisions, error: expenseCollisionError } = await client.from("depenses_fournisseurs")
-    .select("id,entreprise_id,fournisseur_id,chantier_id,commande_id,numero_piece,categorie,date_piece,date_echeance,montant_ht,montant_tva,notes")
-    .eq("entreprise_id", COMPANY_ID)
-    .in("numero_piece", plan.supplierExpenses.map((row) => row.numero_piece));
-  if (expenseCollisionError) abort(`contrôle des clés uniques de dépenses fournisseurs: ${expenseCollisionError.message}`);
-  const expenseRowsById = new Map([...existingExpenseIds, ...(expenseUniqueCollisions ?? [])].map((row) => [row.id, row]));
-  const supplierExpenseIntegrity = validateSupplierExpenses(plan, [...expenseRowsById.values()]);
-  const existingCommandLines = await readRowsByIds(
-    client,
-    "lignes_commande",
-    plan.lignesCommande.map((row) => row.id),
-    "id,entreprise_id,commande_id,designation,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre",
-  );
-  const plannedCommandLinesById = new Map(plan.lignesCommande.map((row) => [row.id, row]));
-  for (const row of existingCommandLines) {
-    assertStoredRowMatches(
-      row,
-      plannedCommandLinesById.get(row.id),
-      ["entreprise_id", "commande_id", "designation", "quantite", "unite", "prix_unitaire_ht", "taux_tva", "quantite_recue", "ordre"],
-      "ligne de commande déterministe existante non conforme",
-    );
-  }
-  const rowsByTable = new Map();
-  for (const step of steps) {
-    if (step.operation !== "insert") continue;
-    const current = rowsByTable.get(step.table) ?? [];
-    current.push(...cleanRows(step.rows));
-    rowsByTable.set(step.table, current);
-  }
-
-  const presentByTable = new Map();
-  const tableSummary = {};
-  const relatedScopes = {
-    contacts_clients: ["client_id", plan.clients.map((row) => row.id)],
-    taches: ["chantier_id", plan.chantiers.map((row) => row.id)],
-    lignes_devis: ["devis_id", plan.devis.map((row) => row.id)],
-    lignes_factures: ["facture_id", plan.factures.map((row) => row.id)],
-    paiements: ["facture_id", plan.factures.map((row) => row.id)],
-  };
-  for (const [table, rows] of rowsByTable) {
-    const existing = await readRowsByIds(client, table, rows.map((row) => row.id), selectedColumnsForRows(table, rows));
-    validateExistingOwnedRows(table, rows, existing);
-    presentByTable.set(table, new Set(existing.map((row) => row.id)));
-    let companyTotal = null;
-    if (COMPANY_SCOPED_TABLES.has(table)) {
-      const { count, error } = await client.from(table).select("id", { count: "exact", head: true }).eq("entreprise_id", COMPANY_ID);
-      if (error) abort(`comptage de reprise ${table}: ${error.message}`);
-      companyTotal = count ?? 0;
-    } else if (relatedScopes[table]) {
-      const [column, ids] = relatedScopes[table];
-      const { count, error } = await client.from(table).select("id", { count: "exact", head: true }).in(column, ids);
-      if (error) abort(`comptage relationnel de reprise ${table}: ${error.message}`);
-      companyTotal = count ?? 0;
-    }
-    if (STRICT_INSERT_ONLY_TABLES.has(table) && companyTotal !== existing.length) {
-      abort(`donnée non déterministe ou collision métier présente dans ${table}`);
-    }
-    tableSummary[table] = {
-      planned: rows.length,
-      present: existing.length,
-      missing: rows.length - existing.length,
-      scopedTotal: companyTotal,
-      otherScopedRows: companyTotal === null ? null : companyTotal - existing.length,
-      futureAction: existing.length === rows.length ? "absence d'action" : "insertion des UUID manquants uniquement",
-    };
-  }
-
-  const modules = steps.map((step, order) => {
-    const presentIds = presentByTable.get(step.table);
-    if (step.operation === "emit") {
-      return {
-        order: order + 1, module: step.key, table: step.table, planned: step.rows.length,
-        present: presentIds?.size ?? 0, missing: step.rows.length - (presentIds?.size ?? 0),
-        operationOnResume: "après insertion des lignes: émission conditionnelle des seuls brouillons du seed",
-        updates: "0 si déjà émise; 1 transition contrôlée par brouillon manquant",
-      };
-    }
-    const present = step.rows.filter((row) => presentIds.has(row.id)).length;
     return {
-      order: order + 1,
-      module: step.key,
-      table: step.table,
-      planned: step.rows.length,
-      present,
-      missing: step.rows.length - present,
-      operationOnResume: present === step.rows.length ? "lecture puis absence d'action" : "lecture puis insertion des UUID manquants",
-      updates: 0,
+      key, kind: "insert", table, keyColumn, rows, columns,
+      markerColumn: markerSpec?.[0] ?? null, marker: markerSpec?.[1] ?? null,
+      scoped, compared: compared ?? [],
     };
   });
-
-  const acceptedQuoteIds = new Set(plan.devis.filter((quote) => quote.statut === "accepte").map((quote) => quote.id));
-  const acceptedLineIds = new Set(plan.lignesDevis.filter((line) => acceptedQuoteIds.has(line.devis_id)).map((line) => line.id));
-  const { data: projectTasks, error: taskError } = await client.from("taches")
-    .select("id,devis_id,ligne_devis_id,description")
-    .in("chantier_id", plan.chantiers.map((chantier) => chantier.id));
-  if (taskError) abort(`classification des tâches: ${taskError.message}`);
-  const explicitTaskIds = new Set(plan.tasks.map((task) => task.id));
-  const explicit = (projectTasks ?? []).filter((task) => explicitTaskIds.has(task.id));
-  const automatic = (projectTasks ?? []).filter((task) => task.ligne_devis_id && acceptedLineIds.has(task.ligne_devis_id));
-  const automaticLineIds = new Set(automatic.map((task) => task.ligne_devis_id));
-  const manual = (projectTasks ?? []).filter((task) => !explicitTaskIds.has(task.id) && !automatic.includes(task));
-  if (explicit.length !== plan.tasks.length) abort("les 60 tâches déterministes ne sont pas toutes présentes");
-  if (automatic.length !== acceptedLineIds.size || automaticLineIds.size !== acceptedLineIds.size) {
-    abort("les tâches automatiques des lignes de devis acceptés ne sont pas bijectives");
-  }
-
-  return {
-    modules,
-    tables: tableSummary,
-    tasks: {
-      total: (projectTasks ?? []).length,
-      explicitSeed: explicit.length,
-      automaticFromAcceptedQuoteLines: automatic.length,
-      distinctAutomaticSourceLines: automaticLineIds.size,
-      manualOrUnclassified: manual.length,
-      resumeBehavior: "devis et lignes existants ignorés; aucun trigger de synchronisation relancé",
-    },
-    collisions: 0,
-    commandNumbering: {
-      ...commandNumbering,
-      existingDeterministicCommands: existingCommandIds.length,
-      manualNumberCollisions: (numberCollisions ?? []).filter((row) => row.id !== commandById.get(row.id)?.id).length,
-      counters: commandCounters ?? [],
-      counterReadsOnly: true,
-    },
-    commandIntegrity: {
-      deterministicCommands: existingCommandIds.length,
-      deterministicLines: existingCommandLines.length,
-      orphanDeterministicLines: existingCommandLines.filter((row) => !commandById.has(row.commande_id)).length,
-    },
-    supplierExpenses: {
-      ...supplierExpenseIntegrity,
-      expectedIds: plan.supplierExpenses.map((row) => row.id),
-      manualUniqueCollisions: (expenseUniqueCollisions ?? []).filter((row) => !plan.supplierExpenses.some((expense) => expense.id === row.id)).length,
-      allLinkedRelationsCompatible: true,
-      atomicInsertBatch: true,
-    },
-    batching: {
-      readBatchSize: READ_BATCH_SIZE,
-      insertBatchSize: INSERT_BATCH_SIZE,
-      boundedReads: true,
-      boundedInserts: true,
-      moduleLevelAtomicity: false,
-      partialBatchResumeByDeterministicId: true,
-    },
-    markerPreserved: true,
-    writeOperationsDuringInspection: 0,
-  };
 }
 
-function summary(plan, expected, liveReadonly = false, resume = null) {
+function preambleSql() {
+  return `-- ${MARKER} — script généré par scripts/seed-elsatia-preview-year.mjs
+-- ${DOCUMENT_MARKER}
+-- Cible verrouillée : ${PROJECT_NAME} (${PROJECT_REF}) / entreprise ${COMPANY_ID}.
+-- Un module = une transaction. Rejouable : seuls les UUID déterministes absents sont insérés.
+set statement_timeout = '15min';
+set client_min_messages = warning;
+-- Une seule exécution à la fois : une relance pendant qu'une exécution interrompue (client
+-- coupé, backend encore actif) termine son module attend la fin de celle-ci au lieu de la
+-- concurrencer. Verrou de session, libéré à la déconnexion.
+select pg_advisory_lock(hashtext(${"'"}${MARKER}${"'"})) is null as verrou_seed;
+
+create temp table if not exists seed_contexte (cle text primary key, valeur text not null);
+
+create or replace function pg_temp.seed_resoudre(p_lignes text) returns jsonb
+language plpgsql as $f$
+declare
+  v_texte text := p_lignes;
+  v record;
+begin
+  for v in select cle, valeur from pg_temp.seed_contexte loop
+    v_texte := replace(v_texte, '{{' || v.cle || '}}', v.valeur);
+  end loop;
+  if v_texte like '%{{%}}%' then
+    raise exception 'ARRÊT SÛR: référence de contexte non résolue dans le plan';
+  end if;
+  return v_texte::jsonb;
+end;
+$f$;
+
+-- Insertion des seules lignes déterministes absentes, puis contrôle de TOUTES les lignes
+-- du plan présentes en base : entreprise, marqueur de recette, valeurs comparées.
+create or replace function pg_temp.seed_inserer(
+  p_table text, p_cle text, p_lignes jsonb, p_colonnes text[], p_comparees text[],
+  p_marqueur_col text, p_marqueur text, p_entreprise uuid
+) returns integer
+language plpgsql as $f$
+declare
+  v_cols text;
+  v_insere integer;
+  v_n integer;
+  v_attendu integer := jsonb_array_length(p_lignes);
+begin
+  select string_agg(format('%I', c), ', ') into v_cols from unnest(p_colonnes) c;
+  execute format(
+    'insert into public.%1$I (%2$s) select %2$s from jsonb_populate_recordset(null::public.%1$I, $1) p
+      where not exists (select 1 from public.%1$I t where t.%3$I = p.%3$I)',
+    p_table, v_cols, p_cle) using p_lignes;
+  get diagnostics v_insere = row_count;
+
+  execute format(
+    'select count(*) from jsonb_populate_recordset(null::public.%1$I, $1) p join public.%1$I t on t.%2$I = p.%2$I',
+    p_table, p_cle) into v_n using p_lignes;
+  if v_n <> v_attendu then
+    raise exception 'ARRÊT SÛR: % ligne(s) déterministe(s) absente(s) dans % après insertion', v_attendu - v_n, p_table;
+  end if;
+
+  if p_entreprise is not null then
+    execute format(
+      'select count(*) from jsonb_populate_recordset(null::public.%1$I, $1) p join public.%1$I t on t.%2$I = p.%2$I
+        where t.entreprise_id is distinct from $2',
+      p_table, p_cle) into v_n using p_lignes, p_entreprise;
+    if v_n > 0 then raise exception 'ARRÊT SÛR: ligne % rattachée à une autre entreprise', p_table; end if;
+  end if;
+
+  if p_marqueur_col is not null then
+    execute format(
+      'select count(*) from jsonb_populate_recordset(null::public.%1$I, $1) p join public.%1$I t on t.%2$I = p.%2$I
+        where strpos(coalesce(t.%3$I::text, ''''), $2) = 0',
+      p_table, p_cle, p_marqueur_col) into v_n using p_lignes, p_marqueur;
+    if v_n > 0 then raise exception 'ARRÊT SÛR: collision avec une donnée manuelle dans %', p_table; end if;
+  end if;
+
+  if coalesce(array_length(p_comparees, 1), 0) > 0 then
+    execute format(
+      'select count(*) from jsonb_populate_recordset(null::public.%1$I, $1) p join public.%1$I t on t.%2$I = p.%2$I
+        where (select jsonb_object_agg(c, to_jsonb(t) -> c) from unnest($2::text[]) c)
+              is distinct from (select jsonb_object_agg(c, to_jsonb(p) -> c) from unnest($2::text[]) c)',
+      p_table, p_cle) into v_n using p_lignes, p_comparees;
+    if v_n > 0 then
+      raise exception 'ARRÊT SÛR: % donnée(s) déterministe(s) existante(s) incompatible(s) dans %', v_n, p_table;
+    end if;
+  end if;
+  return v_insere;
+end;
+$f$;
+`;
+}
+
+function preflightSql(plan) {
+  const plannedActive = plan.employees.filter((row) => row.statut !== "sorti").map((row) => row.id);
+  const strictTables = [...new Set(MODULE_DEFINITIONS.filter((definition) => definition[5] === "strict").map((definition) => definition[1]))];
+  const strictIds = Object.fromEntries(strictTables.map((table) => [table, MODULE_DEFINITIONS
+    .filter((definition) => definition[1] === table)
+    .flatMap((definition) => plan[definition[0]].map((row) => row.id))]));
+  return `-- @preflight
+begin;
+do $preflight$
+declare
+  v_entreprises integer;
+  v_postes text;
+  v_gerant_poste uuid;
+  v_depot_poste uuid;
+  v_uid uuid;
+  v_n integer;
+  v_catalogue integer;
+  v_actifs integer;
+  v_capacite integer;
+  v_table text;
+  v_ids jsonb := ${jsonLiteral(strictIds)}::jsonb;
+begin
+  select count(*) into v_entreprises from public.entreprises where nom = ${sqlText(COMPANY_NAME)};
+  if v_entreprises <> 1 or not exists (select 1 from public.entreprises where id = ${sqlText(COMPANY_ID)} and nom = ${sqlText(COMPANY_NAME)}) then
+    raise exception 'ARRÊT SÛR: entreprise cible non unique ou non conforme';
+  end if;
+
+  select string_agg(nom, '|' order by nom) into v_postes from public.postes where entreprise_id = ${sqlText(COMPANY_ID)};
+  if v_postes is distinct from (select string_agg(n, '|' order by n) from unnest(${sqlTextArray(ALL_ROLES)}) n) then
+    raise exception 'ARRÊT SÛR: modèle des dix postes non conforme';
+  end if;
+  select id into v_gerant_poste from public.postes where entreprise_id = ${sqlText(COMPANY_ID)} and nom = 'Gérant';
+  select id into v_depot_poste from public.postes where entreprise_id = ${sqlText(COMPANY_ID)} and nom = 'Compte dépôt';
+
+  -- Gérant : identifié par Auth (adresse normalisée), puis par son UUID, jamais par utilisateurs.email.
+  select count(*) into v_n from auth.users where lower(btrim(email)) = ${sqlText(MANAGER_EMAIL)};
+  if v_n <> 1 then raise exception 'ARRÊT SÛR: compte Auth Gérant %', case when v_n = 0 then 'absent' else 'dupliqué' end; end if;
+  select id into v_uid from auth.users where lower(btrim(email)) = ${sqlText(MANAGER_EMAIL)};
+  if not exists (select 1 from public.utilisateurs where id = v_uid) then
+    raise exception 'ARRÊT SÛR: profil public Gérant absent';
+  end if;
+  select count(*) into v_n from public.utilisateurs_entreprises where utilisateur_id = v_uid and statut = 'actif';
+  if v_n <> 1 then raise exception 'ARRÊT SÛR: appartenance active du Gérant absente ou multiple'; end if;
+  if not exists (select 1 from public.utilisateurs_entreprises where utilisateur_id = v_uid and statut = 'actif'
+                   and entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_gerant_poste) then
+    raise exception 'ARRÊT SÛR: appartenance du Gérant associée à une autre entreprise ou un autre poste';
+  end if;
+  select count(*) into v_n from public.utilisateurs_entreprises where entreprise_id = ${sqlText(COMPANY_ID)} and statut = 'actif';
+  if v_n <> 1 then raise exception 'ARRÊT SÛR: appartenance active unique de l''entreprise non conforme'; end if;
+
+  if exists (select 1 from public.utilisateurs_entreprises where entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_depot_poste)
+     or exists (select 1 from public.employes where entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_depot_poste) then
+    raise exception 'ARRÊT SÛR: Compte dépôt attribué';
+  end if;
+
+  -- Le Gérant porte tout le catalogue des permissions, sauf mode_compte_depot. Le catalogue
+  -- grandit avec les migrations (99 → 100 en 20260819000216) : la référence est la base.
+  select count(*) into v_catalogue from public.permissions_disponibles;
+  select count(*) into v_n from public.permissions_poste where entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_gerant_poste;
+  if v_n <> v_catalogue then raise exception 'ARRÊT SÛR: le rôle Gérant ne couvre pas exactement le catalogue des permissions (% / %)', v_n, v_catalogue; end if;
+  select count(*) into v_n from public.permissions_poste where entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_gerant_poste and autorise;
+  if v_n <> v_catalogue - 1 or not exists (
+       select 1 from public.permissions_poste where entreprise_id = ${sqlText(COMPANY_ID)} and poste_id = v_gerant_poste
+         and cle_permission = 'mode_compte_depot' and autorise = false) then
+    raise exception 'ARRÊT SÛR: mode_compte_depot doit rester le seul droit désactivé du Gérant';
+  end if;
+
+  select count(*) into v_n from public.employes where entreprise_id = ${sqlText(COMPANY_ID)} and lower(btrim(email)) = ${sqlText(MANAGER_EMAIL)};
+  if v_n > 1 then raise exception 'ARRÊT SÛR: plusieurs fiches salarié portent l''adresse du Gérant'; end if;
+  if v_n = 1 and not exists (select 1 from public.employes where id = ${sqlText(stableId("employe", "GERANT"))}) then
+    raise exception 'ARRÊT SÛR: une fiche Gérant manuelle incompatible existe déjà; aucune fusion automatique autorisée';
+  end if;
+
+  -- Capacité de personnes (trg_capacite_personnes_actives) : vérifiée avant toute écriture.
+  select count(*) into v_actifs from public.employes e
+   where e.entreprise_id = ${sqlText(COMPANY_ID)} and e.statut is distinct from 'sorti'
+     and e.compte_application_statut is distinct from 'ferme'
+     and e.id <> all(${sqlTextArray(plannedActive)}::uuid[]);
+  v_capacite := public.capacite_personnes_totale(${sqlText(COMPANY_ID)});
+  if v_actifs + ${plannedActive.length} > v_capacite then
+    raise exception 'ARRÊT SÛR: capacité de personnes insuffisante (% actives hors seed + ${plannedActive.length} prévues > %). Un opérateur plateforme doit ajuster la capacité avant le peuplement.', v_actifs, v_capacite;
+  end if;
+
+  -- Numéros de commande et pièces fournisseurs : aucune collision avec une donnée manuelle.
+  if exists (select 1 from public.commandes_fournisseurs c
+              where c.entreprise_id = ${sqlText(COMPANY_ID)} and c.numero = any(${sqlTextArray(plan.commandes.map((row) => row.numero))})
+                and c.id <> all(${sqlTextArray(plan.commandes.map((row) => row.id))}::uuid[])) then
+    raise exception 'ARRÊT SÛR: collision avec un numéro de commande manuel';
+  end if;
+  if exists (select 1 from public.depenses_fournisseurs d
+              where d.entreprise_id = ${sqlText(COMPANY_ID)} and d.numero_piece = any(${sqlTextArray(plan.supplierExpenses.map((row) => row.numero_piece))})
+                and d.id <> all(${sqlTextArray(plan.supplierExpenses.map((row) => row.id))}::uuid[])) then
+    raise exception 'ARRÊT SÛR: collision avec une dépense fournisseur manuelle';
+  end if;
+
+  -- Tables historisées strictement insert-only : aucune ligne étrangère au seed dans
+  -- l'entreprise, sinon la reprise pourrait mélanger saisie réelle et recette.
+  for v_table in select jsonb_object_keys(v_ids) loop
+    execute format('select count(*) from public.%I t where t.entreprise_id = $1 and t.id <> all($2) and %s',
+                   v_table, case v_table when 'notifications_utilisateurs' then 'coalesce(t.type, '''') = ''recette_interne''' else 'true' end)
+      into v_n
+      using ${sqlText(COMPANY_ID)}::uuid, array(select jsonb_array_elements_text(v_ids -> v_table))::uuid[];
+    if v_n > 0 then
+      raise exception 'ARRÊT SÛR: donnée non déterministe ou collision métier présente dans % (% ligne(s))', v_table, v_n;
+    end if;
+  end loop;
+
+  delete from pg_temp.seed_contexte;
+  insert into pg_temp.seed_contexte values ('gerant', v_uid::text);
+  insert into pg_temp.seed_contexte select 'poste:' || nom, id::text from public.postes where entreprise_id = ${sqlText(COMPANY_ID)};
+end;
+$preflight$;
+commit;
+`;
+}
+
+function insertModuleSql(module) {
+  const lines = jsonLiteral(module.rows);
+  return `select pg_temp.seed_inserer(${sqlText(module.table)}, ${sqlText(module.keyColumn)},
+  pg_temp.seed_resoudre(${lines}),
+  ${sqlTextArray(module.columns)}, ${sqlTextArray(module.compared)},
+  ${module.markerColumn ? sqlText(module.markerColumn) : "null"}, ${module.marker ? sqlText(module.marker) : "null"},
+  ${module.scoped ? `${sqlText(COMPANY_ID)}::uuid` : "null"}) as ${module.key.toLowerCase()}_inseres;`;
+}
+
+function devisTransitionsSql(plan) {
+  const targets = plan.devis.map((row) => ({ id: row.id, cible: row.__targetStatus, chemin: DEVIS_PATHS[row.__targetStatus] }));
+  if (targets.some((row) => !row.chemin)) abort("statut cible de devis sans transition métier");
+  return `do $devis$
+declare
+  v record;
+  v_statut text;
+  v_debut integer;
+  v_n integer;
+begin
+  for v in select * from jsonb_to_recordset(${jsonLiteral(targets)}::jsonb) as x(id uuid, cible text, chemin text[]) loop
+    select statut into v_statut from public.devis where id = v.id;
+    if v_statut is null then raise exception 'ARRÊT SÛR: devis déterministe absent avant transition'; end if;
+    -- Reprise : le devis doit se trouver sur le chemin brouillon → … → cible.
+    v_debut := case when v_statut = 'brouillon' then 1 else array_position(v.chemin, v_statut) + 1 end;
+    if v_debut is null then
+      raise exception 'ARRÊT SÛR: devis % dans un statut incompatible (% pour %)', v.id, v_statut, v.cible;
+    end if;
+    for i in v_debut..coalesce(array_length(v.chemin, 1), 0) loop
+      update public.devis set statut = v.chemin[i] where id = v.id and statut = v_statut;
+      get diagnostics v_n = row_count;
+      if v_n <> 1 then raise exception 'ARRÊT SÛR: transition concurrente du devis %', v.id; end if;
+      v_statut := v.chemin[i];
+    end loop;
+    if v_statut <> v.cible then raise exception 'ARRÊT SÛR: devis % non amené à %', v.id, v.cible; end if;
+  end loop;
+end;
+$devis$;`;
+}
+
+function invoiceEmissionSql(plan) {
+  const targets = plan.factures.map((row) => ({ id: row.id, cible: row.__emissionStatus }));
+  return `do $emission$
+declare
+  v record;
+  v_facture record;
+begin
+  for v in select * from jsonb_to_recordset(${jsonLiteral(targets)}::jsonb) as x(id uuid, cible text) loop
+    select statut, montant_ttc, montant_paye into v_facture from public.factures where id = v.id for update;
+    if not found then raise exception 'ARRÊT SÛR: émission impossible, facture déterministe absente'; end if;
+    if v_facture.statut <> 'brouillon' then
+      if (v.cible = 'avoir_emis' and v_facture.statut <> 'avoir_emis')
+         or (v.cible <> 'avoir_emis' and v_facture.statut not in ('envoyee', 'en_retard', 'payee_partiel', 'payee')) then
+        raise exception 'ARRÊT SÛR: statut existant incompatible pour la facture %', v.id;
+      end if;
+      continue;
+    end if;
+    if v_facture.montant_ttc <= 0 or v_facture.montant_paye <> 0 then
+      raise exception 'ARRÊT SÛR: émission impossible, total nul ou règlement prématuré';
+    end if;
+    update public.factures set statut = v.cible where id = v.id and statut = 'brouillon';
+  end loop;
+end;
+$emission$;`;
+}
+
+function commandeTransitionsSql(plan) {
+  const linesByCommand = Object.groupBy(plan.lignesCommande, (row) => row.commande_id);
+  const targets = plan.commandes.map((row) => ({
+    id: row.id,
+    cible: row.__targetStatus,
+    chemin: COMMAND_PATHS[row.__targetStatus],
+    reception: (linesByCommand[row.id] ?? []).map((line) => ({ ligne_id: line.id, quantite_recue: line.__targetRecue })),
+  }));
+  if (targets.some((row) => !row.chemin)) abort("statut cible de commande sans transition métier");
+  return `do $commandes$
+declare
+  v record;
+  v_statut text;
+  v_etape text;
+  v_ordre text[] := array['brouillon', 'envoyee', 'confirmee', 'recue_partiel', 'recue'];
+begin
+  for v in select * from jsonb_to_recordset(${jsonLiteral(targets)}::jsonb)
+             as x(id uuid, cible text, chemin text[], reception jsonb) loop
+    select statut into v_statut from public.commandes_fournisseurs where id = v.id;
+    if v_statut is null then raise exception 'ARRÊT SÛR: commande déterministe absente avant transition'; end if;
+    if v_statut = v.cible then continue; end if;
+    if v_statut = 'annulee' or v_statut = 'recue' then
+      raise exception 'ARRÊT SÛR: commande % dans un statut final incompatible (% pour %)', v.id, v_statut, v.cible;
+    end if;
+    foreach v_etape in array v.chemin loop
+      if v_etape = 'reception' then
+        -- Moteur canonique de réception (20260922000322) : quantités cumulées cibles,
+        -- mouvement de stock pour les lignes reliées à un article, statut recalculé.
+        if v_statut in ('envoyee', 'confirmee', 'recue_partiel') then
+          v_statut := public.enregistrer_reception_commande_interne(${sqlText(COMPANY_ID)}::uuid, v.id, v.reception, null);
+        end if;
+      elsif v_etape = 'annulee' then
+        if v_statut <> 'annulee' then
+          perform public.changer_statut_commande_interne(${sqlText(COMPANY_ID)}::uuid, v.id, 'annulee');
+          v_statut := 'annulee';
+        end if;
+      elsif array_position(v_ordre, v_statut) < array_position(v_ordre, v_etape) then
+        perform public.changer_statut_commande_interne(${sqlText(COMPANY_ID)}::uuid, v.id, v_etape);
+        v_statut := v_etape;
+      end if;
+    end loop;
+    select statut into v_statut from public.commandes_fournisseurs where id = v.id;
+    if v_statut <> v.cible then raise exception 'ARRÊT SÛR: commande % non amenée à % (statut %)', v.id, v.cible, v_statut; end if;
+  end loop;
+end;
+$commandes$;`;
+}
+
+function employeeReentrySql(plan) {
+  // Reprise d'un état où le salarié est déjà sorti sans son historique (ancien seed) : il est
+  // réintégré le temps d'insérer ses affectations, puis ressort au module employeeExits.
+  const history = [...plan.affectations, ...plan.absences];
+  const targets = plan.employees.filter((row) => row.__targetStatus !== "actif").map((row) => ({
+    id: row.id, affectations: history.filter((item) => item.employe_id === row.id).map((item) => item.id),
+  }));
+  return `do $reentry$
+declare
+  v record;
+begin
+  for v in select * from jsonb_to_recordset(${jsonLiteral(targets)}::jsonb) as x(id uuid, affectations uuid[]) loop
+    if exists (select 1 from public.employes where id = v.id and statut = 'sorti')
+       and exists (select 1 from unnest(v.affectations) a(id) where not exists (select 1 from public.affectations t where t.id = a.id)) then
+      update public.employes set statut = 'actif', date_sortie = null where id = v.id and statut = 'sorti';
+    end if;
+  end loop;
+end;
+$reentry$;`;
+}
+
+function employeeExitsSql(plan) {
+  const targets = plan.employees.filter((row) => row.__targetStatus !== "actif")
+    .map((row) => ({ id: row.id, statut: row.__targetStatus, date_sortie: row.__targetExit }));
+  return `do $sorties$
+declare
+  v record;
+begin
+  for v in select * from jsonb_to_recordset(${jsonLiteral(targets)}::jsonb) as x(id uuid, statut text, date_sortie date) loop
+    update public.employes set statut = v.statut, date_sortie = v.date_sortie where id = v.id and statut = 'actif';
+    if not exists (select 1 from public.employes where id = v.id and statut = v.statut and date_sortie = v.date_sortie) then
+      raise exception 'ARRÊT SÛR: sortie du salarié % non appliquée', v.id;
+    end if;
+  end loop;
+end;
+$sorties$;`;
+}
+
+function verificationSql(plan) {
+  const acceptedQuoteIds = plan.devis.filter((quote) => quote.__targetStatus === "accepte").map((quote) => quote.id);
+  const expectedReception = plan.lignesCommande.map((line) => ({ id: line.id, quantite_recue: line.__targetRecue }));
+  const lifecycle = simulateInvoiceLifecycle(plan).map((invoice) => ({ id: invoice.id, attendu: invoice.finalStatus }));
+  return `do $verification$
+declare
+  v_n integer;
+begin
+  -- Tâches : les 60 tâches explicites, plus exactement une tâche automatique par ligne de devis accepté.
+  select count(*) into v_n from public.taches where id = any(${sqlTextArray(plan.tasks.map((task) => task.id))}::uuid[]);
+  if v_n <> ${plan.tasks.length} then raise exception 'ARRÊT SÛR: les ${plan.tasks.length} tâches déterministes ne sont pas toutes présentes'; end if;
+  select count(*) into v_n from (
+    select l.id from public.lignes_devis l
+     where l.devis_id = any(${sqlTextArray(acceptedQuoteIds)}::uuid[])
+       and (select count(*) from public.taches t where t.ligne_devis_id = l.id) <> 1) x;
+  if v_n > 0 then raise exception 'ARRÊT SÛR: les tâches automatiques des lignes de devis acceptés ne sont pas bijectives'; end if;
+
+  -- Réceptions : quantités cumulées cibles atteintes par le moteur canonique.
+  select count(*) into v_n from jsonb_to_recordset(${jsonLiteral(expectedReception)}::jsonb) as x(id uuid, quantite_recue numeric)
+    join public.lignes_commande l on l.id = x.id where l.quantite_recue <> x.quantite_recue;
+  if v_n > 0 then raise exception 'ARRÊT SÛR: % ligne(s) de commande sans la réception attendue', v_n; end if;
+
+  -- Factures : statuts dérivés des règlements identiques à la simulation du plan.
+  select count(*) into v_n from jsonb_to_recordset(${jsonLiteral(lifecycle)}::jsonb) as x(id uuid, attendu text)
+    join public.factures f on f.id = x.id where f.statut <> x.attendu;
+  if v_n > 0 then raise exception 'ARRÊT SÛR: % facture(s) hors du statut attendu après règlements', v_n; end if;
+end;
+$verification$;`;
+}
+
+function buildExecutionSql(plan) {
+  const parts = [preambleSql(), preflightSql(plan)];
+  for (const step of executionModules(plan)) {
+    let body;
+    if (step.kind === "insert") body = insertModuleSql(step);
+    else if (step.kind === "devisTransitions") body = devisTransitionsSql(plan);
+    else if (step.kind === "invoiceEmission") body = invoiceEmissionSql(plan);
+    else if (step.kind === "commandeTransitions") body = commandeTransitionsSql(plan);
+    else if (step.kind === "employeeReentry") body = employeeReentrySql(plan);
+    else if (step.kind === "employeeExits") body = employeeExitsSql(plan);
+    else if (step.kind === "verification") body = verificationSql(plan);
+    else abort(`module inconnu: ${step.kind}`);
+    parts.push(`-- @module ${step.key}\nbegin;\n${body}\ncommit;\n`);
+  }
+  parts.push(`-- @summary
+select json_build_object(
+  'entreprise', ${sqlText(COMPANY_ID)},
+  'employes', (select count(*) from public.employes where entreprise_id = ${sqlText(COMPANY_ID)}),
+  'devis', (select count(*) from public.devis where entreprise_id = ${sqlText(COMPANY_ID)}),
+  'factures', (select count(*) from public.factures where entreprise_id = ${sqlText(COMPANY_ID)}),
+  'commandes', (select json_object_agg(statut, n) from (select statut, count(*) n from public.commandes_fournisseurs
+                 where entreprise_id = ${sqlText(COMPANY_ID)} group by statut) c),
+  'pointages', (select count(*) from public.pointages where entreprise_id = ${sqlText(COMPANY_ID)})
+) as ${MARKER.toLowerCase()};
+`);
+  return parts.join("\n");
+}
+
+function buildPreflightSql(plan) {
+  // Lecture seule : la transaction est refusée par la base à la moindre écriture.
+  return `${preambleSql()}\n${preflightSql(plan).replace("begin;", "begin read only;").replace(/commit;\s*$/, "rollback;\n")}
+select json_build_object('preflight', 'OK', 'entreprise', ${sqlText(COMPANY_ID)}) as ${MARKER.toLowerCase()};
+`;
+}
+
+function summary(plan, expected, liveReadonly = false) {
   return {
-    mode: liveReadonly ? "dry-run avec préflight Supabase strictement en lecture seule" : "dry-run local sans client Supabase",
+    mode: liveReadonly ? "dry-run avec préflight SQL en lecture seule sur la Preview liée" : "dry-run local sans connexion",
     target: { projectRef: PROJECT_REF, projectName: PROJECT_NAME, companyId: COMPANY_ID, companyName: COMPANY_NAME },
     period: { start: PERIOD_START, end: PERIOD_END }, marker: MARKER,
     volumes: expected,
     derived: { lignesDevis: plan.lignesDevis.length, lignesFactures: plan.lignesFactures.length, lignesCommande: plan.lignesCommande.length },
     auth: { existingManager: 1, additionalUsers: 0, personalEmployeeFlowsForFictitiousStaff: false },
     documents: { prepared: plan.documents.length, uploaded: 0 },
+    execution: {
+      channel: "supabase db query --linked (rôle postgres), jamais service_role",
+      modules: executionModules(plan).map((module) => module.key),
+      moduleLevelAtomicity: true,
+      resume: "rejouer le script complet : seuls les UUID absents sont insérés, les transitions reprennent où elles se sont arrêtées",
+    },
     externalEffects: { emails: 0, push: 0, stripe: 0, powens: 0, ai: 0, crons: 0 },
-    resume,
   };
 }
 
+function runLinkedSql(sql, label) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "elsatia-preview-seed-"));
+  const file = path.join(directory, `${label}.sql`);
+  try {
+    fs.writeFileSync(file, sql, { mode: 0o600 });
+    execFileSync("npx", ["supabase", "db", "query", "--linked", "--file", file], { cwd: ROOT, stdio: "inherit" });
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 export {
-  INSERT_BATCH_SIZE,
-  READ_BATCH_SIZE,
+  COMMAND_PATHS,
+  DEVIS_PATHS,
+  MARKER,
+  buildExecutionSql,
   buildPlan,
-  chunks,
-  emitSeedInvoices,
-  executionSteps,
-  inspectRemoteResume,
-  insertRowsInBatches,
-  listAuthUsersByEmail,
+  buildPreflightSql,
+  executionModules,
   parseArgs,
-  readRowsByIds,
   safeEnvironment,
+  simulateInvoiceLifecycle,
   stableId,
   summary,
-  simulateInvoiceLifecycle,
   validateCommandNumbers,
-  validateSupplierExpenses,
   validatePlan,
-  verifyManagerIdentity,
-  writeOwned,
+  validateSupplierExpenses,
 };
 
 async function main() {
   const options = parseArgs(process.argv);
   const plan = buildPlan();
   const expected = validatePlan(plan);
+  if (options.emitSql) {
+    // Aucune connexion : écrit le script déterministe pour relecture ou pour le harnais local
+    // (scripts/seeds/verify-seeds.mjs). Le script se garde lui-même par son préflight.
+    fs.writeFileSync(options.emitSql, buildExecutionSql(plan));
+    console.log(`Script SQL écrit dans ${options.emitSql} (aucune connexion, aucune écriture distante).`);
+    return;
+  }
   if (options.dryRun) {
-    let resume = null;
     if (options.liveReadonly) {
       safeEnvironment(process.env);
-      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) abort("SUPABASE_SERVICE_ROLE_KEY absent pour le préflight en lecture seule");
-      const { createClient } = await import("@supabase/supabase-js");
-      const readClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      const context = await livePreflight(readClient, process.env);
-      resume = await inspectRemoteResume(readClient, plan, context);
+      runLinkedSql(buildPreflightSql(plan), "preflight");
     }
-    const output = summary(plan, expected, options.liveReadonly, resume);
+    const output = summary(plan, expected, options.liveReadonly);
     console.log(options.json ? JSON.stringify(output, null, 2) : [
-      "DRY-RUN VALIDÉ — aucune connexion Supabase créée, aucune écriture possible.",
+      options.liveReadonly
+        ? "DRY-RUN VALIDÉ — préflight exécuté en transaction lecture seule, aucune écriture."
+        : "DRY-RUN VALIDÉ — aucune connexion créée, aucune écriture possible.",
       `Cible verrouillée: ${PROJECT_NAME} (${PROJECT_REF}) / ${COMPANY_ID}`,
       `Période: ${PERIOD_START} → ${PERIOD_END}`,
       `Volumes: ${JSON.stringify(expected)}`,
@@ -1120,15 +1288,7 @@ async function main() {
   }
 
   safeEnvironment(process.env);
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) abort("SUPABASE_SERVICE_ROLE_KEY absent");
-  const { createClient } = await import("@supabase/supabase-js");
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { "x-elsatia-seed": MARKER } },
-  });
-  const context = await livePreflight(client, process.env);
-  await inspectRemoteResume(client, plan, context);
-  await executePlan(client, plan, context);
+  runLinkedSql(buildExecutionSql(plan), "execution");
   console.log("Peuplement Preview terminé; contrôler les volumes avant toute nouvelle action.");
 }
 

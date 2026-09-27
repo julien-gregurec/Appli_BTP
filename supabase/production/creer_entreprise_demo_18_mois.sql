@@ -28,15 +28,17 @@ begin
   select id into v_entreprise from public.entreprises where reference_interne='DEMO-18M' limit 1;
   if v_entreprise is null then
     insert into public.entreprises(
-      reference_interne,nom,raison_sociale,siret,adresse,code_postal,ville,abonnement_statut,
+      reference_interne,nom,raison_sociale,siret,adresse,code_postal,ville,abonnement_statut,abonnement_offre,
       abonnement_echeance,abonnement_note,created_at,updated_at
     ) values(
       'DEMO-18M','ELSATIA Gestion Pro - Entreprise Démo','ELSATIA Démonstration SAS','99999999999999',
-      '18 avenue des Artisans','69000','Lyon','actif',current_date+365,
+      '18 avenue des Artisans','69000','Lyon','actif','entreprise',current_date+365,
       'Entreprise fictive - 18 mois d historique pour tester tous les roles',now()-interval '18 months',now()
     ) returning id into v_entreprise;
   else
-    update public.entreprises set abonnement_statut='actif',abonnement_echeance=current_date+365,
+    -- Offre Entreprise (docs/organisation/DEMO_COMMERCIALE.md, P11) : sa capacité de personnes
+    -- couvre les 12 salariés de la démo (trg_capacite_personnes_actives, 20260903000256).
+    update public.entreprises set abonnement_statut='actif',abonnement_offre='entreprise',abonnement_echeance=current_date+365,
       abonnement_note='Entreprise fictive - 18 mois d historique pour tester tous les roles',updated_at=now()
     where id=v_entreprise;
   end if;
@@ -61,23 +63,38 @@ begin
   end loop;
 
   -- Equipe fictive avec portraits synthetiques, Carte BTP et profils applicatifs.
+  -- Salarié existant : mise à jour ciblée (un INSERT … ON CONFLICT consommerait un numéro
+  -- d'identifiant interne à chaque rejeu, trigger BEFORE INSERT).
   for v_i in 1..12 loop
     select id into v_poste from public.postes where entreprise_id=v_entreprise and nom=v_postes[v_i];
-    insert into public.employes(
-      entreprise_id,reference_interne,prenom,nom,email,telephone,poste,poste_id,type_contrat,date_entree,
-      taux_horaire,cout_horaire,statut,notes,carte_btp_numero,carte_btp_expiration,photo_url,created_at
-    ) values(
-      v_entreprise,'DEMO-EMP-'||lpad(v_i::text,3,'0'),v_prenoms[v_i],v_noms[v_i],
-      'demo.'||v_i||'@example.test','060100'||lpad(v_i::text,4,'0'),v_postes[v_i],v_poste,
-      case when v_i in(6,12) then 'apprenti' else 'cdi' end,current_date-(560+v_i*19),
-      48+v_i,24+v_i*1.4,'actif','[DEMO 18M] Salarie fictif - aucune donnee personnelle reelle',
-      'BTP-DEMO-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0'),current_date+365+(v_i*17),
-      '/demo/employes/portrait-'||lpad((((v_i-1)%6)+1)::text,2,'0')||'.png',now()-interval '18 months'
-    ) on conflict(entreprise_id,reference_interne) do update set
-      poste=excluded.poste,poste_id=excluded.poste_id,carte_btp_numero=excluded.carte_btp_numero,
-      carte_btp_expiration=excluded.carte_btp_expiration,photo_url=excluded.photo_url,statut='actif',updated_at=now();
+    update public.employes set poste=v_postes[v_i],poste_id=v_poste,
+      carte_btp_numero='BTP-DEMO-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0'),
+      carte_btp_expiration=current_date+365+(v_i*17),
+      photo_url='/demo/employes/portrait-'||lpad((((v_i-1)%6)+1)::text,2,'0')||'.png',statut='actif',updated_at=now()
+    where entreprise_id=v_entreprise and reference_interne='DEMO-EMP-'||lpad(v_i::text,3,'0');
+    if not found then
+      insert into public.employes(
+        entreprise_id,reference_interne,prenom,nom,email,telephone,poste,poste_id,type_contrat,date_entree,
+        statut,notes,carte_btp_numero,carte_btp_expiration,photo_url,created_at
+      ) values(
+        v_entreprise,'DEMO-EMP-'||lpad(v_i::text,3,'0'),v_prenoms[v_i],v_noms[v_i],
+        'demo.'||v_i||'@example.test','060100'||lpad(v_i::text,4,'0'),v_postes[v_i],v_poste,
+        case when v_i in(6,12) then 'apprenti' else 'cdi' end,current_date-(560+v_i*19),
+        'actif','[DEMO 18M] Salarie fictif - aucune donnee personnelle reelle',
+        'BTP-DEMO-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0'),current_date+365+(v_i*17),
+        '/demo/employes/portrait-'||lpad((((v_i-1)%6)+1)::text,2,'0')||'.png',now()-interval '18 months'
+      );
+    end if;
   end loop;
   select array_agg(id order by reference_interne) into v_employes from public.employes where entreprise_id=v_entreprise and reference_interne like 'DEMO-EMP-%';
+  -- Taux facturé et coût horaire : tables dédiées à lecture restreinte depuis 20260818000205 et
+  -- 20260922000328 (employes.taux_horaire / cout_horaire n'existent plus).
+  for v_i in 1..array_length(v_employes,1) loop
+    insert into public.employes_taux_facture(entreprise_id,employe_id,taux_horaire) values(v_entreprise,v_employes[v_i],48+v_i)
+    on conflict(employe_id) do update set taux_horaire=excluded.taux_horaire;
+    insert into public.employes_cout_horaire(entreprise_id,employe_id,cout_horaire) values(v_entreprise,v_employes[v_i],24+v_i*1.4)
+    on conflict(employe_id) do update set cout_horaire=excluded.cout_horaire;
+  end loop;
   delete from public.habilitations_employe where entreprise_id=v_entreprise and employe_id=any(v_employes);
   for v_i in 1..array_length(v_employes,1) loop
     insert into public.habilitations_employe(entreprise_id,employe_id,type,libelle,date_obtention,date_expiration)
@@ -109,7 +126,8 @@ begin
       (date_trunc('month',current_date)-interval '17 months')::date+(v_i-1)*17,
       case when v_i<=23 then (date_trunc('month',current_date)-interval '17 months')::date+(v_i-1)*17+42 else null end,
       8500+v_i*1350,now()-interval '18 months')
-    on conflict(entreprise_id,reference_interne) do update set statut=excluded.statut,budget_previsionnel=excluded.budget_previsionnel;
+    -- Statut non réécrit au rejeu : devis et factures le font ensuite évoluer (synchronisation).
+    on conflict(entreprise_id,reference_interne) do update set budget_previsionnel=excluded.budget_previsionnel;
   end loop;
   select array_agg(id order by reference_interne) into v_chantiers from public.chantiers where entreprise_id=v_entreprise and reference_interne like 'DEMO-CHA-%';
 
@@ -130,11 +148,14 @@ begin
       v_statut:=case when v_jour<=4 then 'accepte' when v_jour=5 then 'envoye' else 'refuse' end;
       if not exists(select 1 from public.devis where entreprise_id=v_entreprise and numero='DEV-DEMO-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0')) then
         insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-        select v_entreprise,'DEV-DEMO-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),c.client_id,v_chantier,v_statut,v_date,v_date+30,'Validite 30 jours - acompte 30 %','Merci pour votre confiance.','[DEMO 18M] Historique fictif',v_date::timestamptz+interval '9 hours' from public.chantiers c where c.id=v_chantier returning id into v_devis;
+        -- Brouillon, lignes, puis transitions métier : un devis accepté verrouille ses lignes.
+        select v_entreprise,'DEV-DEMO-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),c.client_id,v_chantier,'brouillon',v_date,v_date+30,'Validite 30 jours - acompte 30 %','Merci pour votre confiance.','[DEMO 18M] Historique fictif',v_date::timestamptz+interval '9 hours' from public.chantiers c where c.id=v_chantier returning id into v_devis;
         insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
           (v_devis,'Pose et main d oeuvre','Preparation, implantation et pose','main_oeuvre',24+(v_index%18),'h',55,0,20,1),
           (v_devis,'Fournitures chantier','Profiles, panneaux, fixations','fourniture',12+(v_index%12),'u',115,0,20,2),
           (v_devis,'Protection et nettoyage','Forfait chantier','forfait',1,'forfait',350,0,20,3);
+        update public.devis set statut='envoye' where id=v_devis;
+        if v_statut<>'envoye' then update public.devis set statut=v_statut where id=v_devis; end if;
         if v_statut='accepte' then
           -- Créée en brouillon d'abord : le trigger trg_lignes_factures_brouillon_only
           -- interdit d'insérer des lignes sur une facture déjà émise (garde-fou

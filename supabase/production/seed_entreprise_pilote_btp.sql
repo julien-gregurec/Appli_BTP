@@ -111,15 +111,19 @@ begin
   -- effet (mêmes colonnes, même ligne d'historique tracée) plutôt que le contournement
   -- générique elsatia.capacite_personnes_bypass, pour rester fidèle au geste réel
   -- qu'un opérateur pilote devra de toute façon faire le jour 1 (§9 du pack).
-  update public.entreprises set
-    capacite_personnes_supplementaire=30,capacite_personnes_source='systeme',
-    capacite_personnes_reference_externe='PILOTE-BTP-V1 - fixture de recette',
-    capacite_personnes_maj_at=now()
-  where id=v_entreprise;
-  insert into public.historique_capacite_personnes(entreprise_id,action,ancien,nouveau,source,reference_externe,motif)
-  values(v_entreprise,'capacite_supplementaire_definie','{"capacite_personnes_supplementaire":0}'::jsonb,
-    '{"capacite_personnes_supplementaire":30}'::jsonb,'systeme','PILOTE-BTP-V1 - fixture de recette',
-    '[PILOTE] Capacite etendue pour permettre les 28 salaries de la fixture de recette pilote');
+  -- Rejouable : le geste opérateur (et sa ligne d'historique) n'est fait qu'une fois.
+  if not exists(select 1 from public.historique_capacite_personnes where entreprise_id=v_entreprise
+                  and reference_externe='PILOTE-BTP-V1 - fixture de recette') then
+    update public.entreprises set
+      capacite_personnes_supplementaire=30,capacite_personnes_source='systeme',
+      capacite_personnes_reference_externe='PILOTE-BTP-V1 - fixture de recette',
+      capacite_personnes_maj_at=now()
+    where id=v_entreprise;
+    insert into public.historique_capacite_personnes(entreprise_id,action,ancien,nouveau,source,reference_externe,motif)
+    values(v_entreprise,'capacite_supplementaire_definie','{"capacite_personnes_supplementaire":0}'::jsonb,
+      '{"capacite_personnes_supplementaire":30}'::jsonb,'systeme','PILOTE-BTP-V1 - fixture de recette',
+      '[PILOTE] Capacite etendue pour permettre les 28 salaries de la fixture de recette pilote');
+  end if;
 
   -- 2) Les 5 profils demandés pour la recette pilote (mêmes intitulés et permissions que le
   --    catalogue canonique des 9 rôles prédéfinis, cf. déclaration de v_roles ci-dessus).
@@ -145,7 +149,19 @@ begin
   select id into v_poste_ouvrier from public.postes where entreprise_id=v_entreprise and nom='Ouvrier';
 
   -- 3) 28 salaries fictifs repartis sur les 5 profils demandes pour la recette pilote.
+  -- Salarié existant : mise à jour ciblée, jamais un INSERT … ON CONFLICT — le trigger
+  -- BEFORE INSERT d'identifiant interne consommerait un numéro du compteur à chaque rejeu
+  -- (seed compatibility hardening V1 : +28 numéros perdus par exécution).
   for v_i in 1..array_length(v_prenoms,1) loop
+    update public.employes set
+      poste=v_metiers[v_i],
+      poste_id=case v_role_cle[v_i]
+        when 'gerant' then v_poste_gerant when 'administration' then v_poste_admin
+        when 'chef_chantier' then v_poste_chef_chantier when 'chef_equipe' then v_poste_chef_equipe
+        else v_poste_ouvrier end,
+      statut='actif',updated_at=now()
+    where entreprise_id=v_entreprise and reference_interne='PILOTE-EMP-'||lpad(v_i::text,3,'0');
+    if found then continue; end if;
     insert into public.employes(
       entreprise_id,reference_interne,prenom,nom,email,telephone,poste,poste_id,type_contrat,date_entree,
       statut,notes,carte_btp_numero,carte_btp_expiration,created_at
@@ -163,8 +179,7 @@ begin
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then 'BTP-PILOTE-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0') else null end,
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then current_date+250+(v_i*11) else null end,
       now()-interval '2 months'
-    ) on conflict(entreprise_id,reference_interne) do update set
-      poste=excluded.poste,poste_id=excluded.poste_id,statut='actif',updated_at=now();
+    );
   end loop;
   select array_agg(id order by reference_interne) into v_employes from public.employes where entreprise_id=v_entreprise and reference_interne like 'PILOTE-EMP-%';
 
@@ -263,7 +278,10 @@ begin
     (v_entreprise,'PILOTE-CHA-005',v_clients[5],'Refection toiture copropriete - Immo Rhone','18 cours Gambetta','69007','Lyon','en_cours',current_date-21,current_date+21,current_date-19,null,64500,now()-interval '5 weeks'),
     (v_entreprise,'PILOTE-CHA-006',v_clients[6],'Renovation ecole primaire - Saint-Priest','3 chemin des Vignes','69800','Saint-Priest','accepte',current_date+10,current_date+90,null,null,156000,now()-interval '3 weeks'),
     (v_entreprise,'PILOTE-CHA-007',v_clients[7],'Extension entrepot - Dumont Logistique','5 rue de l''Industrie','69800','Saint-Priest','devis_envoye',current_date+30,current_date+120,null,null,98000,now()-interval '1 month')
-  on conflict(entreprise_id,reference_interne) do update set statut=excluded.statut;
+  -- Rejouable sans réécrire le statut : les devis et factures du seed font ensuite évoluer
+  -- le statut par les triggers de synchronisation (facture émise → « facture ») ; le remettre
+  -- à sa valeur initiale à chaque rejeu produisait un état différent du premier passage.
+  on conflict(entreprise_id,reference_interne) do nothing;
   select array_agg(id order by reference_interne) into v_chantiers from public.chantiers where entreprise_id=v_entreprise and reference_interne like 'PILOTE-CHA-%';
   v_chantiers_actifs:=array[v_chantiers[3],v_chantiers[4],v_chantiers[5]]; -- les 3 chantiers en_cours
 
@@ -468,59 +486,80 @@ begin
   select array_agg(id order by reference) into v_fournisseurs from public.fournisseurs where entreprise_id=v_entreprise and reference like 'PILOTE-FRN-%';
 
   insert into public.articles_stock(entreprise_id,reference,designation,unite,quantite_stock,seuil_alerte,prix_achat_ht,prix_vente_ht,emplacement,actif) values
-    (v_entreprise,'PILOTE-STK-001','Plaque BA13','u',85,20,6.9,11.5,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-002','Sac de ciment 35kg','u',40,15,7.2,11.9,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-003','Parpaing 20cm','u',600,150,1.4,2.3,'Depot - Zone B',true),
-    (v_entreprise,'PILOTE-STK-004','Cable electrique 3G2.5mm','ml',320,80,1.1,1.8,'Depot - Zone C',true),
-    (v_entreprise,'PILOTE-STK-005','Disjoncteur 20A','u',18,10,9.5,15.6,'Depot - Zone C',true),
-    (v_entreprise,'PILOTE-STK-006','Peinture acrylique blanche 10L','u',12,5,42,67.2,'Depot - Zone D',true),
-    (v_entreprise,'PILOTE-STK-007','Rouleau laine de verre','u',9,10,28,44.8,'Depot - Zone D',true),
-    (v_entreprise,'PILOTE-STK-008','Vis autoforantes boite 250','u',22,10,14,22.4,'Depot - Zone E',true),
-    (v_entreprise,'PILOTE-STK-009','Silicone sanitaire','u',30,15,4.8,7.9,'Depot - Zone E',true),
-    (v_entreprise,'PILOTE-STK-010','Carrelage gres cerame 60x60','m2',140,40,18.5,29.6,'Depot - Zone B',true),
-    (v_entreprise,'PILOTE-STK-011','Casque de chantier (EPI)','u',25,8,12,19.2,'Depot - EPI',true),
-    (v_entreprise,'PILOTE-STK-012','Gants de manutention (EPI)','paire',60,20,3.2,5.3,'Depot - EPI',true),
-    (v_entreprise,'PILOTE-STK-013','Gasoil non routier (GNR)','L',400,100,1.35,1.35,'Depot - Cuve',true),
-    (v_entreprise,'PILOTE-STK-014','Mortier-colle sac 25kg','u',35,15,9.8,15.9,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-015','Tuile mecanique terre cuite','u',900,200,1.9,3.1,'Depot - Zone B',true)
-  on conflict(entreprise_id,reference) do update set quantite_stock=excluded.quantite_stock,prix_achat_ht=excluded.prix_achat_ht,prix_vente_ht=excluded.prix_vente_ht,actif=true;
+    (v_entreprise,'PILOTE-STK-001','Plaque BA13','u',0,20,6.9,11.5,'Depot - Zone A',true),
+    (v_entreprise,'PILOTE-STK-002','Sac de ciment 35kg','u',0,15,7.2,11.9,'Depot - Zone A',true),
+    (v_entreprise,'PILOTE-STK-003','Parpaing 20cm','u',0,150,1.4,2.3,'Depot - Zone B',true),
+    (v_entreprise,'PILOTE-STK-004','Cable electrique 3G2.5mm','ml',0,80,1.1,1.8,'Depot - Zone C',true),
+    (v_entreprise,'PILOTE-STK-005','Disjoncteur 20A','u',0,10,9.5,15.6,'Depot - Zone C',true),
+    (v_entreprise,'PILOTE-STK-006','Peinture acrylique blanche 10L','u',0,5,42,67.2,'Depot - Zone D',true),
+    (v_entreprise,'PILOTE-STK-007','Rouleau laine de verre','u',0,10,28,44.8,'Depot - Zone D',true),
+    (v_entreprise,'PILOTE-STK-008','Vis autoforantes boite 250','u',0,10,14,22.4,'Depot - Zone E',true),
+    (v_entreprise,'PILOTE-STK-009','Silicone sanitaire','u',0,15,4.8,7.9,'Depot - Zone E',true),
+    (v_entreprise,'PILOTE-STK-010','Carrelage gres cerame 60x60','m2',0,40,18.5,29.6,'Depot - Zone B',true),
+    (v_entreprise,'PILOTE-STK-011','Casque de chantier (EPI)','u',0,8,12,19.2,'Depot - EPI',true),
+    (v_entreprise,'PILOTE-STK-012','Gants de manutention (EPI)','paire',0,20,3.2,5.3,'Depot - EPI',true),
+    (v_entreprise,'PILOTE-STK-013','Gasoil non routier (GNR)','L',0,100,1.35,1.35,'Depot - Cuve',true),
+    (v_entreprise,'PILOTE-STK-014','Mortier-colle sac 25kg','u',0,15,9.8,15.9,'Depot - Zone A',true),
+    (v_entreprise,'PILOTE-STK-015','Tuile mecanique terre cuite','u',0,200,1.9,3.1,'Depot - Zone B',true)
+  on conflict(entreprise_id,reference) do update set prix_achat_ht=excluded.prix_achat_ht,prix_vente_ht=excluded.prix_vente_ht,actif=true;
   select array_agg(id order by reference) into v_articles from public.articles_stock where entreprise_id=v_entreprise and reference like 'PILOTE-STK-%';
 
-  delete from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[PILOTE]%';
-  for v_i in 1..array_length(v_articles,1) loop
-    insert into public.mouvements_stock(entreprise_id,article_id,type,quantite,date,motif)
-    values(v_entreprise,v_articles[v_i],'entree',50+(v_i%6)*15,current_date-45,'[PILOTE] Stock initial');
-    for v_semaine in 0..3 loop
-      insert into public.mouvements_stock(entreprise_id,article_id,chantier_id,type,quantite,date,motif)
-      values(v_entreprise,v_articles[v_i],v_chantiers_actifs[1+((v_i+v_semaine-1)%3)],'sortie',
-        1+((v_i+v_semaine)%4),current_date-28+v_semaine*7+2,'[PILOTE] Consommation chantier');
+  -- Le stock est porté par ses mouvements : chaque mouvement met à jour quantite_stock
+  -- (trigger appliquer_mouvement_avant_insertion). L'article est donc créé à 0 et l'entrée
+  -- « Stock initial » vaut la quantité cible + les consommations des 4 semaines : le stock
+  -- final est exactement la quantité déclarée ci-dessus (dont la laine de verre sous son
+  -- seuil d'alerte), et il est égal au cumul de ses mouvements. Auparavant la quantité
+  -- déclarée ET l'entrée initiale s'additionnaient (aucun article sous seuil, stock ≠ cumul).
+  -- Rejouable : mouvements créés une seule fois (un rejeu ne crédite jamais deux fois).
+  if not exists(select 1 from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[PILOTE]%') then
+    for v_i in 1..array_length(v_articles,1) loop
+      insert into public.mouvements_stock(entreprise_id,article_id,type,quantite,date,motif)
+      select v_entreprise,v_articles[v_i],'entree',
+        a.quantite_stock + (select sum(1+((v_i+s)%4)) from generate_series(0,3) s),
+        current_date-45,'[PILOTE] Stock initial'
+      from (select (array[85,40,600,320,18,12,9,22,30,140,25,60,400,35,900])[v_i]::numeric as quantite_stock) a;
+      for v_semaine in 0..3 loop
+        insert into public.mouvements_stock(entreprise_id,article_id,chantier_id,type,quantite,date,motif)
+        values(v_entreprise,v_articles[v_i],v_chantiers_actifs[1+((v_i+v_semaine-1)%3)],'sortie',
+          1+((v_i+v_semaine)%4),current_date-28+v_semaine*7+2,'[PILOTE] Consommation chantier');
+      end loop;
     end loop;
-  end loop;
+  end if;
 
   -- 10) Commandes fournisseurs : brouillon, confirmee, recue_partiel, recue.
-  -- Créées en brouillon, lignes ajoutées, puis passées à leur statut : une commande
-  -- engagée est verrouillée (20260926000506, PO-1) et son identité imprimée est figée
-  -- en quittant le brouillon (20260927000507).
+  -- Créées en brouillon, lignes ajoutées, puis transitions métier : une commande engagée est
+  -- verrouillée (20260926000506, PO-1) et son identité imprimée est figée en quittant le
+  -- brouillon (20260927000507). Envoi et confirmation par changer_statut_commande_interne,
+  -- réception par le moteur canonique enregistrer_reception_commande_interne (20260922000322),
+  -- qui recalcule le statut (reçue / reçue partiellement) — jamais de quantité reçue posée à la
+  -- main ni de saut de statut. Montants inchangés (lignes identiques).
   if not exists(select 1 from public.commandes_fournisseurs where entreprise_id=v_entreprise and numero like 'CMD-PILOTE-%') then
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-001',v_fournisseurs[1],v_chantiers[4],'brouillon',current_date-35,current_date-28,'[PILOTE] Approvisionnement gros oeuvre',(current_date-35)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
-      (v_entreprise,v_commande,'Parpaing 20cm','Livraison chantier',2000,'u',1.35,20,2000,1),
-      (v_entreprise,v_commande,'Sac de ciment 35kg','Livraison chantier',150,'u',7.2,20,150,2);
-    update public.commandes_fournisseurs set statut='recue' where id=v_commande;
+      (v_entreprise,v_commande,'Parpaing 20cm','Livraison chantier',2000,'u',1.35,20,0,1),
+      (v_entreprise,v_commande,'Sac de ciment 35kg','Livraison chantier',150,'u',7.2,20,0,2);
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'envoyee');
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'confirmee');
+    perform public.enregistrer_reception_commande_interne(v_entreprise,v_commande,
+      (select jsonb_agg(jsonb_build_object('ligne_id',l.id,'quantite_recue',l.quantite)) from public.lignes_commande l where l.commande_id=v_commande),null);
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-002',v_fournisseurs[2],v_chantiers[3],'brouillon',current_date-10,current_date-3,'[PILOTE] Materiel electrique',(current_date-10)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
-      (v_entreprise,v_commande,'Cable electrique 3G2.5mm','Livraison partielle',500,'ml',1.1,20,300,1),
-      (v_entreprise,v_commande,'Disjoncteur 20A','Livraison partielle',15,'u',9.5,20,10,2);
-    update public.commandes_fournisseurs set statut='recue_partiel' where id=v_commande;
+      (v_entreprise,v_commande,'Cable electrique 3G2.5mm','Livraison partielle',500,'ml',1.1,20,0,1),
+      (v_entreprise,v_commande,'Disjoncteur 20A','Livraison partielle',15,'u',9.5,20,0,2);
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'envoyee');
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'confirmee');
+    perform public.enregistrer_reception_commande_interne(v_entreprise,v_commande,
+      (select jsonb_agg(jsonb_build_object('ligne_id',l.id,'quantite_recue',case l.ordre when 1 then 300 else 10 end)) from public.lignes_commande l where l.commande_id=v_commande),null);
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-003',v_fournisseurs[3],v_chantiers[5],'brouillon',current_date-4,current_date+3,'[PILOTE] Location echafaudage toiture',(current_date-4)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
       (v_entreprise,v_commande,'Location echafaudage 3 semaines','Toiture copropriete',1,'forfait',2400,20,0,1);
-    update public.commandes_fournisseurs set statut='confirmee' where id=v_commande;
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'envoyee');
+    perform public.changer_statut_commande_interne(v_entreprise,v_commande,'confirmee');
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-004',v_fournisseurs[5],null,'brouillon',current_date-1,current_date+7,'[PILOTE] Reappro depot - pas encore envoyee',(current_date-1)::timestamptz+interval '8 hours') returning id into v_commande;

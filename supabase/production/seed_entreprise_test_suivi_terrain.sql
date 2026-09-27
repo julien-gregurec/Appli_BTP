@@ -79,6 +79,9 @@ begin
   join public.chantiers c on c.id = p.chantier_id
   where c.latitude is not null and c.longitude is not null;
 
+  -- Contrôles hors zone choisis par le pointage d'origine (stable d'une exécution à l'autre),
+  -- pas par l'UUID de session, régénéré à chaque rejeu : sinon chaque exécution déplaçait les
+  -- contrôles hors zone (seed compatibility hardening V1).
   insert into public.verifications_zone_pointage(
     entreprise_id, session_id, employe_id, chantier_id,
     latitude, longitude, precision_metres, distance_metres,
@@ -89,11 +92,11 @@ begin
     s.id,
     s.employe_id,
     s.chantier_id,
-    c.latitude + case when gs.numero = 9 and abs(hashtext(s.id::text)) % 11 = 0 then 0.0042 else 0.00007 end,
-    c.longitude + case when gs.numero = 9 and abs(hashtext(s.id::text)) % 11 = 0 then 0.0042 else 0.00005 end,
+    c.latitude + case when gs.numero = 9 and abs(hashtext(s.pointage_id::text)) % 11 = 0 then 0.0042 else 0.00007 end,
+    c.longitude + case when gs.numero = 9 and abs(hashtext(s.pointage_id::text)) % 11 = 0 then 0.0042 else 0.00005 end,
     9 + (gs.numero % 5),
-    case when gs.numero = 9 and abs(hashtext(s.id::text)) % 11 = 0 then 575 else 11 + gs.numero end,
-    not (gs.numero = 9 and abs(hashtext(s.id::text)) % 11 = 0),
+    case when gs.numero = 9 and abs(hashtext(s.pointage_id::text)) % 11 = 0 then 575 else 11 + gs.numero end,
+    not (gs.numero = 9 and abs(hashtext(s.pointage_id::text)) % 11 = 0),
     s.arrivee_at + make_interval(mins => gs.numero * 30)
   from public.sessions_pointage s
   join public.chantiers c on c.id = s.chantier_id

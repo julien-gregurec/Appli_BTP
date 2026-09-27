@@ -1,3 +1,13 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- LEGACY — NE PLUS EXÉCUTER (seed compatibility hardening V1, 2026-09-27)
+-- L'entreprise « juju » a été supprimée le 14-07-2026 (supprimer_entreprises_test.sql). Le script
+-- ne compile plus (raise exception U&'…' refusé par PL/pgSQL) et insère des devis acceptés et des
+-- commandes reçues AVANT leurs lignes, patron refusé depuis les verrous V3 et 20260926000506.
+-- Patron à suivre : supabase/production/seed_entreprise_test_5_ans.sql.
+-- Refusé par scripts/executer-script-production.mjs (SCRIPTS_LEGACY) ; conservé comme archive.
+-- Classement : scripts/seeds/registry.mjs.
+-- ═══════════════════════════════════════════════════════════════════════
+
 -- Données de démonstration réservées à l'entreprise de test « juju ».
 --
 -- Ce script :

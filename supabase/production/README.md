@@ -52,13 +52,24 @@ Si l'une de ces vérifications échoue, le script s'arrête (`ARRÊT SÛR : ...`
 avant toute exécution SQL. Aucune de ces vérifications ne dépend d'une valeur
 par défaut permissive : une variable absente est toujours un refus.
 
-## Scripts destructifs : `supprimer_entreprises_test.sql`, `cleanup_entreprise_pilote_btp.sql`
+## Compatibilité avec le train de migrations
 
-Ces scripts suppriment des lignes en base (`DELETE`). En plus des vérifications
-ci-dessus, ils exigent :
+Chaque script de ce dossier est classé dans `scripts/seeds/registry.mjs` et exécuté pour de vrai
+sur une base fraîche (toutes les migrations) par `npm run verify:seeds`, en CI (job `seeds`).
+Patron obligatoire : un devis, une facture ou une commande fournisseur est créé en **brouillon**,
+ses lignes sont posées, puis il suit ses **transitions métier** (jamais inséré déjà accepté /
+émis / envoyé). Voir `docs/qualification/ELSATIA_SEED_COMPATIBILITY_HARDENING_V1.md`.
+
+**LEGACY, refusés par le wrapper** : `seed_juju_6_mois.sql`, `corriger_encodage_juju.sql`,
+`supprimer_entreprises_test.sql` (entreprise juju supprimée le 14-07-2026, identifiants en dur).
+Conservés comme archive, avec un en-tête « LEGACY ».
+
+## Script destructif : `cleanup_entreprise_pilote_btp.sql`
+
+Ce script supprime des lignes en base (`DELETE`). En plus des vérifications
+ci-dessus, il exige :
 
 ```bash
-CONFIRM_DELETE_TEST_DATA=YES node scripts/executer-script-production.mjs supprimer_entreprises_test.sql
 CONFIRM_DELETE_TEST_DATA=YES node scripts/executer-script-production.mjs cleanup_entreprise_pilote_btp.sql
 ```
 
@@ -69,8 +80,9 @@ l'exécution.
 `PILOTE-BTP-V1` créée par `seed_entreprise_pilote_btp.sql` (et ses comptes
 utilisateurs synthétiques) — jamais une autre entreprise. Il désactive
 individuellement, par nom, 4 triggers métier d'immuabilité (devis
-accepté/facture émise) le temps de la suppression, uniquement pour cette
-entreprise, puis les réactive ; voir l'en-tête du script et
+accepté/facture émise) et la garde CM-06 des commandes envoyées, le temps de la
+suppression, dans UNE transaction (un échec annule tout, triggers compris), puis
+les réactive ; voir l'en-tête du script et
 `docs/qualification/ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md` (§14) pour
 le détail et la justification (testé de bout en bout : seed → cleanup → re-seed
 propre, sur un Postgres local avec les migrations réelles rejouées).
@@ -79,7 +91,6 @@ propre, sur un Postgres local avec les migrations réelles rejouées).
 
 `creer_entreprise_demo_18_mois.sql`, `seed_entreprise_test_5_ans.sql`,
 `seed_entreprise_test_suivi_terrain.sql`, `seed_entreprise_test_tous_onglets.sql`,
-`seed_juju_6_mois.sql`, `corriger_encodage_juju.sql`,
 `seed_entreprise_pilote_btp.sql` (fixture entreprise BTP synthétique pour le pack de recette
 pilote externe, voir `docs/qualification/ELSATIA_EXTERNAL_PILOT_ACCEPTANCE_PACK_V1.md`),
 `assertions_entreprise_pilote_btp.sql` (vérifications de comptage en lecture seule après le

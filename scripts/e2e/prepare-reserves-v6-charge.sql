@@ -25,12 +25,12 @@ on conflict (id) do nothing;
 -- « le premier ». Le décor de charge choisirait alors, à l'insu de tous, quelle entreprise
 -- se fait révoquer — et ferait échouer une recette parfaitement valide. Un décor ne doit
 -- jamais changer le sens d'un autre.
+-- Seulement si absente (le trigger BEFORE INSERT de référence consommerait un numéro global
+-- à chaque passe, même en conflit).
 insert into public.entreprises (id, nom, raison_sociale, siret, ville, code_adhesion)
-values (
-  'c0000000-0000-0000-0000-0000000000c1', 'RECETTE_CHARGE_ENTREPRISE',
+select 'c0000000-0000-0000-0000-0000000000c1', 'RECETTE_CHARGE_ENTREPRISE',
   'CHARGE RECETTE SARL', '66666666600066', 'Colmar', 'CHARGE-C1'
-)
-on conflict (id) do nothing;
+where not exists (select 1 from public.entreprises where id = 'c0000000-0000-0000-0000-0000000000c1');
 
 insert into public.acces_applications_entreprises (
   entreprise_id, application_code, autorise, source

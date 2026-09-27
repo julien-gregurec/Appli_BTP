@@ -1,3 +1,11 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- LEGACY — NE PLUS EXÉCUTER (seed compatibility hardening V1, 2026-09-27)
+-- Correctif ponctuel d'un incident d'encodage (presse-papiers) sur l'entreprise « juju »,
+-- supprimée le 14-07-2026.
+-- Refusé par scripts/executer-script-production.mjs (SCRIPTS_LEGACY) ; conservé comme archive.
+-- Classement : scripts/seeds/registry.mjs.
+-- ═══════════════════════════════════════════════════════════════════════
+
 -- Repairs the JUJU demo data after a clipboard encoding conversion.
 -- This file is intentionally ASCII-only so it can be pasted safely.
 -- It only updates rows belonging to the company named exactly "juju".

@@ -8,7 +8,16 @@
 --
 -- Il refuse de s'exécuter si l'entreprise ou un compte membre n'est pas trouvé.
 -- Il ne modifie aucune autre entreprise. Les données qu'il crée portent le
--- marqueur [RECETTE 5A] et peuvent être régénérées sans doublon.
+-- marqueur [RECETTE 5A].
+--
+-- Rejouable (seed compatibility hardening V1) : chaque historique (ventes, planning, stock,
+-- achats, frais, congés, paie, sous-traitance) est créé UNE fois, dans la transaction du bloc,
+-- puis laissé tel quel aux exécutions suivantes. L'ancienne régénération « supprimer puis
+-- recréer » n'est plus possible : un devis accepté, une facture émise, une commande envoyée
+-- et une période de paie verrouillée sont immuables (y compris en suppression). Les documents
+-- sont créés en brouillon, leurs lignes posées, puis ils suivent leurs transitions métier
+-- (devis envoyé → accepté/refusé, facture émise puis réglée, commande envoyée → confirmée →
+-- réceptionnée par le moteur canonique). Aucun trigger n'est désactivé.
 
 set statement_timeout = '10min';
 
@@ -57,6 +66,7 @@ declare
   v_dossier uuid;
   v_contrat uuid;
   v_sous_traitants uuid[];
+  v_creer_stock boolean;
 begin
   v_debut := (date_trunc('month', current_date) - interval '59 months')::date;
   select e.id, e.code_adhesion
@@ -183,52 +193,10 @@ begin
     raise exception 'Aucun employé actif dans entreprise test : le seed a été annulé';
   end if;
 
-  -- Nettoyage ciblé des données d'une éventuelle exécution précédente.
-  delete from public.pointages where entreprise_id=v_entreprise and tache like '[RECETTE 5A]%';
-  delete from public.affectations where entreprise_id=v_entreprise and tache like '[RECETTE 5A]%';
-  delete from public.demandes_conges where entreprise_id=v_entreprise and commentaire like '[RECETTE 5A]%';
-  delete from public.ordres_virements
-  where entreprise_id=v_entreprise
-    and (
-      note_frais_id in (
-        select id from public.notes_frais
-        where entreprise_id=v_entreprise and description like '[RECETTE 5A]%'
-      )
-      or depense_fournisseur_id in (
-        select id from public.depenses_fournisseurs
-        where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%'
-      )
-    );
-  delete from public.notes_frais where entreprise_id=v_entreprise and description like '[RECETTE 5A]%';
-  delete from public.depenses_fournisseurs where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%';
-  delete from public.commandes_fournisseurs where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%';
-  delete from public.remises_banque_paiements rbp
-  using public.paiements p, public.factures f
-  where rbp.paiement_id = p.id
-    and p.facture_id = f.id
-    and f.entreprise_id = v_entreprise
-    and f.notes_internes like '[RECETTE 5A]%';
-  delete from public.situations_travaux
-  where entreprise_id = v_entreprise
-    and devis_id in (
-      select id
-      from public.devis
-      where entreprise_id = v_entreprise
-        and notes_internes like '[RECETTE 5A]%'
-    );
-  delete from public.factures where entreprise_id=v_entreprise and notes_internes like '[RECETTE 5A]%';
-  delete from public.devis where entreprise_id=v_entreprise and notes_internes like '[RECETTE 5A]%';
-  delete from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[RECETTE 5A]%';
-  delete from public.interventions where entreprise_id=v_entreprise and description like '[RECETTE 5A]%';
-  delete from public.contrats_entretien where entreprise_id=v_entreprise and description like '[RECETTE 5A]%';
-  delete from public.sous_traitants_chantiers where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%';
-  delete from public.validations_paie where entreprise_id=v_entreprise and commentaire like '[RECETTE 5A]%';
-  delete from public.temps_travail_paie where entreprise_id=v_entreprise and source_type='seed_entreprise_test_5_ans';
-  delete from public.absences_paie where entreprise_id=v_entreprise and source_type='seed_entreprise_test_5_ans';
-  delete from public.primes_paie where entreprise_id=v_entreprise and source_type='seed_entreprise_test_5_ans';
-  delete from public.indemnites_deplacement_paie where entreprise_id=v_entreprise and source_type='seed_entreprise_test_5_ans';
+  -- Pas de nettoyage : les historiques ci-dessous sont créés une seule fois (voir l'en-tête).
 
   -- 300 devis sur cinq ans, dont 180 acceptés et facturés.
+  if not exists(select 1 from public.devis where entreprise_id=v_entreprise and notes_internes like '[RECETTE 5A]%') then
   v_index := 0;
   for v_mois in 0..59 loop
     for v_jour in 1..5 loop
@@ -242,7 +210,7 @@ begin
         conditions,notes_client,notes_internes,remise_globale,created_at
       )
       select v_entreprise,'DEV-TST5-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
-        c.client_id,v_chantier,v_statut,v_date,v_date+30,U&'Validit\00E9 30 jours \2014 acompte de 30 % \00E0 la commande',
+        c.client_id,v_chantier,'brouillon',v_date,v_date+30,U&'Validit\00E9 30 jours \2014 acompte de 30 % \00E0 la commande',
         'Merci pour votre confiance.',U&'[RECETTE 5A] Historique de d\00E9monstration',case when v_index%9=0 then 5 else 0 end,
         v_date::timestamptz + interval '9 hours'
       from public.chantiers c where c.id=v_chantier
@@ -253,6 +221,11 @@ begin
         (v_devis,(array['Pose cloisons amovibles',U&'Agencement int\00E9rieur sur mesure',U&'Cr\00E9ation cabine sanitaire',U&'Pose panneaux d\00E9coratifs'])[1+((v_index-1)%4)],U&'Pr\00E9paration, implantation et pose compl\00E8te','main_oeuvre',24+(v_index%20),'h',52,0,20,1),
         (v_devis,'Fournitures et quincaillerie',U&'Profil\00E9s, panneaux, fixations et consommables','fourniture',12+(v_index%15),'u',95+(v_index%4)*18,0,20,2),
         (v_devis,U&'D\00E9placement et protection du chantier','Livraison, protections et nettoyage','forfait',1,'forfait',280+(v_index%5)*35,0,20,3);
+      -- Transitions métier après les lignes : brouillon → envoyé → accepté / refusé.
+      if v_statut<>'brouillon' then
+        update public.devis set statut='envoye' where id=v_devis;
+        if v_statut<>'envoye' then update public.devis set statut=v_statut where id=v_devis; end if;
+      end if;
 
       if v_statut='accepte' then
         insert into public.factures(
@@ -262,7 +235,7 @@ begin
         select v_entreprise,'FAC-TST5-'||to_char(v_date+7,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
           d.client_id,d.chantier_id,d.id,
           case when v_index%5=0 then 'acompte' else 'simple' end,
-          'envoyee',v_date+7,v_date+37,U&'R\00E8glement par virement.',U&'[RECETTE 5A] Historique de d\00E9monstration',
+          'brouillon',v_date+7,v_date+37,U&'R\00E8glement par virement.',U&'[RECETTE 5A] Historique de d\00E9monstration',
           (v_date+7)::timestamptz + interval '10 hours'
         from public.devis d where d.id=v_devis
         returning id into v_facture;
@@ -272,6 +245,8 @@ begin
         )
         select v_facture,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre
         from public.lignes_devis where devis_id=v_devis order by ordre;
+        -- Émission après les lignes (lignes_factures_brouillon_only), puis règlements.
+        update public.factures set statut='envoyee' where id=v_facture;
 
         select montant_ttc into v_total from public.factures where id=v_facture;
         if v_index % 6 in (0,1,2,3) then
@@ -287,7 +262,10 @@ begin
     end loop;
   end loop;
 
+  end if;
+
   -- Planning et pointages validés : six salariés, cinq jours par semaine, cinq ans.
+  if not exists(select 1 from public.affectations where entreprise_id=v_entreprise and tache like '[RECETTE 5A]%') then
   for v_semaine in 0..259 loop
     for v_jour in 0..4 loop
       v_date := date_trunc('week',v_debut)::date + v_semaine*7 + v_jour;
@@ -320,7 +298,11 @@ begin
     end loop;
   end loop;
 
-  -- Stock : trente références, stock initial et consommations mensuelles.
+  end if;
+
+  -- Stock : trente références, stock initial et consommations mensuelles. Le stock est porté
+  -- par ses mouvements (trigger appliquer_mouvement_avant_insertion), créés une seule fois.
+  v_creer_stock := not exists(select 1 from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[RECETTE 5A]%');
   for v_i in 1..30 loop
     insert into public.articles_stock(
       entreprise_id,reference,designation,unite,quantite_stock,seuil_alerte,prix_achat_ht,emplacement,actif
@@ -335,6 +317,7 @@ begin
 
     select id into v_article from public.articles_stock
     where entreprise_id=v_entreprise and reference='TST5-STK-'||lpad(v_i::text,3,'0');
+    continue when not v_creer_stock;
     update public.articles_stock set quantite_stock=0 where id=v_article;
     insert into public.mouvements_stock(entreprise_id,article_id,type,quantite,date,motif)
     values(v_entreprise,v_article,'entree',120+(v_i%5)*20,
@@ -361,6 +344,7 @@ begin
   select array_agg(id order by reference) into v_fournisseurs
   from public.fournisseurs where entreprise_id=v_entreprise and reference like 'TST5-FRN-%';
 
+  if not exists(select 1 from public.commandes_fournisseurs where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%') then
   v_index := 0;
   for v_mois in 0..59 loop
     for v_jour in 1..4 loop
@@ -369,17 +353,28 @@ begin
       v_fournisseur:=v_fournisseurs[1+((v_index-1)%array_length(v_fournisseurs,1))];
       v_chantier:=v_chantiers[1+((v_index-1)%array_length(v_chantiers,1))];
       v_statut:=case when v_index%7=0 then 'recue_partiel' when v_index%6=0 then 'confirmee' else 'recue' end;
+      -- Brouillon, lignes, puis transitions métier : une commande envoyée est verrouillée
+      -- (20260926000506) et son identité imprimée figée à l'envoi (20260927000507). La réception
+      -- passe par le moteur canonique (20260922000322), qui recalcule le statut.
       insert into public.commandes_fournisseurs(
         entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at
       ) values (
         v_entreprise,'CMD-TST5-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
-        v_fournisseur,v_chantier,v_statut,v_date,v_date+7,'[RECETTE 5A] Approvisionnement chantier',v_date::timestamptz+interval '8 hours'
+        v_fournisseur,v_chantier,'brouillon',v_date,v_date+7,'[RECETTE 5A] Approvisionnement chantier',v_date::timestamptz+interval '8 hours'
       ) returning id into v_commande;
       insert into public.lignes_commande(
         entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre
       ) values
-        (v_entreprise,v_commande,U&'Mat\00E9riaux chantier',U&'Panneaux et profil\00E9s',10,'u',95+(v_index%5)*12,20,case when v_statut='recue_partiel' then 6 when v_statut='recue' then 10 else 0 end,1),
-        (v_entreprise,v_commande,'Consommables','Fixations et produits de finition',20,'u',18+(v_index%4)*3,20,case when v_statut='recue_partiel' then 12 when v_statut='recue' then 20 else 0 end,2);
+        (v_entreprise,v_commande,U&'Mat\00E9riaux chantier',U&'Panneaux et profil\00E9s',10,'u',95+(v_index%5)*12,20,0,1),
+        (v_entreprise,v_commande,'Consommables','Fixations et produits de finition',20,'u',18+(v_index%4)*3,20,0,2);
+      perform public.changer_statut_commande_interne(v_entreprise,v_commande,'envoyee');
+      perform public.changer_statut_commande_interne(v_entreprise,v_commande,'confirmee');
+      if v_statut in ('recue','recue_partiel') then
+        perform public.enregistrer_reception_commande_interne(v_entreprise,v_commande,
+          (select jsonb_agg(jsonb_build_object('ligne_id',l.id,'quantite_recue',
+                    case when v_statut='recue' then l.quantite when l.ordre=1 then 6 else 12 end))
+             from public.lignes_commande l where l.commande_id=v_commande),null);
+      end if;
 
       if v_statut in ('recue','recue_partiel') then
         insert into public.depenses_fournisseurs(
@@ -400,6 +395,8 @@ begin
     end loop;
   end loop;
 
+  end if;
+
   -- Charges récurrentes de l'entreprise.
   insert into public.charges_recurrentes(
     entreprise_id,libelle,fournisseur_id,categorie,periodicite,montant_ht,montant_tva,prochaine_echeance,actif,notes
@@ -413,6 +410,7 @@ begin
         montant_tva=excluded.montant_tva,prochaine_echeance=excluded.prochaine_echeance,actif=true;
 
   -- Notes de frais personnelles, sans faux justificatif : le document reste à compléter.
+  if not exists(select 1 from public.notes_frais where entreprise_id=v_entreprise and description like '[RECETTE 5A]%') then
   for v_i in 1..300 loop
     v_date := v_debut + ((v_i-1)*6);
     v_employe := v_employes[1+((v_i-1)%least(12,array_length(v_employes,1)))];
@@ -438,7 +436,10 @@ begin
     );
   end loop;
 
+  end if;
+
   -- Congés historiques (les fiches sont rattachées au compte admin pour le jeu de test).
+  if not exists(select 1 from public.demandes_conges where entreprise_id=v_entreprise and commentaire like '[RECETTE 5A]%') then
   for v_i in 1..100 loop
     v_date := v_debut + ((v_i-1)*18);
     insert into public.demandes_conges(
@@ -453,6 +454,8 @@ begin
       v_date::timestamptz-interval '7 days',v_date::timestamptz-interval '5 days'
     );
   end loop;
+
+  end if;
 
   -- Kilométrages et factures d'entretien sur un échantillon de la flotte déjà créée.
   select array_agg(id order by created_at,id) into v_vehicules
@@ -545,6 +548,8 @@ begin
       updated_at=now();
   end loop;
 
+  -- Périodes de paie : une période verrouillée est immuable, l'historique est créé une fois.
+  if not exists(select 1 from public.validations_paie where entreprise_id=v_entreprise and commentaire like '[RECETTE 5A]%') then
   for v_mois in 0..59 loop
     v_date:=(v_debut+make_interval(months=>v_mois))::date;
     insert into public.periodes_paie(
@@ -651,6 +656,8 @@ begin
     );
   end loop;
 
+  end if;
+
   -- Sous-traitants et coûts de missions rattachés aux chantiers.
   for v_i in 1..5 loop
     insert into public.fournisseurs(
@@ -669,6 +676,7 @@ begin
   select array_agg(id order by reference) into v_sous_traitants
   from public.fournisseurs where entreprise_id=v_entreprise and reference like 'TST5-ST-%';
 
+  if not exists(select 1 from public.sous_traitants_chantiers where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%') then
   for v_i in 1..30 loop
     insert into public.sous_traitants_chantiers(
       entreprise_id,fournisseur_id,chantier_id,mission,date_debut,date_fin,
@@ -683,6 +691,8 @@ begin
       (v_debut+(v_i-1)*55)::timestamptz,(v_debut+(v_i-1)*55+12)::timestamptz
     );
   end loop;
+
+  end if;
 
   -- Contrats d’entretien, dépannages, visites et livraisons sur cinq exercices.
   for v_i in 1..12 loop

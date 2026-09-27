@@ -179,7 +179,7 @@ from (
 where emp.seq = sub.employe_seq;
 
 insert into public.employes (id, entreprise_id, prenom, nom, email, telephone, poste, type_contrat,
-  date_entree, date_sortie, taux_horaire, statut, numero_inscription, identifiant_interne, poste_id, utilisateur_id)
+  date_entree, date_sortie, statut, numero_inscription, identifiant_interne, poste_id, utilisateur_id)
 select
   emp.id, ent.id,
   'Prenom' || emp.seq, 'NomSalarie' || emp.seq,
@@ -187,7 +187,6 @@ select
   '06' || lpad((10000000 + emp.seq)::text, 8, '0'),
   p.nom, case when random() < 0.85 then 'cdi' else 'cdd' end,
   emp.date_entree, emp.date_sortie,
-  round((14 + random()*12)::numeric, 2),
   case when emp.date_sortie is not null then 'sorti' else 'actif' end,
   'MAT-' || ent.taille || '-' || lpad(emp.seq::text, 5, '0'),
   'SAL-' || ent.taille || '-' || lpad(emp.seq::text, 5, '0'),
@@ -197,6 +196,13 @@ from fx.employes emp
 join fx.entreprises ent on ent.seq = emp.entreprise_seq
 join fx.postes p on p.seq = emp.poste_seq
 left join fx.auth_users au on au.seq = emp.utilisateur_seq;
+
+-- Taux horaire facturé : table dédiée à lecture restreinte depuis 20260922000328
+-- (employes.taux_horaire n'existe plus).
+insert into public.employes_taux_facture (employe_id, entreprise_id, taux_horaire)
+select emp.id, ent.id, round((14 + random()*12)::numeric, 2)
+from fx.employes emp
+join fx.entreprises ent on ent.seq = emp.entreprise_seq;
 
 -- utilisateurs_entreprises : rattache chaque compte de connexion à son entreprise (actif),
 -- condition nécessaire à est_membre_actif() / RLS.

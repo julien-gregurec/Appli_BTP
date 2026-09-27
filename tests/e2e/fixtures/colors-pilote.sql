@@ -44,9 +44,14 @@ delete from public.colors_parametres
 -- ---------------------------------------------------------------------------
 -- 1. Deux organisations. La seconde n'existe que pour prouver le cloisonnement.
 -- ---------------------------------------------------------------------------
-insert into public.entreprises(id,nom,code_adhesion) values
-('e0000000-0000-4000-8000-00000000000a','Peintures Recette A','RECA0001'),
-('e0000000-0000-4000-8000-00000000000b','Peintures Recette B','RECB0001') on conflict (id) do nothing;
+-- Insertion des seules organisations absentes : un INSERT … ON CONFLICT DO NOTHING déclenche
+-- quand même le trigger BEFORE INSERT de référence d'entreprise, qui consommait un numéro du
+-- compteur global à chaque passe (seed compatibility hardening V1).
+insert into public.entreprises(id,nom,code_adhesion)
+select v.id, v.nom, v.code from (values
+('e0000000-0000-4000-8000-00000000000a'::uuid,'Peintures Recette A','RECA0001'),
+('e0000000-0000-4000-8000-00000000000b'::uuid,'Peintures Recette B','RECB0001')) as v(id,nom,code)
+where not exists (select 1 from public.entreprises e where e.id = v.id);
 
 insert into public.postes(id,entreprise_id,nom) values
 ('40000000-0000-4000-8000-00000000000a','e0000000-0000-4000-8000-00000000000a','Recette A'),

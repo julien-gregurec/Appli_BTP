@@ -22,10 +22,12 @@ insert into public.utilisateurs (id, prenom, nom)
 values ('f0000000-0000-0000-0000-0000000000a1','Gérant','Étanchéité')
 on conflict (id) do nothing;
 
+-- Seulement si absente : un INSERT … ON CONFLICT DO NOTHING déclenche quand même le trigger
+-- BEFORE INSERT de référence d'entreprise, qui consommait un numéro global à chaque passe.
 insert into public.entreprises (id, nom, raison_sociale, siret, ville, code_adhesion)
-values ('f0000000-0000-0000-0000-000000000001','RECETTE_B_Etancheite','ETANCHEITE B SARL',
-        '55555555500055','Colmar','RECB0001')
-on conflict (id) do nothing;
+select 'f0000000-0000-0000-0000-000000000001','RECETTE_B_Etancheite','ETANCHEITE B SARL',
+        '55555555500055','Colmar','RECB0001'
+where not exists (select 1 from public.entreprises where id = 'f0000000-0000-0000-0000-000000000001');
 
 insert into public.postes (id, entreprise_id, nom)
 values ('f1000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001','Gérant')
