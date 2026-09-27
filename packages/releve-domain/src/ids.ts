@@ -3,7 +3,7 @@
  *
  * Même convention que `@elsatia/client-contracts` : le marquage est purement statique, un
  * identifiant reste une chaîne à l'exécution. Passer un `EtageId` là où un `PieceId` est
- * attendu devient une erreur de compilation — dans une hiérarchie à cinq niveaux, c'est
+ * attendu devient une erreur de compilation — dans une hiérarchie à six niveaux, c'est
  * précisément la confusion qui rattache une pièce au mauvais étage.
  */
 
@@ -15,6 +15,7 @@ export type TenantId = Brand<"TenantId">;
 /** Utilisateur : `auth.users.id` / `utilisateurs.id`. */
 export type UserId = Brand<"UserId">;
 export type ReleveId = Brand<"ReleveId">;
+export type ChantierId = Brand<"ChantierId">;
 export type BatimentId = Brand<"BatimentId">;
 export type EtageId = Brand<"EtageId">;
 export type ZoneId = Brand<"ZoneId">;
@@ -48,6 +49,7 @@ function converter<T extends string>(identifierType: string) {
 export const asTenantId = converter<TenantId>("TenantId");
 export const asUserId = converter<UserId>("UserId");
 export const asReleveId = converter<ReleveId>("ReleveId");
+export const asChantierId = converter<ChantierId>("ChantierId");
 export const asBatimentId = converter<BatimentId>("BatimentId");
 export const asEtageId = converter<EtageId>("EtageId");
 export const asZoneId = converter<ZoneId>("ZoneId");

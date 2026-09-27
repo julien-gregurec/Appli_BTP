@@ -4,7 +4,7 @@
  * Deux familles d'entités, deux stratégies de persistance (voir ADR §3 du rapport
  * `docs/product/ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md`) :
  *
- * 1. **Structure** — `Releve → Batiment → Etage → Zone → Piece`. Tables relationnelles
+ * 1. **Structure** — `Releve (projet) → Chantier → Batiment → Etage → Zone → Piece`. Tables relationnelles
  *    dédiées : le serveur doit pouvoir lister, filtrer, autoriser et lier à Gestion Pro.
  * 2. **Éléments métier** — `Mur, Ouverture, Equipement, Mesure, PhotoAnchor, Annotation,
  *    Materiau, Quantite`. Une table générique typée (`tools_releves_elements`) avec un
@@ -18,7 +18,7 @@
  */
 
 import type {
-  BatimentId, ElementId, EtageId, MediaId, PieceId, ReleveId, TenantId, UserId, VersionId, ZoneId,
+  BatimentId, ChantierId, ElementId, EtageId, MediaId, PieceId, ReleveId, TenantId, UserId, VersionId, ZoneId,
 } from "./ids";
 
 export type IsoDateTime = string;
@@ -65,10 +65,15 @@ export type ReleveStatut = (typeof RELEVE_STATUTS)[number];
 export const RELEVE_VISIBILITES = ["prive", "entreprise"] as const;
 export type ReleveVisibilite = (typeof RELEVE_VISIBILITES)[number];
 
+/** Niveaux de la hiérarchie, de la racine à la feuille (tous créables sans scan). */
+export const RELEVE_HIERARCHY_LEVELS = ["projet", "chantier", "batiment", "etage", "zone", "piece"] as const;
+export type ReleveHierarchyLevel = (typeof RELEVE_HIERARCHY_LEVELS)[number];
+
 /**
- * Racine de la hiérarchie `chantier → bâtiment → étage → zone → pièce`. Le chantier est
- * porté par le relevé : un libellé local toujours présent, et une référence faible
- * facultative vers `chantiers` Gestion Pro (GP reste autoritaire, jamais Tools).
+ * « Site principal » du projet : libellé local toujours présent, référence faible facultative
+ * vers `chantiers` Gestion Pro (GP reste autoritaire, jamais Tools). Il sert d'en-tête de liste
+ * et amorce le premier {@link Chantier} du projet ; la hiérarchie elle-même passe par les
+ * chantiers (`tools_releves_chantiers`), un projet pouvant en couvrir plusieurs.
  */
 export type ReleveChantier = {
   readonly nom: string;
@@ -104,9 +109,24 @@ export type Releve = EntityMeta & {
 
 // ── Structure ─────────────────────────────────────────────────────────────────
 
+/** Chantier d'un projet relevé : un site physique, lié ou non à un chantier Gestion Pro. */
+export type Chantier = EntityMeta & {
+  readonly id: ChantierId;
+  readonly releveId: ReleveId;
+  readonly nom: string;
+  readonly adresse: string | null;
+  readonly codePostal: string | null;
+  readonly ville: string | null;
+  /** `chantiers.id` Gestion Pro, si rattaché (même entreprise exigée par le serveur). */
+  readonly gpChantierId: string | null;
+  readonly ordre: number;
+  readonly notes: string | null;
+};
+
 export type Batiment = EntityMeta & {
   readonly id: BatimentId;
   readonly releveId: ReleveId;
+  readonly chantierId: ChantierId;
   readonly nom: string;
   readonly ordre: number;
   readonly notes: string | null;
@@ -312,6 +332,29 @@ export type Annotation = ReleveElement<"annotation">;
 export type Materiau = ReleveElement<"materiau">;
 export type Quantite = ReleveElement<"quantite">;
 
+/** Portes : ouvertures franchissables. */
+export const PORTE_TYPES = ["porte", "porte_fenetre"] as const satisfies readonly OuvertureType[];
+/** Fenêtres : ouvertures vitrées non franchissables (la porte-fenêtre est une porte). */
+export const FENETRE_TYPES = ["fenetre", "baie"] as const satisfies readonly OuvertureType[];
+export type Porte = Ouverture & { readonly donnees: OuvertureDonnees & { readonly typeOuverture: (typeof PORTE_TYPES)[number] } };
+export type Fenetre = Ouverture & { readonly donnees: OuvertureDonnees & { readonly typeOuverture: (typeof FENETRE_TYPES)[number] } };
+export function isPorte(element: ReleveElement): element is Porte {
+  return element.type === "ouverture" && (PORTE_TYPES as readonly string[]).includes((element as Ouverture).donnees.typeOuverture);
+}
+export function isFenetre(element: ReleveElement): element is Fenetre {
+  return element.type === "ouverture" && (FENETRE_TYPES as readonly string[]).includes((element as Ouverture).donnees.typeOuverture);
+}
+
+// Noms du cahier des charges (anglais) : alias stricts des entités françaises persistées.
+export type Wall = Mur;
+export type Opening = Ouverture;
+export type Door = Porte;
+export type Window = Fenetre;
+export type Equipment = Equipement;
+export type Measurement = Mesure;
+export type Material = Materiau;
+export type Quantity = Quantite;
+
 /** Rattachement exigé par type (miroir des CHECK SQL de `tools_releves_elements`). */
 export const ELEMENT_ATTACHMENT: Record<ElementType, { etage: "requis" | "facultatif"; parent: "requis" | "interdit" }> = {
   mur: { etage: "requis", parent: "interdit" },
@@ -326,12 +369,30 @@ export const ELEMENT_ATTACHMENT: Record<ElementType, { etage: "requis" | "facult
 
 // ── Versions & médias ─────────────────────────────────────────────────────────
 
+/**
+ * Nature d'une version (miroir du CHECK SQL `tools_releves_versions.type_version`) :
+ * - `initial` : relevé de l'existant — unique, toujours la première version ;
+ * - `corrige` : correction d'une version précédente ;
+ * - `projete` : état projeté (plan rénové, étages `etat = 'projet'`) ;
+ * - `as_built` : état réellement construit / réceptionné (DOE).
+ */
+export const VERSION_TYPES = ["initial", "corrige", "projete", "as_built"] as const;
+export type VersionType = (typeof VERSION_TYPES)[number];
+/** Vocabulaire du cahier des charges → valeur persistée. */
+export const VERSION_TYPE_ALIASES = { initial: "initial", corrected: "corrige", projected: "projete", "as-built": "as_built" } as const satisfies Record<string, VersionType>;
+export const VERSION_TYPE_LABELS: Record<VersionType, string> = {
+  initial: "Initiale", corrige: "Corrigée", projete: "Projetée", as_built: "Tel que construit",
+};
+
 /** Instantané immuable, distinct de la révision de synchronisation. */
 export type Version = {
   readonly id: VersionId;
   readonly entrepriseId: TenantId;
   readonly releveId: ReleveId;
   readonly numero: number;
+  readonly typeVersion: VersionType;
+  /** Version dont celle-ci dérive (null pour l'initiale). */
+  readonly versionBaseId: VersionId | null;
   readonly libelle: string | null;
   readonly revisionSource: number;
   /** SHA-256 hexadécimal du contenu canonique. */
@@ -358,6 +419,7 @@ export type MediaFile = EntityMeta & {
 /** Structure complète d'un relevé telle que chargée par un client. */
 export type ReleveStructure = {
   readonly releve: Releve;
+  readonly chantiers: readonly Chantier[];
   readonly batiments: readonly Batiment[];
   readonly etages: readonly Etage[];
   readonly zones: readonly Zone[];
