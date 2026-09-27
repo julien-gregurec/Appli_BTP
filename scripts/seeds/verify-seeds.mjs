@@ -272,6 +272,10 @@ function flowDr(context) {
   };
   const replay = "elsatia_dr_drill_seeds";
   const restore = "elsatia_dr_drill_seeds_restore";
+  // Convention du drill (08_verify_rls_functional.sh) : le rôle authenticator se connecte avec le
+  // même mot de passe jetable que postgres. Rôle de cluster, poste local ou CI uniquement.
+  const authenticator = psql("postgres", { sql: `alter role authenticator with login password '${password.replaceAll("'", "''")}';` });
+  if (!authenticator.ok) throw new Error(`DR mot de passe authenticator: ${authenticator.stderr}`);
   const pgsodium = spawnSync("bash", [path.join(dr, "00b_install_pgsodium_stub.sh")], { encoding: "utf8" });
   showStderr("DR stub pgsodium", pgsodium.stderr ?? "");
   // Rejeu : pipeline DR complet (stubs DR + migrations), puis le seed.
