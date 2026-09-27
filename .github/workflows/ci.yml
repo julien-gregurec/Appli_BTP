@@ -64,6 +64,9 @@ jobs:
       - name: Attendus du train (migrations, DB verify, runbooks) générés et à jour
         run: npm run verify:train-expectations
 
+      - name: Tests du script Stripe Test ordre/rejeu (sans réseau, sk_live refusée)
+        run: npm run test:stripe-ordering-script
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 

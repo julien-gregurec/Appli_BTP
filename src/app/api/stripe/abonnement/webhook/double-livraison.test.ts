@@ -101,9 +101,9 @@ function journalPartage() {
         reserves.delete(args.p_stripe_event_id as string);
         return { data: null, error: null };
       }
-      if (fn === "synchroniser_abonnement_stripe_service") {
+      if (fn === "synchroniser_abonnement_stripe_ordonne_service") {
         traitements.push(args.p_stripe_event_id as string ?? "sans-id");
-        return { data: "actif", error: null };
+        return { data: { decision: "applique", statut_resultant: "actif" }, error: null };
       }
       if (fn === "lier_subscription_entreprise_service") return { data: "lie", error: null };
       return { data: null, error: null };
@@ -116,6 +116,7 @@ const evenement = (id: string) => ({
   id,
   type: "customer.subscription.updated",
   livemode: false,
+  created: 1_757_060_000,
   data: {
     object: {
       id: "sub_test", object: "subscription", customer: "cus_test",
