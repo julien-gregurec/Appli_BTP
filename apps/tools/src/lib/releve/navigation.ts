@@ -10,6 +10,7 @@
  * | Fiche relevé (chantiers, versions) | `/releves/fiche?id=` |
  * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
  * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
+ * | Photos terrain (Lot 4) | `/releves/photos?id=` |
  */
 import { isUuid, type SearchHit } from "@elsatia/releve-domain";
 
@@ -18,11 +19,16 @@ export const RELEVE_NEW_PATH = "/releves/nouveau";
 export const RELEVE_FICHE_PATH = "/releves/fiche";
 export const RELEVE_STRUCTURE_PATH = "/releves/structure";
 export const RELEVE_PIECE_PATH = "/releves/piece";
+export const RELEVE_PHOTOS_PATH = "/releves/photos";
 
 export type StructureSelection = { releveId: string; chantierId: string | null; batimentId: string | null; etageId: string | null };
 
 export function ficheHref(releveId: string): string {
   return `${RELEVE_FICHE_PATH}?${new URLSearchParams({ id: releveId }).toString()}`;
+}
+
+export function photosHref(releveId: string): string {
+  return `${RELEVE_PHOTOS_PATH}?${new URLSearchParams({ id: releveId }).toString()}`;
 }
 
 /** Chaque niveau n'est encodé que si son parent l'est : la sélection reste un chemin cohérent. */

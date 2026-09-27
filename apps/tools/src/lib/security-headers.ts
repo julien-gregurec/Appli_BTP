@@ -23,12 +23,12 @@ export type SecurityHeadersOptions = {
 /*
  * Aucune de ces capacites n'est utilisee par Tools. `web-share`, `fullscreen` et le presse-papiers
  * sont volontairement absents : `navigator.share` alimente le partage d'export sur mobile.
+ * `geolocation` reste fermee : les photos de releve ne portent aucune position (Lot 4).
  */
 const DENIED_FEATURES = [
   "accelerometer",
   "autoplay",
   "browsing-topics",
-  "camera",
   "display-capture",
   "encrypted-media",
   "geolocation",
@@ -44,7 +44,17 @@ const DENIED_FEATURES = [
   "xr-spatial-tracking",
 ] as const;
 
-export const PERMISSIONS_POLICY = DENIED_FEATURES.map((feature) => `${feature}=()`).join(", ");
+/*
+ * Releve & Metre, Lot 4 : levee CIBLEE de la camera pour la meme origine uniquement (`getUserMedia`
+ * de l'apercu camera). Aucune origine tierce ni iframe ne l'obtient ; le micro reste ferme.
+ * `<input type=file capture>` ne depend pas de cette politique (appareil photo du systeme).
+ */
+const SELF_ONLY_FEATURES = ["camera"] as const;
+
+export const PERMISSIONS_POLICY = [
+  ...DENIED_FEATURES.map((feature) => `${feature}=()`),
+  ...SELF_ONLY_FEATURES.map((feature) => `${feature}=(self)`),
+].join(", ");
 
 /** Reduit une URL a son origine exacte. Retourne `null` si la valeur n'est pas une URL http(s). */
 export function toHttpOrigin(value: string | undefined | null): string | null {
@@ -92,6 +102,11 @@ export function buildConnectSrc({ supabaseUrl, billingApiUrl, isDevelopment = fa
  * `style-src` conserve `'unsafe-inline'` : 20 attributs `style` calcules (viewport Atelier, jauges)
  * et la vue d'impression `window.open` + `document.write` reposent dessus.
  */
+function supabaseImageOrigin({ supabaseUrl }: SecurityHeadersOptions): string[] {
+  const origin = toHttpOrigin(supabaseUrl);
+  return origin ? [origin] : [];
+}
+
 export function buildContentSecurityPolicy(options: SecurityHeadersOptions = {}): string {
   const { isDevelopment = false } = options;
   const directives: [string, string[]][] = [
@@ -103,14 +118,17 @@ export function buildContentSecurityPolicy(options: SecurityHeadersOptions = {})
     ["form-action", ["'self'"]],
     ["script-src", isDevelopment ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"] : ["'self'", "'unsafe-inline'"]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
-    // `blob:` : conversion PNG (`exports/png.ts` charge le SVG dans une `Image`). `data:` : icones inline.
-    ["img-src", ["'self'", "data:", "blob:"]],
+    // `blob:` : conversion PNG (`exports/png.ts` charge le SVG dans une `Image`), apercu des photos
+    // de releve avant envoi. `data:` : icones inline. Origine Supabase : photos de releve lues par
+    // URL signee courte (bucket prive `tools-releves`, Lot 4) — jamais une origine tierce.
+    ["img-src", ["'self'", "data:", "blob:", ...supabaseImageOrigin(options)]],
     ["font-src", ["'self'"]],
     ["connect-src", buildConnectSrc(options)],
     // Le service worker `/sw-tools.js` est servi en meme origine ; aucun worker `blob:` n'existe.
     ["worker-src", ["'self'"]],
     ["manifest-src", ["'self'"]],
-    ["media-src", ["'self'"]],
+    // `blob:` : flux camera (`srcObject` n'est pas soumis a media-src, mais une capture rejouee l'est).
+    ["media-src", ["'self'", "blob:"]],
   ];
   const policy = directives.map(([name, values]) => `${name} ${values.join(" ")}`);
   if (!isDevelopment) policy.push("upgrade-insecure-requests");

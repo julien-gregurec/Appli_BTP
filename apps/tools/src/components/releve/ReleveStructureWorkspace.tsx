@@ -10,7 +10,7 @@ import {
 } from "@elsatia/releve-domain";
 import { formatAltitudeM, formatHauteurCm, confirmRemovalMessage, parseAltitudeM, parseHauteurCm, parseNiveau } from "@/lib/releve/forms";
 import {
-  ficheHref, pieceHref, readStructureSelection, RELEVES_PATH, searchHitHref, structureFocus, structureHref, type StructureSelection,
+  ficheHref, photosHref, pieceHref, readStructureSelection, RELEVES_PATH, searchHitHref, structureFocus, structureHref, type StructureSelection,
 } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { AutoNumber, AutoSelect, AutoText, SaveStatus, useAutosave } from "./autosave-ui";
@@ -109,6 +109,7 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
         <label className={`${styles.field} ${styles.search}`}><span>Rechercher dans ce relevé</span>
           <input type="search" value={query} maxLength={80} placeholder="Bâtiment, étage, pièce…" onChange={(event) => setQuery(event.target.value)} /></label>
         <Link className={styles.secondary} href={ficheHref(releveId)}>Fiche du relevé</Link>
+        <Link className={styles.secondary} href={photosHref(releveId)}>Photos terrain</Link>
       </div>
       {query.trim().length >= 2 && <ul className={styles.hits} aria-label="Résultats dans ce relevé">
         {hits.length === 0 && <li className={styles.feedback}>Aucun résultat.</li>}
