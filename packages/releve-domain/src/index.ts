@@ -28,3 +28,8 @@ export * from "./storage";
 export * from "./gp-sync";
 export * from "./repository";
 export * from "./service";
+export * from "./exif";
+export * from "./media";
+export * from "./photo";
+export * from "./media-service";
+export * from "./upload-queue";
