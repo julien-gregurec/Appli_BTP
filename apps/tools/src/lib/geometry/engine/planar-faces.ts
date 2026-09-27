@@ -36,6 +36,8 @@ export type EnclosedFace = {
   area: number;
   /** Index des segments d'entrée qui bordent la face. */
   segmentIndices: number[];
+  /** Pour chaque arête `points[i] → points[i + 1]`, index du segment d'entrée qui la porte. */
+  edgeSources: number[];
 };
 
 type Edge = { a: number; b: number; source: number };
@@ -170,7 +172,7 @@ export function findEnclosedFaces(segments: readonly Segment2D[], options: FaceD
       if (cycle.length < 3 || current !== start) continue;
       const points = cycle.map((h) => vertices[h.from]);
       const area = signedPolygonArea(points);
-      if (area > minArea) faces.push({ polygon: { points }, area, segmentIndices: [...new Set(cycle.map((h) => h.source))] });
+      if (area > minArea) faces.push({ polygon: { points }, area, segmentIndices: [...new Set(cycle.map((h) => h.source))], edgeSources: cycle.map((h) => h.source) });
     }
   }
   return faces.sort((x, y) => y.area - x.area);

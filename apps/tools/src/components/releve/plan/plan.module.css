@@ -1,0 +1,67 @@
+/* Plan 2D (Lot 5) — tablette d'abord : toile haute, outils ≥ 44 px, panneau sous la toile en portrait. */
+.page { overflow-x: hidden; }
+.scopes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.scopes a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font-weight: 800; }
+.scopes a[aria-current="page"] { border-color: var(--navy); background: var(--navy); color: white; }
+
+.editor { display: grid; gap: 10px; padding: 18px 0 60px; min-width: 0; }
+.planBar { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.etat { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 999px; background: #eef1ef; font-size: 12px; font-weight: 900; letter-spacing: .04em; }
+.etat[data-fige="true"] { background: #fff4d6; color: #7a5200; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; position: sticky; top: 0; z-index: 4; padding: 6px 0; background: var(--paper, #f6f5f1); }
+.toolbar button, .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); font-weight: 800; cursor: pointer; touch-action: manipulation; }
+.toolbar button[aria-pressed="true"] { border-color: var(--navy); background: var(--navy); color: white; }
+.toolbar button:disabled { opacity: .45; cursor: default; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 14px; align-items: start; min-width: 0; }
+.stage { min-width: 0; }
+/* Toile plus haute que dans l'Atelier : le plan est le sujet de l'écran. */
+.stage [role="application"] { height: clamp(380px, 68vh, 900px); }
+.panel { display: grid; gap: 12px; min-width: 0; }
+.section { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
+.section h2 { margin: 0; font-size: 16px; }
+.section h3 { margin: 4px 0 0; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; align-items: end; }
+.list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.list li { display: grid; gap: 6px; padding: 6px 0; border-top: 1px dashed #e2e5e3; }
+.list li[data-selected="true"] { background: #fffaf0; }
+.linkButton { min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--navy); font-weight: 800; text-align: left; cursor: pointer; }
+.photo { width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; background: #111; }
+.empty { display: grid; gap: 10px; justify-items: start; margin: 24px 0 60px; padding: 28px; border: 1px dashed #cfd4d1; border-radius: 13px; }
+
+/* ---- Toile -------------------------------------------------------------- */
+.cadre { fill: none; stroke: #c7cdd1; stroke-dasharray: 6 6; }
+.contour { fill: #dce9ff; fill-opacity: .55; stroke: #6b8fd6; stroke-width: 1; }
+.contour[data-scope="false"] { fill: #eef0f2; fill-opacity: .5; stroke: #c9cfd4; }
+.detected { fill: #fff4d6; fill-opacity: .45; stroke: #d99a00; stroke-dasharray: 5 4; }
+.wall { stroke: #23313a; stroke-linecap: square; }
+.wall[data-type="exterieur"] { stroke: #111b21; }
+.wall[data-type="cloison"] { stroke: #5b6b73; }
+.wall[data-type="doublage"] { stroke: #8a979d; }
+.wall[data-selected="true"] { stroke: #d97706; }
+.opening line, .opening path { stroke: #23313a; stroke-width: 1.2; fill: none; }
+.opening .gap { stroke: var(--white, #fff); }
+.opening[data-selected="true"] line:not(.gap), .opening[data-selected="true"] path { stroke: #d97706; stroke-width: 2; }
+.dimension { fill: #374151; font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.overall line { stroke: #6b7780; stroke-width: 1; }
+.overall text { fill: #374151; font-size: 12px; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.roomLabel { fill: #1e3a66; font-size: 12px; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.handle { fill: #fff; stroke: #d97706; stroke-width: 2.5; }
+.marker circle { fill: #d97706; stroke: #fff; stroke-width: 2; }
+.marker rect { fill: #fff; }
+.marker[data-selected="true"] circle { fill: #1e3a66; }
+.draft line { stroke: #d97706; stroke-width: 2; stroke-dasharray: 6 4; }
+.draft text { fill: #7a4200; font-size: 12px; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.draftStart { fill: #d97706; }
+.snap line { stroke: #0e7490; stroke-width: 1; stroke-dasharray: 4 4; }
+.snap rect { fill: none; stroke: #0e7490; stroke-width: 2; }
+
+@media (max-width: 1024px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage [role="application"] { height: clamp(360px, 62vh, 1000px); }
+}
+@media (max-width: 560px) {
+  .toolbar button, .toggle { padding: 0 10px; font-size: 13px; }
+  .stage [role="application"] { height: clamp(320px, 56vh, 640px); }
+}

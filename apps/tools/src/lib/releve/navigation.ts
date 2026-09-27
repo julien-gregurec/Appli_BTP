@@ -11,6 +11,7 @@
  * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
  * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
  * | Photos terrain (Lot 4) | `/releves/photos?id=&portee=&cible=&ajout=` (galerie du relevé ou d'un nœud) |
+ * | Plan 2D (Lot 5) | `/releves/plan?id=&etage=&zone=&piece=&plan=` (plan de l'étage, cadré sur une zone ou une pièce) |
  */
 import { GALLERY_SCOPE_KINDS, isUuid, type GalleryScope, type SearchHit } from "@elsatia/releve-domain";
 
@@ -20,6 +21,7 @@ export const RELEVE_FICHE_PATH = "/releves/fiche";
 export const RELEVE_STRUCTURE_PATH = "/releves/structure";
 export const RELEVE_PIECE_PATH = "/releves/piece";
 export const RELEVE_PHOTOS_PATH = "/releves/photos";
+export const RELEVE_PLAN_PATH = "/releves/plan";
 
 export type StructureSelection = { releveId: string; chantierId: string | null; batimentId: string | null; etageId: string | null };
 
@@ -104,4 +106,25 @@ export type StructureFocus = "batiments" | "etages" | "pieces";
 export function structureFocus(selection: Pick<StructureSelection, "batimentId" | "etageId">): StructureFocus {
   if (selection.etageId) return "pieces";
   return selection.batimentId ? "etages" : "batiments";
+}
+
+/** Portée du plan : l'étage entier, une zone ou une pièce (le plan reste celui de l'étage). */
+export type PlanSelection = { releveId: string; etageId: string; zoneId: string | null; pieceId: string | null; planId: string | null };
+
+export function planHref(selection: { releveId: string; etageId: string; zoneId?: string | null; pieceId?: string | null; planId?: string | null }): string {
+  const params = new URLSearchParams({ id: selection.releveId, etage: selection.etageId });
+  if (selection.pieceId) params.set("piece", selection.pieceId);
+  else if (selection.zoneId) params.set("zone", selection.zoneId);
+  if (selection.planId) params.set("plan", selection.planId);
+  return `${RELEVE_PLAN_PATH}?${params.toString()}`;
+}
+
+/** Lit la portée du plan ; tout identifiant non UUID est ignoré (relevé et étage obligatoires). */
+export function readPlanSelection(search: string): PlanSelection | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id"); const etageId = params.get("etage");
+  if (!isUuid(releveId) || !isUuid(etageId)) return null;
+  const pick = (key: string) => { const value = params.get(key); return isUuid(value) ? value : null; };
+  const pieceId = pick("piece");
+  return { releveId, etageId, pieceId, zoneId: pieceId ? null : pick("zone"), planId: pick("plan") };
 }
