@@ -5,8 +5,9 @@ import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_C
 import {
   ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
   MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
-  RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES,
+  RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES, ZONE_TYPES_LOT2, PIECE_USAGES_LOT2, CHANTIER_STATUTS, ETAGE_TYPES_NIVEAU, PIECE_STATUTS,
 } from "./model";
+import { ACTIVITY_ACTIONS } from "./terrain";
 import { RELEVE_ACTIONS, RELEVE_ROLES } from "./permissions";
 import { MEDIA_CATEGORY_POLICIES, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES } from "./storage";
 import { RELEVE_LIMITS } from "./validation";
@@ -30,12 +31,17 @@ const contratElements = readFileSync(
   "utf8",
 ).replace(/\s+/g, " ");
 
+const lot3 = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260927000701_tools_releve_metre_lot3_structure_terrain.sql", import.meta.url)),
+  "utf8",
+).replace(/\s+/g, " ");
+
 const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`).join(",");
 
 describe("parité domaine ↔ migration tools_releve_metre_foundation_v1", () => {
   it.each([
     ["statuts", RELEVE_STATUTS], ["visibilités", RELEVE_VISIBILITES], ["états d'étage", ETAGE_ETATS],
-    ["types de zone", ZONE_TYPES], ["usages de pièce", PIECE_USAGES], ["types d'élément", ELEMENT_TYPES],
+    ["types de zone", ZONE_TYPES_LOT2], ["usages de pièce", PIECE_USAGES_LOT2], ["types d'élément", ELEMENT_TYPES],
     ["catégories de média", MEDIA_CATEGORIES], ["rôles", RELEVE_ROLES], ["capabilities add-on", TOOLS_ADDON_CAPABILITIES],
   ] as const)("énumération %s identique", (_label, values) => {
     expect(sql.replace(/, /g, ",")).toContain(quoted(values));
@@ -105,5 +111,24 @@ describe("parité domaine ↔ migration tools_releve_metre_contrat_elements_v2 (
     expect(MESURE_TYPES.map((type) => `${type}:${mesureUniteAttendue(type)}`)).toEqual([
       "longueur:mm", "largeur:mm", "hauteur:mm", "diagonale:mm", "distance:mm", "angle:rad", "surface:mm2", "volume:mm3",
     ]);
+  });
+});
+
+describe("parité domaine ↔ migration tools_releve_metre_lot3_structure_terrain", () => {
+  const flat = lot3.replace(/, ?/g, ",");
+  it.each([
+    ["statuts de chantier", CHANTIER_STATUTS], ["types de niveau", ETAGE_TYPES_NIVEAU], ["statuts de pièce", PIECE_STATUTS],
+    ["types de zone (Lot 3)", ZONE_TYPES], ["types de pièce (Lot 3)", PIECE_USAGES], ["actions du journal", ACTIVITY_ACTIONS],
+  ] as const)("énumération %s identique", (_label, values) => {
+    expect(flat).toContain(quoted(values));
+  });
+
+  it("les listes Lot 3 sont des sur-ensembles stricts de la fondation (aucune valeur retirée)", () => {
+    expect(ZONE_TYPES.slice(0, ZONE_TYPES_LOT2.length)).toEqual([...ZONE_TYPES_LOT2]);
+    expect(PIECE_USAGES.slice(0, PIECE_USAGES_LOT2.length)).toEqual([...PIECE_USAGES_LOT2]);
+  });
+
+  it("aucun prix ni SKU dans la migration Lot 3", () => {
+    expect(lot3).not.toMatch(new RegExp(`${RELEVE_METRE_OFFER.monthlyPriceCents}|${RELEVE_METRE_OFFER.annualPriceCents}|24,90|249 €|product_sku`));
   });
 });

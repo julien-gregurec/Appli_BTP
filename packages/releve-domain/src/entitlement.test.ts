@@ -48,3 +48,15 @@ describe("prix de référence : une seule source, jamais codée en dur ailleurs"
     expect(hits).toEqual(["packages/releve-domain/src/entitlement.ts"]);
   });
 });
+
+describe("décision produit Lot 3 : Relevé Pro inclut Tools Pro", () => {
+  it("est retenue, sans activer la facturation réelle", async () => {
+    const { RELEVE_PRO_PRODUCT_DECISION, RELEVE_METRE_OFFER: offer, TOOLS_OFFERS: offers, isReleveMetrePurchasable: purchasable, offerCapabilities: caps, TOOLS_PRO_CAPABILITIES: pro } = await import("./entitlement");
+    expect(RELEVE_PRO_PRODUCT_DECISION).toMatchObject({ includesToolsPro: true, realBillingActive: false });
+    expect(offer.includesToolsPro).toBe(true);
+    expect(offers.releve_pro.offresIncluses).toEqual(["tools_pro"]);
+    expect(offers.releve_pro.commercialementActive).toBe(false);
+    expect(purchasable()).toBe(false);
+    for (const capability of pro) expect(caps("releve_pro")).toContain(capability);
+  });
+});

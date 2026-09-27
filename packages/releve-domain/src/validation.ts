@@ -13,7 +13,8 @@ import {
   ELEMENT_ATTACHMENT, ELEMENT_TYPES, ENTITY_REF_KINDS, EQUIPEMENT_CATEGORIES, ETAGE_ETATS, ETAGE_NIVEAU_MAX,
   ETAGE_NIVEAU_MIN, MATERIAU_CATEGORIES, MESURE_SOURCES, MESURE_TYPES, MESURE_UNITES, MUR_TYPES, OUVERTURE_SENS,
   OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_COORDINATE_LIMIT_MM, RELEVE_STATUTS,
-  RELEVE_VISIBILITES, ZONE_TYPES, type ElementType, type EtageEtat, type PieceUsage, type ReleveStatut,
+  RELEVE_VISIBILITES, ZONE_TYPES, CHANTIER_STATUTS, ETAGE_TYPES_NIVEAU, PIECE_STATUTS,
+  type ChantierStatut, type EtageTypeNiveau, type PieceStatut, type ElementType, type EtageEtat, type PieceUsage, type ReleveStatut,
   type ReleveVisibilite, type ZoneType,
 } from "./model";
 
@@ -191,23 +192,44 @@ export function validateReleveDraft(input: unknown): ReleveValidationResult<Norm
 export type ChantierDraft = {
   nom: string; adresse?: string | null; codePostal?: string | null; ville?: string | null;
   gpChantierId?: string | null; ordre?: number; notes?: string | null;
+  clientNom?: string | null; clientGpId?: string | null; reference?: string | null; description?: string | null;
+  dateReleve?: string | null; statut?: ChantierStatut;
 };
 export type NormalizedChantierDraft = {
   nom: string; adresse: string | null; codePostal: string | null; ville: string | null;
   gpChantierId: string | null; ordre: number; notes: string | null;
+  clientNom: string | null; clientGpId: string | null; reference: string | null; description: string | null;
+  dateReleve: string | null; statut: ChantierStatut;
 };
+
+function codePostalField(c: Collector, path: string, value: unknown): string | null {
+  const codePostal = c.text(path, value, 12, false);
+  if (codePostal && !CODE_POSTAL.test(codePostal)) c.add(path, "invalid_format", "Code postal invalide.");
+  return codePostal;
+}
+
+function dateField(c: Collector, path: string, value: unknown): string | null {
+  const date = c.text(path, value, 10, false);
+  if (date && (!ISO_DATE.test(date) || Number.isNaN(Date.parse(date)))) c.add(path, "invalid_format", "Date AAAA-MM-JJ attendue.");
+  return date;
+}
+
 export function validateChantierDraft(input: unknown): ReleveValidationResult<NormalizedChantierDraft> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
-  const codePostal = c.text("codePostal", raw.codePostal, 12, false);
-  if (codePostal && !CODE_POSTAL.test(codePostal)) c.add("codePostal", "invalid_format", "Code postal invalide.");
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.chantierNom, true) ?? "",
     adresse: c.text("adresse", raw.adresse, RELEVE_LIMITS.adresse, false),
-    codePostal,
+    codePostal: codePostalField(c, "codePostal", raw.codePostal),
     ville: c.text("ville", raw.ville, RELEVE_LIMITS.ville, false),
     gpChantierId: c.uuid("gpChantierId", raw.gpChantierId, true),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
     notes: c.text("notes", raw.notes, RELEVE_LIMITS.notes, false),
+    clientNom: c.text("clientNom", raw.clientNom, RELEVE_LIMITS.clientNom, false),
+    clientGpId: c.uuid("clientGpId", raw.clientGpId, true),
+    reference: c.text("reference", raw.reference, RELEVE_LIMITS.reference, false),
+    description: c.text("description", raw.description, RELEVE_LIMITS.notes, false),
+    dateReleve: dateField(c, "dateReleve", raw.dateReleve),
+    statut: c.enumeration("statut", raw.statut, CHANTIER_STATUTS, "en_cours"),
   });
 }
 
@@ -221,16 +243,33 @@ export function validateBatimentDraft(input: unknown): ReleveValidationResult<{ 
   });
 }
 
-export type EtageDraft = { nom: string; niveau: number; altitudeMm?: number | null; hauteurSousPlafondMm?: number | null; etat?: EtageEtat; ordre?: number };
-export function validateEtageDraft(input: unknown): ReleveValidationResult<{ nom: string; niveau: number; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: EtageEtat; ordre: number }> {
+/** Nature par défaut d'un niveau numérique (étages antérieurs au Lot 3, saisie rapide). */
+export function typeNiveauParDefaut(niveau: number): EtageTypeNiveau {
+  if (niveau < 0) return "sous_sol";
+  return niveau === 0 ? "rdc" : "etage";
+}
+
+export type EtageDraft = {
+  nom: string; niveau: number; altitudeMm?: number | null; hauteurSousPlafondMm?: number | null; etat?: EtageEtat; ordre?: number;
+  typeNiveau?: EtageTypeNiveau | null;
+};
+export type NormalizedEtageDraft = {
+  nom: string; niveau: number; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: EtageEtat; ordre: number;
+  typeNiveau: EtageTypeNiveau;
+};
+export function validateEtageDraft(input: unknown): ReleveValidationResult<NormalizedEtageDraft> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
+  const niveau = c.integer("niveau", raw.niveau, ETAGE_NIVEAU_MIN, ETAGE_NIVEAU_MAX);
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.structureNom, true) ?? "",
-    niveau: c.integer("niveau", raw.niveau, ETAGE_NIVEAU_MIN, ETAGE_NIVEAU_MAX),
+    niveau,
     altitudeMm: c.number("altitudeMm", raw.altitudeMm, -RELEVE_COORDINATE_LIMIT_MM, RELEVE_COORDINATE_LIMIT_MM, { nullable: true }),
     hauteurSousPlafondMm: c.number("hauteurSousPlafondMm", raw.hauteurSousPlafondMm, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
     etat: c.enumeration("etat", raw.etat, ETAGE_ETATS, "existant"),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
+    typeNiveau: raw.typeNiveau === undefined || raw.typeNiveau === null
+      ? typeNiveauParDefaut(niveau)
+      : c.enumeration("typeNiveau", raw.typeNiveau, ETAGE_TYPES_NIVEAU),
   });
 }
 
@@ -244,8 +283,15 @@ export function validateZoneDraft(input: unknown): ReleveValidationResult<{ nom:
   });
 }
 
-export type PieceDraft = { nom: string; usage?: PieceUsage; zoneId?: string | null; hauteurSousPlafondMm?: number | null; ordre?: number };
-export function validatePieceDraft(input: unknown): ReleveValidationResult<{ nom: string; usage: PieceUsage; zoneId: string | null; hauteurSousPlafondMm: number | null; ordre: number }> {
+export type PieceDraft = {
+  nom: string; usage?: PieceUsage; zoneId?: string | null; hauteurSousPlafondMm?: number | null; ordre?: number;
+  commentaire?: string | null; statut?: PieceStatut;
+};
+export type NormalizedPieceDraft = {
+  nom: string; usage: PieceUsage; zoneId: string | null; hauteurSousPlafondMm: number | null; ordre: number;
+  commentaire: string | null; statut: PieceStatut;
+};
+export function validatePieceDraft(input: unknown): ReleveValidationResult<NormalizedPieceDraft> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.structureNom, true) ?? "",
@@ -253,7 +299,68 @@ export function validatePieceDraft(input: unknown): ReleveValidationResult<{ nom
     zoneId: c.uuid("zoneId", raw.zoneId, true),
     hauteurSousPlafondMm: c.number("hauteurSousPlafondMm", raw.hauteurSousPlafondMm, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
+    commentaire: c.text("commentaire", raw.commentaire, RELEVE_LIMITS.notes, false),
+    statut: c.enumeration("statut", raw.statut, PIECE_STATUTS, "a_relever"),
   });
+}
+
+// ── Modifications partielles (sauvegarde automatique champ par champ) ─────────
+
+/** Champs modifiables par niveau : jamais les métadonnées, ni l'étage d'une pièce / d'une zone. */
+export type ChantierPatch = Partial<Omit<NormalizedChantierDraft, "ordre">>;
+export type BatimentPatch = { nom?: string; notes?: string | null; chantierId?: string };
+export type EtagePatch = Partial<Omit<NormalizedEtageDraft, "ordre">>;
+export type ZonePatch = { nom?: string; type?: ZoneType };
+export type PiecePatch = Partial<Omit<NormalizedPieceDraft, "ordre">>;
+export type NodePatchByKind = { chantier: ChantierPatch; batiment: BatimentPatch; etage: EtagePatch; zone: ZonePatch; piece: PiecePatch };
+
+type FieldRule = (c: Collector, path: string, value: unknown) => unknown;
+const textRule = (max: number, required = false): FieldRule => (c, path, value) => c.text(path, value, max, required);
+const NODE_PATCH_RULES: { [K in keyof NodePatchByKind]: Record<string, FieldRule> } = {
+  chantier: {
+    nom: textRule(RELEVE_LIMITS.chantierNom, true), adresse: textRule(RELEVE_LIMITS.adresse), codePostal: codePostalField,
+    ville: textRule(RELEVE_LIMITS.ville), gpChantierId: (c, path, value) => c.uuid(path, value, true), notes: textRule(RELEVE_LIMITS.notes),
+    clientNom: textRule(RELEVE_LIMITS.clientNom), clientGpId: (c, path, value) => c.uuid(path, value, true),
+    reference: textRule(RELEVE_LIMITS.reference), description: textRule(RELEVE_LIMITS.notes), dateReleve: dateField,
+    statut: (c, path, value) => c.enumeration(path, value, CHANTIER_STATUTS),
+  },
+  batiment: {
+    nom: textRule(RELEVE_LIMITS.structureNom, true), notes: textRule(RELEVE_LIMITS.notes),
+    chantierId: (c, path, value) => c.uuid(path, value, false),
+  },
+  etage: {
+    nom: textRule(RELEVE_LIMITS.structureNom, true), niveau: (c, path, value) => c.integer(path, value, ETAGE_NIVEAU_MIN, ETAGE_NIVEAU_MAX),
+    altitudeMm: (c, path, value) => c.number(path, value, -RELEVE_COORDINATE_LIMIT_MM, RELEVE_COORDINATE_LIMIT_MM, { nullable: true }),
+    hauteurSousPlafondMm: (c, path, value) => c.number(path, value, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
+    etat: (c, path, value) => c.enumeration(path, value, ETAGE_ETATS),
+    typeNiveau: (c, path, value) => c.enumeration(path, value, ETAGE_TYPES_NIVEAU),
+  },
+  zone: { nom: textRule(RELEVE_LIMITS.structureNom, true), type: (c, path, value) => c.enumeration(path, value, ZONE_TYPES) },
+  piece: {
+    nom: textRule(RELEVE_LIMITS.structureNom, true), usage: (c, path, value) => c.enumeration(path, value, PIECE_USAGES),
+    zoneId: (c, path, value) => c.uuid(path, value, true),
+    hauteurSousPlafondMm: (c, path, value) => c.number(path, value, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
+    commentaire: textRule(RELEVE_LIMITS.notes), statut: (c, path, value) => c.enumeration(path, value, PIECE_STATUTS),
+  },
+};
+
+/**
+ * Valide une modification partielle : seules les clés présentes sont contrôlées et renvoyées
+ * normalisées. Une clé inconnue (métadonnée, parent physique, colonne calculée) est refusée.
+ */
+export function validateNodePatch<K extends keyof NodePatchByKind>(kind: K, input: unknown): ReleveValidationResult<NodePatchByKind[K]> {
+  const c = new Collector();
+  if (!isRecord(input)) { c.add("", "invalid_type", "Objet attendu."); return c.result({} as NodePatchByKind[K]); }
+  const rules = NODE_PATCH_RULES[kind];
+  const value: Record<string, unknown> = {};
+  const keys = Object.keys(input).filter((key) => input[key] !== undefined);
+  if (!keys.length) c.add("", "required", "Aucune modification.");
+  for (const key of keys) {
+    const rule = rules[key];
+    if (!rule) { c.add(key, "invalid_enum", "Champ non modifiable."); continue; }
+    value[key] = rule(c, key, input[key]);
+  }
+  return c.result(value as NodePatchByKind[K]);
 }
 
 // ── Charges des éléments ──────────────────────────────────────────────────────

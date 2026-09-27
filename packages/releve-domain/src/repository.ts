@@ -14,20 +14,23 @@ import {
   RELEVE_SCHEMA_VERSION, type Batiment, type Chantier, type EntityMeta, type Etage, type Piece, type Releve, type ReleveStructure,
   type Version, type VersionType, type Zone,
 } from "./model";
-import type { NormalizedChantierDraft, NormalizedReleveDraft } from "./validation";
+import type { NodePatchByKind, NormalizedChantierDraft, NormalizedEtageDraft, NormalizedPieceDraft, NormalizedReleveDraft } from "./validation";
 import { planVersion } from "./versioning";
+import { planDuplication, searchStructure, siblingsOf, type ActivityEntry, type DuplicableKind, type SearchHit } from "./terrain";
 
 export type StructureKind = "chantier" | "batiment" | "etage" | "zone" | "piece";
 
 export type NewReleve = NormalizedReleveDraft & { id: ReleveId; entrepriseId: TenantId };
 export type NewChantier = NormalizedChantierDraft & { id: ChantierId; releveId: ReleveId };
 export type NewBatiment = { id: BatimentId; releveId: ReleveId; chantierId: ChantierId; nom: string; ordre: number; notes: string | null };
-export type NewEtage = { id: EtageId; releveId: ReleveId; batimentId: BatimentId; nom: string; niveau: number; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: Etage["etat"]; ordre: number };
+export type NewEtage = NormalizedEtageDraft & { id: EtageId; releveId: ReleveId; batimentId: BatimentId };
 export type NewZone = { id: ZoneId; releveId: ReleveId; etageId: EtageId; nom: string; type: Zone["type"]; ordre: number };
-export type NewPiece = { id: PieceId; releveId: ReleveId; etageId: EtageId; zoneId: ZoneId | null; nom: string; usage: Piece["usage"]; hauteurSousPlafondMm: number | null; ordre: number };
+export type NewPiece = Omit<NormalizedPieceDraft, "zoneId"> & { id: PieceId; releveId: ReleveId; etageId: EtageId; zoneId: ZoneId | null };
 
 export type RelevePatch = Partial<Omit<NormalizedReleveDraft, never>>;
-export type StructurePatch = { nom?: string; ordre?: number };
+/** Modification d'un nœud : champs validés par `validateNodePatch` (+ `ordre`, réservé au dépôt). */
+export type StructurePatch<K extends StructureKind = StructureKind> = NodePatchByKind[K] & { ordre?: number };
+export type StructureNodeByKind = { chantier: Chantier; batiment: Batiment; etage: Etage; zone: Zone; piece: Piece };
 export type NewVersion = { libelle: string | null; type: VersionType; baseId: string | null };
 
 export class ReleveConflictError extends Error {
@@ -49,7 +52,20 @@ export interface ReleveRepository {
   createEtage(input: NewEtage): Promise<Etage>;
   createZone(input: NewZone): Promise<Zone>;
   createPiece(input: NewPiece): Promise<Piece>;
-  updateStructureNode(kind: StructureKind, id: string, patch: StructurePatch): Promise<void>;
+  /**
+   * Modification d'un nœud. Avec `expectedRevision` : contrôle optimiste — si la ligne a été
+   * modifiée ailleurs (autre onglet, autre appareil), {@link ReleveConflictError} et rien
+   * n'est écrit. Renvoie la ligne à jour (nouvelle révision).
+   */
+  updateStructureNode<K extends StructureKind>(kind: K, id: string, patch: StructurePatch<K>, expectedRevision?: number): Promise<StructureNodeByKind[K]>;
+  /** Duplication de sous-structure (jamais d'élément ni de média). Renvoie l'identifiant de la copie. */
+  duplicateNode(kind: DuplicableKind, id: string, newId: string, nom?: string | null): Promise<string>;
+  /** Réordonne une fratrie complète, atomiquement. Renvoie le nombre de lignes modifiées. */
+  reorderNodes(kind: StructureKind, orderedIds: readonly string[]): Promise<number>;
+  /** Recherche simple sur les relevés visibles de l'entreprise. */
+  search(tenantId: TenantId, query: string): Promise<SearchHit[]>;
+  /** Journal d'activité d'un relevé, plus récent d'abord. */
+  listActivity(releveId: ReleveId, limit: number): Promise<ActivityEntry[]>;
   /** Suppression douce ; chantier, bâtiment et étage emportent leurs descendants (et les restaurent). */
   setStructureNodeDeleted(kind: StructureKind, id: string, deleted: boolean): Promise<void>;
   /** Version typée ; le serveur applique les mêmes règles que {@link planVersion}. */
@@ -77,6 +93,7 @@ export class InMemoryReleveRepository implements ReleveRepository {
   private readonly zones = new Map<string, Mutable<Zone>>();
   private readonly pieces = new Map<string, Mutable<Piece>>();
   private readonly versions = new Map<string, Version>();
+  private readonly journal: ActivityEntry[] = [];
   private readonly now: () => string;
   private readonly uuid: () => string;
 
@@ -91,6 +108,12 @@ export class InMemoryReleveRepository implements ReleveRepository {
   }
 
   private touch(row: Row) { row.updatedAt = this.now(); row.updatedBy = this.options.actorId; row.revision += 1; }
+
+  private log(entite: ActivityEntry["entite"], entiteId: string, action: ActivityEntry["action"], champs: string[] = [], details: Record<string, unknown> | null = null, releveId?: string) {
+    this.journalReleve.set(this.journal.length + 1, releveId ?? entiteId);
+    this.journal.push({ id: this.journal.length + 1, entite, entiteId, action, champs, auteurId: this.options.actorId, createdAt: this.now(), details });
+  }
+  private readonly journalReleve = new Map<number, string>();
 
   private requireReleve(releveId: string, allowDeleted = false): Mutable<Releve> {
     const releve = this.releves.get(releveId);
@@ -122,6 +145,7 @@ export class InMemoryReleveRepository implements ReleveRepository {
       client: { nom: input.clientNom, gpClientId: input.clientGpId }, dateReleve: input.dateReleve, notes: input.notes,
     };
     this.releves.set(releve.id, releve);
+    this.log("releve", releve.id, "creation");
     return { ...releve };
   }
 
@@ -151,6 +175,7 @@ export class InMemoryReleveRepository implements ReleveRepository {
     if (Boolean(releve.deletedAt) === deleted) return { ...releve };
     releve.deletedAt = deleted ? this.now() : null;
     this.touch(releve);
+    this.log("releve", releve.id, deleted ? "suppression" : "restauration", ["deleted_at"]);
     return { ...releve };
   }
 
@@ -162,28 +187,28 @@ export class InMemoryReleveRepository implements ReleveRepository {
   async createChantier(input: NewChantier): Promise<Chantier> {
     const releve = this.requireReleve(input.releveId);
     const row: Mutable<Chantier> = { ...this.meta(releve.entrepriseId), ...input, id: input.id };
-    this.chantiers.set(row.id, row); return { ...row };
+    this.chantiers.set(row.id, row); this.log("chantier", row.id, "creation", [], null, row.releveId); return { ...row };
   }
 
   async createBatiment(input: NewBatiment): Promise<Batiment> {
     const releve = this.requireReleve(input.releveId);
     this.checkParent(this.chantiers, input.chantierId, input.releveId, "Chantier");
     const row: Mutable<Batiment> = { ...this.meta(releve.entrepriseId), ...input };
-    this.batiments.set(row.id, row); return { ...row };
+    this.batiments.set(row.id, row); this.log("batiment", row.id, "creation", [], null, row.releveId); return { ...row };
   }
 
   async createEtage(input: NewEtage): Promise<Etage> {
     const releve = this.requireReleve(input.releveId);
     this.checkParent(this.batiments, input.batimentId, input.releveId, "Bâtiment");
     const row: Mutable<Etage> = { ...this.meta(releve.entrepriseId), ...input };
-    this.etages.set(row.id, row); return { ...row };
+    this.etages.set(row.id, row); this.log("etage", row.id, "creation", [], null, row.releveId); return { ...row };
   }
 
   async createZone(input: NewZone): Promise<Zone> {
     const releve = this.requireReleve(input.releveId);
     this.checkParent(this.etages, input.etageId, input.releveId, "Étage");
     const row: Mutable<Zone> = { ...this.meta(releve.entrepriseId), ...input };
-    this.zones.set(row.id, row); return { ...row };
+    this.zones.set(row.id, row); this.log("zone", row.id, "creation", [], null, row.releveId); return { ...row };
   }
 
   async createPiece(input: NewPiece): Promise<Piece> {
@@ -193,17 +218,29 @@ export class InMemoryReleveRepository implements ReleveRepository {
       const zone = this.zones.get(input.zoneId);
       if (!zone || zone.releveId !== input.releveId || zone.etageId !== input.etageId || zone.deletedAt) throw new ReleveNotFoundError("Zone de cet étage");
     }
-    const row: Mutable<Piece> = { ...this.meta(releve.entrepriseId), ...input };
-    this.pieces.set(row.id, row); return { ...row };
+    const row: Mutable<Piece> = { ...this.meta(releve.entrepriseId), ...input, surfaceCalculeeMm2: null, volumeCalculeMm3: null };
+    this.pieces.set(row.id, row); this.log("piece", row.id, "creation", [], null, row.releveId); return { ...row };
   }
 
-  async updateStructureNode(kind: StructureKind, id: string, patch: StructurePatch) {
-    const row = this.table(kind).get(id) as (Row & { nom: string; ordre: number }) | undefined;
+  async updateStructureNode<K extends StructureKind>(kind: K, id: string, patch: StructurePatch<K>, expectedRevision?: number): Promise<StructureNodeByKind[K]> {
+    const row = this.table(kind).get(id) as (Row & Record<string, unknown>) | undefined;
     if (!row || row.deletedAt) throw new ReleveNotFoundError("Élément de structure");
     this.requireReleve(row.releveId!);
-    if (patch.nom !== undefined) row.nom = patch.nom;
-    if (patch.ordre !== undefined) row.ordre = patch.ordre;
+    if (expectedRevision !== undefined && row.revision !== expectedRevision) throw new ReleveConflictError(row.revision);
+    const changes = Object.entries(patch).filter(([key, value]) => value !== undefined && row[key] !== value);
+    if (kind === "batiment" && "chantierId" in patch && patch.chantierId !== row.chantierId) this.checkParent(this.chantiers, String(patch.chantierId), row.releveId!, "Chantier");
+    if (kind === "piece" && "zoneId" in patch && patch.zoneId) {
+      const zone = this.zones.get(String(patch.zoneId));
+      if (!zone || zone.etageId !== row.etageId || zone.deletedAt) throw new ReleveNotFoundError("Zone de cet étage");
+    }
+    if (!changes.length) return { ...row } as unknown as StructureNodeByKind[K];
+    const champs = changes.map(([key]) => key);
+    for (const [key, value] of changes) row[key] = value;
     this.touch(row);
+    const parent = kind === "batiment" ? "chantierId" : kind === "piece" ? "zoneId" : null;
+    const action = parent && champs.includes(parent) ? "deplacement" : champs.length === 1 && champs[0] === "nom" ? "renommage" : champs.length === 1 && champs[0] === "ordre" ? "reordonnancement" : "modification";
+    this.log(kind, id, action, champs, null, row.releveId);
+    return { ...row } as unknown as StructureNodeByKind[K];
   }
 
   async setStructureNodeDeleted(kind: StructureKind, id: string, deleted: boolean) {
@@ -215,7 +252,13 @@ export class InMemoryReleveRepository implements ReleveRepository {
     const previous = row.deletedAt;
     const at = deleted ? this.now() : null;
     const apply = (target: Row) => { target.deletedAt = at; this.touch(target); };
+    if (!deleted) {
+      // Même règle que la garde SQL : restauration sous un parent actif uniquement.
+      const parentOf = { chantier: () => null, batiment: () => this.chantiers.get((row as unknown as Batiment).chantierId), etage: () => this.batiments.get((row as unknown as Etage).batimentId), zone: () => this.etages.get((row as unknown as Zone).etageId), piece: () => this.etages.get((row as unknown as Piece).etageId) }[kind]();
+      if (parentOf?.deletedAt) throw new Error("Restaurez d'abord l'élément parent.");
+    }
     apply(row);
+    this.log(kind, id, deleted ? "suppression" : "restauration", ["deleted_at"], null, row.releveId);
     const descendants = descendantsOf(structure, { kind, id });
     // Même règle que le trigger SQL : la restauration ne ranime que les descendants
     // supprimés par CETTE cascade (même horodatage), jamais une suppression antérieure.
@@ -224,6 +267,55 @@ export class InMemoryReleveRepository implements ReleveRepository {
     for (const etageId of descendants.etages) { const target = this.etages.get(etageId); if (eligible(target)) apply(target); }
     for (const zoneId of descendants.zones) { const target = this.zones.get(zoneId); if (eligible(target)) apply(target); }
     for (const pieceId of descendants.pieces) { const target = this.pieces.get(pieceId); if (eligible(target)) apply(target); }
+  }
+
+  async duplicateNode(kind: DuplicableKind, id: string, newId: string, nom?: string | null): Promise<string> {
+    const source = this.table(kind).get(id);
+    if (!source || source.deletedAt) throw new ReleveNotFoundError("Élément de structure");
+    const structure = (await this.getStructure(source.releveId as ReleveId))!;
+    if (structure.releve.deletedAt) throw new ReleveNotFoundError("Relevé");
+    if (this.table(kind).has(newId)) throw new Error("Identifiant déjà utilisé.");
+    const plan = planDuplication(structure, kind, id, { newId, nom, uuid: this.uuid });
+    if (!plan) throw new ReleveNotFoundError("Élément de structure");
+    const meta = () => this.meta(structure.releve.entrepriseId);
+    for (const item of plan.batiments) this.batiments.set(item.id, { ...item, ...meta() });
+    for (const item of plan.etages) this.etages.set(item.id, { ...item, ...meta() });
+    for (const item of plan.zones) this.zones.set(item.id, { ...item, ...meta() });
+    for (const item of plan.pieces) this.pieces.set(item.id, { ...item, ...meta() });
+    const noeuds = plan.batiments.length + plan.etages.length + plan.zones.length + plan.pieces.length;
+    this.log(kind, newId, "duplication", [], { source_id: id, noeuds, elements_copies: 0, medias_copies: 0 }, structure.releve.id);
+    return newId;
+  }
+
+  async reorderNodes(kind: StructureKind, orderedIds: readonly string[]): Promise<number> {
+    const first = this.table(kind).get(orderedIds[0] ?? "");
+    if (!first || new Set(orderedIds).size !== orderedIds.length) throw new ReleveNotFoundError("Élément de structure");
+    const structure = (await this.getStructure(first.releveId as ReleveId))!;
+    const siblings = siblingsOf(structure, kind, first.id).map((item) => item.id);
+    if (siblings.length !== orderedIds.length || !orderedIds.every((id) => siblings.includes(id))) {
+      throw new ReleveConflictError(first.revision);
+    }
+    let changed = 0;
+    orderedIds.forEach((id, index) => {
+      const row = this.table(kind).get(id) as Row & { ordre: number };
+      if (row.ordre === index) return;
+      row.ordre = index; this.touch(row); changed += 1;
+      this.log(kind, id, "reordonnancement", ["ordre"], { vers: index }, row.releveId);
+    });
+    return changed;
+  }
+
+  async search(tenantId: TenantId, query: string): Promise<SearchHit[]> {
+    const hits: SearchHit[] = [];
+    for (const releve of this.releves.values()) {
+      if (releve.entrepriseId !== tenantId) continue;
+      hits.push(...searchStructure((await this.getStructure(releve.id))!, query));
+    }
+    return hits.slice(0, 30);
+  }
+
+  async listActivity(releveId: ReleveId, limit: number): Promise<ActivityEntry[]> {
+    return this.journal.filter((entry) => this.journalReleve.get(entry.id) === releveId).reverse().slice(0, limit);
   }
 
   async createVersion(releveId: ReleveId, input: NewVersion): Promise<Version> {

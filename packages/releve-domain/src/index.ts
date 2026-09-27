@@ -13,6 +13,7 @@
  * | `permissions` | matrice view/create/edit/delete/share/export/sync-gp (miroir RLS) |
  * | `entitlement` | capability premium `releve-metre`, offres (Relevé Pro ⊃ Tools Pro), prix de référence, non-activation |
  * | `storage` | chemins du bucket privé `tools-releves` |
+ * | `terrain` | Lot 3 : fil d'Ariane, ordre, duplication, suppression maîtrisée, recherche, filtres, activité |
  * | `gp-sync` | contrat v1 de transmission vers Gestion Pro (non branché) |
  * | `repository` / `service` | port de persistance et cas d'usage |
  */
@@ -26,5 +27,6 @@ export * from "./permissions";
 export * from "./entitlement";
 export * from "./storage";
 export * from "./gp-sync";
+export * from "./terrain";
 export * from "./repository";
 export * from "./service";

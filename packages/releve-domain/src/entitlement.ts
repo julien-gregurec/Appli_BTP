@@ -29,7 +29,11 @@ export type ReleveMetreOffer = {
   readonly annualPriceCents: number;
   /** SKU prévus (lot 21). Aucun n'est accepté par la base ni publié dans un store. */
   readonly plannedSkus: readonly ["tools_releve_monthly", "tools_releve_annual"];
-  /** Relevé Pro inclut les capabilities Tools Pro (recommandation audit §0.2-3). */
+  /**
+   * Relevé Pro inclut les capabilities Tools Pro — **décision produit retenue** (Lot 3,
+   * 2026-09-27 ; contrat : docs/product/ELSATIA_TOOLS_RELEVE_METRE_CONTRAT_PRODUIT_V1.md).
+   * Aucune facturation réelle n'est activée pour autant.
+   */
   readonly includesToolsPro: true;
   /** `working-price` tant que la décision de prix finale (lot 21) n'est pas prise. */
   readonly status: "working-price" | "active";
@@ -37,7 +41,10 @@ export type ReleveMetreOffer = {
   readonly commercialActivation: boolean;
 };
 
-/** Seul interrupteur de la relation d'inclusion côté domaine (miroir de `offres_incluses`). */
+/**
+ * Seul interrupteur de la relation d'inclusion côté domaine (miroir de `offres_incluses`).
+ * Décision retenue au Lot 3 (ex-DECISION_REQUIRED D4 du Lot 2) : Relevé Pro ⊃ Tools Pro.
+ */
 const RELEVE_METRE_OFFER_INCLUDES_TOOLS_PRO = true;
 
 export const RELEVE_METRE_OFFER: ReleveMetreOffer = Object.freeze({
@@ -88,7 +95,7 @@ export const TOOLS_OFFERS: Readonly<Record<ToolsOfferCode, ToolsOffer>> = Object
   tools_pro: { code: "tools_pro", libelle: "Tools Pro", capabilityCle: null, capabilities: TOOLS_PRO_CAPABILITIES, offresIncluses: [], commercialementActive: true },
   releve_pro: {
     code: "releve_pro", libelle: "Relevé & Métré Pro", capabilityCle: RELEVE_METRE_CAPABILITY, capabilities: TOOLS_ADDON_CAPABILITIES,
-    // Décision de travail (à confirmer au lot 21) : Relevé Pro inclut Tools Pro.
+    // Décision produit retenue (Lot 3) : Relevé Pro inclut Tools Pro. Facturation non activée.
     offresIncluses: RELEVE_METRE_OFFER_INCLUDES_TOOLS_PRO ? ["tools_pro"] : [],
     commercialementActive: false,
   },
@@ -126,6 +133,14 @@ export function hasReleveMetre(capabilities: Iterable<string>): boolean {
 export function isReleveMetrePurchasable(offer: ReleveMetreOffer = RELEVE_METRE_OFFER): boolean {
   return offer.commercialActivation === true && offer.status !== "working-price";
 }
+
+/** Décision produit : trace lisible par les écrans et les tests (aucun effet de facturation). */
+export const RELEVE_PRO_PRODUCT_DECISION = Object.freeze({
+  code: "releve_pro_includes_tools_pro",
+  retainedOn: "2026-09-27",
+  includesToolsPro: RELEVE_METRE_OFFER_INCLUDES_TOOLS_PRO,
+  realBillingActive: false,
+} as const);
 
 export function formatWorkingPrice(cents: number): string {
   return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100)} € HT`;
