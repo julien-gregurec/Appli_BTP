@@ -109,6 +109,7 @@ describe("interdit n°2 — un Price historique n'est jamais proposé à un nouv
         customerId: "cus_1",
         offre: "mini",
         periodicite: "mensuel",
+        essai: { mode: "aucun", raison: "essai_expire", finLocale: null, restantSecondes: 0 },
         environnement: malConfigure,
       }),
     ).rejects.toThrow(PrixGenerationHistoriqueNonVendable);

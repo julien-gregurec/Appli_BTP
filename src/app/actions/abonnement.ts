@@ -10,6 +10,7 @@ import { peutGererAbonnementSuspendu } from "@/lib/acces-support-abonnement";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/commercialisation-abonnements";
 import {
+  AbonnementStripeDejaRattache,
   ajouterOptionIAAbonnement,
   creerOuRecupererClientStripe,
   creerSessionAbonnementStripe,
@@ -19,6 +20,7 @@ import {
   estPeriodiciteAbonnement,
   modifierOptionIAAbonnement,
   OFFRES_ABONNEMENT_COMMERCIALISEES,
+  preparerCheckoutAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
 import {
@@ -63,6 +65,8 @@ export async function demarrerAbonnementAction(formData: FormData) {
 
   let destination: string;
   try {
+    // Essai Stripe = reliquat de l'essai local ELSATIA, jamais un second essai.
+    const essai = await preparerCheckoutAbonnement(ctx.entrepriseId);
     const customerId = await creerOuRecupererClientStripe({
       entrepriseId: ctx.entrepriseId,
       email: user.email,
@@ -72,12 +76,16 @@ export async function demarrerAbonnementAction(formData: FormData) {
       customerId,
       offre,
       periodicite,
+      essai,
     });
     if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
     destination = session.url;
   } catch (error) {
-    console.error("demarrerAbonnementAction", error);
     const separateur = retourErreur.includes("?") ? "&" : "?";
+    if (error instanceof AbonnementStripeDejaRattache) {
+      redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Un abonnement existe déjà pour votre entreprise : gérez-le depuis le portail de facturation.")}`);
+    }
+    console.error("demarrerAbonnementAction", error);
     redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Souscription impossible pour le moment. Réessayez ou contactez-nous.")}`);
   }
   redirect(destination);

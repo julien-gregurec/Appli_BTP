@@ -22,9 +22,11 @@
 //      invoice.payment_failed APRÈS invoice.paid (ordre inversé) et 3× le même
 //      événement (doublons), puis la requête SQL de vérification attendue.
 //
-// Prérequis côté ELSATIA : l'entreprise doit avoir été créée le MÊME JOUR UTC
-// (essai local = essai Stripe, cf. finding F-1 du rapport : un trial_end Stripe
-// postérieur à essai_debut + 30 fait échouer synchroniser_abonnement_stripe_service).
+// Prérequis côté ELSATIA : idéalement une entreprise créée le MÊME JOUR UTC
+// (essai local = essai Stripe). Depuis la migration 20260927000507
+// (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1, finding F-1 fermé), un trial_end
+// Stripe au-delà de essai_debut + 30 ne fait plus échouer le webhook : il est
+// borné à l'essai local et journalisé dans stripe_essai_ecarts.
 //
 // Usage :
 //   node scripts/qualification/stripe-ordering-test-mode.mjs                # plan seul

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { calculerEssaiCheckout, parametresEssaiCheckout, suffixeIdempotenceEssai, type EssaiCheckout } from "@/lib/stripe-essai-checkout";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -333,11 +334,50 @@ export async function creerOuRecupererClientStripe(params: {
   return client.id;
 }
 
+/**
+ * Refus d'un second Checkout : l'entreprise est déjà rattachée à une
+ * subscription Stripe. Un nouveau Checkout créerait (et facturerait) une
+ * seconde subscription que le webhook refuse de rattacher
+ * (`rattachement_stripe_incoherent`) ; le changement d'offre passe par le
+ * Portail Stripe.
+ */
+export class AbonnementStripeDejaRattache extends Error {
+  constructor() {
+    super("Un abonnement Stripe est déjà rattaché à cette entreprise");
+    this.name = "AbonnementStripeDejaRattache";
+  }
+}
+
+/**
+ * Prépare un Checkout d'abonnement : relit l'essai LOCAL (seule autorité) et
+ * calcule l'essai Stripe restant (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
+ * Lecture seule, aucun appel Stripe.
+ */
+export async function preparerCheckoutAbonnement(entrepriseId: string, maintenant: Date = new Date()): Promise<EssaiCheckout> {
+  const admin = createAdminClient();
+  const { data: entreprise, error } = await admin
+    .from("entreprises")
+    .select("id,abonnement_essai_debut,abonnement_essai_fin,stripe_subscription_id")
+    .eq("id", entrepriseId)
+    .single();
+  if (error || !entreprise) throw new Error("Entreprise introuvable");
+  if (entreprise.stripe_subscription_id) throw new AbonnementStripeDejaRattache();
+  return calculerEssaiCheckout({
+    essaiDebut: entreprise.abonnement_essai_debut as string | null,
+    essaiFin: entreprise.abonnement_essai_fin as string | null,
+  }, maintenant);
+}
+
 export async function creerSessionAbonnementStripe(params: {
   entrepriseId: string;
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  /**
+   * Essai restant calculé depuis la fenêtre locale (`preparerCheckoutAbonnement`).
+   * Obligatoire : aucune durée d'essai fixe n'est plus envoyée à Stripe.
+   */
+  essai: EssaiCheckout;
   /** Injectable pour les tests ; `process.env` en exécution réelle. */
   environnement?: Record<string, string | undefined>;
 }) {
@@ -359,7 +399,10 @@ export async function creerSessionAbonnementStripe(params: {
     "metadata[entreprise_id]": params.entrepriseId,
     "metadata[offre]": params.offre,
     "metadata[periodicite]": params.periodicite,
-    "subscription_data[trial_period_days]": String(DUREE_ESSAI_JOURS),
+    // Essai : fin ABSOLUE = fin de l'essai local (jamais `trial_period_days`,
+    // qui repartirait de la complétion de la session) ; aucun essai si expiré
+    // ou si le reliquat est sous le minimum Checkout de 48 h.
+    ...parametresEssaiCheckout(params.essai),
     "subscription_data[metadata][entreprise_id]": params.entrepriseId,
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
@@ -369,7 +412,9 @@ export async function creerSessionAbonnementStripe(params: {
   }
   return requeteStripe<StripeSession>("checkout/sessions", {
     corps,
-    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}`,
+    // La clé varie avec l'essai : Stripe refuse une clé rejouée avec d'autres
+    // paramètres (bascule « essai » → « sans essai » sous les 48 h).
+    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}-${suffixeIdempotenceEssai(params.essai)}`,
   });
 }
 

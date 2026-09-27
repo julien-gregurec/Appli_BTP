@@ -11,14 +11,15 @@
 -- `npm run sync:train-expectations` et vérifié en CI (`npm run verify:train-expectations`) :
 -- aucun nombre de migrations n'est maintenu à la main (train canonique V3 — rapport
 -- ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE). Contrôles 14-17 : garde-fous du train V3
--- (RGPD factures/contrats, Réserves).
+-- (RGPD factures/contrats, Réserves). Contrôle 18 : contrat d'ordre Stripe (…506) et essai
+-- borné (…507, ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (341, '20260927000506')),
+attendu_train(nb, derniere) as (values (342, '20260927000507')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -165,6 +166,19 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select bool_or(pg_get_functiondef(p.oid) like '%lignes_avenants%') from pg_proc p
                    join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'exporter_donnees_entreprise'), false), true
+  union all
+  select 18, 'Stripe : ordre (506) + essai borné (507)', 'journal d''ordre, écarts d''essai, trigger borner_essai_entreprise, essai jamais > début + 30',
+         coalesce(nullif(concat_ws(', ',
+           case when to_regclass('public.stripe_evenements_ordre') is null then 'journal ordre ABSENT' end,
+           case when to_regclass('public.stripe_essai_ecarts') is null then 'écarts essai ABSENTS' end,
+           case when not exists (select 1 from pg_trigger where tgname = 'borner_essai_entreprise' and tgrelid = 'public.entreprises'::regclass and not tgisinternal)
+                then 'trigger ABSENT' end,
+           (select count(*)::text || ' essai(s) hors fenêtre' from public.entreprises
+             where abonnement_essai_fin > abonnement_essai_debut + 30 having count(*) > 0)), ''), 'contrôlé'),
+         to_regclass('public.stripe_evenements_ordre') is not null
+           and to_regclass('public.stripe_essai_ecarts') is not null
+           and exists (select 1 from pg_trigger where tgname = 'borner_essai_entreprise' and tgrelid = 'public.entreprises'::regclass and not tgisinternal)
+           and not exists (select 1 from public.entreprises where abonnement_essai_fin > abonnement_essai_debut + 30), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

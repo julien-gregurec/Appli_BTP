@@ -277,7 +277,8 @@ APRÈS (…401)     : applique, perime → statut final = actif
 
 ## 13. Findings et points ouverts
 
-**F-1 — PRÉEXISTANT, bloquant pour un vrai Checkout, hors périmètre ordre (non corrigé).**
+**F-1 — PRÉEXISTANT, bloquant pour un vrai Checkout, hors périmètre ordre (non corrigé ici ;
+fermé par `ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1.md`, migration `20260927000507`).**
 `entreprises_essai_dates_coherentes` impose `abonnement_essai_fin ∈ [essai_debut, essai_debut + 30]`
 et non nul. Or `synchroniser_abonnement_stripe_service` écrit `abonnement_essai_fin = trial_end`
 Stripe, et Checkout envoie toujours `trial_period_days = 30`. Une entreprise qui s'abonne au jour N>0

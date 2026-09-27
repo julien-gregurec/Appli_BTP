@@ -503,6 +503,40 @@ describe("surface d'export de la route et module métier", () => {
     expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
   });
 
+  it("trial_will_end : journalisé sans effet (essai local fait autorité), sans relecture ni écriture d'essai", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.trial_will_end" })));
+    expect(response.status).toBe(200);
+    expect(deps.recupererAbonnementStripe).not.toHaveBeenCalled();
+    expect(deps.acquerirVerrouRemise).not.toHaveBeenCalled();
+    expect(admin.appels.some((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service")).toBe(false);
+    const journal = admin.appels.find((a) => a.table === "journaliser_evenement_stripe_ordre_service");
+    expect(journal?.donnees).toMatchObject({ p_stripe_event_type: "customer.subscription.trial_will_end", p_motif: "essai_fin_annoncee" });
+    expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("essai : la relecture Stripe transmet trial_end tel quel ; la borne est en base (RPC)", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    // Subscription héritée (trial_period_days = 30 posé au jour 15) : trial_end hors fenêtre locale.
+    deps.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "trialing", trial_end: Date.parse("2026-11-15T08:00:00Z") / 1000, discounts: [], metadata: {} });
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(200);
+    const synchro = admin.appels.find((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service");
+    expect((synchro?.donnees as Record<string, unknown>).p_essai_fin).toBe("2026-11-15");
+  });
+
+  it("sans essai : trial_end null transmis (la base conserve l'essai local, plus de violation NOT NULL)", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    deps.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "active", trial_end: null, discounts: [], metadata: {} });
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.created" })));
+    expect(response.status).toBe(200);
+    const synchro = admin.appels.find((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service");
+    expect((synchro?.donnees as Record<string, unknown>).p_essai_fin).toBeNull();
+  });
+
   it("une erreur métier renvoie 500 sans détail interne et rejoue l'événement", async () => {
     const journal = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const admin = adminFake();

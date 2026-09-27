@@ -296,6 +296,12 @@ export async function POST(request: Request) {
       if (entrepriseId) {
         await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
       }
+    } else if (evenement.type === "customer.subscription.trial_will_end") {
+      // Annonce Stripe (J-3) : l'essai local ELSATIA fait autorité
+      // (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1) ; aucune relecture, aucune
+      // écriture d'essai ni de statut. Le prochain customer.subscription.updated
+      // porte la transition réelle.
+      await journaliserSansEffet(admin, entrepriseId, evenement, "essai_fin_annoncee");
     } else if (evenement.type === "invoice.created" && objet.billing_reason !== "subscription_create") {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       const customerId = identifiant(objet.customer);
