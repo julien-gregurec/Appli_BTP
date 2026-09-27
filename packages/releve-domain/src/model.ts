@@ -109,6 +109,10 @@ export type Releve = EntityMeta & {
 
 // ── Structure ─────────────────────────────────────────────────────────────────
 
+/** Lot 3 : avancement d'un chantier de relevé. */
+export const CHANTIER_STATUTS = ["a_planifier", "en_cours", "termine", "archive"] as const;
+export type ChantierStatut = (typeof CHANTIER_STATUTS)[number];
+
 /** Chantier d'un projet relevé : un site physique, lié ou non à un chantier Gestion Pro. */
 export type Chantier = EntityMeta & {
   readonly id: ChantierId;
@@ -121,6 +125,15 @@ export type Chantier = EntityMeta & {
   readonly gpChantierId: string | null;
   readonly ordre: number;
   readonly notes: string | null;
+  /** Lot 3 (facultatifs côté lecture : absents d'un cache antérieur). */
+  readonly clientNom?: string | null;
+  /** `clients.id` Gestion Pro : rattachement préparé, jamais autoritaire côté Tools. */
+  readonly clientGpId?: string | null;
+  readonly reference?: string | null;
+  readonly description?: string | null;
+  /** Date du relevé sur ce chantier (AAAA-MM-JJ). */
+  readonly dateReleve?: string | null;
+  readonly statut?: ChantierStatut;
 };
 
 export type Batiment = EntityMeta & {
@@ -139,20 +152,36 @@ export type EtageEtat = (typeof ETAGE_ETATS)[number];
 export const ETAGE_NIVEAU_MIN = -10;
 export const ETAGE_NIVEAU_MAX = 200;
 
+/**
+ * Lot 3 : nature du niveau, indépendante de son numéro. « Combles », « Entresol » ou
+ * « Sous-sol 2 » se saisissent librement (nom) sans être forcés à un entier.
+ */
+export const ETAGE_CATEGORIES = ["sous_sol", "rdc", "entresol", "etage", "combles", "toiture", "exterieur", "autre"] as const;
+export type EtageCategorie = (typeof ETAGE_CATEGORIES)[number];
+
 export type Etage = EntityMeta & {
   readonly id: EtageId;
   readonly releveId: ReleveId;
   readonly batimentId: BatimentId;
   readonly nom: string;
-  /** 0 = rez-de-chaussée, négatif = sous-sol. */
-  readonly niveau: number;
+  /**
+   * 0 = rez-de-chaussée, négatif = sous-sol. Lot 3 : FACULTATIF et décimal (pas de 0,5 ;
+   * `null` pour des combles non numérotés). Réservé au tri et au futur calage altimétrique.
+   */
+  readonly niveau: number | null;
+  /** Lot 3 (absent d'un cache antérieur : déduit du niveau). */
+  readonly categorieNiveau?: EtageCategorie;
   readonly altitudeMm: number | null;
   readonly hauteurSousPlafondMm: number | null;
   readonly etat: EtageEtat;
   readonly ordre: number;
 };
 
-export const ZONE_TYPES = ["logement", "lot", "parties_communes", "local_technique", "exterieur", "autre"] as const;
+/** Lot 3 : aile, secteur, appartement, plateau, zone technique ajoutés (sans retrait). */
+export const ZONE_TYPES = [
+  "logement", "lot", "parties_communes", "local_technique", "exterieur", "autre",
+  "aile", "secteur", "appartement", "plateau", "zone_technique",
+] as const;
 export type ZoneType = (typeof ZONE_TYPES)[number];
 
 export type Zone = EntityMeta & {
@@ -162,13 +191,24 @@ export type Zone = EntityMeta & {
   readonly nom: string;
   readonly type: ZoneType;
   readonly ordre: number;
+  readonly commentaire?: string | null;
 };
 
+/** Lot 3 : circulation, local technique, stockage ajoutés (sans retrait). */
 export const PIECE_USAGES = [
   "sejour", "chambre", "cuisine", "salle_de_bain", "salle_d_eau", "wc", "entree", "degagement",
   "bureau", "cellier", "buanderie", "garage", "cave", "combles", "escalier", "exterieur", "autre",
+  "circulation", "local_technique", "stockage",
 ] as const;
 export type PieceUsage = (typeof PIECE_USAGES)[number];
+/** Types proposés en premier sur le terrain (cahier Lot 3), les autres restent disponibles. */
+export const PIECE_TYPES_PRINCIPAUX = [
+  "bureau", "chambre", "sejour", "cuisine", "wc", "salle_de_bain", "circulation", "local_technique", "stockage", "exterieur", "autre",
+] as const satisfies readonly PieceUsage[];
+
+/** Lot 3 : avancement du relevé d'une pièce. */
+export const PIECE_STATUTS = ["a_relever", "en_cours", "relevee", "verifiee"] as const;
+export type PieceStatut = (typeof PIECE_STATUTS)[number];
 
 export type Piece = EntityMeta & {
   readonly id: PieceId;
@@ -180,6 +220,11 @@ export type Piece = EntityMeta & {
   readonly usage: PieceUsage;
   readonly hauteurSousPlafondMm: number | null;
   readonly ordre: number;
+  /** Lot 3 (facultatifs côté lecture). */
+  readonly commentaire?: string | null;
+  readonly statut?: PieceStatut;
+  /** Surface déclarée sur le terrain (mm²), en attendant la surface calculée du lot 5. */
+  readonly surfaceDeclareeMm2?: number | null;
 };
 
 // ── Éléments métier ───────────────────────────────────────────────────────────

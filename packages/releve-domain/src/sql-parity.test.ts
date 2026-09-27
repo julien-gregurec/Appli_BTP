@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_CAPABILITIES, expandOfferCapabilities, offerCapabilities } from "./entitlement";
 import {
   ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
-  MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
+  MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, CHANTIER_STATUTS, ETAGE_CATEGORIES, PIECE_STATUTS, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
   RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES,
 } from "./model";
 import { RELEVE_ACTIONS, RELEVE_ROLES } from "./permissions";
+import { JOURNAL_ACTIONS, SEARCH_FILTERS } from "./repository";
 import { MEDIA_CATEGORY_POLICIES, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES } from "./storage";
 import { RELEVE_LIMITS } from "./validation";
 
@@ -35,7 +36,7 @@ const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`
 describe("parité domaine ↔ migration tools_releve_metre_foundation_v1", () => {
   it.each([
     ["statuts", RELEVE_STATUTS], ["visibilités", RELEVE_VISIBILITES], ["états d'étage", ETAGE_ETATS],
-    ["types de zone", ZONE_TYPES], ["usages de pièce", PIECE_USAGES], ["types d'élément", ELEMENT_TYPES],
+    ["types d'élément", ELEMENT_TYPES],
     ["catégories de média", MEDIA_CATEGORIES], ["rôles", RELEVE_ROLES], ["capabilities add-on", TOOLS_ADDON_CAPABILITIES],
   ] as const)("énumération %s identique", (_label, values) => {
     expect(sql.replace(/, /g, ",")).toContain(quoted(values));
@@ -105,5 +106,42 @@ describe("parité domaine ↔ migration tools_releve_metre_contrat_elements_v2 (
     expect(MESURE_TYPES.map((type) => `${type}:${mesureUniteAttendue(type)}`)).toEqual([
       "longueur:mm", "largeur:mm", "hauteur:mm", "diagonale:mm", "distance:mm", "angle:rad", "surface:mm2", "volume:mm3",
     ]);
+  });
+});
+
+describe("parité domaine ↔ migration tools_releve_metre_structure_terrain_v1 (Lot 3)", () => {
+  const terrain = readFileSync(
+    fileURLToPath(new URL("../../../supabase/migrations/20260928000701_tools_releve_metre_structure_terrain_v1.sql", import.meta.url)),
+    "utf8",
+  ).replace(/\s+/g, " ").replace(/, /g, ",");
+
+  it.each([
+    ["types de zone", ZONE_TYPES], ["usages de pièce", PIECE_USAGES], ["statuts de chantier", CHANTIER_STATUTS],
+    ["catégories de niveau", ETAGE_CATEGORIES], ["statuts de pièce", PIECE_STATUTS], ["actions du journal", JOURNAL_ACTIONS],
+  ] as const)("énumération %s identique", (_label, values) => {
+    expect(terrain).toContain(quoted(values));
+  });
+
+  it("sur-ensemble du Lot 2 : chaque ancien type de zone et usage de pièce reste admis", () => {
+    const zones601 = ["logement", "lot", "parties_communes", "local_technique", "exterieur", "autre"];
+    const usages601 = ["sejour", "chambre", "cuisine", "salle_de_bain", "salle_d_eau", "wc", "entree", "degagement", "bureau", "cellier", "buanderie", "garage", "cave", "combles", "escalier", "exterieur", "autre"];
+    expect(sql.replace(/, /g, ",")).toContain(quoted(zones601));
+    expect(sql.replace(/, /g, ",")).toContain(quoted(usages601));
+    expect(ZONE_TYPES.slice(0, zones601.length)).toEqual(zones601);
+    expect(PIECE_USAGES.slice(0, usages601.length)).toEqual(usages601);
+  });
+
+  it("bornes identiques : textes, surface, niveau décimal", () => {
+    expect(terrain).toContain(`char_length(description) <= ${RELEVE_LIMITS.description}`);
+    expect(terrain).toContain(`char_length(commentaire) <= ${RELEVE_LIMITS.commentaire}`);
+    expect(terrain).toContain(`char_length(client_nom) <= ${RELEVE_LIMITS.clientNom}`);
+    expect(terrain).toContain(`char_length(reference) <= ${RELEVE_LIMITS.reference}`);
+    expect(terrain).toContain("surface_declaree_mm2 between 1 and 1e12");
+    expect(RELEVE_LIMITS.surfaceMaxMm2).toBe(1e12);
+    expect(terrain).toContain("numeric(5,1)");
+  });
+
+  it("filtres de recherche identiques à tools_releve_rechercher", () => {
+    for (const filtre of SEARCH_FILTERS) if (filtre !== "actif") expect(terrain).toContain(`when '${filtre}' then`);
   });
 });

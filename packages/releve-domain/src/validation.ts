@@ -9,6 +9,7 @@
 
 import { isUuid } from "./ids";
 import {
+  CHANTIER_STATUTS, ETAGE_CATEGORIES, PIECE_STATUTS, type ChantierStatut, type EtageCategorie, type PieceStatut,
   ANNOTATION_FORMES, ANNOTATION_FORMES_TEXTUELLES, REVETEMENT_TYPES, mesureUniteAttendue,
   ELEMENT_ATTACHMENT, ELEMENT_TYPES, ENTITY_REF_KINDS, EQUIPEMENT_CATEGORIES, ETAGE_ETATS, ETAGE_NIVEAU_MAX,
   ETAGE_NIVEAU_MIN, MATERIAU_CATEGORIES, MESURE_SOURCES, MESURE_TYPES, MESURE_UNITES, MUR_TYPES, OUVERTURE_SENS,
@@ -60,6 +61,11 @@ export const RELEVE_LIMITS = {
   metadataJson: 8_000,
   formule: 500,
   cleQuantite: 120,
+  /** Lot 3 : chantier et fiches terrain. */
+  description: 4000,
+  commentaire: 4000,
+  /** Surface déclarée : 1 mm² à 1 km² (1e12 mm²). */
+  surfaceMaxMm2: 1e12,
 } as const;
 
 const CODE_POSTAL = /^[0-9A-Za-z -]{2,12}$/;
@@ -191,15 +197,22 @@ export function validateReleveDraft(input: unknown): ReleveValidationResult<Norm
 export type ChantierDraft = {
   nom: string; adresse?: string | null; codePostal?: string | null; ville?: string | null;
   gpChantierId?: string | null; ordre?: number; notes?: string | null;
+  /** Lot 3. */
+  clientNom?: string | null; clientGpId?: string | null; reference?: string | null; description?: string | null;
+  dateReleve?: string | null; statut?: ChantierStatut;
 };
 export type NormalizedChantierDraft = {
   nom: string; adresse: string | null; codePostal: string | null; ville: string | null;
   gpChantierId: string | null; ordre: number; notes: string | null;
+  clientNom: string | null; clientGpId: string | null; reference: string | null; description: string | null;
+  dateReleve: string | null; statut: ChantierStatut;
 };
 export function validateChantierDraft(input: unknown): ReleveValidationResult<NormalizedChantierDraft> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
   const codePostal = c.text("codePostal", raw.codePostal, 12, false);
   if (codePostal && !CODE_POSTAL.test(codePostal)) c.add("codePostal", "invalid_format", "Code postal invalide.");
+  const dateReleve = c.text("dateReleve", raw.dateReleve, 10, false);
+  if (dateReleve && (!ISO_DATE.test(dateReleve) || Number.isNaN(Date.parse(dateReleve)))) c.add("dateReleve", "invalid_format", "Date AAAA-MM-JJ attendue.");
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.chantierNom, true) ?? "",
     adresse: c.text("adresse", raw.adresse, RELEVE_LIMITS.adresse, false),
@@ -208,6 +221,12 @@ export function validateChantierDraft(input: unknown): ReleveValidationResult<No
     gpChantierId: c.uuid("gpChantierId", raw.gpChantierId, true),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
     notes: c.text("notes", raw.notes, RELEVE_LIMITS.notes, false),
+    clientNom: c.text("clientNom", raw.clientNom, RELEVE_LIMITS.clientNom, false),
+    clientGpId: c.uuid("clientGpId", raw.clientGpId, true),
+    reference: c.text("reference", raw.reference, RELEVE_LIMITS.reference, false),
+    description: c.text("description", raw.description, RELEVE_LIMITS.description, false),
+    dateReleve,
+    statut: c.enumeration("statut", raw.statut, CHANTIER_STATUTS, "en_cours"),
   });
 }
 
@@ -221,12 +240,20 @@ export function validateBatimentDraft(input: unknown): ReleveValidationResult<{ 
   });
 }
 
-export type EtageDraft = { nom: string; niveau: number; altitudeMm?: number | null; hauteurSousPlafondMm?: number | null; etat?: EtageEtat; ordre?: number };
-export function validateEtageDraft(input: unknown): ReleveValidationResult<{ nom: string; niveau: number; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: EtageEtat; ordre: number }> {
+/**
+ * Lot 3 : `niveau` facultatif et décimal au dixième (demi-niveau), `categorieNiveau` libre de
+ * tout numéro (combles, entresol…). Sans catégorie, elle est déduite du niveau.
+ */
+export type EtageDraft = { nom: string; niveau?: number | null; categorieNiveau?: EtageCategorie; altitudeMm?: number | null; hauteurSousPlafondMm?: number | null; etat?: EtageEtat; ordre?: number };
+export function validateEtageDraft(input: unknown): ReleveValidationResult<{ nom: string; niveau: number | null; categorieNiveau: EtageCategorie; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: EtageEtat; ordre: number }> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
+  const niveau = c.number("niveau", raw.niveau, ETAGE_NIVEAU_MIN, ETAGE_NIVEAU_MAX, { nullable: true });
+  if (niveau !== null && Math.round(niveau * 10) !== niveau * 10) c.add("niveau", "invalid_format", "Niveau au dixième près (ex. 1,5).");
+  const deduite: EtageCategorie = niveau === null ? "autre" : niveau < 0 ? "sous_sol" : niveau === 0 ? "rdc" : "etage";
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.structureNom, true) ?? "",
-    niveau: c.integer("niveau", raw.niveau, ETAGE_NIVEAU_MIN, ETAGE_NIVEAU_MAX),
+    niveau,
+    categorieNiveau: c.enumeration("categorieNiveau", raw.categorieNiveau, ETAGE_CATEGORIES, deduite),
     altitudeMm: c.number("altitudeMm", raw.altitudeMm, -RELEVE_COORDINATE_LIMIT_MM, RELEVE_COORDINATE_LIMIT_MM, { nullable: true }),
     hauteurSousPlafondMm: c.number("hauteurSousPlafondMm", raw.hauteurSousPlafondMm, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
     etat: c.enumeration("etat", raw.etat, ETAGE_ETATS, "existant"),
@@ -234,18 +261,26 @@ export function validateEtageDraft(input: unknown): ReleveValidationResult<{ nom
   });
 }
 
-export type ZoneDraft = { nom: string; type?: ZoneType; ordre?: number };
-export function validateZoneDraft(input: unknown): ReleveValidationResult<{ nom: string; type: ZoneType; ordre: number }> {
+export type ZoneDraft = { nom: string; type?: ZoneType; ordre?: number; commentaire?: string | null };
+export function validateZoneDraft(input: unknown): ReleveValidationResult<{ nom: string; type: ZoneType; ordre: number; commentaire: string | null }> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.structureNom, true) ?? "",
     type: c.enumeration("type", raw.type, ZONE_TYPES, "logement"),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
+    commentaire: c.text("commentaire", raw.commentaire, RELEVE_LIMITS.commentaire, false),
   });
 }
 
-export type PieceDraft = { nom: string; usage?: PieceUsage; zoneId?: string | null; hauteurSousPlafondMm?: number | null; ordre?: number };
-export function validatePieceDraft(input: unknown): ReleveValidationResult<{ nom: string; usage: PieceUsage; zoneId: string | null; hauteurSousPlafondMm: number | null; ordre: number }> {
+export type PieceDraft = {
+  nom: string; usage?: PieceUsage; zoneId?: string | null; hauteurSousPlafondMm?: number | null; ordre?: number;
+  commentaire?: string | null; statut?: PieceStatut; surfaceDeclareeMm2?: number | null;
+};
+export type NormalizedPieceDraft = {
+  nom: string; usage: PieceUsage; zoneId: string | null; hauteurSousPlafondMm: number | null; ordre: number;
+  commentaire: string | null; statut: PieceStatut; surfaceDeclareeMm2: number | null;
+};
+export function validatePieceDraft(input: unknown): ReleveValidationResult<NormalizedPieceDraft> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
   return c.result({
     nom: c.text("nom", raw.nom, RELEVE_LIMITS.structureNom, true) ?? "",
@@ -253,7 +288,43 @@ export function validatePieceDraft(input: unknown): ReleveValidationResult<{ nom
     zoneId: c.uuid("zoneId", raw.zoneId, true),
     hauteurSousPlafondMm: c.number("hauteurSousPlafondMm", raw.hauteurSousPlafondMm, RELEVE_LIMITS.hauteurMinMm, RELEVE_LIMITS.hauteurMaxMm, { nullable: true }),
     ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
+    commentaire: c.text("commentaire", raw.commentaire, RELEVE_LIMITS.commentaire, false),
+    statut: c.enumeration("statut", raw.statut, PIECE_STATUTS, "a_relever"),
+    surfaceDeclareeMm2: c.number("surfaceDeclareeMm2", raw.surfaceDeclareeMm2, 1, RELEVE_LIMITS.surfaceMaxMm2, { nullable: true }),
   });
+}
+
+// ── Lot 3 : modifications partielles (autosave champ par champ) ────────────────
+
+export type NodeKind = "chantier" | "batiment" | "etage" | "zone" | "piece";
+
+/**
+ * Valide un patch partiel d'un nœud : seuls les champs présents sont contrôlés, avec les
+ * mêmes règles que la création. Clé inconnue ou non modifiable (identifiants, parent…) :
+ * refusée. Renvoie le patch normalisé.
+ */
+export function validateNodePatch(kind: NodeKind, input: unknown): ReleveValidationResult<Record<string, unknown>> {
+  const raw = isRecord(input) ? input : {};
+  const EDITABLE: Record<NodeKind, readonly string[]> = {
+    chantier: ["nom", "adresse", "codePostal", "ville", "notes", "clientNom", "reference", "description", "dateReleve", "statut"],
+    batiment: ["nom", "notes"],
+    etage: ["nom", "niveau", "categorieNiveau", "altitudeMm", "hauteurSousPlafondMm", "etat"],
+    zone: ["nom", "type", "commentaire"],
+    piece: ["nom", "usage", "zoneId", "hauteurSousPlafondMm", "commentaire", "statut", "surfaceDeclareeMm2"],
+  };
+  const unknown = Object.keys(raw).filter((key) => !EDITABLE[kind].includes(key));
+  if (unknown.length) return { ok: false, issues: unknown.map((key) => ({ path: key, code: "invalid_enum" as const, message: "Champ non modifiable." })) };
+  if (!Object.keys(raw).length) return { ok: false, issues: [{ path: "patch", code: "required", message: "Aucune modification." }] };
+  // Base complète valide + patch : on réutilise les validateurs de création, puis on ne garde que les clés du patch.
+  const bases: Record<NodeKind, Record<string, unknown>> = {
+    chantier: { nom: "x" }, batiment: { nom: "x" }, etage: { nom: "x", niveau: 0 }, zone: { nom: "x" }, piece: { nom: "x" },
+  };
+  const validators: Record<NodeKind, (value: unknown) => ReleveValidationResult<Record<string, unknown>>> = {
+    chantier: validateChantierDraft, batiment: validateBatimentDraft, etage: validateEtageDraft, zone: validateZoneDraft, piece: validatePieceDraft,
+  };
+  const result = validators[kind]({ ...bases[kind], ...raw });
+  if (!result.ok) return { ok: false, issues: result.issues.filter((issue) => Object.keys(raw).includes(issue.path.split(".")[0])) };
+  return { ok: true, value: Object.fromEntries(Object.keys(raw).map((key) => [key, result.value[key]])) };
 }
 
 // ── Charges des éléments ──────────────────────────────────────────────────────

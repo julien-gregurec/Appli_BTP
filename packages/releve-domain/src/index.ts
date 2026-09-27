@@ -28,3 +28,5 @@ export * from "./storage";
 export * from "./gp-sync";
 export * from "./repository";
 export * from "./service";
+export * from "./autosave";
+export * from "./fiche";

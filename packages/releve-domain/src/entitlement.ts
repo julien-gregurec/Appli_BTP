@@ -88,7 +88,8 @@ export const TOOLS_OFFERS: Readonly<Record<ToolsOfferCode, ToolsOffer>> = Object
   tools_pro: { code: "tools_pro", libelle: "Tools Pro", capabilityCle: null, capabilities: TOOLS_PRO_CAPABILITIES, offresIncluses: [], commercialementActive: true },
   releve_pro: {
     code: "releve_pro", libelle: "Relevé & Métré Pro", capabilityCle: RELEVE_METRE_CAPABILITY, capabilities: TOOLS_ADDON_CAPABILITIES,
-    // Décision de travail (à confirmer au lot 21) : Relevé Pro inclut Tools Pro.
+    // Décision produit VALIDÉE (2026-09-27, Lot 3) : Relevé Pro inclut Tools Pro. Aucune activation
+    // commerciale pour autant (Stripe, stores, SKU inchangés ; lot 21).
     offresIncluses: RELEVE_METRE_OFFER_INCLUDES_TOOLS_PRO ? ["tools_pro"] : [],
     commercialementActive: false,
   },

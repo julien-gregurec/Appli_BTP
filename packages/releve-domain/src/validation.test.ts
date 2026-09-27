@@ -28,7 +28,10 @@ describe("saisies de structure", () => {
     expect(validateEtageDraft({ nom: "Sous-sol", niveau: -1, hauteurSousPlafondMm: 2200 }).ok).toBe(true);
     expect(validateEtageDraft({ nom: "Tour", niveau: 201 }).ok).toBe(false);
     expect(validateEtageDraft({ nom: "RDC", niveau: 0, hauteurSousPlafondMm: 100 }).ok).toBe(false);
-    expect(validateEtageDraft({ nom: "RDC", niveau: 0.5 }).ok).toBe(false);
+    // Lot 3 : niveau décimal au dixième (demi-niveau) admis, au-delà refusé ; niveau facultatif.
+    expect(validateEtageDraft({ nom: "Entresol", niveau: 0.5 }).ok).toBe(true);
+    expect(validateEtageDraft({ nom: "RDC", niveau: 0.55 }).ok).toBe(false);
+    expect(validateEtageDraft({ nom: "Combles", niveau: null, categorieNiveau: "combles" })).toMatchObject({ ok: true, value: { niveau: null, categorieNiveau: "combles" } });
   });
 
   it("refuse un usage de pièce inconnu", () => {

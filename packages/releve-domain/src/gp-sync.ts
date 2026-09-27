@@ -17,6 +17,7 @@
  *   multi-chantiers produit une enveloppe par chantier lié.
  */
 
+import { compareEtages, etageCategorie } from "./hierarchy";
 import { mesureMode, type Chantier, type MesureMode, type ReleveAggregate, type ReleveElement, type Version, type QuantiteUnite, type Point2D } from "./model";
 
 export const GP_SYNC_CONTRACT_VERSION = 1 as const;
@@ -80,16 +81,20 @@ export type ReleveGpEnvelope = {
   };
   readonly tenant: { readonly entrepriseId: string };
   readonly client: { readonly gpClientId: string | null; readonly nom: string | null };
-  readonly chantier: { readonly ref: string; readonly gpChantierId: string; readonly nom: string; readonly adresse: string | null; readonly codePostal: string | null; readonly ville: string | null };
+  readonly chantier: {
+    readonly ref: string; readonly gpChantierId: string; readonly nom: string; readonly adresse: string | null; readonly codePostal: string | null; readonly ville: string | null;
+    /** Lot 3 (additif) : identification terrain du chantier. Jamais de description libre transmise. */
+    readonly reference: string | null; readonly clientNom: string | null; readonly gpClientId: string | null; readonly dateReleve: string | null; readonly statut: string;
+  };
   readonly building: ReadonlyArray<{ readonly ref: string; readonly nom: string; readonly ordre: number }>;
   readonly floor: ReadonlyArray<{
-    readonly ref: string; readonly buildingRef: string; readonly nom: string; readonly niveau: number; readonly etat: string;
+    readonly ref: string; readonly buildingRef: string; readonly nom: string; readonly niveau: number | null; readonly categorie: string; readonly etat: string;
     readonly altitudeM: number | null; readonly hauteurSousPlafondM: number | null;
     readonly zones: ReadonlyArray<{ readonly ref: string; readonly nom: string; readonly type: string }>;
   }>;
   /** Zones à plat (aussi imbriquées dans `floor[].zones` pour compatibilité). */
   readonly zone: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly nom: string; readonly type: string }>;
-  readonly room: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly zoneRef: string | null; readonly nom: string; readonly usage: string; readonly hauteurSousPlafondM: number | null }>;
+  readonly room: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly zoneRef: string | null; readonly nom: string; readonly usage: string; readonly hauteurSousPlafondM: number | null; readonly statut: string; readonly surfaceDeclareeM2: number | null }>;
   readonly walls: ReadonlyArray<{ readonly ref: string; readonly floorRef: string; readonly roomRef: string | null; readonly a: GpPoint; readonly b: GpPoint; readonly epaisseurM: number; readonly hauteurM: number | null; readonly type: string; readonly adjacentRoomRefs: readonly string[]; readonly materialRef: string | null }>;
   /** Portes et fenêtres : `family` distingue door / window / other (trémie, passage). */
   readonly openings: ReadonlyArray<{ readonly ref: string; readonly wallRef: string; readonly family: "door" | "window" | "other"; readonly type: string; readonly decalageM: number; readonly largeurM: number; readonly hauteurM: number; readonly allegeM: number | null; readonly sens: string; readonly metadata: Readonly<Record<string, unknown>> | null }>;
@@ -165,7 +170,7 @@ export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, ex
   // plus les éléments sans étage (matériaux, quantités et mesures de niveau projet).
   const batiments = alive(aggregate.batiments).filter((item) => item.chantierId === chantier?.id).sort((a, b) => a.ordre - b.ordre);
   const batimentIds = new Set(batiments.map((item) => item.id as string));
-  const etages = alive(aggregate.etages).filter((item) => batimentIds.has(item.batimentId)).sort((a, b) => a.niveau - b.niveau || a.ordre - b.ordre);
+  const etages = alive(aggregate.etages).filter((item) => batimentIds.has(item.batimentId)).sort(compareEtages);
   const etageIds = new Set(etages.map((item) => item.id as string));
   const zones = alive(aggregate.zones).filter((item) => etageIds.has(item.etageId));
   const pieces = alive(aggregate.pieces).filter((item) => etageIds.has(item.etageId));
@@ -193,15 +198,19 @@ export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, ex
     source: { app: "tools", module: "releve-metre", releveId: releve.id, chantierRef: chantier.id, versionId: version.id, versionNumero: version.numero, versionType: version.typeVersion, empreinte: version.empreinte, exportedAt },
     tenant: { entrepriseId: releve.entrepriseId },
     client: { gpClientId: releve.client.gpClientId, nom: releve.client.nom },
-    chantier: { ref: chantier.id, gpChantierId, nom: chantier.nom, adresse: chantier.adresse, codePostal: chantier.codePostal, ville: chantier.ville },
+    chantier: {
+      ref: chantier.id, gpChantierId, nom: chantier.nom, adresse: chantier.adresse, codePostal: chantier.codePostal, ville: chantier.ville,
+      reference: chantier.reference ?? null, clientNom: chantier.clientNom ?? releve.client.nom, gpClientId: chantier.clientGpId ?? releve.client.gpClientId,
+      dateReleve: chantier.dateReleve ?? null, statut: chantier.statut ?? "en_cours",
+    },
     building: batiments.map((item) => ({ ref: item.id, nom: item.nom, ordre: item.ordre })),
     floor: etages.map((etage) => ({
-      ref: etage.id, buildingRef: etage.batimentId, nom: etage.nom, niveau: etage.niveau, etat: etage.etat,
+      ref: etage.id, buildingRef: etage.batimentId, nom: etage.nom, niveau: etage.niveau, categorie: etageCategorie(etage), etat: etage.etat,
       altitudeM: nullableM(etage.altitudeMm), hauteurSousPlafondM: nullableM(etage.hauteurSousPlafondMm),
       zones: zones.filter((zone) => zone.etageId === etage.id).map((zone) => ({ ref: zone.id, nom: zone.nom, type: zone.type })),
     })),
     zone: zones.map((zone) => ({ ref: zone.id, floorRef: zone.etageId, nom: zone.nom, type: zone.type })),
-    room: pieces.map((piece) => ({ ref: piece.id, floorRef: piece.etageId, zoneRef: piece.zoneId, nom: piece.nom, usage: piece.usage, hauteurSousPlafondM: nullableM(piece.hauteurSousPlafondMm ?? hspEtage.get(piece.etageId) ?? null) })),
+    room: pieces.map((piece) => ({ ref: piece.id, floorRef: piece.etageId, zoneRef: piece.zoneId, nom: piece.nom, usage: piece.usage, hauteurSousPlafondM: nullableM(piece.hauteurSousPlafondMm ?? hspEtage.get(piece.etageId) ?? null), statut: piece.statut ?? "a_relever", surfaceDeclareeM2: piece.surfaceDeclareeMm2 == null ? null : mm2ToM2(piece.surfaceDeclareeMm2) })),
     walls: murs.map((mur) => ({ ref: mur.id, floorRef: mur.etageId!, roomRef: mur.pieceId, a: pointToM(mur.donnees.a), b: pointToM(mur.donnees.b), epaisseurM: mmToM(mur.donnees.epaisseurMm), hauteurM: nullableM(mur.donnees.hauteurMm), type: mur.donnees.typeMur, adjacentRoomRefs: [...(mur.donnees.piecesAdjacentesIds ?? [])], materialRef: mur.donnees.materiauId ?? null })),
     openings: ouvertures.map((item) => ({ ref: item.id, wallRef: item.parentElementId!, family: openingFamily(item.donnees.typeOuverture), type: item.donnees.typeOuverture, decalageM: mmToM(item.donnees.decalageMm), largeurM: mmToM(item.donnees.largeurMm), hauteurM: mmToM(item.donnees.hauteurMm), allegeM: nullableM(item.donnees.allegeMm), sens: item.donnees.sens, metadata: item.donnees.metadata ?? null })),
     measurements: ofType(elements, "mesure").map((item) => {

@@ -9,14 +9,17 @@
  */
 
 import { asBatimentId, asChantierId, asEtageId, asPieceId, asReleveId, asZoneId, newUuid, type ReleveId, type TenantId } from "./ids";
-import { nextOrdre } from "./hierarchy";
+import { moveInList, nextOrdre, siblingsOf } from "./hierarchy";
+import type { ChantierId } from "./ids";
 import type { Chantier, Releve, ReleveStructure, Version, VersionType } from "./model";
 import { canPerform, tenantDecision, RELEVE_DENIAL_MESSAGES, type ReleveAction, type ReleveActorContext, type ReleveDenialReason } from "./permissions";
-import { ReleveNotFoundError, type ReleveRepository, type StructureKind } from "./repository";
 import {
-  unwrapValidation, validateBatimentDraft, validateChantierDraft, validateEtageDraft, validatePieceDraft, validateReleveDraft, validateZoneDraft,
+  ReleveNotFoundError, type DuplicableKind, type JournalEntry, type NewChantier, type ReleveRepository, type SearchFilter, type SearchResult, type StructureKind,
+} from "./repository";
+import {
+  unwrapValidation, validateNodePatch, validateBatimentDraft, validateChantierDraft, validateEtageDraft, validatePieceDraft, validateReleveDraft, validateZoneDraft,
   RELEVE_LIMITS, ReleveValidationError,
-  type BatimentDraft, type ChantierDraft, type EtageDraft, type PieceDraft, type ReleveDraft, type ZoneDraft,
+  type BatimentDraft, type ChantierDraft, type NodeKind, type EtageDraft, type PieceDraft, type ReleveDraft, type ZoneDraft,
 } from "./validation";
 import { planVersion } from "./versioning";
 
@@ -72,10 +75,7 @@ export class ReleveService {
     this.require("create");
     const value = unwrapValidation(validateReleveDraft(draft));
     const releve = await this.repository.createReleve({ ...value, id: asReleveId(this.uuid()), entrepriseId: this.actor.tenantId });
-    await this.repository.createChantier({
-      id: asChantierId(this.uuid()), releveId: releve.id, nom: value.chantierNom, adresse: value.chantierAdresse,
-      codePostal: value.chantierCodePostal, ville: value.chantierVille, gpChantierId: value.chantierGpId, ordre: 0, notes: null,
-    });
+    await this.repository.createChantier(chantierFromSite(releve, asChantierId(this.uuid())));
     return releve;
   }
 
@@ -125,11 +125,7 @@ export class ReleveService {
     } else if (actifs.length === 1) {
       chantierId = actifs[0].id;
     } else if (actifs.length === 0) {
-      const site = structure.releve.chantier;
-      chantierId = (await this.repository.createChantier({
-        id: asChantierId(this.uuid()), releveId, nom: site.nom, adresse: site.adresse, codePostal: site.codePostal,
-        ville: site.ville, gpChantierId: site.gpChantierId, ordre: 0, notes: null,
-      })).id;
+      chantierId = (await this.repository.createChantier(chantierFromSite(structure.releve, asChantierId(this.uuid())))).id;
     } else {
       throw new ReleveValidationError([{ path: "chantierId", code: "required", message: "Plusieurs chantiers : précisez le chantier du bâtiment." }]);
     }
@@ -196,6 +192,90 @@ export class ReleveService {
     await this.load(releveId, "view");
     return this.repository.listVersions(releveId);
   }
+  // ── Lot 3 : relevé métier terrain ────────────────────────────────────────────
+
+  private node(structure: ReleveStructure, kind: NodeKind, id: string) {
+    const rows = { chantier: structure.chantiers, batiment: structure.batiments, etage: structure.etages, zone: structure.zones, piece: structure.pieces }[kind] as ReadonlyArray<{ id: string; deletedAt: string | null; revision: number }>;
+    const row = rows.find((item) => item.id === id && !item.deletedAt);
+    if (!row) throw new ReleveNotFoundError("Élément de structure");
+    return row;
+  }
+
+  /**
+   * Modification partielle (autosave) d'un chantier, bâtiment, étage, zone ou pièce, avec
+   * contrôle optimiste : `expectedRevision` est la révision lue ; si un autre onglet ou un
+   * autre utilisateur a écrit entre-temps, `ReleveConflictError` et RIEN n'est écrasé.
+   * Renvoie la nouvelle révision.
+   */
+  async updateNode(releveId: ReleveId, kind: NodeKind, id: string, patch: Record<string, unknown>, expectedRevision: number): Promise<number> {
+    const structure = await this.load(releveId, "edit");
+    this.node(structure, kind, id);
+    const value = unwrapValidation(validateNodePatch(kind, patch));
+    if (kind === "piece" && value.zoneId) {
+      const piece = structure.pieces.find((item) => item.id === id)!;
+      if (!structure.zones.some((zone) => zone.id === value.zoneId && zone.etageId === piece.etageId && !zone.deletedAt)) throw new ReleveNotFoundError("Zone de cet étage");
+    }
+    return this.repository.updateNode(kind, id, value, expectedRevision);
+  }
+
+  /** Monte / descend un nœud parmi ses frères (même parent ; pièces : même zone). */
+  async move(releveId: ReleveId, kind: NodeKind, id: string, delta: -1 | 1): Promise<boolean> {
+    const structure = await this.load(releveId, "edit");
+    this.node(structure, kind, id);
+    const next = moveInList(siblingsOf(structure, kind, id), id, delta);
+    if (!next) return false;
+    await this.repository.reorder(kind, next);
+    return true;
+  }
+
+  /** Réordonne tous les frères d'un coup (glisser-déposer). */
+  async reorder(releveId: ReleveId, kind: NodeKind, orderedIds: readonly string[]): Promise<void> {
+    const structure = await this.load(releveId, "edit");
+    const expected = siblingsOf(structure, kind, orderedIds[0] ?? "");
+    if (orderedIds.length !== expected.length || !orderedIds.every((id) => expected.includes(id))) {
+      throw new ReleveValidationError([{ path: "ordre", code: "invariant_violated", message: "La liste doit contenir tous les éléments du même niveau." }]);
+    }
+    await this.repository.reorder(kind, orderedIds);
+  }
+
+  /** Duplique la STRUCTURE d'un bâtiment, d'un étage ou d'une pièce (jamais photos ni mesures). */
+  async duplicate(releveId: ReleveId, kind: DuplicableKind, id: string, nom: string | null = null): Promise<string> {
+    const structure = await this.load(releveId, "edit");
+    this.node(structure, kind, id);
+    const value = nom?.trim() || null;
+    if (value && value.length > RELEVE_LIMITS.structureNom) throw new ReleveValidationError([{ path: "nom", code: "out_of_range", message: `${RELEVE_LIMITS.structureNom} caractères maximum.` }]);
+    return this.repository.duplicate(kind, id, value);
+  }
+
+  /** Recherche dans les relevés visibles : relevé, chantier, bâtiment, pièce ; filtres actif / archivé / récent. */
+  async search(texte: string, filtre: SearchFilter = "actif"): Promise<SearchResult[]> {
+    const decision = tenantDecision(this.actor, "view");
+    if (!decision.allowed) throw new RelevePermissionError("view", decision.reason);
+    return this.repository.search(this.actor.tenantId, texte.slice(0, 120), filtre);
+  }
+
+  async journal(releveId: ReleveId, limit = 100): Promise<JournalEntry[]> {
+    await this.load(releveId, "view");
+    return this.repository.listJournal(releveId, limit);
+  }
+
+  /** Fige la version INITIALE si elle n'existe pas encore (idempotent). */
+  async ensureInitialVersion(releveId: ReleveId, libelle: string | null = "Relevé initial"): Promise<Version> {
+    const versions = await this.listVersions(releveId);
+    const initiale = versions.find((version) => version.typeVersion === "initial");
+    return initiale ?? this.createVersion(releveId, libelle, { type: "initial" });
+  }
+
+}
+
+/** Premier chantier d'un projet : recopie du site principal (client, référence, date compris). */
+function chantierFromSite(releve: Releve, id: ChantierId): NewChantier {
+  const site = releve.chantier;
+  return {
+    id, releveId: releve.id, nom: site.nom, adresse: site.adresse, codePostal: site.codePostal, ville: site.ville, gpChantierId: site.gpChantierId,
+    ordre: 0, notes: null, clientNom: releve.client.nom, clientGpId: releve.client.gpClientId, reference: releve.reference, description: null,
+    dateReleve: releve.dateReleve, statut: "en_cours",
+  };
 }
 
 function draftOf(releve: Releve): ReleveDraft {
