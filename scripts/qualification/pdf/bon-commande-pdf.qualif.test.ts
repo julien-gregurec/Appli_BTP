@@ -1,4 +1,4 @@
-// Qualification PDF du bon de commande (RD-2, migration 20260927000507).
+// Qualification PDF du bon de commande (RD-2, migration 20260927000508).
 //
 // Entrée : BON_COMMANDE_PDF_JSON = fichier écrit par scripts/qualification/rgpd-residual-debt-v1.sh,
 // lignes RÉELLES lues en base (commande, lignes, fiche fournisseur, fiche entreprise), deux

@@ -2,7 +2,7 @@
 //
 // Même règle que devis et factures (src/lib/client-snapshot.ts) : une commande sortie du
 // brouillon imprime l'identité figée par la base à ce moment-là (fournisseur destinataire,
-// entreprise émettrice — migration 20260927000507), jamais les fiches courantes. Seul un
+// entreprise émettrice — migration 20260927000508), jamais les fiches courantes. Seul un
 // brouillon lit les fiches à jour.
 
 import type { ClientEntete, EntrepriseEntete } from "@/components/DocumentImprimable";
@@ -63,7 +63,7 @@ function destinataireDepuis(source: FournisseurSnapshotCommande | FicheFournisse
  * les instantanés priment : les fiches fournisseur et entreprise ne sont plus une source
  * valable pour ce document. La base garantit leur présence hors brouillon (contrainte
  * commandes_fournisseurs_identite_figee_check) ; le repli sur les fiches ne sert qu'à une
- * base antérieure à 20260927000507.
+ * base antérieure à 20260927000508.
  */
 export function identiteBonCommande(params: {
   commande: CommandeIdentiteSource;

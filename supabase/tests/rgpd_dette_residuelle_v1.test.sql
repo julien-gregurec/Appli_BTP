@@ -1,4 +1,4 @@
--- RGPD — dette technique résiduelle V1 (migration 20260927000507).
+-- RGPD — dette technique résiduelle V1 (migration 20260927000508).
 -- Rapport : docs/qualification/ELSATIA_RGPD_PURGE_RESIDUAL_DEBT_CLOSURE_V1.md
 --
 --   1. Structure : colonnes, contrainte, triggers, aucun droit applicatif sur les fonctions.

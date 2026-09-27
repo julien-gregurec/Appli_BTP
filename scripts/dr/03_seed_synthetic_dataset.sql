@@ -196,7 +196,7 @@ begin
 
     -- Commandes créées en brouillon puis passées à leur statut après leurs lignes : une
     -- commande engagée est verrouillée (20260926000506), son identité imprimée figée à la
-    -- sortie du brouillon (20260927000507).
+    -- sortie du brouillon (20260927000508).
     insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, montant_ht, montant_tva, montant_ttc, cree_par_utilisateur_id)
       values (ent, 'DR-'||suffixe||'-CMD-0001', fourn1, cha1, 'brouillon', '2026-07-25', '2026-07-30', 3900, 780, 4680, user1)
       returning id into cmd1;

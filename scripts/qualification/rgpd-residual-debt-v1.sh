@@ -3,7 +3,7 @@
 # Rapport : docs/qualification/ELSATIA_RGPD_PURGE_RESIDUAL_DEBT_CLOSURE_V1.md
 #
 # Usage : scripts/qualification/rgpd-residual-debt-v1.sh <base-V3+506> [dossier-de-sortie]
-#   base-V3+506 : base neuve au train V3 + 20260926000506, SANS 20260927000507
+#   base-V3+506 : base neuve au train V3 + 20260926000506, SANS 20260927000508
 #                 (rebuild_db.sh après avoir écarté 507).
 # Étapes :
 #   1. T0      : jeu réaliste (fixtures RGPD + seed pilote GP) ; reproduction RD-1 (purge
@@ -22,7 +22,7 @@ V506="${1:?usage: rgpd-residual-debt-v1.sh <base-V3+506-sans-507> [sortie]}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 OUT="${2:-$(mktemp -d)}"; mkdir -p "$OUT"; chmod 777 "$OUT" 2>/dev/null || true
-M507="$REPO/supabase/migrations/20260927000507_rgpd_dette_residuelle_historique_affectations_bon_commande.sql"
+M507="$REPO/supabase/migrations/20260927000508_rgpd_dette_residuelle_historique_affectations_bon_commande.sql"
 DRIVER_NOUVEAU="$REPO/supabase/tests/fixtures/rgpd_purge_driver.inc"
 # Déroulé d'origine (…506, sans balayage final en cas d'échec), pour la reproduction.
 DRIVER_ORIGINE="$OUT/rgpd_purge_driver_origine.inc"
@@ -123,7 +123,7 @@ echo "== sortie : $OUT"
 # ─── 1. T0 ────────────────────────────────────────────────────────────
 echo "== 1. T0 (V3 + 506, sans 507) : reproduction"
 db_new rd_t0 "$V506"
-echo "   migrations : $(pga -d rd_t0 -c "select count(*) from supabase_migrations.schema_migrations" 2>/dev/null || ls "$REPO"/supabase/migrations/*.sql | grep -vc 000507) ; 507 présente : $(pga -d rd_t0 -c "select exists (select 1 from information_schema.columns where table_name = 'commandes_fournisseurs' and column_name = 'fournisseur_snapshot')")"
+echo "   migrations : $(pga -d rd_t0 -c "select count(*) from supabase_migrations.schema_migrations" 2>/dev/null || ls "$REPO"/supabase/migrations/*.sql | grep -vc 000508) ; 507 présente : $(pga -d rd_t0 -c "select exists (select 1 from information_schema.columns where table_name = 'commandes_fournisseurs' and column_name = 'fournisseur_snapshot')")"
 charger_jeu rd_t0
 # SIRET émetteur connu pour la vérification PDF (fiche du tenant A sans SIRET dans la fixture).
 pga -d rd_t0 -c "update public.entreprises set siret = coalesce(siret, '11111111100011') where id = '$A'" >/dev/null

@@ -35,7 +35,7 @@ function fauxServeur(options: { echecsPurge?: Record<string, number>; echecStora
     ...(options.cacheRecree ? { entreprises_dashboard_cache: { categorie: "DELETE" as const, ordre: 0, lignes: 1 } } : {}),
     // Table vide au rapport initial (donc non listée), remplie par trigger quand une
     // étape suivante supprime ses lignes sources (cas affectations → affectations_historique
-    // avant 20260927000507).
+    // avant 20260927000508).
     ...(options.historiqueRecree ? { affectations_historique: { categorie: "DELETE" as const, ordre: 0, lignes: 0 } } : {}),
     pointages: { categorie: "DELETE", ordre: 0, lignes: 3 },
     chantiers: { categorie: "DELETE", ordre: 1, lignes: 2 },

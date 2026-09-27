@@ -500,7 +500,7 @@ begin
   -- 10) Commandes fournisseurs : brouillon, confirmee, recue_partiel, recue.
   -- Créées en brouillon, lignes ajoutées, puis passées à leur statut : une commande
   -- engagée est verrouillée (20260926000506, PO-1) et son identité imprimée est figée
-  -- en quittant le brouillon (20260927000507).
+  -- en quittant le brouillon (20260927000508).
   if not exists(select 1 from public.commandes_fournisseurs where entreprise_id=v_entreprise and numero like 'CMD-PILOTE-%') then
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-001',v_fournisseurs[1],v_chantiers[4],'brouillon',current_date-35,current_date-28,'[PILOTE] Approvisionnement gros oeuvre',(current_date-35)::timestamptz+interval '8 hours') returning id into v_commande;
