@@ -9,6 +9,7 @@ import {
   chunks,
   emitSeedInvoices,
   executionSteps,
+  finalizeSeedRows,
   parseArgs,
   readRowsByIds,
   safeEnvironment,
@@ -79,6 +80,22 @@ function simulatePass(initialState, sourcePlan, { failBefore = null, failDuring 
   for (const step of executionSteps(plan, EXECUTION_CONTEXT)) {
     if (step.key === failBefore) return { state, operations, failedBefore: step.key };
     const table = tableState(state, step.table);
+    if (step.operation === "finalize") {
+      // Modèle de finalizeSeedRows : brouillon → statut final, après les lignes ; le passage d'un
+      // devis à « accepte » déclenche la synchronisation des tâches (trigger sur UPDATE OF statut).
+      let updated = 0;
+      for (const source of step.rows) {
+        const stored = table.get(source.id);
+        assert.ok(stored, `ligne à finaliser absente dans ${step.table}`);
+        if (stored.statut === source.__finalStatus) continue;
+        assert.equal(stored.statut, "brouillon");
+        stored.statut = source.__finalStatus;
+        updated += 1;
+        if (step.table === "devis") synchronizeAutomaticQuoteTasks(state, stored.id);
+      }
+      operations.push({ key: step.key, table: step.table, inserted: 0, updated, skipped: step.rows.length - updated });
+      continue;
+    }
     if (step.operation === "emit") {
       let updated = 0;
       for (const invoice of step.rows) {
@@ -468,6 +485,58 @@ test("l'émission réelle ne met à jour que les brouillons complets et devient 
   assert.equal(client.updates.length, 25);
 });
 
+function finalizationClient(table, rows, markerColumn) {
+  const stored = new Map(rows.map((row) => [row.id, { id: row.id, entreprise_id: COMPANY_ID, statut: "brouillon", [markerColumn]: row[markerColumn] }]));
+  const updates = [];
+  return {
+    stored,
+    updates,
+    from(name) {
+      assert.equal(name, table);
+      let updatePayload = null;
+      const filters = {};
+      const builder = {
+        select() {
+          if (!updatePayload) return builder;
+          const row = stored.get(filters.id);
+          if (!row || row.statut !== filters.statut) return Promise.resolve({ data: [], error: null });
+          Object.assign(row, updatePayload);
+          updates.push({ id: row.id, ...updatePayload });
+          return Promise.resolve({ data: [{ id: row.id }], error: null });
+        },
+        in(column, ids) {
+          assert.equal(column, "id");
+          return Promise.resolve({ data: ids.map((id) => stored.get(id)).filter(Boolean), error: null });
+        },
+        update(payload) { updatePayload = payload; return builder; },
+        eq(column, value) { filters[column] = value; return builder; },
+      };
+      return builder;
+    },
+  };
+}
+
+test("devis et commandes sont insérés en brouillon puis finalisés après leurs lignes, sans effet au second passage", async () => {
+  const plan = buildPlan();
+  assert.ok(plan.devis.every((row) => row.statut === "brouillon"));
+  assert.ok(plan.commandes.every((row) => row.statut === "brouillon"));
+  const commandes = finalizationClient("commandes_fournisseurs", plan.commandes, "notes");
+  assert.equal(await finalizeSeedRows(commandes, "commandes_fournisseurs", plan.commandes), 18);
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(Object.groupBy([...commandes.stored.values()], (row) => row.statut)).map(([k, v]) => [k, v.length])),
+    { recue: 5, recue_partiel: 5, confirmee: 4, annulee: 4 },
+  );
+  assert.equal(await finalizeSeedRows(commandes, "commandes_fournisseurs", plan.commandes), 0);
+  const devis = finalizationClient("devis", plan.devis, "notes_internes");
+  assert.equal(await finalizeSeedRows(devis, "devis", plan.devis), 35);
+  assert.equal([...devis.stored.values()].filter((row) => row.statut === "accepte").length, 22);
+  assert.equal(await finalizeSeedRows(devis, "devis", plan.devis), 0);
+  // Un statut non brouillon différent de la cible est une collision : arrêt sûr.
+  const collision = finalizationClient("commandes_fournisseurs", plan.commandes, "notes");
+  collision.stored.get(plan.commandes[0].id).statut = "envoyee";
+  await assert.rejects(finalizeSeedRows(collision, "commandes_fournisseurs", plan.commandes), /statut existant incompatible/);
+});
+
 test("les commandes 2025 et 2026 utilisent des numéros canoniques stables hors de la plage du compteur", () => {
   const first = buildPlan().commandes;
   const second = buildPlan().commandes;
@@ -647,6 +716,12 @@ test("toutes les créations sont insert-only et la seule mise à jour est l'émi
   assert.ok(steps.length > 20);
   assert.ok(steps.filter((step) => step.operation === "insert").every((step) => step.insertOnly === true));
   assert.deepEqual(steps.filter((step) => step.operation === "emit").map((step) => step.key), ["invoiceEmission"]);
+  assert.deepEqual(steps.filter((step) => step.operation === "finalize").map((step) => step.key), ["quoteFinalization", "commandFinalization"]);
+  // Finalisation toujours APRÈS les lignes (verrous devis accepté / commande engagée).
+  const keys = steps.map((step) => step.key);
+  assert.ok(keys.indexOf("quoteFinalization") > keys.indexOf("lignesDevis"));
+  assert.ok(keys.indexOf("commandFinalization") > keys.indexOf("lignesCommande"));
+  assert.ok(keys.indexOf("commandFinalization") < keys.indexOf("supplierExpenses"));
   const insertionRows = steps.filter((step) => step.operation === "insert").flatMap((step) => step.rows);
   assert.equal(new Set(insertionRows.map((row) => row.id)).size, insertionRows.length);
 });

@@ -242,7 +242,7 @@ begin
         conditions,notes_client,notes_internes,remise_globale,created_at
       )
       select v_entreprise,'DEV-TST5-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
-        c.client_id,v_chantier,v_statut,v_date,v_date+30,U&'Validit\00E9 30 jours \2014 acompte de 30 % \00E0 la commande',
+        c.client_id,v_chantier,'brouillon',v_date,v_date+30,U&'Validit\00E9 30 jours \2014 acompte de 30 % \00E0 la commande',
         'Merci pour votre confiance.',U&'[RECETTE 5A] Historique de d\00E9monstration',case when v_index%9=0 then 5 else 0 end,
         v_date::timestamptz + interval '9 hours'
       from public.chantiers c where c.id=v_chantier
@@ -253,6 +253,11 @@ begin
         (v_devis,(array['Pose cloisons amovibles',U&'Agencement int\00E9rieur sur mesure',U&'Cr\00E9ation cabine sanitaire',U&'Pose panneaux d\00E9coratifs'])[1+((v_index-1)%4)],U&'Pr\00E9paration, implantation et pose compl\00E8te','main_oeuvre',24+(v_index%20),'h',52,0,20,1),
         (v_devis,'Fournitures et quincaillerie',U&'Profil\00E9s, panneaux, fixations et consommables','fourniture',12+(v_index%15),'u',95+(v_index%4)*18,0,20,2),
         (v_devis,U&'D\00E9placement et protection du chantier','Livraison, protections et nettoyage','forfait',1,'forfait',280+(v_index%5)*35,0,20,3);
+      -- Devis créé en brouillon, lignes ajoutées, puis statut final : un devis accepté est
+      -- verrouillé (verrouiller_devis_accepte, train V3).
+      if v_statut<>'brouillon' then
+        update public.devis set statut=v_statut where id=v_devis;
+      end if;
 
       if v_statut='accepte' then
         insert into public.factures(
@@ -262,7 +267,7 @@ begin
         select v_entreprise,'FAC-TST5-'||to_char(v_date+7,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
           d.client_id,d.chantier_id,d.id,
           case when v_index%5=0 then 'acompte' else 'simple' end,
-          'envoyee',v_date+7,v_date+37,U&'R\00E8glement par virement.',U&'[RECETTE 5A] Historique de d\00E9monstration',
+          'brouillon',v_date+7,v_date+37,U&'R\00E8glement par virement.',U&'[RECETTE 5A] Historique de d\00E9monstration',
           (v_date+7)::timestamptz + interval '10 hours'
         from public.devis d where d.id=v_devis
         returning id into v_facture;
@@ -272,6 +277,8 @@ begin
         )
         select v_facture,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre
         from public.lignes_devis where devis_id=v_devis order by ordre;
+        -- Facture émise après ses lignes : les lignes d'une facture émise sont immuables (train V3).
+        update public.factures set statut='envoyee' where id=v_facture;
 
         select montant_ttc into v_total from public.factures where id=v_facture;
         if v_index % 6 in (0,1,2,3) then
@@ -373,13 +380,16 @@ begin
         entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at
       ) values (
         v_entreprise,'CMD-TST5-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
-        v_fournisseur,v_chantier,v_statut,v_date,v_date+7,'[RECETTE 5A] Approvisionnement chantier',v_date::timestamptz+interval '8 hours'
+        v_fournisseur,v_chantier,'brouillon',v_date,v_date+7,'[RECETTE 5A] Approvisionnement chantier',v_date::timestamptz+interval '8 hours'
       ) returning id into v_commande;
       insert into public.lignes_commande(
         entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre
       ) values
         (v_entreprise,v_commande,U&'Mat\00E9riaux chantier',U&'Panneaux et profil\00E9s',10,'u',95+(v_index%5)*12,20,case when v_statut='recue_partiel' then 6 when v_statut='recue' then 10 else 0 end,1),
         (v_entreprise,v_commande,'Consommables','Fixations et produits de finition',20,'u',18+(v_index%4)*3,20,case when v_statut='recue_partiel' then 12 when v_statut='recue' then 20 else 0 end,2);
+      -- Commande créée en brouillon puis passée à son statut : une commande engagée est
+      -- verrouillée (20260926000506) et son identité figée en quittant le brouillon (20260927000508).
+      update public.commandes_fournisseurs set statut=v_statut where id=v_commande;
 
       if v_statut in ('recue','recue_partiel') then
         insert into public.depenses_fournisseurs(

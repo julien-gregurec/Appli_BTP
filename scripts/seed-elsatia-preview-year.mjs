@@ -188,7 +188,10 @@ function buildPlan() {
     const issue = addDays(PERIOD_START, index * 9);
     return {
       id: stableId("devis", index), entreprise_id: COMPANY_ID, client_id: clients[index % clients.length].id,
-      chantier_id: chantiers[index % chantiers.length].id, statut, date_emission: issue, date_validite: addDays(issue, 30),
+      // Un devis accepté est verrouillé (lignes comprises) : insertion en brouillon, lignes,
+      // puis finalisation contrôlée (étape quoteFinalization).
+      chantier_id: chantiers[index % chantiers.length].id, statut: "brouillon", __finalStatus: statut,
+      date_emission: issue, date_validite: addDays(issue, 30),
       conditions: "Document de recette — validité 30 jours", notes_client: DOCUMENT_MARKER,
       notes_internes: marker(`devis ${index + 1}`), remise_globale: index % 9 === 0 ? 3 : 0, __key: `DEV${index + 1}`,
     };
@@ -247,7 +250,11 @@ function buildPlan() {
     const yearlySequence = (index % 9) + 1;
     return {
       id: stableId("commande", index), entreprise_id: COMPANY_ID, fournisseur_id: suppliers[index % 9].id,
-      chantier_id: chantiers[index % 16].id, statut: ["recue", "recue_partiel", "confirmee", "annulee"][index % 4],
+      // Une commande engagée est verrouillée (20260926000506) et son identité imprimée figée en
+      // quittant le brouillon (20260927000508) : insertion en brouillon, lignes, puis finalisation
+      // contrôlée (étape commandFinalization).
+      chantier_id: chantiers[index % 16].id, statut: "brouillon",
+      __finalStatus: ["recue", "recue_partiel", "confirmee", "annulee"][index % 4],
       numero: `CMD-${businessYear}-${SEED_COMMAND_NUMBER_BASE + yearlySequence}`,
       date_commande: dateCommande, notes: marker(`commande ${index + 1}`), __key: `CMD${index + 1}`,
     };
@@ -256,7 +263,7 @@ function buildPlan() {
     id: stableId("ligne-commande", `${orderIndex}-${lineIndex}`), entreprise_id: COMPANY_ID, commande_id: order.id,
     designation: `Matériau ${orderIndex + 1}.${lineIndex + 1} TEST`, quantite: 5 + lineIndex * 4,
     unite: lineIndex === 1 ? "m²" : "u", prix_unitaire_ht: 18 + orderIndex * 3 + lineIndex * 9,
-    taux_tva: 20, quantite_recue: order.statut === "recue" ? 5 + lineIndex * 4 : order.statut === "recue_partiel" ? 2 : 0,
+    taux_tva: 20, quantite_recue: order.__finalStatus === "recue" ? 5 + lineIndex * 4 : order.__finalStatus === "recue_partiel" ? 2 : 0,
     ordre: lineIndex,
   })));
   const supplierExpenses = Array.from({ length: 30 }, (_, index) => {
@@ -427,7 +434,10 @@ function validatePlan(plan) {
   const depositAssignments = plan.employees.filter((row) => row.__role === "Compte dépôt");
   if (depositAssignments.length) abort("Compte dépôt attribué à une fiche salarié");
   if (plan.employees.filter((row) => row.email === MANAGER_EMAIL).length !== 1) abort("fiche Gérant non unique");
-  const quoteCounts = Object.groupBy(plan.devis, (row) => row.statut);
+  if (plan.devis.some((row) => row.statut !== "brouillon") || plan.commandes.some((row) => row.statut !== "brouillon")) {
+    abort("devis et commandes doivent être insérés en brouillon puis finalisés après leurs lignes");
+  }
+  const quoteCounts = Object.groupBy(plan.devis, (row) => row.__finalStatus);
   if (quoteCounts.accepte?.length !== 22 || quoteCounts.refuse?.length !== 6 || quoteCounts.expire?.length !== 4 || quoteCounts.envoye?.length !== 3) {
     abort("répartition des devis incorrecte");
   }
@@ -784,12 +794,14 @@ function executionSteps(plan, context) {
     ["tasks", "taches", plan.tasks],
     ["devis", "devis", plan.devis],
     ["lignesDevis", "lignes_devis", plan.lignesDevis],
+    ["quoteFinalization", "devis", plan.devis, "finalize"],
     ["factures", "factures", plan.factures],
     ["lignesFactures", "lignes_factures", plan.lignesFactures],
     ["invoiceEmission", "factures", plan.factures, "emit"],
     ["paiements", "paiements", plan.paiements],
     ["commandes", "commandes_fournisseurs", plan.commandes],
     ["lignesCommande", "lignes_commande", plan.lignesCommande],
+    ["commandFinalization", "commandes_fournisseurs", plan.commandes, "finalize"],
     ["supplierExpenses", "depenses_fournisseurs", plan.supplierExpenses],
     ["stockMovements", "mouvements_stock", plan.stockMovements],
     ["affectations", "affectations", plan.affectations],
@@ -833,9 +845,35 @@ async function emitSeedInvoices(client, invoices) {
   }
 }
 
+// Passage brouillon → statut final des devis et commandes du seed, APRÈS leurs lignes (verrous
+// des devis acceptés et des commandes engagées). Idempotent : une ligne déjà à son statut final
+// est ignorée ; tout autre statut non brouillon est une collision.
+async function finalizeSeedRows(client, table, rows) {
+  const [markerColumn, expectedMarker] = TABLE_MARKERS[table];
+  const existing = await readRowsByIds(client, table, rows.map((row) => row.id), `id,statut,${markerColumn}`);
+  if (existing.length !== rows.length) abort(`finalisation impossible: lignes déterministes manquantes dans ${table}`);
+  const plannedById = new Map(rows.map((row) => [row.id, row]));
+  let updated = 0;
+  for (const row of existing) {
+    if (!String(row[markerColumn] ?? "").includes(expectedMarker)) abort(`collision avec une donnée manuelle dans ${table}`);
+    const target = plannedById.get(row.id).__finalStatus;
+    if (row.statut === target) continue;
+    if (row.statut !== "brouillon") abort(`statut existant incompatible dans ${table} pour ${row.id}`);
+    const { data, error } = await client.from(table)
+      .update({ statut: target })
+      .eq("id", row.id)
+      .eq("statut", "brouillon")
+      .select("id");
+    if (error || data?.length !== 1) abort(`finalisation contrôlée impossible dans ${table}: ${error?.message ?? "ligne non mise à jour"}`);
+    updated += 1;
+  }
+  return updated;
+}
+
 async function executePlan(client, plan, context) {
   for (const step of executionSteps(plan, context)) {
     if (step.operation === "emit") await emitSeedInvoices(client, step.rows);
+    else if (step.operation === "finalize") await finalizeSeedRows(client, step.table, step.rows);
     else await writeOwned(client, step.table, step.rows, { insertOnly: true });
   }
 }
@@ -879,12 +917,14 @@ async function inspectRemoteResume(client, plan, context) {
   );
   const commandById = new Map(plan.commandes.map((row) => [row.id, row]));
   for (const row of existingCommandIds) {
+    const planned = commandById.get(row.id);
     assertStoredRowMatches(
       row,
-      commandById.get(row.id),
-      ["entreprise_id", "fournisseur_id", "chantier_id", "statut", "numero", "date_commande", "notes"],
+      planned,
+      ["entreprise_id", "fournisseur_id", "chantier_id", "numero", "date_commande", "notes"],
       "commande déterministe existante non conforme",
     );
+    if (row.statut !== "brouillon" && row.statut !== planned.__finalStatus) abort("commande déterministe existante non conforme");
   }
   const { data: numberCollisions, error: numberCollisionError } = await client.from("commandes_fournisseurs")
     .select("id,numero")
@@ -973,6 +1013,14 @@ async function inspectRemoteResume(client, plan, context) {
 
   const modules = steps.map((step, order) => {
     const presentIds = presentByTable.get(step.table);
+    if (step.operation === "finalize") {
+      return {
+        order: order + 1, module: step.key, table: step.table, planned: step.rows.length,
+        present: presentIds?.size ?? 0, missing: step.rows.length - (presentIds?.size ?? 0),
+        operationOnResume: "après insertion des lignes: passage brouillon → statut final des seules lignes du seed encore en brouillon",
+        updates: "0 si déjà finalisée; 1 transition contrôlée par brouillon restant",
+      };
+    }
     if (step.operation === "emit") {
       return {
         order: order + 1, module: step.key, table: step.table, planned: step.rows.length,
@@ -994,7 +1042,7 @@ async function inspectRemoteResume(client, plan, context) {
     };
   });
 
-  const acceptedQuoteIds = new Set(plan.devis.filter((quote) => quote.statut === "accepte").map((quote) => quote.id));
+  const acceptedQuoteIds = new Set(plan.devis.filter((quote) => quote.__finalStatus === "accepte").map((quote) => quote.id));
   const acceptedLineIds = new Set(plan.lignesDevis.filter((line) => acceptedQuoteIds.has(line.devis_id)).map((line) => line.id));
   const { data: projectTasks, error: taskError } = await client.from("taches")
     .select("id,devis_id,ligne_devis_id,description")
@@ -1075,6 +1123,7 @@ export {
   chunks,
   emitSeedInvoices,
   executionSteps,
+  finalizeSeedRows,
   inspectRemoteResume,
   insertRowsInBatches,
   listAuthUsersByEmail,
