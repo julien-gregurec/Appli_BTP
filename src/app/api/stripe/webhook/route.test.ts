@@ -125,8 +125,39 @@ describe("webhook Stripe Connect des factures clients", () => {
     expect(deps.rpc).not.toHaveBeenCalled();
   });
 
-  it("met toujours à jour l'onboarding Connect par les droits colonne d'entreprises", async () => {
-    await POST(requete({ id: "evt_3", type: "account.updated", livemode: false, data: { object: { id: "acct_1", charges_enabled: true, details_submitted: true } } }));
-    expect(deps.update).toHaveBeenCalledWith("entreprises", { stripe_onboarding_complete: true }, "stripe_account_id", "acct_1");
+  it("applique account.updated par la RPC ordonnée (event.created), sans UPDATE direct", async () => {
+    deps.rpc.mockResolvedValue({ data: "applique", error: null });
+    const reponse = await POST(requete({ id: "evt_3", type: "account.updated", livemode: false, created: 1_757_060_000, data: { object: { id: "acct_1", charges_enabled: true, details_submitted: true } } }));
+    expect(reponse.status).toBe(200);
+    expect(deps.rpc).toHaveBeenCalledWith("stripe_connect_maj_compte_service", {
+      p_stripe_account_id: "acct_1",
+      p_onboarding_complete: true,
+      p_stripe_event_id: "evt_3",
+      p_stripe_event_created: new Date(1_757_060_000 * 1000).toISOString(),
+    });
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("un ancien account.updated périmé répond 200 sans rien réécrire", async () => {
+    deps.rpc.mockResolvedValue({ data: "perime", error: null });
+    const reponse = await POST(requete({ id: "evt_old", type: "account.updated", livemode: false, created: 1_700_000_000, data: { object: { id: "acct_1", charges_enabled: false, details_submitted: false } } }));
+    expect(reponse.status).toBe(200);
+    expect(deps.update).not.toHaveBeenCalled();
+  });
+
+  it("une erreur de mise à jour du compte n'est plus avalée : 500 et réservation libérée (rejouable)", async () => {
+    deps.rpc.mockImplementation(async (fn: string) => fn === "stripe_connect_maj_compte_service"
+      ? { data: null, error: { code: "40001" } } : { data: null, error: null });
+    const reponse = await POST(requete({ id: "evt_4", type: "account.updated", livemode: false, created: 1_757_060_000, data: { object: { id: "acct_1", charges_enabled: true, details_submitted: true } } }));
+    expect(reponse.status).toBe(500);
+    expect(deps.rpc).toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", { p_stripe_event_id: "evt_4" });
+  });
+
+  it("D3 : un encaissement en échec libère la réservation pour que la re-livraison soit rejouée", async () => {
+    deps.rpc.mockImplementation(async (fn: string) => fn === "stripe_connect_encaisser_facture_service"
+      ? { data: null, error: { code: "57014" } } : { data: null, error: null });
+    const reponse = await POST(requete(paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE })));
+    expect(reponse.status).toBe(500);
+    expect(deps.rpc).toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", { p_stripe_event_id: "evt_1" });
   });
 });

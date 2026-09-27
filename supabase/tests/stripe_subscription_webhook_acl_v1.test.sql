@@ -112,7 +112,22 @@ select lives_ok($$
     now() - interval '30 days', now(), 200.00, 40.00, 240.00, 'eur', 'open', null, null)
 $$, 'rejeu facture (upsert)');
 select is((select count(*)::int from public.factures_abonnement where stripe_invoice_id='in_acl_1'), 1, 'facture : pas de doublon');
-select is((select statut from public.factures_abonnement where stripe_invoice_id='in_acl_1'), 'open', 'facture : statut mis à jour');
+-- ELSATIA-STRIPE-EVENT-ORDERING-REPLAY-HARDENING-V1 (…401) : une facture Stripe
+-- payée est terminale. Ce test attendait auparavant 'open' — exactement la
+-- régression d'un événement antérieur rejoué après le paiement.
+select is((select statut from public.factures_abonnement where stripe_invoice_id='in_acl_1'), 'paid', 'facture payée : un rejeu antérieur ne la dégrade pas');
+select ok((select payee_at from public.factures_abonnement where stripe_invoice_id='in_acl_1') is not null, 'facture payée : payee_at conservé au rejeu');
+select lives_ok($$
+  select public.synchroniser_facture_abonnement_service(
+    'a0000000-0000-0000-0000-000000000001','in_acl_2','FAC-ACL-2',
+    now() - interval '30 days', now(), 200.00, 40.00, 240.00, 'eur', 'draft', null, null)
+$$, 'facture non payée (draft)');
+select lives_ok($$
+  select public.synchroniser_facture_abonnement_service(
+    'a0000000-0000-0000-0000-000000000001','in_acl_2','FAC-ACL-2',
+    now() - interval '30 days', now(), 200.00, 40.00, 240.00, 'eur', 'open', null, null)
+$$, 'rejeu facture non payée');
+select is((select statut from public.factures_abonnement where stripe_invoice_id='in_acl_2'), 'open', 'facture non payée : statut mis à jour');
 
 -- ── non-régression capacité R2 : les RPC capacité restent intactes ─────────
 select has_function('public','synchroniser_capacite_stripe_service','R2-B RPC capacité toujours présente');

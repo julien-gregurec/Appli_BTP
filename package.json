@@ -26,6 +26,7 @@
     "test:preflight-preview": "node --test scripts/preflight-preview.test.mjs",
     "smoke:email:preview": "node scripts/smoke-email-preview.mjs",
     "test:smoke-email": "node --test scripts/smoke-email-preview.test.mjs",
+    "test:stripe-ordering-script": "node --test scripts/qualification/stripe-ordering-test-mode.test.mjs",
     "prebuild": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:gestion-pro": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:reserves": "node scripts/check-env-manifest.mjs --auto --app reserves",

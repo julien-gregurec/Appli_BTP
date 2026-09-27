@@ -48,7 +48,20 @@ async function acquerirVerrouRemiseAvecReprise(admin: SupabaseAdmin, subscriptio
   }
 }
 
-async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription) {
+// Contrat d'ordre Stripe (migration 20260926000401) : l'événement qui a
+// déclenché la relecture. `created` est l'horloge Stripe de l'événement, jamais
+// l'ordre d'arrivée HTTP.
+export type EvenementOrdonne = {
+  id: string;
+  type: string;
+  created: number;
+  objetType: string;
+  objetId: string;
+};
+
+export type DecisionOrdre = { decision: "applique" | "perime" | "deja_traite"; statut_resultant: string | null };
+
+async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription, evenement: EvenementOrdonne) {
   const offre = abonnement.metadata?.offre;
   const periodicite = abonnement.metadata?.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);
@@ -56,7 +69,12 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
   // `entreprises` (hors colonnes abonnement/stripe), `plans_abonnement`,
   // `abonnements_entreprises`. La synchronisation passe par une RPC SECURITY
   // DEFINER bornée qui vérifie le lien subscription ↔ entreprise (fail-closed).
-  const { data, error } = await admin.rpc("synchroniser_abonnement_stripe_service", {
+  // Version ordonnée : verrou ligne entreprise + filigrane d'accès. Une
+  // relecture déclenchée par un événement antérieur au dernier appliqué
+  // rafraîchit l'offre et les échéances mais ne peut pas inverser le statut
+  // d'accès (ex. vieux past_due relu pendant qu'un invoice.paid plus récent
+  // était appliqué en parallèle).
+  const { data, error } = await admin.rpc("synchroniser_abonnement_stripe_ordonne_service", {
     p_entreprise_id: entrepriseId,
     p_stripe_subscription_id: abonnement.id,
     p_stripe_customer_id: identifiant(abonnement.customer),
@@ -68,18 +86,24 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
     p_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
     p_debut_periode: instantDepuisUnix(abonnement.current_period_start),
     p_fin_periode: instantDepuisUnix(abonnement.current_period_end),
+    p_stripe_event_id: evenement.id,
+    p_stripe_event_type: evenement.type,
+    p_stripe_event_created: instantDepuisUnix(evenement.created),
+    p_objet_type: evenement.objetType,
+    p_objet_id: evenement.objetId,
   });
   if (error) throw new Error(error.message);
-  return (data as string) ?? statut;
+  const resultat = (data ?? null) as DecisionOrdre | null;
+  return resultat?.statut_resultant ?? statut;
 }
 
 export async function synchroniserAbonnementCoordonne(
   admin: SupabaseAdmin,
   entrepriseId: string,
   subscriptionId: string,
-  evenementId: string,
+  evenement: EvenementOrdonne,
 ) {
-  const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenementId)}`);
+  const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenement.id)}`);
   try {
     // Le payload peut être ancien ou désordonné : seule cette relecture est une
     // observation Stripe utilisable pour la remise et la saga active.
@@ -102,7 +126,7 @@ export async function synchroniserAbonnementCoordonne(
       admin, entrepriseId, abonnementActuel, verrou, passerelleStripeRemise,
     );
     if (expiration) abonnementActuel = await recupererAbonnementStripe(subscriptionId);
-    return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel);
+    return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel, evenement);
   } finally {
     await libererVerrouRemise(admin, subscriptionId, verrou);
   }

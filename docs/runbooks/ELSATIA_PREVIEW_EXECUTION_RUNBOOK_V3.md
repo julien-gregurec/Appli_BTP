@@ -92,7 +92,7 @@ npx supabase db push --linked --dry-run
 
 ```bash
 npx supabase db push --linked
-npx supabase migration list --linked      # train canonique V2 : 335 des deux côtés, dernière 20260923000400 (ref de préparation : 321, 20260922000330)
+npx supabase migration list --linked      # train V2 + ordonnancement Stripe : 336 des deux côtés, dernière 20260926000401 (train V2 seul : 335, 20260923000400 ; ref de préparation : 321, 20260922000330)
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -f docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -c "set elsatia.preflight_environment='preview'" -f docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql
 ```

@@ -58,6 +58,9 @@ jobs:
       - name: Tests du smoke e-mail Preview (sans réseau)
         run: npm run test:smoke-email
 
+      - name: Tests du script Stripe Test ordre/rejeu (sans réseau, sk_live refusée)
+        run: npm run test:stripe-ordering-script
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 

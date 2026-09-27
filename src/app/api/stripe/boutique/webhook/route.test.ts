@@ -108,3 +108,25 @@ describe("webhook boutique — contrôle de mode fail-closed", () => {
     expect(deps.finaliser).not.toHaveBeenCalled();
   });
 });
+
+// ELSATIA-STRIPE-EVENT-ORDERING-REPLAY-HARDENING-V1 — D3 : un événement dont la
+// finalisation échoue (500) doit rester rejouable. Avant, la réservation dans
+// stripe_webhook_events survivait à l'échec : la re-livraison Stripe était
+// avalée comme doublon et la commande restait impayée.
+describe("webhook boutique — rejeu après échec (D3)", () => {
+  it("libère la réservation quand la finalisation échoue", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");
+    deps.finaliser.mockImplementation(async (fn: string) => fn === "boutique_finaliser_commande_payee"
+      ? { error: { code: "40001", message: "serialization failure" } } : { error: null });
+    const reponse = await poster(evenement(false));
+    expect(reponse.status).toBe(500);
+    expect(deps.finaliser).toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", { p_stripe_event_id: "evt_test_1" });
+  });
+
+  it("ne libère rien quand la finalisation réussit", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");
+    const reponse = await poster(evenement(false));
+    expect(reponse.status).toBe(200);
+    expect(deps.finaliser).not.toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", expect.anything());
+  });
+});
