@@ -11,9 +11,20 @@
 
 ## 0. Verdict
 
-**`CANONICAL TRAIN V4 LOCALLY QUALIFIED`** (provisoire : recettes Playwright §14 en cours)
+**`CANONICAL TRAIN V4 READY FOR REMOTE PREVIEW`**
 
-Rapport en cours de finalisation : toutes les portes base de données, applications et pack Preview sont vertes ; le verdict final dépend des recettes Playwright (§14).
+Toutes les portes locales sont vertes. Base neuve **352/352**, 0 erreur. **Upgrade V3 → V4 avec données réalistes** :
+59/59 empreintes métier identiques, 0 policy supprimée ou modifiée, sonde RLS 0 écart sur 960 cellules,
+schéma et ACL identiques au fresh. pgTAP : **137/146 propres, 0 régression** face à V3 (les 9 non propres
+sont ceux de V3). Applications : typecheck, lint, Vitest et build verts pour les 5 (Gestion Pro, Tools,
+Colors, Réserves, Studio). **Playwright** : GP ↔ Réserves 5/5 ×2, Réserves 59/59, Colors 73/73,
+Relevé Lots 2/3/4 29/29. Seeds officiels compatibles. Pack Preview aligné : 352 migrations,
+`20260927100000`, DB verify à 23 contrôles, GO local.
+
+Ce qui reste relève exclusivement de l'exécution distante, marqué NOT PROVEN localement comme en V3 :
+Storage, GoTrue, e-mail et Stripe Test réels. S'y ajoutent des décisions ouvertes qui échouent sans
+danger (fail-closed), notamment la durée de conservation RGPD des contrats. Aucune ne bloque la
+première Preview (périmètre §16).
 
 ---
 
@@ -339,7 +350,29 @@ fichiers) · `test:migration-targets` ✅ 7/7.
 
 ## 14. Playwright
 
-_En cours d'exécution — résultats ajoutés à la finalisation._
+Playwright 1.62.1 avec Chromium 141 (build 1194), comme en V3, et `executablePath` explicite.
+Chaque pile tourne sur une base PostgreSQL 16 neuve aux **352 migrations V4**. Les applications
+sont compilées avec l'env de recette (`next build` + `next start`) ; Tools tourne en
+`next dev --webpack`, comme dans les rapports Relevé. Aucune modification de harnais.
+
+| Recette | Pile | Référence | **V4** |
+|---|---|---|---|
+| GP ↔ Réserves `gp-reserves-integration.spec.ts` | `gp-reserves-pile-locale/preparer-base.sh`, passerelle, GP :3100, Réserves :3020 | 5/5 ×2 | ✅ **5/5 ×2** (21,7 s ; 19,4 s après remise à zéro de la base) |
+| Réserves V3 collaboration | `reserves-pile-locale/preparer-base.sh` + V6 charge + `amorcer-recette-v4.mjs` | 1 | ✅ 1/1 |
+| Réserves V4 listes/PDF (PDF réel Chromium) | idem | 11 | ✅ 11/11 |
+| Réserves V4 mobile hors ligne | idem | 6 | ✅ 6/6 |
+| Réserves V5 hors ligne (`--grep-invert "rechargement hors ligne"`, comme V3) | idem | 13 | ✅ 13/13 |
+| Réserves V6 sécurité (cross tenant) | idem | 23 | ✅ 23/23 |
+| Réserves V6 performance | idem | 5 | ✅ 5/5 |
+| **Réserves total** | | 59/59 | ✅ **59/59** |
+| Colors (`colors` + `colors-mobile`) | `colors-pile-locale/preparer-base.sh`, nuancier de recette | 73/73 | ✅ **73/73** |
+| Relevé Lot 2 | `releve_e2e_stack.sh` : GoTrue v2.196.0, PostgREST v12.2.3, mock Storage, seed pilote | 4 | ✅ 4/4 |
+| Relevé Lot 3 | idem | 6 | ✅ 6/6 |
+| Relevé Lot 4 (photos, annotations) | idem | 19 | ✅ 19/19 |
+| **Relevé total** | | 29/29 | ✅ **29/29** |
+
+Seul cas non exécuté, identique à V3 : V5 « rechargement hors ligne ». L'émulation hors ligne de
+Chromium 1194 ne s'applique pas aux `fetch` du service worker.
 
 ## 15. Pack Preview
 
