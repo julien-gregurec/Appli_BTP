@@ -186,6 +186,9 @@ requête par les prédicats de la base.
 | Intervention révoquée | 0 réserve, 0 photo, écriture refusée, accès gratuit retiré (P 8.20–8.24 ; E V3) |
 | Changement d'identité sur le même appareil | la file de A ne part jamais sous B ; aucune donnée de l'organisation précédente après déconnexion (E V5, V6) |
 
+> **Mise à jour :** D-01 est tranchée (**mode lecture seule**) et livrée par `20260927000506` ;
+> voir `ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md`.
+
 **D-01 (décision propriétaire, non bloquante).** Quand l'organisation **hôte** est suspendue, ses
 propres utilisateurs perdent tout accès, mais une entreprise intervenante **active** continue de
 voir les réserves qui lui sont attribuées et peut y agir (commenter, demander une levée) — constaté
@@ -277,7 +280,7 @@ jouent dans l'ordre V3 → V4 → V4 mobile → V5 → V6 (V3 révoque B, V4 mob
 | ID | Nature | Détail |
 |---|---|---|
 | G-01 | Produit (intégration GP) | Aucun écran n'expose l'import GP ni le résumé Réserves sur la fiche chantier GP ; seul le nom est repris ; plans, entreprises, contacts non livrés (contrat V1) |
-| D-01 | Décision propriétaire | Intervenant actif d'un hôte suspendu : maintien ou gel (§3.8) |
+| D-01 | ~~Décision propriétaire~~ **Tranchée : lecture seule** | Intervenant actif d'un hôte suspendu : gel en lecture seule, livré par `20260927000506` — voir `ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md` |
 | R-06 | P3 | `auteur_entreprise_id` est nul sur les transitions faites par l'intervenant (acceptation, refus, demande de levée) : l'auteur (`auteur_id`) est tracé, l'organisation se déduit de son appartenance ; le PDF l'affiche correctement pour les messages |
 | R-07 | P3 | `reserves_enregistrer_pagination` : tout lecteur d'un plan (intervenant compris) peut réécrire `nb_pages` (1..500), ce qui peut faire refuser la création d'un repère sur une page réelle |
 | R-08 | P3 (V6 §3, non intégré) | `reserves_annuaire_rechercher` n'échappe pas `%`/`_` : « %%% » contourne la borne de 3 caractères (limité aux organisations publiées, 20 résultats) |

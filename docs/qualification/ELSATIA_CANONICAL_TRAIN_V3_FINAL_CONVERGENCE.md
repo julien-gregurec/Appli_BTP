@@ -5,7 +5,7 @@
 | Date | 2026-09-26 → 2026-09-27 |
 | Base | `integration/elsatia-canonical-train-v2` @ `819ebe56` (335 migrations, dernière `20260923000400`) |
 | Branche | `integration/elsatia-canonical-train-v3` |
-| Migrations | **<!--train:nb-->340<!--/train:nb-->**, dernière **`<!--train:derniere-->20260926000505<!--/train:derniere-->`** (valeurs générées : `npm run sync:train-expectations`) |
+| Migrations | **<!--train:nb-->341<!--/train:nb-->**, dernière **`<!--train:derniere-->20260927000506<!--/train:derniere-->`** (valeurs générées : `npm run sync:train-expectations`) |
 | Moteur | PostgreSQL 16.13 réel + pgTAP 1.3, amorce `scripts/local-postgres-bootstrap` (sans Docker) |
 | Navigateur | Chromium 1194 (Playwright), apps compilées (`next build` + `next start`) |
 | Actions distantes | **Aucune.** Aucune Preview, aucune Production, aucun merge vers `main`. |
@@ -291,7 +291,7 @@ Sur les 126 fichiers communs, les **seuls** écarts sont `purge_entreprise_archi
 |---|---|---|---|
 | `DECISION_REQUIRED:RGPD-DUREE-CONSERVATION-CONTRAT` | juridique — **durée seulement** | ouvert | purge des contrats acceptés refusée (fail-closed) ; activation = 1 ligne (§4.1) |
 | `DECISION_REQUIRED:RGPD-PURGE-VS-COMMANDE-FOURNISSEUR` (nouveau constat) | produit / juridique | ouvert, **préexistant sur V2** (vérifié) | le garde-fou CM-06 (`…326`) refuse la suppression d'une commande fournisseur non brouillon, y compris pendant la purge RGPD (`…331`) : un tenant avec des commandes confirmées/reçues n'est jamais marqué purgé. Échec sûr. Choix conservateur : non corrigé ici (même classe de question que les contrats : conserver ou supprimer après preuve) |
-| D-01 Réserves : hôte suspendu | propriétaire | ouvert (lot C) | intervenant actif garde l'accès à ses réserves ; aucun correctif |
+| D-01 Réserves : hôte suspendu | propriétaire | **tranché : lecture seule** (`20260927000506`) | l'intervenant consulte, n'écrit plus ; voir `ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md` |
 | Intégration GP ↔ Réserves (écrans) | produit | ouvert (lot C) | base prouvée, pas d'UI |
 | Studio B + I1 : implémentation | technique | décidée, non livrée | Studio exclu de la Preview |
 | `STUDIO-SIGNUP-DEFAULT`, `HOSTING-PROVIDER-STUDIO-WORKER`, `PREVIEW-PROJECT-INVENTORY`, … | propriétaire | ouverts | inchangés (manifeste) |
