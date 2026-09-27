@@ -9,13 +9,15 @@
  * | Nouveau relevé | `/releves/nouveau` |
  * | Fiche relevé (chantiers, versions) | `/releves/fiche?id=` |
  * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
+ * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
  */
-import { isUuid } from "@elsatia/releve-domain";
+import { isUuid, type SearchHit } from "@elsatia/releve-domain";
 
 export const RELEVES_PATH = "/releves";
 export const RELEVE_NEW_PATH = "/releves/nouveau";
 export const RELEVE_FICHE_PATH = "/releves/fiche";
 export const RELEVE_STRUCTURE_PATH = "/releves/structure";
+export const RELEVE_PIECE_PATH = "/releves/piece";
 
 export type StructureSelection = { releveId: string; chantierId: string | null; batimentId: string | null; etageId: string | null };
 
@@ -51,4 +53,31 @@ export function readStructureSelection(search: string): StructureSelection | nul
   const batimentId = pick("batiment", chantierId !== null);
   const etageId = pick("etage", batimentId !== null);
   return { releveId, chantierId, batimentId, etageId };
+}
+
+export function pieceHref(releveId: string, pieceId: string): string {
+  return `${RELEVE_PIECE_PATH}?${new URLSearchParams({ id: releveId, piece: pieceId }).toString()}`;
+}
+
+export function readPieceSelection(search: string): { releveId: string; pieceId: string } | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id"); const pieceId = params.get("piece");
+  return isUuid(releveId) && isUuid(pieceId) ? { releveId, pieceId } : null;
+}
+
+/** Lien d'un résultat de recherche : fiche pour un projet, fiche pièce, sinon structure au bon niveau. */
+export function searchHitHref(hit: SearchHit): string {
+  if (hit.entite === "releve") return ficheHref(hit.releveId);
+  if (hit.entite === "piece" && hit.pieceId) return pieceHref(hit.releveId, hit.pieceId);
+  return structureHref({ releveId: hit.releveId, chantierId: hit.chantierId, batimentId: hit.batimentId, etageId: hit.etageId });
+}
+
+/**
+ * Colonne affichée sur smartphone (navigation en profondeur) : la plus profonde explicitement
+ * choisie dans l'URL. Sur tablette et bureau, les trois colonnes restent visibles.
+ */
+export type StructureFocus = "batiments" | "etages" | "pieces";
+export function structureFocus(selection: Pick<StructureSelection, "batimentId" | "etageId">): StructureFocus {
+  if (selection.etageId) return "pieces";
+  return selection.batimentId ? "etages" : "batiments";
 }
