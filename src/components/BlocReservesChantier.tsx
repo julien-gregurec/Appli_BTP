@@ -1,8 +1,12 @@
 import { BoutonEnvoi } from "@/components/BoutonEnvoi";
-import { utiliserDansReservesAction } from "@/app/actions/reserves-gp";
 import { urlChantierReserves, type EtatReservesChantier } from "@/lib/reserves-gp";
 
 /*
+ * Les formulaires portent `data-application-tierce` : le « mode consultation » de Gestion Pro
+ * masque les écritures GP d'un poste sans `gerer_chantiers`, mais cette action écrit dans
+ * Réserves et reste jugée par la base (rôle Réserves + chantier consultable dans GP). Un
+ * chef de chantier responsable des réserves doit donc la voir.
+ *
  * Bloc « ELSATIA Réserves » de la fiche chantier. Affiché seulement quand la base le permet
  * (organisation abonnée à Réserves, rôle Réserves de l'utilisateur, chantier consultable
  * dans Gestion Pro) : sinon la page ne le rend pas du tout. Aucun réglage technique visible.
@@ -16,7 +20,7 @@ export function BlocReservesChantier({
   etat: EtatReservesChantier;
   urlReserves: string | null;
 }) {
-  const action = utiliserDansReservesAction.bind(null, chantierId);
+  const action = `/chantiers/${encodeURIComponent(chantierId)}/reserves`;
   const bouton = "rounded-md px-3 py-1.5 text-sm font-medium";
 
   if (!etat.lie) {
@@ -30,7 +34,7 @@ export function BlocReservesChantier({
           </p>
         </div>
         {etat.peutSynchroniser ? (
-          <form action={action}>
+          <form method="post" action={action} data-application-tierce="reserves">
             <BoutonEnvoi className={`${bouton} bg-violet-700 text-white hover:bg-violet-800 disabled:opacity-60`} libelleEnCours="Transmission…">
               Utiliser dans ELSATIA Réserves
             </BoutonEnvoi>
@@ -69,7 +73,7 @@ export function BlocReservesChantier({
             </a>
           )}
           {etat.peutSynchroniser && (
-            <form action={action}>
+            <form method="post" action={action} data-application-tierce="reserves">
               <BoutonEnvoi className={`${bouton} border border-violet-300 hover:bg-violet-100 disabled:opacity-60 dark:border-violet-800 dark:hover:bg-violet-950`} libelleEnCours="Mise à jour…">
                 Mettre à jour depuis Gestion Pro
               </BoutonEnvoi>

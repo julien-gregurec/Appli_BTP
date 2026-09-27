@@ -65,6 +65,9 @@ export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
 const SOUS_RESSOURCES_CHANTIER_TERRAIN: [RegExp, string[]][] = [
   [/^\/chantiers\/[^/]+\/documents(\/|$)/, ["gerer_chantiers", "ajouter_documents_chantier"]],
   [/^\/chantiers\/[^/]+\/comptes-rendus(\/|$)/, ["gerer_chantiers", "ajouter_documents_chantier"]],
+  // Transmission vers ELSATIA Réserves : n'écrit rien dans Gestion Pro. L'accès au chantier
+  // suffit au proxy ; la base exige en plus le rôle Réserves et le chantier consultable.
+  [/^\/chantiers\/[^/]+\/reserves(\/|$)/, ["gerer_chantiers", "acces_chantiers", "voir_chantiers_assignes"]],
 ];
 
 /**

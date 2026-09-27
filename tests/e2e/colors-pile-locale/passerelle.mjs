@@ -28,6 +28,7 @@
  *   POST /storage/v1/object/sign/<bucket>/<chemin>          POST /storage/v1/object/sign/<bucket> (groupée)
  *   PATCH /rest/v1/<table> (filtres PostgREST)
  *   GET  /storage/v1/object/sign/<bucket>/<chemin>?token=   GET /storage/v1/render/image/sign/…
+ *   GET  /storage/v1/object/[authenticated/]<bucket>/<chemin> (téléchargement sous RLS)
  *   GET  /__recette/journal   POST /__recette/duree-jeton   (pilotage de recette, local seulement)
  */
 import http from "node:http";
@@ -648,6 +649,25 @@ async function routeStockage(req, res, url, appelant) {
     for (const { name } of supprimes) fs.rmSync(cheminFichier(bucket, name), { force: true });
     consigner({ type: "stockage_suppression", bucket, noms: supprimes.map((s) => s.name), role: appelant.role });
     return repondre(res, 200, supprimes.map((s) => ({ name: s.name, id: s.id, bucket_id: bucket })));
+  }
+
+  // Téléchargement authentifié (`download()` de storage-js) : l'objet n'est servi que si
+  // l'appelant peut le SÉLECTIONNER sous RLS — ce sont les policies du bucket qui jugent.
+  const lecture = route.match(/^\/object\/(?:authenticated\/)?([^/]+)\/(.+)$/);
+  if (lecture && req.method === "GET") {
+    const [, bucket, nom] = lecture;
+    const ligne = await sousRole(appelant, async (client) => {
+      const { rows } = await client.query("select metadata from storage.objects where bucket_id = $1 and name = $2", [bucket, nom]);
+      return rows[0] ?? null;
+    });
+    const fichier = cheminFichier(bucket, nom);
+    if (!ligne || !fs.existsSync(fichier)) {
+      consigner({ type: "stockage_lecture_refusee", bucket, nom, role: appelant.role });
+      return repondreErreurStockage(res, 400, "not_found", "Object not found");
+    }
+    consigner({ type: "stockage_lecture", bucket, nom, role: appelant.role });
+    res.writeHead(200, { "content-type": ligne.metadata?.mimetype ?? "application/octet-stream" });
+    return fs.createReadStream(fichier).pipe(res);
   }
 
   const televersement = route.match(/^\/object\/([^/]+)\/(.+)$/);
