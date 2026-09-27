@@ -262,6 +262,8 @@ export type MurDonnees = {
   readonly piecesAdjacentesIds?: readonly PieceId[];
   /** Recovery V2 (facultatif) : matériau / revêtement du mur (élément `materiau`). */
   readonly materiauId?: ElementId | null;
+  /** Lot 5 (facultatif) : mur du plan de base dont celui-ci est la copie (plan dérivé). */
+  readonly origineId?: string | null;
 };
 
 export const OUVERTURE_TYPES = ["porte", "fenetre", "porte_fenetre", "baie", "tremie", "passage"] as const;
@@ -278,6 +280,8 @@ export type OuvertureDonnees = {
   readonly sens: OuvertureSens;
   /** Recovery V2 (facultatif) : attributs métier libres (menuiserie, vitrage…), objet JSON. */
   readonly metadata?: Readonly<Record<string, unknown>>;
+  /** Lot 5 (facultatif) : ouverture du plan de base dont celle-ci est la copie. */
+  readonly origineId?: string | null;
 };
 /** Catégories métier d'ouverture demandées par le contrat produit. */
 export const OUVERTURE_FAMILLES = { porte: ["porte", "porte_fenetre"], fenetre: ["fenetre"], baie: ["baie"], ouverture_libre: ["tremie", "passage"] } as const satisfies Record<string, readonly OuvertureType[]>;
