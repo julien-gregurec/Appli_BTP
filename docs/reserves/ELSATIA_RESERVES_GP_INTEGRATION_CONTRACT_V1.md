@@ -37,15 +37,14 @@ L'opération est idempotente : réimporter un chantier déjà lié met à jour s
 | --- | --- | --- |
 | `chantiers.id` | `chantier_gp_id` | ✅ livré |
 | `chantiers.nom` | `nom` | ✅ livré |
-| adresse, code postal, ville | idem | ⛔ à faire |
-| plans / `documents_chantier` | `reserves_plans` | ⛔ à faire |
-| entreprises et contacts | `reserves_intervenants` | ⛔ à faire |
+| adresse, code postal, ville | idem | ✅ livré (§6, `reserves_synchroniser_chantier_gp`) |
+| référence, client, description, dates | `reference`, `client`, `description`, `date_debut`, `date_fin_prevue` | ✅ livré (§6) |
+| plans / `documents_chantier` (catégorie « plan ») | `reserves_plans` (copie versionnée) | ✅ livré (§6) |
+| sous-traitants du chantier | `reserves_intervenants` | ✅ livré (§6) |
+| contacts (client, entreprises) | `reserves_contacts` | ✅ livré (§6) |
+| bâtiments / zones | `reserves_plans.niveau` / `zone` | ⛔ Gestion Pro ne porte aucune structure bâtiment/zone : rien à transmettre |
 
-Les trois dernières lignes sont **le contrat, pas la livraison** : les colonnes existent
-et sont prêtes à recevoir ces données, mais aucune reprise automatique n'est écrite dans
-ce lot. La reprise des plans en particulier suppose une décision sur le stockage partagé
-(bucket `chantier-documents` de Gestion Pro contre bucket propre à Réserves) qui n'a pas
-été tranchée.
+`reserves_importer_chantier_gp` (nom seul) reste servie, inchangée, pour ses appelants.
 
 ## 3. Sens Réserves → Gestion Pro
 
@@ -81,7 +80,7 @@ Réserves en dur à maintenir.
 `'interne'` : l'application est active au catalogue (condition de l'accès du propriétaire
 global) sans être annoncée comme commercialisée.
 
-## 4. Ce qui n'est pas branché dans ce lot
+## 4. Ce qui n'était pas branché dans le lot V1 (historique)
 
 Aucun appel croisé n'est câblé dans les interfaces : Gestion Pro n'affiche pas encore le
 bloc réserves sur sa fiche chantier, et Réserves n'a pas d'écran d'import. Les deux
@@ -103,3 +102,38 @@ L'intégration ne crée **aucune** brèche multi-tenant :
 
 Le test pgTAP vérifie qu'une entreprise invitée ne lit aucun chantier ni client Gestion
 Pro de l'organisation hôte, alors même qu'elle travaille sur son chantier.
+
+## 6. Complétion V1 — migration `20260927000402` (2026-09-27)
+
+Rapport : `docs/qualification/ELSATIA_GP_RESERVES_INTEGRATION_COMPLETION_V1.md`.
+
+| Fonction | Rôle |
+| --- | --- |
+| `reserves_synchroniser_chantier_gp(chantier_gp)` → rapport | crée **ou rattache** (homonyme Réserves libre) le chantier, transmet champs, entreprises, contacts, prépare les copies de plan. Idempotente. |
+| `reserves_confirmer_plan_gp(plan, chemin)` | active une copie de plan déposée dans `reserves-plans` (seulement celle que la synchronisation a préparée). |
+| `reserves_etat_chantier_gp(chantier_gp)` → état \| NULL | ce qu'affiche la fiche GP : total, ouvertes (émises), en cours, attente levée, levées, en retard, statuts, lien, droit de synchroniser. NULL = pas de bloc. |
+
+Règles :
+
+- **Habilitation** : Réserves `gerer_chantier` + chantier consultable dans GP
+  (`peut_consulter_chantier`, qui couvre le chef de chantier affecté). Chaque donnée n'est
+  transmise que si l'appelant la voit dans GP : sous-traitants (`acces_sous_traitants`),
+  contacts client (`acces_clients`), plans (`peut_voir_document_chantier`, audience).
+- **Propriété d'un champ** : GP l'emporte tant que Réserves ne l'a pas modifié depuis la
+  dernière transmission (empreinte `gp_empreinte`) ; sinon la valeur Réserves est conservée
+  et signalée (`champs_conserves`).
+- **Plans** : copie possédée par Réserves, `gp_version` incrémentée à chaque version GP
+  appliquée. Une version GP n'est appliquée que si le plan n'a été ni modifié dans Réserves
+  (`modifie_localement_at`) ni utilisé pour localiser une réserve ; sinon
+  `gp_maj_disponible` est posé. Le fichier actif n'est remplacé qu'après dépôt confirmé.
+- **Contacts** : `reserves_contacts` n'a aucun lien vers un compte ; aucune habilitation
+  ni aucun accès applicatif n'est écrit par la synchronisation. L'accès d'une entreprise
+  reste né de l'invitation / désignation explicite.
+- **Suppression GP** : aucune clé étrangère nouvelle vers GP ; R-04 (détachement) conservé.
+- **Écriture directe** : les colonnes d'intégration (`source`, liens GP, empreintes,
+  versions) sont refusées en PATCH sous `authenticated`/`anon`.
+
+Côté Gestion Pro : bloc « ELSATIA Réserves » de la fiche chantier
+(`src/components/BlocReservesChantier.tsx`), action POST `/chantiers/[id]/reserves`
+(`src/app/(app)/chantiers/[id]/reserves/route.ts`), copie des plans sous la session de
+l'utilisateur (`src/lib/reserves-gp.ts`), URL Réserves issue du catalogue.
