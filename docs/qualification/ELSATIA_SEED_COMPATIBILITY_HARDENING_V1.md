@@ -233,7 +233,26 @@ CI (`.github/workflows/ci.yml`) : `test:seeds` dans le job `verification` ; nouv
 migrations puis tous les seeds. **Une migration qui rend un seed incompatible fait échouer ce
 job**, rapport en artefact `seeds-report`.
 
-RUN_FINAL_PLACEHOLDER
+### Run final (base reconstruite depuis zéro, 342 migrations, dernière `20260927000507_rgpd_dette_residuelle_historique_affectations_bon_commande.sql`)
+
+| Seed | Classe | Runs | Idempotent (métier) | Même état strict | Contrôles | Scénario | Durée |
+|---|---|---|---|---|---|---|---|
+| `preview-year` | PREVIEW | 3 | oui | oui | 0 anomalie | OK ×5 | 26 s |
+| `pilote-btp` | PREVIEW | 3 | oui | non (UUID régénérés) | 0 anomalie | OK ×1 | 4 s |
+| `entreprise-test-5-ans` | PREVIEW | 3 | oui | oui | 0 anomalie | — | 34 s |
+| `entreprise-test-tous-onglets` | PREVIEW | 3 | oui | non (UUID régénérés) | 0 anomalie | — | 45 s |
+| `entreprise-test-suivi-terrain` | PREVIEW | 3 | oui | non (UUID régénérés) | 0 anomalie | — | 42 s |
+| `demo-18-mois` | PRODUCTION_TOOL | 3 | oui | non (UUID régénérés) | 0 anomalie | OK ×1 | 10 s |
+| `dr-synthetic` | ACTIVE | 1 | oui | oui | 0 anomalie | OK ×1 | 124 s |
+| `purge-qualification-v2` | CI_ONLY | 3 | oui | oui | 0 anomalie | — | 2 s |
+| `perf-fixture` | CI_ONLY | 1 | oui | oui | 0 anomalie | — | 443 s |
+| `perf-annuaire` | CI_ONLY | 2 | oui | oui | 0 anomalie | — | 35 s |
+| `e2e-reserves` | CI_ONLY | 3 | oui | non (UUID régénérés) | 0 anomalie | — | 7 s |
+| `e2e-colors` | CI_ONLY | 3 | oui | non (UUID régénérés) | 0 anomalie | — | 2 s |
+| `upgrade-complements` | CI_ONLY | 1 | oui | oui | 0 anomalie | — | 5 s |
+| `pgtap-rgpd-commandes` | CI_ONLY | 1 | oui | oui | 0 anomalie | — | 2 s |
+
+Verdict du harnais : **ALL ACTIVE SEEDS QUALIFIED** (code de sortie 0). `npm run test:seeds` : 48/48.
 
 ## 12. Ce que ce verdict ne couvre pas
 
