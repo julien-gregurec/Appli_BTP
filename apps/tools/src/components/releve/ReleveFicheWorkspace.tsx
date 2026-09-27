@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  allowedActions, buildReleveTree, structureStats, VERSION_TYPE_LABELS, VERSION_TYPES,
-  type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type Version, type VersionType,
+  allowedActions, buildReleveTree, CHANTIER_STATUTS, structureStats, trashOf, VERSION_TYPE_LABELS, VERSION_TYPES,
+  type Chantier, type ChantierStatut, type JournalEntry, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type Version, type VersionType,
 } from "@elsatia/releve-domain";
 import { readReleveId, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
-import { RELEVE_STATUT_LABELS } from "./labels";
+import { CHANTIER_STATUT_LABELS, ENTITE_LABELS, JOURNAL_ACTION_LABELS, RELEVE_STATUT_LABELS } from "./labels";
+import { AutosaveBadge, useNodeAutosave } from "./useNodeAutosave";
 import styles from "./releve.module.css";
 import { ReleveLocked } from "./ReleveLocked";
 import { useReleveService } from "./use-releve-service";
@@ -37,16 +38,18 @@ export function ReleveFicheWorkspace() {
 function Fiche({ service, actor, releveId }: { service: ReleveService; actor: ReleveActorContext; releveId: ReleveId }) {
   const [structure, setStructure] = useState<ReleveStructure | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
+  const [generation, setGeneration] = useState(0);
   const [feedback, setFeedback] = useState("");
 
   const reload = useCallback(async () => {
-    const [loaded, list] = await Promise.all([service.get(releveId), service.listVersions(releveId)]);
-    setStructure(loaded); setVersions(list);
+    const [loaded, list, entries] = await Promise.all([service.get(releveId), service.listVersions(releveId), service.journal(releveId, 30)]);
+    setStructure(loaded); setVersions(list); setJournal(entries);
   }, [service, releveId]);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([service.get(releveId), service.listVersions(releveId)])
-      .then(([loaded, list]) => { if (!cancelled) { setStructure(loaded); setVersions(list); } })
+    Promise.all([service.get(releveId), service.listVersions(releveId), service.journal(releveId, 30)])
+      .then(([loaded, list, entries]) => { if (!cancelled) { setStructure(loaded); setVersions(list); setJournal(entries); } })
       .catch((error: unknown) => { if (!cancelled) setFeedback(error instanceof Error ? error.message : "Chargement impossible."); });
     return () => { cancelled = true; };
   }, [service, releveId]);
@@ -86,14 +89,7 @@ function Fiche({ service, actor, releveId }: { service: ReleveService; actor: Re
     <div className={`shell ${styles.fiche}`}>
       <section className={styles.column} aria-label="Chantiers">
         <h2>Chantiers</h2>
-        {tree.chantiers.map(({ chantier, batiments }) => <article key={chantier.id} className={styles.card}>
-          <div>
-            <span className={styles.meta}>{batiments.length} bâtiment(s){chantier.gpChantierId ? " · Lié à Gestion Pro" : ""}</span>
-            <h2>{chantier.nom}</h2>
-            <p>{[chantier.adresse, [chantier.codePostal, chantier.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "Adresse non renseignée"}</p>
-          </div>
-          <Link className={styles.open} href={structureHref({ releveId, chantierId: chantier.id })}>Bâtiments, étages, pièces</Link>
-        </article>)}
+        {tree.chantiers.map(({ chantier, batiments }) => <ChantierCard key={`${chantier.id}:${generation}`} service={service} releveId={releveId} chantier={chantier} batiments={batiments.length} canEdit={canEdit} reload={reload} hardReload={() => reload().then(() => setGeneration((value) => value + 1))} />)}
         {tree.chantiers.length === 0 && <p className={styles.feedback}>Aucun chantier.</p>}
         {canEdit && <ChantierForm onSubmit={(nom, ville) => run(() => service.addChantier(releveId, { nom, ville: ville || null }), "Chantier ajouté.")} />}
       </section>
@@ -106,6 +102,18 @@ function Fiche({ service, actor, releveId }: { service: ReleveService; actor: Re
           <small><time dateTime={version.createdAt}>{dateFormat.format(new Date(version.createdAt))}</time></small>
         </li>)}</ul>
         {canEdit && <VersionForm first={versions.length === 0} onSubmit={(type, libelle) => run(() => service.createVersion(releveId, libelle || null, { type }), "Version figée.")} />}
+
+        <h2>Corbeille</h2>
+        {trashOf(structure).length === 0 ? <p className={styles.feedback}>Rien à restaurer.</p> : <ul className={styles.pieces} aria-label="Corbeille">{trashOf(structure).map((entry) => <li key={entry.id} className={styles.piece}>
+          <span><strong>{entry.nom}</strong> <small>{ENTITE_LABELS[entry.kind]} · {entry.contexte} · {dateFormat.format(new Date(entry.deletedAt))}</small></span>
+          {canEdit && <button type="button" className={styles.secondary} onClick={() => void run(() => service.restoreNode(releveId, entry.kind, entry.id), `« ${entry.nom} » restauré.`)}>Restaurer</button>}
+        </li>)}</ul>}
+
+        <h2>Historique</h2>
+        <ul className={styles.journal} aria-label="Historique">{journal.map((entry) => <li key={entry.id}>
+          <time dateTime={entry.createdAt}>{dateFormat.format(new Date(entry.createdAt))}</time>
+          <span>{JOURNAL_ACTION_LABELS[entry.action]} · {ENTITE_LABELS[entry.entite] ?? entry.entite} {nomEntite(structure, entry)}</span>
+        </li>)}</ul>
       </section>
     </div>
   </>;
@@ -130,4 +138,55 @@ function VersionForm({ first, onSubmit }: { first: boolean; onSubmit(type: Versi
     <label className={styles.field}><span>Libellé (facultatif)</span><input value={libelle} maxLength={200} onChange={(event) => setLibelle(event.target.value)} /></label>
     <button className={styles.secondary} type="submit">Figer une version</button>
   </form>;
+}
+
+function nomEntite(structure: ReleveStructure, entry: JournalEntry): string {
+  const rows: Array<{ id: string; nom: string }> = [...structure.chantiers, ...structure.batiments, ...structure.etages, ...structure.zones, ...structure.pieces];
+  if (entry.entite === "releve") return `« ${structure.releve.nom} »`;
+  const row = rows.find((item) => item.id === entry.entiteId);
+  return row ? `« ${row.nom} »` : "";
+}
+
+type ChantierFields = {
+  nom: string; clientNom: string | null; adresse: string | null; codePostal: string | null; ville: string | null;
+  reference: string | null; description: string | null; dateReleve: string | null; statut: ChantierStatut;
+};
+
+/** Chantier : champs métier enregistrés automatiquement, sans bouton Enregistrer. */
+function ChantierCard({ service, releveId, chantier, batiments, canEdit, reload, hardReload }: { service: ReleveService; releveId: ReleveId; chantier: Chantier; batiments: number; canEdit: boolean; reload(): Promise<void>; hardReload(): Promise<void> }) {
+  const initial = useMemo<ChantierFields>(() => ({
+    nom: chantier.nom, clientNom: chantier.clientNom ?? null, adresse: chantier.adresse, codePostal: chantier.codePostal, ville: chantier.ville,
+    reference: chantier.reference ?? null, description: chantier.description ?? null, dateReleve: chantier.dateReleve ?? null, statut: chantier.statut ?? "en_cours",
+  }), [chantier]);
+  const save = useCallback(async (patch: Partial<ChantierFields>, expected: number) => {
+    const next = await service.updateNode(releveId, "chantier", chantier.id, patch, expected);
+    await reload();
+    return next;
+  }, [service, releveId, chantier.id, reload]);
+  const autosave = useNodeAutosave<ChantierFields>(initial, chantier.revision, save);
+  const values = autosave.values;
+  const text = (key: keyof ChantierFields, label: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) =>
+    <label className={styles.field}><span>{label}</span><input value={String(values[key] ?? "")} disabled={!canEdit} {...extra}
+      onChange={(event) => autosave.set(key, (event.target.value || (key === "nom" ? "" : null)) as never)} onBlur={() => void autosave.flush()} /></label>;
+  return <article className={styles.chantierCard} aria-label={`Chantier ${chantier.nom}`}>
+    <header>
+      <span className={styles.meta}>{batiments} bâtiment(s) · {CHANTIER_STATUT_LABELS[values.statut]}{chantier.gpChantierId ? " · Lié à Gestion Pro" : ""}</span>
+      <h2>{values.nom || chantier.nom}</h2>
+      <AutosaveBadge label={`Chantier ${chantier.nom}`} state={autosave.state} onRetry={() => void autosave.retry()} onReload={() => void hardReload()} />
+    </header>
+    <div className={styles.formGrid}>
+      {text("nom", "Nom du chantier", { maxLength: 180, required: true })}
+      {text("clientNom", "Client", { maxLength: 180 })}
+      {text("adresse", "Adresse", { maxLength: 400 })}
+      {text("codePostal", "Code postal", { maxLength: 12, inputMode: "numeric" })}
+      {text("ville", "Ville", { maxLength: 120 })}
+      {text("reference", "Référence", { maxLength: 80 })}
+      {text("dateReleve", "Date", { type: "date" })}
+      <label className={styles.field}><span>Statut</span><select value={values.statut} disabled={!canEdit} onChange={(event) => autosave.set("statut", event.target.value as ChantierStatut)}>
+        {CHANTIER_STATUTS.map((statut) => <option key={statut} value={statut}>{CHANTIER_STATUT_LABELS[statut]}</option>)}</select></label>
+    </div>
+    <label className={styles.field}><span>Description</span><textarea rows={2} maxLength={4000} value={values.description ?? ""} disabled={!canEdit}
+      onChange={(event) => autosave.set("description", event.target.value || null)} onBlur={() => void autosave.flush()} /></label>
+    <Link className={styles.open} href={structureHref({ releveId, chantierId: chantier.id })}>Bâtiments, étages, pièces</Link>
+  </article>;
 }

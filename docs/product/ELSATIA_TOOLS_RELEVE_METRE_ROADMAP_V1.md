@@ -60,6 +60,8 @@ Total estimé : **≈ 173 – 265 j** hors AR/LiDAR natifs avancés (voir lot 4b
 
 ## Lot 3 — Structure (chantier / bâtiment / étage / zone / pièce)
 
+> **Réalisé** : [ELSATIA_TOOLS_RELEVE_METRE_LOT3_STRUCTURE_TERRAIN_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_LOT3_STRUCTURE_TERRAIN_V1.md) — verdict **RELEVE METRE LOT 3 LOCALLY QUALIFIED** (migration 701 : chantier métier, étages libres, fiche pièce, réordre, duplication, recherche, audit, autosave avec contrôle de révision). Le dépôt IndexedDB / offline complet de la structure reste à faire.
+
 | | |
 |---|---|
 | Scope | `ReleveProject` v1 + migration tolérante ; repository IndexedDB dédié (`elsatia-releve[-company:<id>]`) ; CRUD bâtiment/étage/zone/pièce ; écran liste des relevés ; gate `releve-metre` client **et** serveur ; table `tools_releves` + RPC sync (pattern `tools_projects`) ; lien optionnel `chantier_gp_id` (pattern Réserves) ; étendre `entitlementToAccess` et les fonctions SQL d'entitlement |

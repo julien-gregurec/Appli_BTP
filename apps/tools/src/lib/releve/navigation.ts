@@ -9,6 +9,7 @@
  * | Nouveau relevé | `/releves/nouveau` |
  * | Fiche relevé (chantiers, versions) | `/releves/fiche?id=` |
  * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
+ * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
  */
 import { isUuid } from "@elsatia/releve-domain";
 
@@ -16,6 +17,7 @@ export const RELEVES_PATH = "/releves";
 export const RELEVE_NEW_PATH = "/releves/nouveau";
 export const RELEVE_FICHE_PATH = "/releves/fiche";
 export const RELEVE_STRUCTURE_PATH = "/releves/structure";
+export const RELEVE_PIECE_PATH = "/releves/piece";
 
 export type StructureSelection = { releveId: string; chantierId: string | null; batimentId: string | null; etageId: string | null };
 
@@ -51,4 +53,15 @@ export function readStructureSelection(search: string): StructureSelection | nul
   const batimentId = pick("batiment", chantierId !== null);
   const etageId = pick("etage", batimentId !== null);
   return { releveId, chantierId, batimentId, etageId };
+}
+
+export function pieceHref(releveId: string, pieceId: string): string {
+  return `${RELEVE_PIECE_PATH}?${new URLSearchParams({ id: releveId, piece: pieceId }).toString()}`;
+}
+
+/** Fiche pièce : relevé et pièce, tous deux des UUID ; sinon `null`. */
+export function readPieceSelection(search: string): { releveId: string; pieceId: string } | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id"); const pieceId = params.get("piece");
+  return isUuid(releveId) && isUuid(pieceId) ? { releveId, pieceId } : null;
 }

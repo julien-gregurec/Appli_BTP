@@ -20,16 +20,20 @@ export type ReleveRow = MetaRow & {
 export type ChantierRow = MetaRow & {
   id: string; releve_id: string; nom: string; adresse: string | null; code_postal: string | null; ville: string | null;
   chantier_gp_id: string | null; ordre: number; notes: string | null;
+  /** Lot 3 (absents d'une base antérieure). */
+  client_nom?: string | null; client_gp_id?: string | null; reference?: string | null; description?: string | null;
+  date_releve?: string | null; statut?: NonNullable<Chantier["statut"]>;
 };
 export type BatimentRow = MetaRow & { id: string; releve_id: string; chantier_id: string; nom: string; ordre: number; notes: string | null };
 export type EtageRow = MetaRow & {
-  id: string; releve_id: string; batiment_id: string; nom: string; niveau: number; altitude_mm: number | string | null;
-  hauteur_sous_plafond_mm: number | string | null; etat: Etage["etat"]; ordre: number;
+  id: string; releve_id: string; batiment_id: string; nom: string; niveau: number | string | null; altitude_mm: number | string | null;
+  hauteur_sous_plafond_mm: number | string | null; etat: Etage["etat"]; ordre: number; categorie_niveau?: NonNullable<Etage["categorieNiveau"]>;
 };
-export type ZoneRow = MetaRow & { id: string; releve_id: string; etage_id: string; nom: string; type: Zone["type"]; ordre: number };
+export type ZoneRow = MetaRow & { id: string; releve_id: string; etage_id: string; nom: string; type: Zone["type"]; ordre: number; commentaire?: string | null };
 export type PieceRow = MetaRow & {
   id: string; releve_id: string; etage_id: string; zone_id: string | null; nom: string; usage: Piece["usage"];
   hauteur_sous_plafond_mm: number | string | null; ordre: number;
+  commentaire?: string | null; statut?: NonNullable<Piece["statut"]>; surface_declaree_mm2?: number | string | null;
 };
 export type VersionRow = {
   id: string; entreprise_id: string; releve_id: string; numero: number; type_version: Version["typeVersion"]; version_base_id: string | null;
@@ -61,6 +65,8 @@ export function chantierFromRow(row: ChantierRow): Chantier {
   return {
     ...meta(row), id: row.id as Chantier["id"], releveId: row.releve_id as ReleveId, nom: row.nom, adresse: row.adresse,
     codePostal: row.code_postal, ville: row.ville, gpChantierId: row.chantier_gp_id, ordre: row.ordre, notes: row.notes,
+    clientNom: row.client_nom ?? null, clientGpId: row.client_gp_id ?? null, reference: row.reference ?? null,
+    description: row.description ?? null, dateReleve: row.date_releve ?? null, statut: row.statut ?? "en_cours",
   };
 }
 
@@ -71,19 +77,20 @@ export function batimentFromRow(row: BatimentRow): Batiment {
 export function etageFromRow(row: EtageRow): Etage {
   return {
     ...meta(row), id: row.id as Etage["id"], releveId: row.releve_id as ReleveId, batimentId: row.batiment_id as Etage["batimentId"],
-    nom: row.nom, niveau: row.niveau, altitudeMm: numOrNull(row.altitude_mm), hauteurSousPlafondMm: numOrNull(row.hauteur_sous_plafond_mm),
-    etat: row.etat, ordre: row.ordre,
+    nom: row.nom, niveau: numOrNull(row.niveau), altitudeMm: numOrNull(row.altitude_mm), hauteurSousPlafondMm: numOrNull(row.hauteur_sous_plafond_mm),
+    etat: row.etat, ordre: row.ordre, ...(row.categorie_niveau && { categorieNiveau: row.categorie_niveau }),
   };
 }
 
 export function zoneFromRow(row: ZoneRow): Zone {
-  return { ...meta(row), id: row.id as Zone["id"], releveId: row.releve_id as ReleveId, etageId: row.etage_id as Zone["etageId"], nom: row.nom, type: row.type, ordre: row.ordre };
+  return { ...meta(row), id: row.id as Zone["id"], releveId: row.releve_id as ReleveId, etageId: row.etage_id as Zone["etageId"], nom: row.nom, type: row.type, ordre: row.ordre, commentaire: row.commentaire ?? null };
 }
 
 export function pieceFromRow(row: PieceRow): Piece {
   return {
     ...meta(row), id: row.id as Piece["id"], releveId: row.releve_id as ReleveId, etageId: row.etage_id as Piece["etageId"],
     zoneId: row.zone_id as Piece["zoneId"], nom: row.nom, usage: row.usage, hauteurSousPlafondMm: numOrNull(row.hauteur_sous_plafond_mm), ordre: row.ordre,
+    commentaire: row.commentaire ?? null, statut: row.statut ?? "a_relever", surfaceDeclareeMm2: numOrNull(row.surface_declaree_mm2 ?? null),
   };
 }
 
@@ -107,5 +114,21 @@ export function relevePatchToRow(patch: Partial<{
   };
   const row: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) if (value !== undefined && columns[key]) row[columns[key]] = value;
+  return row;
+}
+
+/** Lot 3 : champs éditables d'un nœud (camelCase domaine → colonne SQL). Jamais les métadonnées. */
+const NODE_COLUMNS: Record<string, string> = {
+  nom: "nom", adresse: "adresse", codePostal: "code_postal", ville: "ville", notes: "notes", clientNom: "client_nom",
+  reference: "reference", description: "description", dateReleve: "date_releve", statut: "statut", niveau: "niveau",
+  categorieNiveau: "categorie_niveau", altitudeMm: "altitude_mm", hauteurSousPlafondMm: "hauteur_sous_plafond_mm", etat: "etat",
+  type: "type", commentaire: "commentaire", usage: "usage", zoneId: "zone_id", surfaceDeclareeMm2: "surface_declaree_mm2",
+};
+export function nodePatchToRow(patch: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (!NODE_COLUMNS[key]) throw new Error(`Champ non modifiable : ${key}`);
+    if (value !== undefined) row[NODE_COLUMNS[key]] = value;
+  }
   return row;
 }

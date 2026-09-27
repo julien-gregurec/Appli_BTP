@@ -55,3 +55,50 @@ a.secondary { display: inline-flex; align-items: center; }
 .facts dd { margin: 0; font-weight: 700; }
 .fiche { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; padding: 24px 0 60px; }
 @media (max-width: 900px) { .fiche { grid-template-columns: 1fr; } }
+
+/* ── Lot 3 : relevé métier terrain ─────────────────────────────────────────── */
+.crumbBar { position: sticky; top: 0; z-index: 20; padding: 8px 0; border-bottom: 1px solid var(--line); background: rgba(250, 249, 246, .96); backdrop-filter: blur(6px); }
+.crumbBar .breadcrumb { margin: 0; align-items: center; }
+.crumbBar li { display: inline-flex; align-items: center; min-height: 36px; }
+.crumbBar [aria-current="location"] { color: var(--ink); font-weight: 900; }
+.crumbButton { min-height: 36px; padding: 0 4px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.nodeBlock { display: grid; gap: 6px; }
+.count { color: var(--ink-soft); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.tools, .toolsCompact { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed #cfd4d1; border-radius: 10px; background: #fbfaf7; }
+.toolsCompact { padding: 8px; }
+.toolButtons { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.iconButton { min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--ink); font-size: 18px; font-weight: 900; cursor: pointer; }
+.iconButton:disabled { opacity: .35; cursor: not-allowed; }
+.pieceLink { display: flex; flex: 1; min-width: 0; min-height: 44px; align-items: center; gap: 8px; overflow-wrap: anywhere; color: inherit; }
+.autosave { display: inline-flex; align-items: center; gap: 8px; min-height: 22px; color: var(--ink-soft); font-size: 12px; font-weight: 800; }
+.autosave[data-status="saved"] { color: #1d6b3f; }
+.autosave[data-status="error"], .autosave[data-status="conflict"] { color: #a63a24; }
+.linkButton { min-height: 32px; padding: 0 8px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; font-weight: 800; cursor: pointer; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.field textarea { width: 100%; padding: 9px 11px; border: 1px solid #d6dad7; border-radius: 7px; background: white; color: var(--ink); font: inherit; font-size: 16px; }
+.field input, .field select { font-size: 16px; }
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; border: 0; }
+.segmented legend { width: 100%; margin-bottom: 6px; color: #5e6f76; font-size: 10px; font-weight: 800; }
+.segmented label { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); font-weight: 800; cursor: pointer; }
+.segmented label[data-checked="true"] { border-color: var(--navy); background: var(--navy); color: white; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.chantierCard { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: var(--white); }
+.chantierCard header { display: grid; gap: 4px; }
+.chantierCard h2 { margin: 0; font-size: 17px; }
+.journal { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.journal li { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.journal time { color: var(--ink-soft); }
+.search { display: grid; gap: 10px; margin-top: 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: inherit; font-weight: 800; cursor: pointer; }
+.chip[aria-checked="true"] { border-color: var(--navy); background: var(--navy); color: white; }
+.select { min-height: 44px; }
+.remove { min-width: 44px; min-height: 44px; }
+
+/* Téléphone / tablette portrait : une seule colonne, celle du niveau sélectionné. */
+@media (max-width: 900px) {
+  .levels[data-active="batiments"] > [data-column="etages"], .levels[data-active="batiments"] > [data-column="pieces"],
+  .levels[data-active="etages"] > [data-column="batiments"], .levels[data-active="etages"] > [data-column="pieces"],
+  .levels[data-active="pieces"] > [data-column="batiments"], .levels[data-active="pieces"] > [data-column="etages"] { display: none; }
+  .journal li { grid-template-columns: 1fr; gap: 2px; }
+}

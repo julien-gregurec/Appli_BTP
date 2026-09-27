@@ -8,11 +8,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ReleveConflictError, ReleveNotFoundError,
+  type DuplicableKind, type JournalEntry, type NodeKind, type SearchFilter, type SearchResult,
   type NewBatiment, type NewChantier, type NewEtage, type NewPiece, type NewReleve, type NewVersion, type NewZone, type ReleveId, type RelevePatch,
   type ReleveRepository, type StructureKind, type StructurePatch, type TenantId,
 } from "@elsatia/releve-domain";
 import {
-  batimentFromRow, chantierFromRow, etageFromRow, pieceFromRow, releveFromRow, relevePatchToRow, versionFromRow, zoneFromRow,
+  batimentFromRow, chantierFromRow, etageFromRow, nodePatchToRow, pieceFromRow, releveFromRow, relevePatchToRow, versionFromRow, zoneFromRow,
   type BatimentRow, type ChantierRow, type EtageRow, type PieceRow, type ReleveRow, type VersionRow, type ZoneRow,
 } from "./mapping";
 
@@ -96,6 +97,8 @@ export class SupabaseReleveRepository implements ReleveRepository {
     const { data, error } = await this.client.from(TABLES.chantier).insert({
       id: input.id, releve_id: input.releveId, nom: input.nom, adresse: input.adresse, code_postal: input.codePostal,
       ville: input.ville, chantier_gp_id: input.gpChantierId, ordre: input.ordre, notes: input.notes,
+      client_nom: input.clientNom, client_gp_id: input.clientGpId, reference: input.reference, description: input.description,
+      date_releve: input.dateReleve, statut: input.statut,
     }).select("*").single();
     if (error) fail("Ajout du chantier", error);
     return chantierFromRow(data as ChantierRow);
@@ -109,7 +112,7 @@ export class SupabaseReleveRepository implements ReleveRepository {
 
   async createEtage(input: NewEtage) {
     const { data, error } = await this.client.from(TABLES.etage).insert({
-      id: input.id, releve_id: input.releveId, batiment_id: input.batimentId, nom: input.nom, niveau: input.niveau,
+      id: input.id, releve_id: input.releveId, batiment_id: input.batimentId, nom: input.nom, niveau: input.niveau, categorie_niveau: input.categorieNiveau,
       altitude_mm: input.altitudeMm, hauteur_sous_plafond_mm: input.hauteurSousPlafondMm, etat: input.etat, ordre: input.ordre,
     }).select("*").single();
     if (error) fail("Ajout de l'étage", error);
@@ -117,7 +120,7 @@ export class SupabaseReleveRepository implements ReleveRepository {
   }
 
   async createZone(input: NewZone) {
-    const { data, error } = await this.client.from(TABLES.zone).insert({ id: input.id, releve_id: input.releveId, etage_id: input.etageId, nom: input.nom, type: input.type, ordre: input.ordre }).select("*").single();
+    const { data, error } = await this.client.from(TABLES.zone).insert({ id: input.id, releve_id: input.releveId, etage_id: input.etageId, nom: input.nom, type: input.type, ordre: input.ordre, commentaire: input.commentaire ?? null }).select("*").single();
     if (error) fail("Ajout de la zone", error);
     return zoneFromRow(data as ZoneRow);
   }
@@ -126,6 +129,7 @@ export class SupabaseReleveRepository implements ReleveRepository {
     const { data, error } = await this.client.from(TABLES.piece).insert({
       id: input.id, releve_id: input.releveId, etage_id: input.etageId, zone_id: input.zoneId, nom: input.nom, usage: input.usage,
       hauteur_sous_plafond_mm: input.hauteurSousPlafondMm, ordre: input.ordre,
+      commentaire: input.commentaire, statut: input.statut, surface_declaree_mm2: input.surfaceDeclareeMm2,
     }).select("*").single();
     if (error) fail("Ajout de la pièce", error);
     return pieceFromRow(data as PieceRow);
@@ -157,5 +161,48 @@ export class SupabaseReleveRepository implements ReleveRepository {
     const { data, error } = await this.client.from("tools_releves_versions").select(VERSION_COLUMNS).eq("releve_id", releveId).order("numero", { ascending: false });
     if (error) fail("Chargement des versions", error);
     return ((data ?? []) as VersionRow[]).map(versionFromRow);
+  }
+
+  // ── Lot 3 ─────────────────────────────────────────────────────────────────
+
+  async updateNode(kind: NodeKind, id: string, patch: Record<string, unknown>, expectedRevision: number): Promise<number> {
+    // Contrôle optimiste : la mise à jour ne vise que la révision lue ; 0 ligne = conflit ou retrait.
+    const { data, error } = await this.client.from(TABLES[kind]).update(nodePatchToRow(patch))
+      .eq("id", id).eq("revision", expectedRevision).is("deleted_at", null).select("revision").maybeSingle();
+    if (error) fail("Enregistrement", error);
+    if (data) return Number((data as { revision: number | string }).revision);
+    const current = await this.client.from(TABLES[kind]).select("revision,deleted_at").eq("id", id).maybeSingle();
+    const row = current.data as { revision: number | string; deleted_at: string | null } | null;
+    if (row && !row.deleted_at) throw new ReleveConflictError(Number(row.revision));
+    throw new ReleveNotFoundError("Élément de structure");
+  }
+
+  async reorder(kind: NodeKind, orderedIds: readonly string[]): Promise<void> {
+    const { error } = await this.client.rpc("tools_releve_reordonner", { p_entite: kind, p_ids: [...orderedIds] });
+    if (error) fail("Réordonnancement", error);
+  }
+
+  async duplicate(kind: DuplicableKind, id: string, nom: string | null): Promise<string> {
+    const { data, error } = await this.client.rpc("tools_releve_dupliquer", { p_entite: kind, p_id: id, p_nom: nom });
+    if (error) fail("Duplication", error);
+    return String(data);
+  }
+
+  async search(tenantId: TenantId, texte: string, filtre: SearchFilter): Promise<SearchResult[]> {
+    const { data, error } = await this.client.rpc("tools_releve_rechercher", { p_entreprise_id: tenantId, p_texte: texte, p_filtre: filtre, p_limite: 50 });
+    if (error) fail("Recherche", error);
+    type Row = { type: SearchResult["type"]; id: string; releve_id: string; libelle: string; contexte: string | null; releve_nom: string; releve_statut: SearchResult["releveStatut"]; updated_at: string };
+    return ((data ?? []) as Row[]).map((row) => ({
+      type: row.type, id: row.id, releveId: row.releve_id as ReleveId, libelle: row.libelle, contexte: row.contexte ?? "",
+      releveNom: row.releve_nom, releveStatut: row.releve_statut, updatedAt: row.updated_at,
+    }));
+  }
+
+  async listJournal(releveId: ReleveId, limit = 100): Promise<JournalEntry[]> {
+    const { data, error } = await this.client.from("tools_releves_journal").select("id,entite,entite_id,action,champs,auteur_id,created_at")
+      .eq("releve_id", releveId).order("id", { ascending: false }).limit(limit);
+    if (error) fail("Chargement de l'historique", error);
+    type Row = { id: number | string; entite: JournalEntry["entite"]; entite_id: string; action: JournalEntry["action"]; champs: string[] | null; auteur_id: string | null; created_at: string };
+    return ((data ?? []) as Row[]).map((row) => ({ id: String(row.id), entite: row.entite, entiteId: row.entite_id, action: row.action, champs: row.champs ?? [], auteurId: row.auteur_id, createdAt: row.created_at }));
   }
 }

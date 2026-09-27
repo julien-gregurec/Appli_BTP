@@ -382,7 +382,8 @@ export class InMemoryReleveRepository implements ReleveRepository {
   }
 
   async listJournal(releveId: ReleveId, limit = 100): Promise<JournalEntry[]> {
-    return this.journal.filter((entry) => entry.releveId === releveId).reverse().slice(0, limit).map(({ releveId: _releveId, ...entry }) => entry);
+    return this.journal.filter((entry) => entry.releveId === releveId).reverse().slice(0, limit)
+      .map((entry) => ({ id: entry.id, entite: entry.entite, entiteId: entry.entiteId, action: entry.action, champs: entry.champs, auteurId: entry.auteurId, createdAt: entry.createdAt }));
   }
 }
 
