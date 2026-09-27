@@ -105,7 +105,7 @@ function journalPartage() {
         traitements.push(args.p_stripe_event_id as string ?? "sans-id");
         return { data: { decision: "applique", statut_resultant: "actif" }, error: null };
       }
-      if (fn === "lier_subscription_entreprise_service") return { data: "lie", error: null };
+      if (fn === "relier_subscription_reabonnement_service") return { data: "deja_lie", error: null };
       return { data: null, error: null };
     },
   });

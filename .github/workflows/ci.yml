@@ -70,6 +70,9 @@ jobs:
       - name: Tests du script Stripe Test essai (sans réseau, sk_live refusée)
         run: npm run test:stripe-trial-script
 
+      - name: Tests du script Stripe Test réabonnement (sans réseau, sk_live refusée)
+        run: npm run test:stripe-resubscription-script
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 

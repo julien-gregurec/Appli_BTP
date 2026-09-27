@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { annulerBaisseCapacitePlanifieeAction, appliquerCapacitePersonnesAction, choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, previsualiserCapacitePersonnesAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { annulerBaisseCapacitePlanifieeAction, appliquerCapacitePersonnesAction, choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, previsualiserCapacitePersonnesAction, reactiverOptionIAAction, reprendreAbonnementAction } from "@/app/actions/abonnement";
+import { ecranReabonnement, MESSAGES_REABONNEMENT, offresSouscriptibles } from "@/lib/stripe-reabonnement";
+import { etatReabonnementEntreprise } from "@/lib/acces-support-abonnement";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
@@ -56,10 +58,24 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     supabase.rpc("capacite_stripe_etat_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
     supabase.rpc("modules_entreprise_etat", { p_entreprise_id: ctx.entrepriseId }),
   ]);
-  const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
   const abonnementsOuverts = abonnementsPublicsOuverts();
-  const souscrit = Boolean(entreprise?.stripe_subscription_id);
+  // Réabonnement (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1) : une subscription
+  // terminée ne vaut plus « souscrit » ; les offres redeviennent choisissables.
+  // La RLS masque l'entreprise suspendue ou annulée à ses membres : l'état de
+  // reprise est lu par la fonction bornée (aucun identifiant Stripe exposé).
+  const etatReprise = await etatReabonnementEntreprise(supabase, ctx.entrepriseId);
+  const etatLocal = {
+    abonnementStatut: etatReprise?.abonnement_statut ?? entreprise?.abonnement_statut,
+    stripeSubscriptionId: etatReprise ? (etatReprise.subscription_rattachee ? "rattachee" : null) : entreprise?.stripe_subscription_id,
+    annulationPrevueAt: etatReprise ? etatReprise.annulation_prevue_at : entreprise?.abonnement_annulation_prevue_at,
+    derniereFactureStatut: etatReprise ? etatReprise.derniere_facture_statut : entreprise?.derniere_facture_statut,
+    derniereFactureUrl: etatReprise ? etatReprise.derniere_facture_url : entreprise?.derniere_facture_url,
+  };
+  const reabonnement = Boolean(etatLocal.stripeSubscriptionId) && etatLocal.abonnementStatut === "annule";
+  const souscrit = !offresSouscriptibles(etatLocal);
+  const statut = statutAbonnement(etatLocal.abonnementStatut ?? "essai");
+  const ecranReprise = ecranReabonnement(etatLocal);
   const offre = offreParCle(entreprise?.abonnement_offre ?? "essentiel");
   const stockage = Array.isArray(utilisationStockage) ? utilisationStockage[0] : utilisationStockage;
   const stockageGo = Number(stockage?.octets_utilises ?? 0) / OCTETS_PAR_GO;
@@ -96,7 +112,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     ? calculerReductionRemise({ type: entreprise?.remise_type as "montant" | "pourcentage" | null, valeur: entreprise?.remise_valeur, sousTotal: abonnementAvantRemiseMensuel })
     : 0;
   const abonnementApresRemiseMensuel = Math.max(0, abonnementAvantRemiseMensuel - remiseReductionMensuelle);
-  const paiementEnEchec = entreprise?.abonnement_statut === "suspendu" && souscrit;
+  const paiementEnEchec = ecranReprise?.cle === "paiement_requis" && souscrit;
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = resoudreUrlContactCommercial();
   type ModuleEtatRow = {
@@ -182,16 +198,29 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </div>}
     {error&&<p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {succes&&<p className="rounded-md bg-green-50 p-3 text-sm text-green-700">Votre abonnement a été mis à jour.</p>}
-    {paiementEnEchec&&<div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
-      <p className="font-semibold">Le dernier prélèvement de votre abonnement a échoué.</p>
-      <p className="mt-1">L’accès peut être limité tant que le moyen de paiement n’est pas mis à jour.</p>
-      <form action={ouvrirPortailAbonnementAction} className="mt-3"><button className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Mettre à jour mon moyen de paiement</button></form>
+    {paiementEnEchec&&<div data-testid="reabonnement-paiement-requis" className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+      <p className="font-semibold">{MESSAGES_REABONNEMENT.paiement_requis.titre}</p>
+      <p className="mt-1">{MESSAGES_REABONNEMENT.paiement_requis.description}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {ecranReprise?.cle==="paiement_requis"&&ecranReprise.urlFacture&&<a href={ecranReprise.urlFacture} target="_blank" rel="noreferrer" className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">{MESSAGES_REABONNEMENT.paiement_requis.libellePayer}</a>}
+        <form action={reprendreAbonnementAction}><button className="rounded-md border border-red-700 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100 dark:text-red-200">{MESSAGES_REABONNEMENT.paiement_requis.libellePortail}</button></form>
+      </div>
+    </div>}
+    {ecranReprise?.cle==="abonnement_annule"&&<div data-testid="reabonnement-annule" className="rounded-md border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100">
+      <p className="font-semibold">{MESSAGES_REABONNEMENT.abonnement_annule.titre}</p>
+      <p className="mt-1">{MESSAGES_REABONNEMENT.abonnement_annule.description}</p>
+      <a href="#choisir-offre" className="mt-3 inline-block rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{MESSAGES_REABONNEMENT.reactiver.libelle}</a>
     </div>}
     <section className="grid gap-3 rounded-xl border p-5 sm:grid-cols-3">
       <div><p className="text-xs uppercase text-neutral-500">Statut</p><p className="mt-1 font-semibold" style={{color:statut.couleur}}>{statut.libelle}</p></div>
       <div><p className="text-xs uppercase text-neutral-500">Offre</p><p className="mt-1 font-semibold">{entreprise?.abonnement_offre ? entreprise.abonnement_offre[0].toUpperCase()+entreprise.abonnement_offre.slice(1) : "À choisir"}{entreprise?.abonnement_periodicite ? ` · ${entreprise.abonnement_periodicite}` : ""}</p></div>
       <div><p className="text-xs uppercase text-neutral-500">Prochaine échéance</p><p className="mt-1 font-semibold">{entreprise?.abonnement_echeance ? new Date(entreprise.abonnement_echeance).toLocaleDateString("fr-FR") : entreprise?.abonnement_essai_fin ? new Date(entreprise.abonnement_essai_fin).toLocaleDateString("fr-FR") : "—"}</p></div>
-      {entreprise?.abonnement_annulation_prevue_at&&<p className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">Résiliation programmée le {new Date(entreprise.abonnement_annulation_prevue_at).toLocaleDateString("fr-FR")}.</p>}
+      {entreprise?.abonnement_annulation_prevue_at&&ecranReprise?.cle!=="reprendre"&&<p className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">Résiliation programmée le {new Date(entreprise.abonnement_annulation_prevue_at).toLocaleDateString("fr-FR")}.</p>}
+      {ecranReprise?.cle==="reprendre"&&<div data-testid="reabonnement-reprendre" className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="font-semibold">{MESSAGES_REABONNEMENT.reprendre.titre} le {new Date(ecranReprise.finPrevueAt).toLocaleDateString("fr-FR")}.</p>
+        <p className="mt-1">{MESSAGES_REABONNEMENT.reprendre.description}</p>
+        <form action={reprendreAbonnementAction} className="mt-2"><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{MESSAGES_REABONNEMENT.reprendre.libelle}</button></form>
+      </div>}
     </section>
 
     {cap&&<section id="capacite" className="rounded-xl border p-5 scroll-mt-4">
@@ -407,7 +436,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </>}
 
     {souscrit ? <section className="rounded-xl border p-5"><h2 className="font-semibold">Gérer l’abonnement</h2><p className="mt-1 text-sm text-neutral-500">Le portail sécurisé Stripe permet de changer de carte, télécharger les factures et gérer la résiliation.</p><div className="mt-4 flex flex-wrap gap-2"><form action={ouvrirPortailAbonnementAction}><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Gérer mon abonnement</button></form>{entreprise?.derniere_facture_url&&<Link href={entreprise.derniere_facture_url} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Voir la dernière facture</Link>}{entreprise?.derniere_facture_pdf&&<Link href={entreprise.derniere_facture_pdf} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Télécharger le PDF</Link>}</div>{entreprise?.derniere_facture_at&&<p className="mt-3 text-xs text-neutral-500">Dernière facture : {entreprise.derniere_facture_statut??"—"} · {new Date(entreprise.derniere_facture_at).toLocaleString("fr-FR")}</p>}</section>
-    : <section id="choisir-offre" className="space-y-4 scroll-mt-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Essai gratuit de 30 jours. Les abonnements en ligne ouvriront prochainement.</p></div>{(!configure||!abonnementsOuverts)&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">La souscription en ligne est temporairement fermée. Contactez {BRAND_NAME} pour préparer votre accès ; aucun paiement ne sera déclenché depuis cette page.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{offre.devisObligatoire?"Sur devis":`${prix.total} €`} {!offre.devisObligatoire&&<span className="text-xs font-normal text-neutral-500">HT/mois</span>}</p>{offre.devisObligatoire||!configure||!abonnementsOuverts?<Link href={contactCommercial} className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">{offre.devisObligatoire?"Demander un devis":"Ouverture prochaine"}</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white">Démarrer l’essai</button></form>}</article>})}</div></section>}
+    : <section id="choisir-offre" className="space-y-4 scroll-mt-4"><div><h2 className="font-semibold">{reabonnement ? MESSAGES_REABONNEMENT.reactiver.libelle : "Choisir une offre"}</h2><p className="text-sm text-neutral-500">{reabonnement ? MESSAGES_REABONNEMENT.reactiver.description : "Essai gratuit de 30 jours. Les abonnements en ligne ouvriront prochainement."}</p></div>{(!configure||!abonnementsOuverts)&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">La souscription en ligne est temporairement fermée. Contactez {BRAND_NAME} pour préparer votre accès ; aucun paiement ne sera déclenché depuis cette page.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{offre.devisObligatoire?"Sur devis":`${prix.total} €`} {!offre.devisObligatoire&&<span className="text-xs font-normal text-neutral-500">HT/mois</span>}</p>{offre.devisObligatoire||!configure||!abonnementsOuverts?<Link href={contactCommercial} className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">{offre.devisObligatoire?"Demander un devis":"Ouverture prochaine"}</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white">{reabonnement ? "Réactiver avec cette offre" : "Démarrer l’essai"}</button></form>}</article>})}</div></section>}
 
     {souscrit && offreSuivante && <section className="rounded-xl border p-5">
       <h2 className="font-semibold">Passer à l’offre {offreSuivante.nom}</h2>

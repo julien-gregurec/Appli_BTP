@@ -1,8 +1,8 @@
 # ELSATIA — Preview : pack d'exécution final (V1)
 
 > **Train canonique V3 (2026-09-26)** — ce pack s'exécute désormais sur
-> `integration/elsatia-canonical-train-v3` : **<!--train:nb-->342<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260927000507<!--/train:derniere-->`**, DB verify
-> **<!--train:controles-->18<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
+> `integration/elsatia-canonical-train-v3` : **<!--train:nb-->343<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260927000508<!--/train:derniere-->`**, DB verify
+> **<!--train:controles-->19<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet). Ces trois valeurs sont **générées** depuis
 > `supabase/migrations` (`npm run sync:train-expectations`) et vérifiées en CI
 > (`npm run verify:train-expectations`). Les mentions « 335 » ci-dessous décrivent les preuves
@@ -44,7 +44,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | `scripts/preview/lib/preview-guard.mjs` | Garde-fous communs (réf. Preview, Production refusée, Stripe test, origines HTTPS) |
 | `scripts/preview/env-inventory.mjs` | Inventaire depuis le manifeste (hors ligne) |
 | `scripts/preview/env-check.mjs` | Preflight manifeste **+ cohérence entre applications** (hors ligne) |
-| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->18<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
+| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->19<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
 | `scripts/preview/http-smoke.mjs` | Smoke HTTP anonyme des 5 apps (GET/OPTIONS, redirections non suivies) |
 | `scripts/preview/stripe-test-verify.mjs` | Stripe Test : endpoints, événements, portail, prix (GET uniquement) |
 | `scripts/preview/storage-smoke.mjs` | Buckets, drapeaux public, refus anonyme ; `--write` = safe-run dépôt/lecture signée/suppression |
@@ -60,7 +60,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | | |
 |---|---|
 | Ref à déployer | **`integration/elsatia-canonical-train-v3`** (V3). Historique : `integration/elsatia-canonical-train-v2` |
-| Migrations | **<!--train:nb-->342<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260927000507<!--/train:derniere-->`** ; `verify:migrations` ✅ (V2 : 335 → `20260923000400`) |
+| Migrations | **<!--train:nb-->343<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260927000508<!--/train:derniere-->`** ; `verify:migrations` ✅ (V2 : 335 → `20260923000400`) |
 | Rejeu à froid (ce pack) | `rebuild_db.sh pack_preview` : **335/335**, 0 erreur |
 | Applications | Gestion Pro (racine), Colors, Tools, Réserves, Studio (`apps/*`), worker `workers/studio-video` |
 | Lot Studio post-H | **non intégré** (inchangé) |
@@ -195,14 +195,14 @@ Branches de décision **pré-écrites** (sortie de `db-verify --allow-pending`) 
 | Constat | Action |
 |---|---|
 | `DB-MIGRATIONS-FOREIGN` (version distante absente du dépôt : autre lignée, p. ex. une orpheline `…184`) | **Arrêt.** `db push` refusera. Défaut conservateur : `supabase migration repair --status reverted <v>` **uniquement** si le schéma de cette version est prouvé identique à une migration du train ; sinon réinitialiser le projet (données de recette seulement, sauvegarde faite) |
-| `DB-MIGRATIONS-PENDING` = <!--train:nb-->342<!--/train:nb--> − N | Normal avant push. **Si N = 335 (base V2), les 5 migrations V3 (`2026092600050[1-5]`) sont toutes > `20260923000400` : upgrade monotone prouvé (rapport V3 §8).** Si N = 328 (base V1), les 7 migrations V2 sont **toutes > `…346`** : upgrade monotone prouvé (V2 §9 : 0 écart de lignes, 34/34 checksums, RLS identique) |
+| `DB-MIGRATIONS-PENDING` = <!--train:nb-->343<!--/train:nb--> − N | Normal avant push. **Si N = 335 (base V2), les 5 migrations V3 (`2026092600050[1-5]`) sont toutes > `20260923000400` : upgrade monotone prouvé (rapport V3 §8).** Si N = 328 (base V1), les 7 migrations V2 sont **toutes > `…346`** : upgrade monotone prouvé (V2 §9 : 0 écart de lignes, 34/34 checksums, RLS identique) |
 | `pgsodium` indisponible | NO-GO (la `20260828000244` l'installe ; 245→400 bloquées) |
 
 ### 4.2 Migration push et vérification
 
 ```bash
 npx supabase db push --linked
-npx supabase migration list --linked                      # <!--train:nb-->342<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260927000507<!--/train:derniere-->
+npx supabase migration list --linked                      # <!--train:nb-->343<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260927000508<!--/train:derniere-->
 npm run preview:db-verify -- --before-owner               # juste après push
 ```
 
@@ -613,7 +613,7 @@ détection de fuite, détection du rate-limiter).
 | « aucun code ne lit `STRIPE_PORTAL_CONFIGURATION_ID` » | lu par `src/lib/stripe-abonnement.ts:389` (optionnel) |
 | « `configurer-portail-stripe.mjs` n'existe que sur l'orpheline Billing V3 » | présent : `scripts/configurer-portail-stripe.mjs` |
 | « 3-D Secure suspend immédiatement » | `invoice.payment_action_required` ne touche **pas** l'accès (`statut_resultant = action_requise`) |
-| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V3, <!--train:nb-->342<!--/train:nb-->, dernière `<!--train:derniere-->20260927000507<!--/train:derniere-->` |
+| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V3, <!--train:nb-->343<!--/train:nb-->, dernière `<!--train:derniere-->20260927000508<!--/train:derniere-->` |
 | STEP 14 : crons GP « → 200 » avec bearer | **404** tant que `FEATURE_CRONS_ENABLED=false` (valeur Preview imposée) |
 | STEP 12 : « 27 prix V4 vérifiés » suffisent à la capacité | les prix `COMPTE_SUP_<OFFRE>` lus par le runtime ne sont pas dans la table vérifiée |
 

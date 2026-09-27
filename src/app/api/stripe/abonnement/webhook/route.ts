@@ -8,13 +8,16 @@ import { notifierPaiementAbonnementEchoue } from "@/lib/abonnement-notifications
 import { VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
 // Next.js n'autorise dans un `route.ts` que les exports de gestionnaires HTTP
 // et la configuration de segment : la logique métier vit dans ce module.
-import { identifiant, instantDepuisUnix, synchroniserAbonnementCoordonne, type EvenementOrdonne, type StripeReference, type SupabaseAdmin } from "@/lib/stripe-abonnement-synchronisation";
+import { identifiant, instantDepuisUnix, RattachementSubscriptionRefuse, synchroniserAbonnementCoordonne, type EvenementOrdonne, type StripeReference, type SupabaseAdmin } from "@/lib/stripe-abonnement-synchronisation";
 
 type StripeObjet = {
   id: string;
   object?: string;
   customer?: StripeReference;
   subscription?: StripeReference;
+  // Versions d'API Stripe récentes : la subscription d'une facture est portée
+  // par `parent.subscription_details.subscription`.
+  parent?: { subscription_details?: { subscription?: StripeReference } | null } | null;
   status?: string;
   mode?: string;
   payment_status?: string;
@@ -75,7 +78,10 @@ async function entreprisePour(admin: SupabaseAdmin, objet: StripeObjet): Promise
     if (entreprise && "ok" in entreprise) return entreprise;
     if (!entreprise) return { ok: false, categorie: "entreprise_inconnue" };
     if (customerId && entreprise.stripe_customer_id && customerId !== entreprise.stripe_customer_id) return { ok: false, categorie: "rattachement_stripe_incoherent" };
-    if (subscriptionId && entreprise.stripe_subscription_id && subscriptionId !== entreprise.stripe_subscription_id) return { ok: false, categorie: "rattachement_stripe_incoherent" };
+    // Une subscription différente de la subscription rattachée n'est plus
+    // refusée ici : réabonnement (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1). La
+    // base décide sous verrou (ancienne terminée chez Stripe, même client) ;
+    // un double abonnement reste refusé (RattachementSubscriptionRefuse → 422).
     return { ok: true, entrepriseId: entreprise.id };
   }
   if (subscriptionId) {
@@ -102,7 +108,7 @@ function diagnosticWebhook(niveau: "warn" | "error", evenement: Pick<StripeEvent
 }
 
 type DecisionFacture = {
-  decision: "applique" | "perime" | "sans_effet" | "deja_traite";
+  decision: "applique" | "perime" | "sans_effet" | "deja_traite" | "differe";
   motif?: string | null;
   statut_resultant: string | null;
   notifier_echec: boolean;
@@ -114,12 +120,30 @@ type DecisionFacture = {
 // `event.created`. Un événement plus ancien que le dernier appliqué (ex. vieux
 // `invoice.payment_failed` rejoué après `invoice.paid`) est journalisé
 // `perime` et ne modifie rien.
+/**
+ * Facture d'une subscription pas (encore) rattachée — typiquement la première
+ * facture d'un réabonnement arrivée avant `customer.subscription.created` :
+ * rien n'est écrit, Stripe re-livre (503). La relecture de subscription reste
+ * l'autorité de l'accès (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1).
+ */
+class FactureSubscriptionNonRattachee extends Error {
+  constructor() {
+    super("Facture d'une subscription non rattachée");
+    this.name = "FactureSubscriptionNonRattachee";
+  }
+}
+
+function subscriptionDeFacture(objet: StripeObjet) {
+  return identifiant(objet.subscription) ?? identifiant(objet.parent?.subscription_details?.subscription);
+}
+
 async function appliquerEvenementFacture(admin: SupabaseAdmin, entrepriseId: string, evenement: StripeEvent): Promise<DecisionFacture> {
   const objet = evenement.data.object;
   const taxes = (objet.total_tax_amounts ?? []).reduce((total, taxe) => total + Number(taxe.amount ?? 0), 0);
   const totalCentimes = Number(objet.total ?? 0);
   const htCentimes = objet.subtotal_excluding_tax == null ? Math.max(0, totalCentimes - taxes) : Number(objet.subtotal_excluding_tax);
-  const { data, error } = await admin.rpc("appliquer_evenement_facture_abonnement_service", {
+  // Garde de subscription (migration 20260927000508) puis contrat d'ordre 506.
+  const { data, error } = await admin.rpc("appliquer_evenement_facture_abonnement_v2_service", {
     p_entreprise_id: entrepriseId,
     p_stripe_event_id: evenement.id,
     p_stripe_event_type: evenement.type,
@@ -136,9 +160,11 @@ async function appliquerEvenementFacture(admin: SupabaseAdmin, entrepriseId: str
     p_devise: objet.currency ?? "eur",
     p_url_facture: objet.hosted_invoice_url || null,
     p_url_pdf: objet.invoice_pdf || null,
+    p_stripe_subscription_id: subscriptionDeFacture(objet),
   });
   if (error) throw new Error(error.message);
   if (!data || typeof data !== "object") throw new Error("Décision d'ordonnancement absente");
+  if ((data as DecisionFacture).decision === "differe") throw new FactureSubscriptionNonRattachee();
   return data as DecisionFacture;
 }
 
@@ -262,7 +288,7 @@ export async function POST(request: Request) {
         livemode: evenement.livemode,
         object_id: objet.id,
         customer_id: identifiant(objet.customer),
-        subscription_id: objet.object === "subscription" ? objet.id : identifiant(objet.subscription),
+        subscription_id: objet.object === "subscription" ? objet.id : (identifiant(objet.subscription) ?? identifiant(objet.parent?.subscription_details?.subscription)),
       },
     });
     reservation = resultat.error;
@@ -284,7 +310,8 @@ export async function POST(request: Request) {
       const subscriptionId = identifiant(objet.subscription);
       if (!subscriptionId) throw new Error("Abonnement absent de la session Stripe");
       statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenementOrdonne(evenement));
-      await reconcilierAbonnementStripe(entrepriseId);
+      // Session d'une subscription remplacée ou terminale : sans effet.
+      if (statutResultant !== null) await reconcilierAbonnementStripe(entrepriseId);
       // R2-B : capacité personnes = DB → Stripe (autorité DB, out-of-order safe).
       await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
     } else if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(evenement.type)) {
@@ -293,7 +320,7 @@ export async function POST(request: Request) {
       // Le payload peut être ancien : l'abonnement est RELU chez Stripe sous
       // verrou, puis appliqué par la RPC ordonnée (filigrane d'accès).
       statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenementOrdonne(evenement));
-      if (entrepriseId) {
+      if (entrepriseId && statutResultant !== null) {
         await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
       }
     } else if (evenement.type === "customer.subscription.trial_will_end") {
@@ -306,6 +333,19 @@ export async function POST(request: Request) {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       const customerId = identifiant(objet.customer);
       if (!customerId) throw new Error("Client Stripe absent de la facture");
+      // Réabonnement : aucune ligne de dépassement sur la facture d'une
+      // subscription qui n'est pas (ou plus) celle de l'entreprise.
+      const subscriptionFacture = subscriptionDeFacture(objet);
+      if (subscriptionFacture) {
+        const { data: courante, error: lecture } = await admin.from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+        if (lecture) throw new Error(lecture.message);
+        const courant = (courante as { stripe_subscription_id?: string | null } | null)?.stripe_subscription_id ?? null;
+        if (courant && courant !== subscriptionFacture) {
+          await journaliserSansEffet(admin, entrepriseId, evenement, "subscription_non_courante");
+          await admin.rpc("finaliser_evenement_abonnement_service", { p_stripe_event_id: evenement.id, p_statut_resultant: null });
+          return NextResponse.json({ received: true });
+        }
+      }
       await Promise.all([
         ajouterDepassementAppareilsFacture({ entrepriseId, customerId, invoiceId: objet.id, montantHt: await calculerDepassementAppareils(entrepriseId) }),
         ajouterDepassementStockageFacture({ entrepriseId, customerId, invoiceId: objet.id }),
@@ -350,6 +390,14 @@ export async function POST(request: Request) {
     // B1 — verrou remise toujours occupé après reprise : état transitoire, pas
     // une panne. On demande une re-livraison (503 + Retry-After), sans alarme
     // « error » ni corps d'erreur métier.
+    if (e instanceof FactureSubscriptionNonRattachee) {
+      diagnosticWebhook("warn", evenement, "facture_subscription_non_rattachee", configurationMode.mode);
+      return NextResponse.json({ received: false, deferred: true }, { status: 503, headers: { "Retry-After": "30" } });
+    }
+    if (e instanceof RattachementSubscriptionRefuse) {
+      diagnosticWebhook("error", evenement, "rattachement_stripe_incoherent", configurationMode.mode);
+      return NextResponse.json({ error: "Événement Stripe non traitable" }, { status: 422 });
+    }
     if (e instanceof VerrouRemiseOccupe) {
       diagnosticWebhook("warn", evenement, "verrou_remise_occupe", configurationMode.mode);
       return NextResponse.json({ received: false, deferred: true }, { status: 503, headers: { "Retry-After": "5" } });

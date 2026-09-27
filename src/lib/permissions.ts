@@ -5,6 +5,23 @@ import type { ContexteEntreprise } from "@/lib/entreprise";
 import { filtrerPermissionsSelonOffre } from "@/lib/tarification";
 import { modeAssistance, permissionsAssistanceGestionPro } from "@/lib/assistance-server";
 import { permissionsDeConsultation, resoudrePermissionsAssistance } from "@elsatia/platform-support-comms";
+import { etatReabonnementEntreprise } from "@/lib/acces-support-abonnement";
+
+/**
+ * Entreprise suspendue ou annulée (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1) : la
+ * RLS (`est_membre_actif`) masque ses permissions de poste à ses propres
+ * membres, qui recevaient une liste VIDE — « Abonnement » fermé et en lecture
+ * seule, aucun réabonnement ni régularisation possible. Seules les pages de
+ * sortie restent accessibles (getContexteEntreprise) : le périmètre rendu est
+ * celui de la gestion d'abonnement, accordé par la règle évaluée en base
+ * (`etat_reabonnement_entreprise` : `gerer_parametres` ou support), rien d'autre.
+ */
+export const PERMISSIONS_REPRISE_ABONNEMENT = ["acces_parametres", "gerer_parametres"] as const;
+
+function entrepriseMasqueeParRls(ctx: ContexteEntreprise) {
+  return ctx.abonnementStatut === "suspendu" || ctx.abonnementStatut === "annule"
+    || (ctx.suspensionPrevueAt !== null && new Date(ctx.suspensionPrevueAt).getTime() <= Date.now());
+}
 
 // null signifie « accès complet » (prototype sans connexion).
 /**
@@ -51,6 +68,10 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
     }).permissions;
   }
   if(!appartenance?.poste_id)return [];
+  if(entrepriseMasqueeParRls(ctx)){
+    const etat=await etatReabonnementEntreprise(sb,ctx.entrepriseId);
+    return etat?.peut_gerer===true?[...PERMISSIONS_REPRISE_ABONNEMENT]:[];
+  }
   const {data}=await sb.from("permissions_poste").select("cle_permission").eq("entreprise_id",ctx.entrepriseId).eq("poste_id",appartenance.poste_id).eq("autorise",true);
   const droits=new Set((data??[]).map(x=>x.cle_permission));
   droits.delete("saisir_son_pointage");

@@ -12,14 +12,15 @@
 -- aucun nombre de migrations n'est maintenu à la main (train canonique V3 — rapport
 -- ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE). Contrôles 14-17 : garde-fous du train V3
 -- (RGPD factures/contrats, Réserves). Contrôle 18 : contrat d'ordre Stripe (…506) et essai
--- borné (…507, ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
+-- borné (…507, ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1). Contrôle 19 : réabonnement (…508,
+-- ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (342, '20260927000507')),
+attendu_train(nb, derniere) as (values (343, '20260927000508')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -179,6 +180,16 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and to_regclass('public.stripe_essai_ecarts') is not null
            and exists (select 1 from pg_trigger where tgname = 'borner_essai_entreprise' and tgrelid = 'public.entreprises'::regclass and not tgisinternal)
            and not exists (select 1 from public.entreprises where abonnement_essai_fin > abonnement_essai_debut + 30), true
+  union all
+  select 19, 'Stripe : réabonnement (508)', 'historique des subscriptions remplacées, rattachement et facture v2 présents',
+         coalesce(nullif(concat_ws(', ',
+           case when to_regclass('public.stripe_subscriptions_remplacees') is null then 'historique ABSENT' end,
+           case when to_regprocedure('public.relier_subscription_reabonnement_service(uuid,text,text,text,text,text)') is null then 'rattachement ABSENT' end,
+           case when to_regprocedure('public.appliquer_evenement_facture_abonnement_v2_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text,text)') is null
+                then 'facture v2 ABSENTE' end), ''), 'contrôlé'),
+         to_regclass('public.stripe_subscriptions_remplacees') is not null
+           and to_regprocedure('public.relier_subscription_reabonnement_service(uuid,text,text,text,text,text)') is not null
+           and to_regprocedure('public.appliquer_evenement_facture_abonnement_v2_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text,text)') is not null, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

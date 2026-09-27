@@ -61,6 +61,72 @@ export type EvenementOrdonne = {
 
 export type DecisionOrdre = { decision: "applique" | "perime" | "deja_traite"; statut_resultant: string | null };
 
+/**
+ * Rattachement refusé par la base (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1) :
+ * subscription d'un autre client, ou ancienne subscription encore vivante chez
+ * Stripe (double abonnement). Non traitable en l'état : 422, jamais appliqué.
+ */
+export class RattachementSubscriptionRefuse extends Error {
+  constructor() {
+    super("Rattachement de subscription Stripe refusé");
+    this.name = "RattachementSubscriptionRefuse";
+  }
+}
+
+/** Issue de `lier`/`relier` : la subscription est-elle la courante de l'entreprise ? */
+export type IssueRattachement = "lie" | "deja_lie" | "relie" | "remplacee" | "terminale_ignoree";
+
+/**
+ * Rattache la subscription relue à l'entreprise (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1).
+ *
+ * - Première liaison ou subscription déjà courante : contrat historique.
+ * - L'entreprise porte une AUTRE subscription : l'ancienne est RELUE chez
+ *   Stripe ; la base ne remplace que si elle est terminée (`canceled`,
+ *   `incomplete_expired`) et le client identique (fail-closed sinon).
+ * - Subscription déjà remplacée, ou nouvelle déjà terminale : jamais rattachée,
+ *   l'événement est sans effet sur l'accès.
+ */
+async function rattacherSubscription(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription): Promise<IssueRattachement> {
+  const { data: entreprise, error: lecture } = await admin
+    .from("entreprises")
+    .select("stripe_subscription_id")
+    .eq("id", entrepriseId)
+    .maybeSingle();
+  if (lecture) throw new Error(lecture.message);
+  const courante = (entreprise as { stripe_subscription_id?: string | null } | null)?.stripe_subscription_id ?? null;
+  let ancienneStatut: string | null = null;
+  if (courante && courante !== abonnement.id) {
+    ancienneStatut = (await recupererAbonnementStripe(courante)).status;
+  }
+  const { data, error } = await admin.rpc("relier_subscription_reabonnement_service", {
+    p_entreprise_id: entrepriseId,
+    p_nouvelle_subscription_id: abonnement.id,
+    p_stripe_customer_id: identifiant(abonnement.customer),
+    p_nouvelle_statut_stripe: abonnement.status,
+    p_ancienne_subscription_id: courante && courante !== abonnement.id ? courante : null,
+    p_ancienne_statut_stripe: ancienneStatut,
+  });
+  if (error) {
+    if ((error as { code?: string }).code === "42501") throw new RattachementSubscriptionRefuse();
+    throw new Error(error.message);
+  }
+  return (data as IssueRattachement | null) ?? "deja_lie";
+}
+
+async function journaliserSubscriptionIgnoree(admin: SupabaseAdmin, entrepriseId: string, evenement: EvenementOrdonne, motif: string) {
+  const { error } = await admin.rpc("journaliser_evenement_stripe_ordre_service", {
+    p_flux: "abonnement",
+    p_stripe_event_id: evenement.id,
+    p_stripe_event_type: evenement.type,
+    p_stripe_event_created: instantDepuisUnix(evenement.created),
+    p_objet_type: evenement.objetType,
+    p_objet_id: evenement.objetId,
+    p_entreprise_id: entrepriseId,
+    p_motif: motif,
+  });
+  if (error) console.warn("Journal d'ordonnancement Stripe non écrit", { categorie: "journal_ordre_indisponible", type_evenement: evenement.type });
+}
+
 async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription, evenement: EvenementOrdonne) {
   const offre = abonnement.metadata?.offre;
   const periodicite = abonnement.metadata?.periodicite;
@@ -97,26 +163,32 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
   return resultat?.statut_resultant ?? statut;
 }
 
+/**
+ * Relit la subscription chez Stripe, la rattache, puis l'applique par la RPC
+ * ordonnée. Renvoie le statut résultant, ou `null` si la subscription n'est pas
+ * (ou plus) celle de l'entreprise : événement journalisé sans effet.
+ */
 export async function synchroniserAbonnementCoordonne(
   admin: SupabaseAdmin,
   entrepriseId: string,
   subscriptionId: string,
   evenement: EvenementOrdonne,
-) {
+): Promise<string | null> {
   const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenement.id)}`);
   try {
     // Le payload peut être ancien ou désordonné : seule cette relecture est une
     // observation Stripe utilisable pour la remise et la saga active.
     let abonnementActuel = await recupererAbonnementStripe(subscriptionId);
     // B3 — première liaison : la chaîne remise ci-dessous exige que la
-    // subscription soit déjà rattachée à l'entreprise. On lie ici (CAS sur NULL,
-    // fail-closed si déjà liée à une autre subscription).
-    const lien = await admin.rpc("lier_subscription_entreprise_service", {
-      p_entreprise_id: entrepriseId,
-      p_stripe_subscription_id: subscriptionId,
-      p_stripe_customer_id: identifiant(abonnementActuel.customer),
-    });
-    if (lien.error) throw new Error(lien.error.message);
+    // subscription soit déjà rattachée à l'entreprise. Réabonnement : une
+    // nouvelle subscription ne remplace l'ancienne que si celle-ci est terminée
+    // chez Stripe (fail-closed sinon).
+    const issue = await rattacherSubscription(admin, entrepriseId, abonnementActuel);
+    if (issue === "remplacee" || issue === "terminale_ignoree") {
+      await journaliserSubscriptionIgnoree(admin, entrepriseId, evenement,
+        issue === "remplacee" ? "subscription_remplacee" : "subscription_terminale_non_rattachee");
+      return null;
+    }
     const operation = await lireOperationActiveRemiseServeur(admin, subscriptionId, verrou);
     if (operation) {
       await reconcilierOperationRemiseSousVerrou(admin, operation, verrou, passerelleStripeRemise);

@@ -12,6 +12,7 @@ import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/co
 import {
   AbonnementStripeDejaRattache,
   ajouterOptionIAAbonnement,
+  ClientStripeInvalide,
   creerSessionPortailStripe,
   estOffreAbonnement,
   estPalierOptionIA,
@@ -19,8 +20,16 @@ import {
   modifierOptionIAAbonnement,
   OFFRES_ABONNEMENT_COMMERCIALISEES,
   ouvrirCheckoutAbonnement,
+  recupererAbonnementStripe,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
+import {
+  MESSAGE_CLIENT_STRIPE_INVALIDE,
+  MESSAGE_REFUS_CHECKOUT,
+  MESSAGES_REABONNEMENT,
+  parcoursDepuisSubscription,
+  parcoursViaPortail,
+} from "@/lib/stripe-reabonnement";
 import {
   CAPACITE_SUPPLEMENTAIRE_MAX,
   RACCOURCIS_CAPACITE,
@@ -47,6 +56,8 @@ export async function demarrerAbonnementAction(formData: FormData) {
     const retourErreur = retourErreurAutorise(formData.get("retour_erreur"));
     redirect(`${retourErreur}?error=${encodeURIComponent(MESSAGE_OUVERTURE_PROCHAINE)}`);
   }
+  // Entreprise suspendue ou annulée : permissionsUtilisateur rend le périmètre
+  // de gestion d'abonnement accordé en base (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1).
   const ctx = await verifierDroitAbonnement();
   const offre = String(formData.get("offre") ?? "");
   const periodicite = String(formData.get("periodicite") ?? "mensuel");
@@ -76,7 +87,16 @@ export async function demarrerAbonnementAction(formData: FormData) {
   } catch (error) {
     const separateur = retourErreur.includes("?") ? "&" : "?";
     if (error instanceof AbonnementStripeDejaRattache) {
-      redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Un abonnement existe déjà pour votre entreprise : gérez-le depuis le portail de facturation.")}`);
+      // Réabonnement : la subscription existante impose son parcours
+      // (réactivation par le Portail, paiement requis, déjà actif).
+      const parcours = error.parcours;
+      const message = parcours in MESSAGE_REFUS_CHECKOUT
+        ? MESSAGE_REFUS_CHECKOUT[parcours as keyof typeof MESSAGE_REFUS_CHECKOUT]
+        : MESSAGE_REFUS_CHECKOUT.actif;
+      redirect(`${retourErreur}${separateur}error=${encodeURIComponent(message)}`);
+    }
+    if (error instanceof ClientStripeInvalide) {
+      redirect(`${retourErreur}${separateur}error=${encodeURIComponent(MESSAGE_CLIENT_STRIPE_INVALIDE)}`);
     }
     console.error("demarrerAbonnementAction", error);
     redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Souscription impossible pour le moment. Réessayez ou contactez-nous.")}`);
@@ -105,6 +125,52 @@ export async function ouvrirPortailAbonnementAction() {
   } catch (error) {
     console.error("ouvrirPortailAbonnementAction", error);
     redirect(`/abonnement?error=${encodeURIComponent("Le portail de facturation est momentanément indisponible.")}`);
+  }
+  redirect(destination);
+}
+
+/**
+ * Reprise d'un abonnement (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1). La
+ * subscription est RELUE chez Stripe (autorité), jamais déduite de l'état local :
+ * - résiliation programmée ou paiement requis → Portail Stripe (reprise de
+ *   l'abonnement, paiement, moyen de paiement) : aucune fonction Stripe
+ *   dupliquée côté ELSATIA ;
+ * - subscription terminée → choix d'une offre (nouveau Checkout, même client,
+ *   sans essai) ;
+ * - déjà actif / état non gérable → message.
+ * Aucun droit n'est rouvert ici : l'accès ne revient qu'avec le webhook Stripe.
+ */
+export async function reprendreAbonnementAction() {
+  const ctx = await verifierDroitAbonnement();
+  // Colonnes Stripe lues côté serveur après le contrôle du droit : la RLS
+  // masque l'entreprise suspendue ou annulée à ses membres.
+  const { data: entreprise } = await createAdminClient()
+    .from("entreprises")
+    .select("stripe_customer_id,stripe_subscription_id")
+    .eq("id", ctx.entrepriseId)
+    .single();
+  if (!entreprise?.stripe_subscription_id || !entreprise.stripe_customer_id) {
+    redirect("/abonnement#choisir-offre");
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (!baseUrl) redirect(`/abonnement?error=${encodeURIComponent("Adresse publique de l’application non configurée")}`);
+  let destination: string;
+  try {
+    const parcours = parcoursDepuisSubscription(await recupererAbonnementStripe(entreprise.stripe_subscription_id));
+    if (parcours === "nouveau_checkout") {
+      destination = "/abonnement#choisir-offre";
+    } else if (parcoursViaPortail(parcours)) {
+      const session = await creerSessionPortailStripe(entreprise.stripe_customer_id, `${baseUrl}/abonnement`);
+      if (!session.url) throw new Error("Stripe n’a pas retourné le portail client");
+      destination = session.url;
+    } else if (parcours === "actif") {
+      destination = `/abonnement?error=${encodeURIComponent(MESSAGE_REFUS_CHECKOUT.actif)}`;
+    } else {
+      destination = `/abonnement?error=${encodeURIComponent(MESSAGE_REFUS_CHECKOUT.support)}`;
+    }
+  } catch (error) {
+    console.error("reprendreAbonnementAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent(MESSAGES_REABONNEMENT.echec.description)}`);
   }
   redirect(destination);
 }
@@ -393,7 +459,9 @@ export async function ouvrirPortailAbonnementSuspenduAction() {
   if (!(await peutGererAbonnementSuspendu(supabase, user.id, profil.entreprise_active_id))) {
     redirect(`/abonnement-suspendu?error=${encodeURIComponent("Seul un administrateur peut gérer l’abonnement")}`);
   }
-  const { data: entreprise } = await supabase.from("entreprises").select("stripe_customer_id").eq("id", profil.entreprise_active_id).maybeSingle();
+  // Lecture serveur après le contrôle du droit : la RLS masque l'entreprise
+  // suspendue à ses propres membres (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1).
+  const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_customer_id").eq("id", profil.entreprise_active_id).maybeSingle();
   if (!entreprise?.stripe_customer_id) redirect(`/abonnement-suspendu?error=${encodeURIComponent(`Aucun abonnement Stripe n’est associé. Contactez ${PRODUCT_NAME}.`)}`);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!baseUrl) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Adresse publique non configurée")}`);
