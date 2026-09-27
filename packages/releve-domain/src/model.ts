@@ -194,15 +194,10 @@ export const ENTITY_REF_KINDS = ["releve", "batiment", "etage", "zone", "piece",
 export type EntityRefKind = (typeof ENTITY_REF_KINDS)[number];
 export type EntityRef = { readonly kind: EntityRefKind; readonly id: string };
 
-/**
- * Ancrage spatial : un point sur un étage (mm), une entité, ou — Lot 4 — un point du **plan
- * futur** d'un étage en coordonnées normalisées (0–1, origine en haut à gauche) : le plan
- * n'existe pas encore (lot 5), la position relative est conservée et sera recalée dessus.
- */
+/** Ancrage spatial : un point sur un étage, ou une entité. */
 export type Ancre =
   | { readonly kind: "point"; readonly etageId: EtageId; readonly point: Point2D }
-  | { readonly kind: "entite"; readonly ref: EntityRef }
-  | { readonly kind: "plan"; readonly etageId: EtageId; readonly x: number; readonly y: number };
+  | { readonly kind: "entite"; readonly ref: EntityRef };
 
 export const MUR_TYPES = ["exterieur", "porteur", "cloison", "doublage"] as const;
 export type MurType = (typeof MUR_TYPES)[number];
@@ -278,29 +273,11 @@ export type MesureDonnees = {
   readonly priseLe: IsoDateTime;
 };
 
-/**
- * Lot 4 — repère posé SUR la photo : position normalisée (0–1 de la largeur / hauteur de
- * l'image redressée), objet du relevé qu'il désigne, libellé et ordre. C'est le point d'appui
- * du futur plan : « ce coin de la photo est le mur M, ce boîtier est l'équipement E ».
- */
-export type PhotoRepere = {
-  readonly id: string;
-  readonly x: number;
-  readonly y: number;
-  readonly label: string;
-  readonly ordre: number;
-  readonly cible: EntityRef | null;
-};
-
 export type PhotoAnchorDonnees = {
   readonly mediaId: MediaId;
   readonly ancre: Ancre;
   readonly directionRad: number | null;
   readonly legende: string | null;
-  /** Lot 4 (facultatif) : rang de la photo parmi celles du même objet. */
-  readonly ordre?: number;
-  /** Lot 4 (facultatif) : repères posés sur la photo. */
-  readonly reperes?: readonly PhotoRepere[];
 };
 
 /** Recovery V2 : forme d'annotation (absente = `texte`, rétro-compatible). Aucun éditeur au lot 2. */

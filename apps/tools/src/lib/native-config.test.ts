@@ -34,16 +34,6 @@ describe("configuration native canonique", () => {
     expect(androidManifest).toContain('android:allowBackup="false"');
     expect(androidPaths).not.toContain("external-path");
   });
-  it("Relevé & Métré (Lot 4) : usage caméra déclaré sur iOS, aucune permission Android ajoutée ni localisation", () => {
-    // Sans cette clé, iOS interrompt l'application quand `<input capture>` ouvre l'appareil photo.
-    expect(iosInfoPlist).toMatch(/<key>NSCameraUsageDescription<\/key>\s*<string>[^<]*photos de terrain[^<]*<\/string>/);
-    expect(iosInfoPlist).not.toContain("NSLocation");
-    expect(iosInfoPlist).not.toContain("NSMicrophoneUsageDescription");
-    // Android : l'intent ACTION_IMAGE_CAPTURE n'exige CAMERA que si l'application la déclare.
-    expect(androidManifest).not.toContain("android.permission.CAMERA");
-    expect(androidManifest).not.toContain("ACCESS_FINE_LOCATION");
-  });
-
   it("déclare uniquement le deep link de récupération contrôlé", () => {
     expect(iosInfoPlist).toContain("fr.elsatia.tools.auth");
     expect(androidManifest).toContain('android:scheme="fr.elsatia.tools"');

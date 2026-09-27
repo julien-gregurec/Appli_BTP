@@ -60,9 +60,6 @@ export const RELEVE_LIMITS = {
   metadataJson: 8_000,
   formule: 500,
   cleQuantite: 120,
-  /** Lot 4 : repères par photo et libellé d'un repère. */
-  reperesMax: 50,
-  labelRepere: 120,
 } as const;
 
 const CODE_POSTAL = /^[0-9A-Za-z -]{2,12}$/;
@@ -287,43 +284,7 @@ function validateAncre(c: Collector, path: string, value: unknown) {
   if (!isRecord(value)) { c.add(path, "invalid_type", "Ancre attendue."); return; }
   if (value.kind === "point") { c.uuid(`${path}.etageId`, value.etageId, false); c.point(`${path}.point`, value.point); return; }
   if (value.kind === "entite") { validateRef(c, `${path}.ref`, value.ref); return; }
-  if (value.kind === "plan") {
-    c.uuid(`${path}.etageId`, value.etageId, false);
-    c.number(`${path}.x`, value.x, 0, 1); c.number(`${path}.y`, value.y, 0, 1);
-    return;
-  }
-  c.add(`${path}.kind`, "invalid_enum", "Ancre « point », « entite » ou « plan » attendue.");
-}
-
-/** Lot 4 : repères posés sur une photo (coordonnées normalisées, identifiants uniques). */
-function validateReperes(c: Collector, path: string, value: unknown) {
-  if (value === undefined) return;
-  if (!Array.isArray(value)) { c.add(path, "invalid_type", "Liste attendue."); return; }
-  if (value.length > RELEVE_LIMITS.reperesMax) c.add(path, "out_of_range", `${RELEVE_LIMITS.reperesMax} repères maximum.`);
-  const ids = new Set<string>();
-  value.forEach((item, index) => {
-    const at = `${path}.${index}`;
-    if (!isRecord(item)) { c.add(at, "invalid_type", "Repère attendu."); return; }
-    const id = c.uuid(`${at}.id`, item.id, false);
-    if (id && ids.has(id)) c.add(`${at}.id`, "invariant_violated", "Identifiant de repère en double.");
-    if (id) ids.add(id);
-    c.number(`${at}.x`, item.x, 0, 1); c.number(`${at}.y`, item.y, 0, 1);
-    c.text(`${at}.label`, item.label, RELEVE_LIMITS.labelRepere, true);
-    c.integer(`${at}.ordre`, item.ordre, 0, RELEVE_LIMITS.ordreMax);
-    if (present(item.cible)) validateRef(c, `${at}.cible`, item.cible);
-  });
-}
-
-/** Lot 4 : géométrie d'une annotation dessinée sur une photo (`espace: "photo"`, coordonnées 0–1). */
-export const PHOTO_ANNOTATION_COULEURS = ["rouge", "jaune", "bleu", "blanc"] as const;
-function validatePhotoGeometrie(c: Collector, path: string, forme: string, value: unknown) {
-  if (!isRecord(value) || value.espace !== "photo") return;
-  const unit = (key: string) => c.number(`${path}.${key}`, value[key], 0, 1);
-  if (forme === "fleche") { unit("x1"); unit("y1"); unit("x2"); unit("y2"); }
-  else if (forme === "cercle") { unit("cx"); unit("cy"); c.number(`${path}.r`, value.r, 0, 1, { exclusiveMin: true }); }
-  else if (forme === "texte") { unit("x"); unit("y"); }
-  else c.add(`${path}.espace`, "invariant_violated", "Seuls texte, flèche et cercle se dessinent sur une photo.");
-  if (present(value.couleur)) c.enumeration(`${path}.couleur`, value.couleur, PHOTO_ANNOTATION_COULEURS);
+  c.add(`${path}.kind`, "invalid_enum", "Ancre « point » ou « entite » attendue.");
 }
 
 const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, unknown>) => void> = {
@@ -368,8 +329,6 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     validateAncre(c, "donnees.ancre", d.ancre);
     c.number("donnees.directionRad", d.directionRad, -2 * Math.PI, 2 * Math.PI, { nullable: true });
     c.text("donnees.legende", d.legende, RELEVE_LIMITS.libelle, false);
-    if (d.ordre !== undefined) c.integer("donnees.ordre", d.ordre, 0, RELEVE_LIMITS.ordreMax);
-    validateReperes(c, "donnees.reperes", d.reperes);
   },
   annotation(c, d) {
     validateAncre(c, "donnees.ancre", d.ancre);
@@ -377,7 +336,6 @@ const DONNEES_VALIDATORS: Record<ElementType, (c: Collector, d: Record<string, u
     c.text("donnees.texte", d.texte, RELEVE_LIMITS.texteAnnotation, (ANNOTATION_FORMES_TEXTUELLES as readonly string[]).includes(forme));
     if (!present(d.texte) && !(ANNOTATION_FORMES_TEXTUELLES as readonly string[]).includes(forme)) c.add("donnees.texte", "invalid_type", "Texte attendu (chaîne vide admise).");
     validateObject(c, "donnees.geometrie", d.geometrie, RELEVE_LIMITS.metadataJson);
-    validatePhotoGeometrie(c, "donnees.geometrie", forme, d.geometrie);
     c.uuid("donnees.mediaAudioId", d.mediaAudioId, true);
   },
   materiau(c, d) {

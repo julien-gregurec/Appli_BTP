@@ -6,7 +6,7 @@ import {
   allowedActions, buildReleveTree, niveauLabel, PIECE_USAGES,
   type PieceUsage, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type StructureKind,
 } from "@elsatia/releve-domain";
-import { ficheHref, photosHref, readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
+import { ficheHref, readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { USAGE_LABELS } from "./labels";
 import styles from "./releve.module.css";
@@ -94,7 +94,6 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
             {tree.chantiers.map(({ chantier }) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}
           </select></label>}
         <Link className={styles.secondary} href={ficheHref(releveId)}>Fiche du relevé</Link>
-        <Link className={styles.secondary} href={photosHref(releveId)}>Photos terrain</Link>
       </div>
       <p className={styles.feedback} role="status" aria-live="polite">{feedback}</p>
     </div></section>

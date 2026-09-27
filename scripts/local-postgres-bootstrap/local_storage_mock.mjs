@@ -136,22 +136,8 @@ function execSql(sql) {
 // storage-api either (it uses its own service connection for bucket
 // metadata) -- read as postgres here too.
 function bucketInfo(bucket) {
-  const rows = runAsRole('service_role', {}, `select id, public, file_size_limit, allowed_mime_types from storage.buckets where id = ${sqlLiteral(bucket)}`);
+  const rows = runAsRole('service_role', {}, `select id, public from storage.buckets where id = ${sqlLiteral(bucket)}`);
   return rows[0] || null;
-}
-
-// Opt-in (STORAGE_ENFORCE_BUCKET_LIMITS=1, Relevé & Métré Lot 4) : applique `file_size_limit` et
-// `allowed_mime_types` du bucket comme le vrai storage-api (413 EntityTooLarge / 415 InvalidMimeType).
-// Désactivé par défaut pour ne rien changer aux recettes existantes.
-const ENFORCE_BUCKET_LIMITS = process.env.STORAGE_ENFORCE_BUCKET_LIMITS === '1';
-function bucketLimitViolation(info, contentType, size) {
-  if (!ENFORCE_BUCKET_LIMITS || !info) return null;
-  if (info.file_size_limit && size > Number(info.file_size_limit)) return { status: 413, error: 'Payload too large', message: 'The object exceeded the maximum allowed size' };
-  const mime = String(contentType || '').split(';')[0].trim();
-  if (Array.isArray(info.allowed_mime_types) && info.allowed_mime_types.length && !info.allowed_mime_types.includes(mime)) {
-    return { status: 415, error: 'invalid_mime_type', message: `mime type ${mime} is not supported` };
-  }
-  return null;
 }
 
 function objectFilePath(bucket, name) {
@@ -286,8 +272,6 @@ const server = http.createServer(async (req, res) => {
       const metadata = JSON.stringify({ mimetype: contentType, size: bodyBuf.length });
       const info = bucketInfo(bucket);
       if (!info) return json(res, 400, { statusCode: '400', error: 'bucket_not_found', message: 'Bucket not found' });
-      const violation = bucketLimitViolation(info, contentType, bodyBuf.length);
-      if (violation) return json(res, violation.status, { statusCode: String(violation.status), error: violation.error, message: violation.message });
       const insertCols = `bucket_id, name, owner, metadata`;
       const insertVals = `${sqlLiteral(bucket)}, ${sqlLiteral(name)}, ${owner ? sqlLiteral(owner) : 'null'}, ${sqlLiteral(metadata)}::jsonb`;
       // No RETURNING: real Postgres RLS also re-checks a RETURNING row

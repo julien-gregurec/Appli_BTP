@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ficheHref, photosHref, readReleveId, readStructureSelection, structureHref } from "./navigation";
+import { ficheHref, readReleveId, readStructureSelection, structureHref } from "./navigation";
 
 const R = "e1000000-0000-0000-0000-000000000001";
 const C = "e9000000-0000-0000-0000-000000000001";
@@ -14,7 +14,6 @@ describe("navigation Relevé & Métré (routes statiques)", () => {
     expect(structureHref({ releveId: R, batimentId: B, etageId: E })).toBe(`/releves/structure?id=${R}`);
     expect(structureHref({ releveId: R, chantierId: C, etageId: E })).toBe(`/releves/structure?id=${R}&chantier=${C}`);
     expect(ficheHref(R)).toBe(`/releves/fiche?id=${R}`);
-    expect(photosHref(R)).toBe(`/releves/photos?id=${R}`);
   });
 
   it("relit la sélection et ignore tout identifiant forgé", () => {

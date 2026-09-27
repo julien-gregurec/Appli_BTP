@@ -17,7 +17,7 @@
  *   multi-chantiers produit une enveloppe par chantier lié.
  */
 
-import { mesureMode, type Chantier, type MesureMode, type ReleveAggregate, type ReleveElement, type Version, type QuantiteUnite, type Point2D, type Ancre } from "./model";
+import { mesureMode, type Chantier, type MesureMode, type ReleveAggregate, type ReleveElement, type Version, type QuantiteUnite, type Point2D } from "./model";
 
 export const GP_SYNC_CONTRACT_VERSION = 1 as const;
 
@@ -62,8 +62,7 @@ const pointToM = (point: Point2D) => ({ x: mmToM(point.x), y: mmToM(point.y) });
 const nullableM = (value: number | null) => (value === null ? null : mmToM(value));
 
 type GpPoint = { x: number; y: number };
-/** Lot 4 : `plan` = point du plan futur d'un étage, coordonnées normalisées 0–1 (sans unité). */
-type GpAncre = { kind: "point"; floorRef: string; point: GpPoint } | { kind: "entite"; refKind: string; ref: string } | { kind: "plan"; floorRef: string; x: number; y: number };
+type GpAncre = { kind: "point"; floorRef: string; point: GpPoint } | { kind: "entite"; refKind: string; ref: string };
 
 export type ReleveGpEnvelope = {
   readonly contractVersion: typeof GP_SYNC_CONTRACT_VERSION;
@@ -97,7 +96,7 @@ export type ReleveGpEnvelope = {
   readonly measurements: ReadonlyArray<{ readonly ref: string; readonly cible: { kind: string; ref: string }; readonly type: string; readonly valeur: number; readonly unite: "m" | "m²" | "m³" | "rad"; readonly source: string; readonly mode: MesureMode; readonly precisionM: number | null; readonly priseLe: string }>;
   /** Lignes compatibles `lignes_metres` (designation, formule, resultat, unite). Jamais de prix. */
   readonly quantities: ReadonlyArray<{ readonly ref: string; readonly cle: string; readonly designation: string; readonly floorRef: string | null; readonly roomRef: string | null; readonly formule: string; readonly resultat: number; readonly unite: GpUnite; readonly qualite: string; readonly materialRef: string | null; readonly gpPrestationRef: string | null; readonly sources: ReadonlyArray<{ readonly kind: string; readonly ref: string }>; readonly gpOuvrageRef: string | null }>;
-  readonly photos: ReadonlyArray<{ readonly ref: string; readonly mediaRef: string; readonly storagePath: string; readonly mimeType: string; readonly bytes: number; readonly ancre: GpAncre; readonly legende: string | null; readonly ordre: number; readonly reperes: ReadonlyArray<{ readonly x: number; readonly y: number; readonly label: string; readonly ordre: number; readonly cible: { readonly kind: string; readonly ref: string } | null }> }>;
+  readonly photos: ReadonlyArray<{ readonly ref: string; readonly mediaRef: string; readonly storagePath: string; readonly mimeType: string; readonly bytes: number; readonly ancre: GpAncre; readonly legende: string | null }>;
   readonly annotations: ReadonlyArray<{ readonly ref: string; readonly forme: string; readonly texte: string; readonly geometrie: Readonly<Record<string, unknown>> | null; readonly ancre: GpAncre; readonly audioStoragePath: string | null }>;
   readonly materials: ReadonlyArray<{ readonly ref: string; readonly libelle: string; readonly categorie: string; readonly unite: GpUnite; readonly pertePourcent: number; readonly gpPrestationRef: string | null; readonly revetement: string | null }>;
   /** Revêtements : matériaux typés par un revêtement, avec les quantités qui les portent. */
@@ -127,10 +126,10 @@ function ofType<T extends ReleveElement["type"]>(elements: readonly ReleveElemen
   return elements.filter((element): element is ReleveElement<T> => element.type === type && !element.deletedAt);
 }
 
-function ancreToGp(ancre: Ancre): GpAncre {
-  if (ancre.kind === "point") return { kind: "point", floorRef: ancre.etageId, point: pointToM(ancre.point) };
-  if (ancre.kind === "plan") return { kind: "plan", floorRef: ancre.etageId, x: ancre.x, y: ancre.y };
-  return { kind: "entite", refKind: ancre.ref.kind, ref: ancre.ref.id };
+function ancreToGp(ancre: { kind: "point"; etageId: string; point: Point2D } | { kind: "entite"; ref: { kind: string; id: string } }): GpAncre {
+  return ancre.kind === "point"
+    ? { kind: "point", floorRef: ancre.etageId, point: pointToM(ancre.point) }
+    : { kind: "entite", refKind: ancre.ref.kind, ref: ancre.ref.id };
 }
 
 function openingFamily(type: string): "door" | "window" | "other" {
@@ -216,7 +215,7 @@ export function buildGpEnvelope(aggregate: ReleveAggregate, version: Version, ex
     }),
     photos: photos.map((item) => {
       const media = medias.get(item.donnees.mediaId)!;
-      return { ref: item.id, mediaRef: media.id, storagePath: media.storagePath, mimeType: media.mimeType, bytes: media.tailleOctets, ancre: ancreToGp(item.donnees.ancre), legende: item.donnees.legende, ordre: item.donnees.ordre ?? 0, reperes: (item.donnees.reperes ?? []).map((repere) => ({ x: repere.x, y: repere.y, label: repere.label, ordre: repere.ordre, cible: repere.cible ? { kind: repere.cible.kind, ref: repere.cible.id } : null })) };
+      return { ref: item.id, mediaRef: media.id, storagePath: media.storagePath, mimeType: media.mimeType, bytes: media.tailleOctets, ancre: ancreToGp(item.donnees.ancre), legende: item.donnees.legende };
     }),
     annotations: ofType(elements, "annotation").map((item) => ({ ref: item.id, forme: item.donnees.forme ?? "texte", texte: item.donnees.texte, geometrie: item.donnees.geometrie ?? null, ancre: ancreToGp(item.donnees.ancre), audioStoragePath: item.donnees.mediaAudioId ? medias.get(item.donnees.mediaAudioId)?.storagePath ?? null : null })),
     materials: materiaux.map((item) => ({ ref: item.id, libelle: item.donnees.libelle, categorie: item.donnees.categorie, unite: toGpUnite(item.donnees.unite), pertePourcent: item.donnees.pertePourcent, gpPrestationRef: item.donnees.gpPrestationRef, revetement: item.donnees.revetement ?? null })),
