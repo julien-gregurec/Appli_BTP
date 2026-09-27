@@ -79,8 +79,10 @@ describe("politique de sécurité HTTP publique", () => {
     const policy = buildContentSecurityPolicy(PROD);
     expect(directive(policy, "worker-src")).toBe("worker-src 'self'");
     expect(directive(policy, "manifest-src")).toBe("manifest-src 'self'");
-    // `blob:` est indispensable à la conversion PNG du plan coté.
-    expect(directive(policy, "img-src")).toBe("img-src 'self' data: blob:");
+    // `blob:` est indispensable à la conversion PNG du plan coté ; l'origine Supabase (et elle seule)
+    // sert les photos de relevé par URL signée (Lot 4).
+    expect(directive(policy, "img-src")).toBe("img-src 'self' data: blob: https://abcdefgh.supabase.co");
+    expect(directive(buildContentSecurityPolicy({}), "img-src")).toBe("img-src 'self' data: blob:");
     // La vue d'impression injecte une feuille de style en ligne.
     expect(directive(policy, "style-src")).toBe("style-src 'self' 'unsafe-inline'");
   });
@@ -113,7 +115,10 @@ describe("politique de sécurité HTTP publique", () => {
   });
 
   it("ferme les capteurs sans neutraliser le partage d'export mobile", () => {
-    expect(PERMISSIONS_POLICY).toContain("camera=()");
+    // Lot 4 Relevé & Métré : caméra ouverte à la même origine seulement, jamais à un tiers.
+    expect(PERMISSIONS_POLICY).toContain("camera=(self)");
+    expect(PERMISSIONS_POLICY).not.toContain("camera=()");
+    expect(PERMISSIONS_POLICY).not.toMatch(/camera=\([^)]*(\*|https?:)/);
     expect(PERMISSIONS_POLICY).toContain("geolocation=()");
     expect(PERMISSIONS_POLICY).toContain("microphone=()");
     expect(PERMISSIONS_POLICY).toContain("payment=()");

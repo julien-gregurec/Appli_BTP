@@ -18,12 +18,12 @@ const securityHeaders = buildSecurityHeaders({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  transpilePackages: ["@elsatia/application-access"],
+  transpilePackages: ["@elsatia/application-access", "@elsatia/releve-domain"],
   ...(isNativeBuild
     ? { output: "export" as const, trailingSlash: true }
     : { headers: async () => [{ source: "/:path*", headers: securityHeaders }] }),
   turbopack: {
-    // Tools reste autonome ; le build Webpack transpile le seul package partagé déclaré.
+    // Tools reste autonome ; le build Webpack transpile les seuls packages partagés déclarés.
     root: fileURLToPath(new URL("./", import.meta.url)),
   },
 };
