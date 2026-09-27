@@ -20,6 +20,15 @@ with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
 attendu_train(nb, derniere) as (values (340, '20260926000505')),
 -- [/train-expectations]
+-- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
+-- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
+politique_contrats as (
+  select case when to_regclass('platform.purge_politique_contrats') is null then null
+              else (xpath('/row/e/text()', query_to_xml(
+                'select politique || '' / durée '' || coalesce(duree_conservation::text, ''non validée'') as e '
+                || 'from platform.purge_politique_contrats', false, true, '')))[1]::text
+         end as etat
+),
 migrations as (
   -- Le registre du CLI n'existe que sur un vrai projet (absent du harnais local).
   select case when to_regclass('supabase_migrations.schema_migrations') is null then null
@@ -125,8 +134,9 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
   -- propriétaire ; tant que la durée n'est pas validée, l'état effectif est duree_requise
   -- (purge des contrats refusée, fail-closed). Un autre choix = dérive de la décision.
   select 14, 'RGPD contrats acceptés : politique retenue', 'conserver_contrat_minimise (état duree_requise tant que la durée n''est pas validée)',
-         coalesce((select politique || ' / durée ' || coalesce(duree_conservation::text, 'non validée') from platform.purge_politique_contrats), 'ABSENTE'),
-         coalesce((select politique = 'conserver_contrat_minimise' from platform.purge_politique_contrats), false), true
+         coalesce(p.etat, 'ABSENTE (migrations 502/504 non appliquées)'),
+         coalesce(p.etat like 'conserver_contrat_minimise / %', false), true
+  from politique_contrats p
   union all
   select 15, 'TRUNCATE refusé sur factures et contrats (501/502)', '8 triggers refuser_truncate_*',
          (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in (

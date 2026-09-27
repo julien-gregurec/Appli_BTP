@@ -35,11 +35,19 @@ TABLES_METIER = [
     "habilitations_applications_utilisateurs",
     "colors_seaux", "colors_emplacements", "colors_mouvements", "colors_parametres",
     "appareils_comptes", "journal_activite",
+    # Train V3 (ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE §8) : contrats, tables enfants
+    # de l'export RGPD, Réserves, Tools, signatures.
+    "avenants", "lignes_avenants", "pieces_jointes_devis", "contacts_clients", "taches",
+    "chantier_transferts", "signatures_documents", "documents_chantier",
+    "reserves_chantiers", "reserves", "reserves_photos", "reserves_historique",
+    "reserves_intervenants", "reserves_invitations", "reserves_plans", "reserves_messages",
+    "reserves_transitions", "tools_projects", "tools_monetization_customers",
+    "tools_monetization_subscriptions",
 ]
 TABLES_SONDE_RLS = [
     "entreprises", "employes", "clients", "chantiers", "devis", "factures",
     "affectations", "pointages", "notes_frais", "boutique_commandes", "colors_seaux",
-    "acces_applications_entreprises",
+    "acces_applications_entreprises", "avenants", "reserves", "reserves_photos", "tools_projects",
 ]
 
 
@@ -96,6 +104,19 @@ def main():
              ||'|'||md5(coalesce(qual,'')||'#'||coalesce(with_check,''))
         from pg_policies where schemaname in ('public','storage') order by 1;""")
 
+    # Permissions : droits de table et EXECUTE des fonctions pour les rôles d'API.
+    grants = lignes(db, """
+      select table_schema||'.'||table_name||'|'||grantee||'|'||string_agg(privilege_type, ',' order by privilege_type)
+        from information_schema.role_table_grants
+       where grantee in ('anon','authenticated','service_role') and table_schema in ('public','platform','storage')
+       group by table_schema, table_name, grantee order by 1;""")
+    fonctions = lignes(db, """
+      select n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'
+             ||has_function_privilege('anon', p.oid, 'execute')||'|'||has_function_privilege('authenticated', p.oid, 'execute')
+             ||'|'||has_function_privilege('service_role', p.oid, 'execute')
+        from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+       where n.nspname in ('public','platform') order by 1;""")
+
     utilisateurs = lignes(db, """
       select ue.utilisateur_id||'|'||ue.entreprise_id from public.utilisateurs_entreprises ue
        order by ue.entreprise_id, ue.utilisateur_id;""")
@@ -117,7 +138,8 @@ def main():
         probe[uid] = res
 
     json.dump({"base": db, "row_counts": counts, "colonnes": colonnes, "checksums": checksums,
-               "rls_tables": rls_tables, "policies": policies, "rls_probe": probe},
+               "rls_tables": rls_tables, "policies": policies, "rls_probe": probe,
+               "grants": grants, "fonctions": fonctions},
               open(sortie, "w"), indent=1, ensure_ascii=False, sort_keys=True)
     print(f"{db}: {len(counts)} tables, {len(checksums)} checksums, {len(policies)} policies, "
           f"{len(probe)} utilisateurs sondés -> {sortie}")
