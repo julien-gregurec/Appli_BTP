@@ -194,18 +194,23 @@ begin
       (ent, art2, cha1, 'sortie', 60, '2026-08-02', 'Charpente toiture Durand', emp1),
       (ent, art1, null, 'entree', 1000, '2026-07-28', 'Réassort fournisseur', null);
 
+    -- Commandes créées en brouillon puis passées à leur statut après leurs lignes : une
+    -- commande engagée est verrouillée (20260926000506), son identité imprimée figée à la
+    -- sortie du brouillon (20260927000507).
     insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, montant_ht, montant_tva, montant_ttc, cree_par_utilisateur_id)
-      values (ent, 'DR-'||suffixe||'-CMD-0001', fourn1, cha1, 'recue', '2026-07-25', '2026-07-30', 3900, 780, 4680, user1)
+      values (ent, 'DR-'||suffixe||'-CMD-0001', fourn1, cha1, 'brouillon', '2026-07-25', '2026-07-30', 3900, 780, 4680, user1)
       returning id into cmd1;
     insert into public.lignes_commande (entreprise_id, commande_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, quantite_recue, article_id) values
       (ent, cmd1, 'Tuile terre cuite', 1000, 'u', 6.5, 20, 1000, art1),
       (ent, cmd1, 'Chevron sapin 63x175', 300, 'ml', 3.2, 20, 300, art2);
+    update public.commandes_fournisseurs set statut = 'recue' where id = cmd1;
 
     insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, montant_ht, montant_tva, montant_ttc, cree_par_utilisateur_id)
-      values (ent, 'DR-'||suffixe||'-CMD-0002', fourn2, cha2, 'envoyee', '2026-09-15', '2026-09-30', 8000, 1600, 9600, user1)
+      values (ent, 'DR-'||suffixe||'-CMD-0002', fourn2, cha2, 'brouillon', '2026-09-15', '2026-09-30', 8000, 1600, 9600, user1)
       returning id into cmd2;
     insert into public.lignes_commande (entreprise_id, commande_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, article_id) values
       (ent, cmd2, 'Isolant laine de bois 100mm', 250, 'm2', 12.0, 20, art3);
+    update public.commandes_fournisseurs set statut = 'envoyee' where id = cmd2;
 
     -- Réserves : module séparé avec ses propres chantiers/intervenants
     -- (public.reserves_chantiers / reserves_intervenants), reliés au vrai

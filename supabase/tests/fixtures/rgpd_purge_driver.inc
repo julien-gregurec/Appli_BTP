@@ -1,6 +1,7 @@
 -- Déroulé SQL de scripts/purger-entreprise.mjs (mode execute), pour pgTAP et pour le
 -- harnais de qualification : mêmes RPC, même ordre (rapport topologique, 5 passes de
--- rattrapage, anonymisation, Storage ORPHELIN uniquement, marquage).
+-- rattrapage, balayage final même si la purge est incomplète, anonymisation, Storage
+-- ORPHELIN uniquement, marquage).
 --
 -- Entrée : set_config('rgpd.entreprise_cible', <uuid>, true) et
 --          set_config('rgpd.run_id', <uuid>, true).
@@ -43,6 +44,17 @@ begin
   end loop;
 
   if cardinality(v_echecs) > 0 then
+    -- Balayage final aussi quand la purge s'arrête (comme le script) : les tables déjà
+    -- vidées dans ce passage et re-remplies par trigger, hors tables en échec.
+    for v_passe in 1..3 loop
+      v_progres := false;
+      for v_t in select table_nom from public.rapport_purge_entreprise(v_ent)
+                  where categorie = 'DELETE' and not (table_nom = any(v_echecs)) order by ordre, table_nom loop
+        select * into v_res from public.purger_table_entreprise(v_ent, v_t.table_nom, v_run);
+        v_progres := true;
+      end loop;
+      exit when not v_progres;
+    end loop;
     perform set_config('rgpd.resultat', 'incomplete:' || array_to_string(v_echecs, ','), true);
     return;
   end if;

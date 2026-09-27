@@ -43,11 +43,14 @@ TABLES_METIER = [
     "reserves_intervenants", "reserves_invitations", "reserves_plans", "reserves_messages",
     "reserves_transitions", "tools_projects", "tools_monetization_customers",
     "tools_monetization_subscriptions",
+    # RGPD × commandes fournisseurs V1 (ELSATIA_RGPD_PURCHASE_ORDERS_RECONCILIATION_V1).
+    "lignes_commande", "fournisseurs", "receptions_idempotence",
 ]
 TABLES_SONDE_RLS = [
     "entreprises", "employes", "clients", "chantiers", "devis", "factures",
     "affectations", "pointages", "notes_frais", "boutique_commandes", "colors_seaux",
     "acces_applications_entreprises", "avenants", "reserves", "reserves_photos", "tools_projects",
+    "commandes_fournisseurs", "lignes_commande", "depenses_fournisseurs", "reglements_fournisseurs",
 ]
 
 

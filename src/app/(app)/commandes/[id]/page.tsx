@@ -10,6 +10,7 @@ import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { contenuEmailCommande } from "@/lib/email";
 import { ReceptionCommandeForm } from "@/components/ReceptionCommandeForm";
+import { identiteBonCommande, mentionIdentiteBonCommande } from "@/lib/commande-document";
 
 export default async function CommandeDetailPage({
   params,
@@ -70,6 +71,7 @@ export default async function CommandeDetailPage({
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {reception && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Réception enregistrée. Les quantités reçues et manquantes sont à jour.</p>}
+        <p className="text-xs text-neutral-500">{mentionIdentiteBonCommande(identiteBonCommande({ commande, ficheFournisseur: null, ficheEntreprise: null, nomEntrepriseParDefaut: ctx.entrepriseNom }))}</p>
 
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800">

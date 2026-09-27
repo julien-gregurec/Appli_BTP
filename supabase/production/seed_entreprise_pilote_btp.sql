@@ -498,23 +498,29 @@ begin
   end loop;
 
   -- 10) Commandes fournisseurs : brouillon, confirmee, recue_partiel, recue.
+  -- Créées en brouillon, lignes ajoutées, puis passées à leur statut : une commande
+  -- engagée est verrouillée (20260926000506, PO-1) et son identité imprimée est figée
+  -- en quittant le brouillon (20260927000507).
   if not exists(select 1 from public.commandes_fournisseurs where entreprise_id=v_entreprise and numero like 'CMD-PILOTE-%') then
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
-    values(v_entreprise,'CMD-PILOTE-001',v_fournisseurs[1],v_chantiers[4],'recue',current_date-35,current_date-28,'[PILOTE] Approvisionnement gros oeuvre',(current_date-35)::timestamptz+interval '8 hours') returning id into v_commande;
+    values(v_entreprise,'CMD-PILOTE-001',v_fournisseurs[1],v_chantiers[4],'brouillon',current_date-35,current_date-28,'[PILOTE] Approvisionnement gros oeuvre',(current_date-35)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
       (v_entreprise,v_commande,'Parpaing 20cm','Livraison chantier',2000,'u',1.35,20,2000,1),
       (v_entreprise,v_commande,'Sac de ciment 35kg','Livraison chantier',150,'u',7.2,20,150,2);
+    update public.commandes_fournisseurs set statut='recue' where id=v_commande;
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
-    values(v_entreprise,'CMD-PILOTE-002',v_fournisseurs[2],v_chantiers[3],'recue_partiel',current_date-10,current_date-3,'[PILOTE] Materiel electrique',(current_date-10)::timestamptz+interval '8 hours') returning id into v_commande;
+    values(v_entreprise,'CMD-PILOTE-002',v_fournisseurs[2],v_chantiers[3],'brouillon',current_date-10,current_date-3,'[PILOTE] Materiel electrique',(current_date-10)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
       (v_entreprise,v_commande,'Cable electrique 3G2.5mm','Livraison partielle',500,'ml',1.1,20,300,1),
       (v_entreprise,v_commande,'Disjoncteur 20A','Livraison partielle',15,'u',9.5,20,10,2);
+    update public.commandes_fournisseurs set statut='recue_partiel' where id=v_commande;
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
-    values(v_entreprise,'CMD-PILOTE-003',v_fournisseurs[3],v_chantiers[5],'confirmee',current_date-4,current_date+3,'[PILOTE] Location echafaudage toiture',(current_date-4)::timestamptz+interval '8 hours') returning id into v_commande;
+    values(v_entreprise,'CMD-PILOTE-003',v_fournisseurs[3],v_chantiers[5],'brouillon',current_date-4,current_date+3,'[PILOTE] Location echafaudage toiture',(current_date-4)::timestamptz+interval '8 hours') returning id into v_commande;
     insert into public.lignes_commande(entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre) values
       (v_entreprise,v_commande,'Location echafaudage 3 semaines','Toiture copropriete',1,'forfait',2400,20,0,1);
+    update public.commandes_fournisseurs set statut='confirmee' where id=v_commande;
 
     insert into public.commandes_fournisseurs(entreprise_id,numero,fournisseur_id,chantier_id,statut,date_commande,date_livraison_prevue,notes,created_at)
     values(v_entreprise,'CMD-PILOTE-004',v_fournisseurs[5],null,'brouillon',current_date-1,current_date+7,'[PILOTE] Reappro depot - pas encore envoyee',(current_date-1)::timestamptz+interval '8 hours') returning id into v_commande;

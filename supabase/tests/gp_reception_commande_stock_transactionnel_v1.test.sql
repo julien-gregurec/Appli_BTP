@@ -28,7 +28,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(65);
+select plan(66);
 
 -- ─────────────────────────────────────────────────────────────
 -- Fixtures : deux entreprises, un utilisateur avec droits d'achat, un
@@ -535,10 +535,26 @@ select is(
 -- ─────────────────────────────────────────────────────────────
 -- FK composite : une ligne de commande ne peut référencer un article d'une
 -- autre entreprise (garantie au niveau base, pas seulement applicative).
+-- RGPD × commandes fournisseurs V1 (20260926000506, PO-1) : la ligne de t1 appartient à une
+-- commande reçue dont l'article est déjà relié ; la changer est désormais refusé par le
+-- verrou des commandes engagées, avant même la FK. La FK est donc prouvée sur une ligne
+-- d'une commande en brouillon (seul état où l'article d'une ligne peut encore changer).
 -- ─────────────────────────────────────────────────────────────
+create temp table t_brouillon on commit drop as
+select public.creer_commande_fournisseur_interne(
+  'e1111111-0000-0000-0000-000000000001'::uuid,
+  jsonb_build_object('fournisseur_id','f1111111-0000-0000-0000-000000000001'),
+  jsonb_build_array(jsonb_build_object('designation','Ligne brouillon','quantite',1,'unite','u','prix_unitaire_ht',1,'taux_tva',20,'ordre',1))
+) as commande_id;
 select throws_ok(
   format($sql$update public.lignes_commande set article_id = 'a2000000-0000-0000-0000-00000000a001'::uuid where id = %L$sql$,
     (select ligne_id from t1)),
+  'P0001', 'COMMANDE_ENGAGEE_VERROUILLEE',
+  'PO-1) relier une ligne d''une commande reçue à un autre article est refusé (commande engagée verrouillée)'
+);
+select throws_ok(
+  format($sql$update public.lignes_commande set article_id = 'a2000000-0000-0000-0000-00000000a001'::uuid where id = %L$sql$,
+    (select l.id from public.lignes_commande l join t_brouillon b on b.commande_id = l.commande_id)),
   '23503',
   'insert or update on table "lignes_commande" violates foreign key constraint "lignes_commande_article_entreprise_fk"',
   'FK) impossible en base de relier une ligne E1 à un article E2 (contrainte composite)'

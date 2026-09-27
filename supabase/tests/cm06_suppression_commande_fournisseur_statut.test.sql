@@ -95,15 +95,31 @@ select throws_ok(
   '7. commande reçue de l''entreprise B -> suppression refusée aussi'
 );
 
--- 8. Non-régression : passer une commande reçue à 'annulee' (geste métier normal,
---    un UPDATE) reste possible, et la rend alors supprimable.
+-- 8. Non-régression : annuler une commande confirmée (transition du produit,
+--    TRANSITIONS_COMMANDES / changer_statut_commande) reste possible, et la rend
+--    alors supprimable.
 select lives_ok(
-  $$update public.commandes_fournisseurs set statut='annulee' where id='a7000000-0000-0000-0000-000000000004'$$,
-  '8. annuler une commande reçue reste possible (le trigger ne porte que sur DELETE)'
+  $$update public.commandes_fournisseurs set statut='annulee' where id='a7000000-0000-0000-0000-000000000003'$$,
+  '8. annuler une commande confirmée reste possible (transition du produit)'
 );
 select lives_ok(
-  $$delete from public.commandes_fournisseurs where id='a7000000-0000-0000-0000-000000000004'$$,
+  $$delete from public.commandes_fournisseurs where id='a7000000-0000-0000-0000-000000000003'$$,
   '8b. une fois annulée, la même commande devient supprimable'
+);
+
+-- 8c. RGPD × commandes fournisseurs V1 (20260926000506, PO-1) : une commande REÇUE
+--     n'est pas annulable (recue: [] dans le produit). Avant PO-1, un UPDATE direct
+--     reçue → annulée passait, puis la suppression : CM-06 était contournable. Ce
+--     contournement était l'ancien test 8 ; il est désormais refusé.
+select throws_ok(
+  $$update public.commandes_fournisseurs set statut='annulee' where id='a7000000-0000-0000-0000-000000000004'$$,
+  'P0001', 'COMMANDE_ENGAGEE_VERROUILLEE',
+  '8c. passer une commande reçue à annulée (hors transitions du produit) est refusé'
+);
+select throws_ok(
+  $$delete from public.commandes_fournisseurs where id='a7000000-0000-0000-0000-000000000004'$$,
+  'P0001', 'COMMANDE_SUPPRESSION_STATUT_INTERDIT',
+  '8d. la commande reçue reste donc non supprimable'
 );
 
 select * from finish();
