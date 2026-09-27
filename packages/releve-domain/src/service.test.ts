@@ -23,17 +23,18 @@ async function seed(service: ReleveService) {
   return { releve, batiment, rdc, etage1, logement, sejour, palier, chambre };
 }
 
-describe("ReleveService — hiérarchie chantier → bâtiment → étage → zone → pièce", () => {
+describe("ReleveService — hiérarchie projet → chantier → bâtiment → étage → zone → pièce", () => {
   it("crée une structure complète sans scan et la restitue en arbre ordonné", async () => {
     const { owner } = setup();
     const { releve } = await seed(owner);
     expect(releve).toMatchObject({ kind: "releve", entrepriseId: TENANT_A, proprietaireId: USER_OWNER, visibilite: "prive", revision: 1 });
     const structure = await owner.get(releve.id);
     expect(checkStructureIntegrity(structure)).toEqual([]);
-    expect(structureStats(structure)).toEqual({ batiments: 1, etages: 2, zones: 1, pieces: 3 });
+    expect(structureStats(structure)).toEqual({ chantiers: 1, batiments: 1, etages: 2, zones: 1, pieces: 3 });
     const tree = buildReleveTree(structure);
-    expect(tree.chantier.nom).toBe("Rue des Lilas");
-    const [batiment] = tree.batiments;
+    expect(tree.sitePrincipal.nom).toBe("Rue des Lilas");
+    expect(tree.chantiers.map((node) => node.chantier.nom)).toEqual(["Rue des Lilas"]);
+    const [batiment] = tree.chantiers[0].batiments;
     expect(batiment.etages.map((node) => niveauLabel(node.etage.niveau))).toEqual(["RDC", "R+1"]);
     expect(batiment.etages[0].zones[0].pieces.map((piece) => piece.nom)).toEqual(["Séjour"]);
     expect(batiment.etages[0].piecesSansZone.map((piece) => piece.nom)).toEqual(["Palier"]);
@@ -63,9 +64,9 @@ describe("ReleveService — hiérarchie chantier → bâtiment → étage → zo
     const { releve, batiment, palier } = await seed(owner);
     await owner.removeNode(releve.id, "piece", palier.id);
     await owner.removeNode(releve.id, "batiment", batiment.id);
-    expect(structureStats(await owner.get(releve.id))).toEqual({ batiments: 0, etages: 0, zones: 0, pieces: 0 });
+    expect(structureStats(await owner.get(releve.id))).toEqual({ chantiers: 1, batiments: 0, etages: 0, zones: 0, pieces: 0 });
     await owner.restoreNode(releve.id, "batiment", batiment.id);
-    expect(structureStats(await owner.get(releve.id))).toEqual({ batiments: 1, etages: 2, zones: 1, pieces: 2 });
+    expect(structureStats(await owner.get(releve.id))).toEqual({ chantiers: 1, batiments: 1, etages: 2, zones: 1, pieces: 2 });
   });
 
   it("une zone supprimée libère ses pièces vers l'étage", async () => {
@@ -73,7 +74,7 @@ describe("ReleveService — hiérarchie chantier → bâtiment → étage → zo
     const { releve, logement } = await seed(owner);
     await owner.removeNode(releve.id, "zone", logement.id);
     const tree = buildReleveTree(await owner.get(releve.id));
-    expect(tree.batiments[0].etages[0].piecesSansZone.map((piece) => piece.nom)).toEqual(["Séjour", "Palier"]);
+    expect(tree.chantiers[0].batiments[0].etages[0].piecesSansZone.map((piece) => piece.nom)).toEqual(["Séjour", "Palier"]);
   });
 
   it("numérote les versions et renseigne la révision source", async () => {
@@ -83,6 +84,48 @@ describe("ReleveService — hiérarchie chantier → bâtiment → étage → zo
     const v2 = await owner.createVersion(releve.id);
     expect([v1.numero, v2.numero, v1.libelle, v2.libelle]).toEqual([1, 2, "Relevé initial", null]);
     expect((await owner.listVersions(releve.id)).map((version) => version.numero)).toEqual([2, 1]);
+  });
+
+  it("types de version : initial → corrigé → projeté → tel que construit, base chaînée", async () => {
+    const { owner } = setup();
+    const { releve } = await seed(owner);
+    await expect(owner.createVersion(releve.id, null, { type: "projete" })).rejects.toThrow(/version initiale/);
+    const v1 = await owner.createVersion(releve.id);
+    await expect(owner.createVersion(releve.id, null, { type: "initial" })).rejects.toThrow(/unique/);
+    const v2 = await owner.createVersion(releve.id, "Cote reprise");
+    const v3 = await owner.createVersion(releve.id, "Rénovation", { type: "projete", baseId: v1.id });
+    const v4 = await owner.createVersion(releve.id, "DOE", { type: "as_built" });
+    expect([v1, v2, v3, v4].map((version) => `${version.typeVersion}:${version.versionBaseId === null ? "-" : version.versionBaseId}`)).toEqual([
+      "initial:-", `corrige:${v1.id}`, `projete:${v1.id}`, `as_built:${v3.id}`,
+    ]);
+    await expect(owner.createVersion(releve.id, null, { type: "corrige", baseId: "e8000000-0000-0000-0000-00000000ffff" })).rejects.toThrow(/base introuvable/);
+  });
+
+  it("chantiers : un projet multi-chantiers exige le chantier du bâtiment", async () => {
+    const { owner } = setup();
+    const { releve, batiment } = await seed(owner);
+    const structure = await owner.get(releve.id);
+    expect(batiment.chantierId).toBe(structure.chantiers[0].id);
+    const sud = await owner.addChantier(releve.id, { nom: "Chantier Sud", codePostal: "67100" });
+    await expect(owner.addBatiment(releve.id, { nom: "Ambigu" })).rejects.toBeInstanceOf(ReleveValidationError);
+    const b = await owner.addBatiment(releve.id, { nom: "Bâtiment Sud", chantierId: sud.id });
+    expect([b.chantierId, b.ordre]).toEqual([sud.id, 0]);
+    await expect(owner.addBatiment(releve.id, { nom: "X", chantierId: "e9000000-0000-0000-0000-00000000ffff" })).rejects.toThrow(/Chantier/);
+    await owner.removeNode(releve.id, "chantier", sud.id);
+    expect(structureStats(await owner.get(releve.id))).toMatchObject({ chantiers: 1, batiments: 1 });
+    await owner.restoreNode(releve.id, "chantier", sud.id);
+    expect(structureStats(await owner.get(releve.id))).toMatchObject({ chantiers: 2, batiments: 2 });
+  });
+
+  it("chantier par défaut : recréé depuis le site principal si le projet n'en a plus", async () => {
+    const { owner } = setup();
+    const { releve } = await seed(owner);
+    const [unique] = (await owner.get(releve.id)).chantiers;
+    await owner.removeNode(releve.id, "chantier", unique.id);
+    const b = await owner.addBatiment(releve.id, { nom: "Annexe" });
+    const structure = await owner.get(releve.id);
+    const actif = structure.chantiers.find((item) => !item.deletedAt)!;
+    expect([actif.nom, actif.codePostal, b.chantierId === actif.id]).toEqual(["Rue des Lilas", "67000", true]);
   });
 
   it("détecte un conflit de révision", async () => {

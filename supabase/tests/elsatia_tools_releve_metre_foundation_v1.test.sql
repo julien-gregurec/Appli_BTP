@@ -80,7 +80,7 @@ select is(
 
 select ok(
   not has_function_privilege('anon', 'public.tools_releve_peut(uuid,text)', 'EXECUTE')
-  and not has_function_privilege('anon', 'public.tools_releve_creer_version(uuid,text)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.tools_releve_creer_version(uuid,text,text,uuid)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.tools_releve_journaliser()', 'EXECUTE'),
   'A6. prédicats fermés à anon ; fonctions de trigger non appelables');
 

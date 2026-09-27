@@ -8,16 +8,17 @@
  * proposer ou de tenter une action vouée au refus.
  */
 
-import { asBatimentId, asEtageId, asPieceId, asReleveId, asZoneId, newUuid, type ReleveId, type TenantId } from "./ids";
+import { asBatimentId, asChantierId, asEtageId, asPieceId, asReleveId, asZoneId, newUuid, type ReleveId, type TenantId } from "./ids";
 import { nextOrdre } from "./hierarchy";
-import type { Releve, ReleveStructure, Version } from "./model";
+import type { Chantier, Releve, ReleveStructure, Version, VersionType } from "./model";
 import { canPerform, tenantDecision, RELEVE_DENIAL_MESSAGES, type ReleveAction, type ReleveActorContext, type ReleveDenialReason } from "./permissions";
 import { ReleveNotFoundError, type ReleveRepository, type StructureKind } from "./repository";
 import {
-  unwrapValidation, validateBatimentDraft, validateEtageDraft, validatePieceDraft, validateReleveDraft, validateZoneDraft,
+  unwrapValidation, validateBatimentDraft, validateChantierDraft, validateEtageDraft, validatePieceDraft, validateReleveDraft, validateZoneDraft,
   RELEVE_LIMITS, ReleveValidationError,
-  type BatimentDraft, type EtageDraft, type PieceDraft, type ReleveDraft, type ZoneDraft,
+  type BatimentDraft, type ChantierDraft, type EtageDraft, type PieceDraft, type ReleveDraft, type ZoneDraft,
 } from "./validation";
+import { planVersion } from "./versioning";
 
 export class RelevePermissionError extends Error {
   constructor(public readonly action: ReleveAction, public readonly reason: ReleveDenialReason) {
@@ -63,10 +64,19 @@ export class ReleveService {
     return releves.filter((releve) => releve.deletedAt && canPerform(this.actor, "delete", releve).allowed);
   }
 
+  /**
+   * Nouveau projet relevé. Son premier chantier est créé dans la foulée depuis le site
+   * principal saisi : la hiérarchie Projet → Chantier → Bâtiment est complète dès l'origine.
+   */
   async create(draft: ReleveDraft): Promise<Releve> {
     this.require("create");
     const value = unwrapValidation(validateReleveDraft(draft));
-    return this.repository.createReleve({ ...value, id: asReleveId(this.uuid()), entrepriseId: this.actor.tenantId });
+    const releve = await this.repository.createReleve({ ...value, id: asReleveId(this.uuid()), entrepriseId: this.actor.tenantId });
+    await this.repository.createChantier({
+      id: asChantierId(this.uuid()), releveId: releve.id, nom: value.chantierNom, adresse: value.chantierAdresse,
+      codePostal: value.chantierCodePostal, ville: value.chantierVille, gpChantierId: value.chantierGpId, ordre: 0, notes: null,
+    });
+    return releve;
   }
 
   async get(releveId: ReleveId): Promise<ReleveStructure> { return this.load(releveId, "view"); }
@@ -93,10 +103,39 @@ export class ReleveService {
     return this.repository.setReleveDeleted(releveId, false);
   }
 
-  async addBatiment(releveId: ReleveId, draft: BatimentDraft) {
+  async addChantier(releveId: ReleveId, draft: ChantierDraft): Promise<Chantier> {
     const structure = await this.load(releveId, "edit");
-    const value = unwrapValidation(validateBatimentDraft({ ordre: nextOrdre(structure.batiments), ...draft }));
-    return this.repository.createBatiment({ ...value, id: asBatimentId(this.uuid()), releveId });
+    const value = unwrapValidation(validateChantierDraft({ ordre: nextOrdre(structure.chantiers), ...draft }));
+    return this.repository.createChantier({ ...value, id: asChantierId(this.uuid()), releveId });
+  }
+
+  /**
+   * Bâtiment d'un chantier. Sans `chantierId` : chantier actif unique du projet, créé depuis
+   * le site principal s'il n'en existe aucun (même règle que le trigger SQL
+   * `tools_releve_batiment_chantier_defaut`) ; plusieurs chantiers → le chantier est exigé.
+   */
+  async addBatiment(releveId: ReleveId, draft: BatimentDraft & { chantierId?: string | null }) {
+    const structure = await this.load(releveId, "edit");
+    const { chantierId: requested, ...rest } = draft;
+    const actifs = structure.chantiers.filter((item) => !item.deletedAt);
+    let chantierId: string;
+    if (requested) {
+      if (!actifs.some((item) => item.id === requested)) throw new ReleveNotFoundError("Chantier");
+      chantierId = requested;
+    } else if (actifs.length === 1) {
+      chantierId = actifs[0].id;
+    } else if (actifs.length === 0) {
+      const site = structure.releve.chantier;
+      chantierId = (await this.repository.createChantier({
+        id: asChantierId(this.uuid()), releveId, nom: site.nom, adresse: site.adresse, codePostal: site.codePostal,
+        ville: site.ville, gpChantierId: site.gpChantierId, ordre: 0, notes: null,
+      })).id;
+    } else {
+      throw new ReleveValidationError([{ path: "chantierId", code: "required", message: "Plusieurs chantiers : précisez le chantier du bâtiment." }]);
+    }
+    const siblings = structure.batiments.filter((item) => item.chantierId === chantierId);
+    const value = unwrapValidation(validateBatimentDraft({ ordre: nextOrdre(siblings), ...rest }));
+    return this.repository.createBatiment({ ...value, id: asBatimentId(this.uuid()), releveId, chantierId: asChantierId(chantierId) });
   }
 
   async addEtage(releveId: ReleveId, batimentId: string, draft: EtageDraft) {
@@ -140,11 +179,17 @@ export class ReleveService {
     await this.repository.setStructureNodeDeleted(kind, id, false);
   }
 
-  async createVersion(releveId: ReleveId, libelle: string | null = null): Promise<Version> {
+  /**
+   * Fige une version typée (initiale, corrigée, projetée, tel que construit). Sans type :
+   * `initial` pour la première, `corrige` ensuite. La base par défaut est la dernière version.
+   */
+  async createVersion(releveId: ReleveId, libelle: string | null = null, options: { type?: VersionType; baseId?: string | null } = {}): Promise<Version> {
     await this.load(releveId, "edit");
     const value = libelle?.trim() || null;
     if (value && value.length > RELEVE_LIMITS.libelle) throw new ReleveValidationError([{ path: "libelle", code: "out_of_range", message: `${RELEVE_LIMITS.libelle} caractères maximum.` }]);
-    return this.repository.createVersion(releveId, value);
+    const planned = planVersion(await this.repository.listVersions(releveId), options);
+    if (!planned.ok) throw new ReleveValidationError([{ path: "typeVersion", code: "invariant_violated", message: planned.message }]);
+    return this.repository.createVersion(releveId, { libelle: value, type: planned.plan.type, baseId: planned.plan.baseId });
   }
 
   async listVersions(releveId: ReleveId): Promise<Version[]> {

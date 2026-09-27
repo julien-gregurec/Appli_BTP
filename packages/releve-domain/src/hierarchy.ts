@@ -1,21 +1,23 @@
 /**
- * Hiérarchie `chantier → bâtiment → étage → zone → pièce`, sans dépendance à un scan.
+ * Hiérarchie `projet relevé → chantier → bâtiment → étage → zone → pièce`, sans dépendance
+ * à un scan.
  *
  * Fonctions pures sur une {@link ReleveStructure} : construction de l'arbre affiché,
  * contrôles d'intégrité (miroir des clés étrangères composites SQL), calcul des
  * descendants pour la suppression douce en cascade, prochain ordre libre.
  */
 
-import type { Batiment, Etage, Piece, Releve, ReleveStructure, Zone } from "./model";
+import type { Batiment, Chantier, Etage, Piece, Releve, ReleveStructure, Zone } from "./model";
 
 export type ZoneNode = { readonly zone: Zone; readonly pieces: readonly Piece[] };
 export type EtageNode = { readonly etage: Etage; readonly zones: readonly ZoneNode[]; readonly piecesSansZone: readonly Piece[] };
 export type BatimentNode = { readonly batiment: Batiment; readonly etages: readonly EtageNode[] };
+export type ChantierNode = { readonly chantier: Chantier; readonly batiments: readonly BatimentNode[] };
 export type ReleveTree = {
-  /** Le chantier est porté par le relevé (libellé local + lien GP facultatif). */
-  readonly chantier: Releve["chantier"];
   readonly releve: Releve;
-  readonly batiments: readonly BatimentNode[];
+  /** Site principal du projet (en-tête, lien GP du projet). */
+  readonly sitePrincipal: Releve["chantier"];
+  readonly chantiers: readonly ChantierNode[];
 };
 
 const alive = <T extends { deletedAt: string | null }>(items: readonly T[]) => items.filter((item) => !item.deletedAt);
@@ -26,10 +28,8 @@ export function buildReleveTree(structure: ReleveStructure): ReleveTree {
   const etages = alive(structure.etages);
   const zones = alive(structure.zones);
   const pieces = alive(structure.pieces);
-  return {
-    chantier: structure.releve.chantier,
-    releve: structure.releve,
-    batiments: alive(structure.batiments).sort(byOrdre).map((batiment) => ({
+  const batiments = alive(structure.batiments).sort(byOrdre);
+  const batimentNode = (batiment: Batiment): BatimentNode => ({
       batiment,
       etages: etages
         .filter((etage) => etage.batimentId === batiment.id)
@@ -44,13 +44,20 @@ export function buildReleveTree(structure: ReleveStructure): ReleveTree {
             piecesSansZone: etagePieces.filter((piece) => !piece.zoneId || !zoneIds.has(piece.zoneId)),
           };
         }),
+  });
+  return {
+    releve: structure.releve,
+    sitePrincipal: structure.releve.chantier,
+    chantiers: alive(structure.chantiers).sort(byOrdre).map((chantier) => ({
+      chantier,
+      batiments: batiments.filter((batiment) => batiment.chantierId === chantier.id).map(batimentNode),
     })),
   };
 }
 
 export type StructureIssueCode =
   | "tenant_mismatch" | "releve_mismatch" | "orphan" | "cross_etage" | "duplicate_id" | "duplicate_niveau";
-export type StructureIssue = { readonly code: StructureIssueCode; readonly entity: "batiment" | "etage" | "zone" | "piece"; readonly id: string; readonly message: string };
+export type StructureIssue = { readonly code: StructureIssueCode; readonly entity: "chantier" | "batiment" | "etage" | "zone" | "piece"; readonly id: string; readonly message: string };
 
 /**
  * Contrôle d'intégrité. Les cas `tenant_mismatch`, `releve_mismatch`, `orphan` et
@@ -62,7 +69,8 @@ export function checkStructureIntegrity(structure: ReleveStructure): StructureIs
   const issues: StructureIssue[] = [];
   const { releve } = structure;
   const seen = new Set<string>();
-  const all: Array<{ entity: StructureIssue["entity"]; item: Batiment | Etage | Zone | Piece }> = [
+  const all: Array<{ entity: StructureIssue["entity"]; item: Chantier | Batiment | Etage | Zone | Piece }> = [
+    ...structure.chantiers.map((item) => ({ entity: "chantier" as const, item })),
     ...structure.batiments.map((item) => ({ entity: "batiment" as const, item })),
     ...structure.etages.map((item) => ({ entity: "etage" as const, item })),
     ...structure.zones.map((item) => ({ entity: "zone" as const, item })),
@@ -74,6 +82,8 @@ export function checkStructureIntegrity(structure: ReleveStructure): StructureIs
     if (item.entrepriseId !== releve.entrepriseId) issues.push({ code: "tenant_mismatch", entity, id: item.id, message: "Élément d'une autre entreprise." });
     if (item.releveId !== releve.id) issues.push({ code: "releve_mismatch", entity, id: item.id, message: "Élément d'un autre relevé." });
   }
+  const chantiers = new Map(structure.chantiers.map((item) => [item.id as string, item]));
+  for (const batiment of structure.batiments) if (!chantiers.has(batiment.chantierId)) issues.push({ code: "orphan", entity: "batiment", id: batiment.id, message: "Chantier parent introuvable." });
   const batiments = new Map(structure.batiments.map((item) => [item.id as string, item]));
   const etages = new Map(structure.etages.map((item) => [item.id as string, item]));
   const zones = new Map(structure.zones.map((item) => [item.id as string, item]));
@@ -98,6 +108,7 @@ export function checkStructureIntegrity(structure: ReleveStructure): StructureIs
 }
 
 export type StructureNodeRef =
+  | { readonly kind: "chantier"; readonly id: string }
   | { readonly kind: "batiment"; readonly id: string }
   | { readonly kind: "etage"; readonly id: string }
   | { readonly kind: "zone"; readonly id: string }
@@ -108,11 +119,16 @@ export type StructureNodeRef =
  * ses pièces : elles redeviennent des pièces sans zone de l'étage (même règle que le
  * `on delete set null` SQL), car la zone est un regroupement, pas un contenant physique.
  */
-export function descendantsOf(structure: ReleveStructure, ref: StructureNodeRef): { etages: string[]; zones: string[]; pieces: string[] } {
-  if (ref.kind === "piece" || ref.kind === "zone") return { etages: [], zones: [], pieces: [] };
-  const etageIds = ref.kind === "etage" ? [ref.id] : structure.etages.filter((etage) => etage.batimentId === ref.id).map((etage) => etage.id as string);
+export function descendantsOf(structure: ReleveStructure, ref: StructureNodeRef): { batiments: string[]; etages: string[]; zones: string[]; pieces: string[] } {
+  if (ref.kind === "piece" || ref.kind === "zone") return { batiments: [], etages: [], zones: [], pieces: [] };
+  const batimentIds = ref.kind === "chantier"
+    ? structure.batiments.filter((batiment) => batiment.chantierId === ref.id).map((batiment) => batiment.id as string)
+    : ref.kind === "batiment" ? [ref.id] : [];
+  const batimentSet = new Set(batimentIds);
+  const etageIds = ref.kind === "etage" ? [ref.id] : structure.etages.filter((etage) => batimentSet.has(etage.batimentId)).map((etage) => etage.id as string);
   const set = new Set(etageIds);
   return {
+    batiments: ref.kind === "chantier" ? batimentIds : [],
     etages: ref.kind === "etage" ? [] : etageIds,
     zones: structure.zones.filter((zone) => set.has(zone.etageId)).map((zone) => zone.id),
     pieces: structure.pieces.filter((piece) => set.has(piece.etageId)).map((piece) => piece.id),
@@ -123,9 +139,10 @@ export function nextOrdre(siblings: readonly { ordre: number; deletedAt: string 
   return alive(siblings).reduce((max, item) => Math.max(max, item.ordre + 1), 0);
 }
 
-export type StructureStats = { batiments: number; etages: number; zones: number; pieces: number };
+export type StructureStats = { chantiers: number; batiments: number; etages: number; zones: number; pieces: number };
 export function structureStats(structure: ReleveStructure): StructureStats {
   return {
+    chantiers: alive(structure.chantiers).length,
     batiments: alive(structure.batiments).length,
     etages: alive(structure.etages).length,
     zones: alive(structure.zones).length,

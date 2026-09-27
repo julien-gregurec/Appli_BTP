@@ -13,12 +13,30 @@
  * - `mediaId` : UUID généré côté client (reprise d'upload idempotente hors ligne).
  *
  * La même règle est appliquée par `tools_releve_storage_autorise()` côté SQL.
+ *
+ * Correspondance avec l'arborescence logique du cahier des charges `releve/{project}/…` :
+ * le préfixe `releve/` est le bucket dédié `tools-releves`, et le segment `{entrepriseId}`
+ * est inséré AVANT `{project}` pour que la propriété tenant soit vérifiable sur le seul
+ * chemin (voir {@link logicalReleveFolder}).
  */
 
 import { isUuid, type MediaId, type ReleveId, type TenantId } from "./ids";
 import { MEDIA_CATEGORIES, type MediaCategorie } from "./model";
 
 export const RELEVE_STORAGE_BUCKET = "tools-releves";
+
+/** Dossiers d'un projet exigés par le cahier des charges (les notes vocales vont dans `annotations`). */
+export const RELEVE_PROJECT_FOLDERS = ["photos", "documents", "exports"] as const satisfies readonly MediaCategorie[];
+
+/**
+ * Dossier physique d'une catégorie de projet : `releve/{project}/{categorie}` du cahier des
+ * charges ⇒ `tools-releves` : `{entrepriseId}/{releveId}/{categorie}/`.
+ */
+export function logicalReleveFolder(input: { entrepriseId: TenantId; releveId: ReleveId; categorie: MediaCategorie }): { bucket: typeof RELEVE_STORAGE_BUCKET; prefix: string } {
+  if (!isUuid(input.entrepriseId) || !isUuid(input.releveId)) throw new ReleveStoragePathError("Identifiants de dossier invalides.");
+  if (!(MEDIA_CATEGORIES as readonly string[]).includes(input.categorie)) throw new ReleveStoragePathError("Catégorie inconnue.");
+  return { bucket: RELEVE_STORAGE_BUCKET, prefix: `${input.entrepriseId}/${input.releveId}/${input.categorie}/` };
+}
 
 export type MediaCategoryPolicy = {
   readonly mimeTypes: Readonly<Record<string, string>>;

@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { releveFixture, TENANT_A, TENANT_B, USER_OWNER } from "./fixtures";
 import { checkStructureIntegrity, descendantsOf, nextOrdre, niveauLabel } from "./hierarchy";
-import type { Batiment, Etage, Piece, ReleveStructure, Zone } from "./model";
+import type { Batiment, Chantier, Etage, Piece, ReleveStructure, Zone } from "./model";
 
 const meta = { entrepriseId: TENANT_A, createdAt: "2026-09-26T10:00:00Z", updatedAt: "2026-09-26T10:00:00Z", createdBy: USER_OWNER, updatedBy: USER_OWNER, revision: 1, deletedAt: null };
 const releve = releveFixture();
-const batiment = { ...meta, id: "b1", releveId: releve.id, nom: "A", ordre: 0, notes: null } as unknown as Batiment;
+const chantier = { ...meta, id: "c1", releveId: releve.id, nom: "Chantier", adresse: null, codePostal: null, ville: null, gpChantierId: null, ordre: 0, notes: null } as unknown as Chantier;
+const batiment = { ...meta, id: "b1", releveId: releve.id, chantierId: "c1", nom: "A", ordre: 0, notes: null } as unknown as Batiment;
 const rdc = { ...meta, id: "e0", releveId: releve.id, batimentId: "b1", nom: "RDC", niveau: 0, altitudeMm: null, hauteurSousPlafondMm: null, etat: "existant", ordre: 0 } as unknown as Etage;
 const r1 = { ...rdc, id: "e1", nom: "R+1", niveau: 1 } as unknown as Etage;
 const zone = { ...meta, id: "z0", releveId: releve.id, etageId: "e0", nom: "Logement", type: "logement", ordre: 0 } as unknown as Zone;
 const piece = { ...meta, id: "p0", releveId: releve.id, etageId: "e0", zoneId: "z0", nom: "Séjour", usage: "sejour", hauteurSousPlafondMm: null, ordre: 0 } as unknown as Piece;
 
 function structure(overrides: Partial<ReleveStructure> = {}): ReleveStructure {
-  return { releve, batiments: [batiment], etages: [rdc, r1], zones: [zone], pieces: [piece], ...overrides };
+  return { releve, chantiers: [chantier], batiments: [batiment], etages: [rdc, r1], zones: [zone], pieces: [piece], ...overrides };
 }
 
 describe("intégrité de la hiérarchie (miroir des clés composites SQL)", () => {
@@ -31,16 +32,22 @@ describe("intégrité de la hiérarchie (miroir des clés composites SQL)", () =
     ]);
   });
 
+  it("détecte un bâtiment dont le chantier est absent", () => {
+    const issues = checkStructureIntegrity(structure({ batiments: [batiment, { ...batiment, id: "b2", chantierId: "absent" } as unknown as Batiment] }));
+    expect(issues.map((issue) => `${issue.code}:${issue.entity}:${issue.id}`)).toEqual(["orphan:batiment:b2"]);
+  });
+
   it("un étage « projet » au même niveau n'est pas un doublon (plan rénové)", () => {
     expect(checkStructureIntegrity(structure({ etages: [rdc, r1, { ...rdc, id: "e9", etat: "projet" } as Etage] }))).toEqual([]);
   });
 });
 
 describe("descendants et ordre", () => {
-  it("bâtiment → étages, zones, pièces ; zone et pièce → rien", () => {
-    expect(descendantsOf(structure(), { kind: "batiment", id: "b1" })).toEqual({ etages: ["e0", "e1"], zones: ["z0"], pieces: ["p0"] });
-    expect(descendantsOf(structure(), { kind: "etage", id: "e0" })).toEqual({ etages: [], zones: ["z0"], pieces: ["p0"] });
-    expect(descendantsOf(structure(), { kind: "zone", id: "z0" })).toEqual({ etages: [], zones: [], pieces: [] });
+  it("chantier → bâtiments…, bâtiment → étages, zones, pièces ; zone et pièce → rien", () => {
+    expect(descendantsOf(structure(), { kind: "chantier", id: "c1" })).toEqual({ batiments: ["b1"], etages: ["e0", "e1"], zones: ["z0"], pieces: ["p0"] });
+    expect(descendantsOf(structure(), { kind: "batiment", id: "b1" })).toEqual({ batiments: [], etages: ["e0", "e1"], zones: ["z0"], pieces: ["p0"] });
+    expect(descendantsOf(structure(), { kind: "etage", id: "e0" })).toEqual({ batiments: [], etages: [], zones: ["z0"], pieces: ["p0"] });
+    expect(descendantsOf(structure(), { kind: "zone", id: "z0" })).toEqual({ batiments: [], etages: [], zones: [], pieces: [] });
   });
 
   it("nextOrdre ignore les éléments supprimés", () => {

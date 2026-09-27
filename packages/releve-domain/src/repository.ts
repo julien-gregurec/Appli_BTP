@@ -8,24 +8,27 @@
  * et sert de spécification exécutable aux adaptateurs.
  */
 
-import { newUuid, type BatimentId, type EtageId, type PieceId, type ReleveId, type TenantId, type UserId, type VersionId, type ZoneId } from "./ids";
+import { newUuid, type BatimentId, type ChantierId, type EtageId, type PieceId, type ReleveId, type TenantId, type UserId, type VersionId, type ZoneId } from "./ids";
 import { descendantsOf } from "./hierarchy";
 import {
-  RELEVE_SCHEMA_VERSION, type Batiment, type EntityMeta, type Etage, type Piece, type Releve, type ReleveStructure,
-  type Version, type Zone,
+  RELEVE_SCHEMA_VERSION, type Batiment, type Chantier, type EntityMeta, type Etage, type Piece, type Releve, type ReleveStructure,
+  type Version, type VersionType, type Zone,
 } from "./model";
-import type { NormalizedReleveDraft } from "./validation";
+import type { NormalizedChantierDraft, NormalizedReleveDraft } from "./validation";
+import { planVersion } from "./versioning";
 
-export type StructureKind = "batiment" | "etage" | "zone" | "piece";
+export type StructureKind = "chantier" | "batiment" | "etage" | "zone" | "piece";
 
 export type NewReleve = NormalizedReleveDraft & { id: ReleveId; entrepriseId: TenantId };
-export type NewBatiment = { id: BatimentId; releveId: ReleveId; nom: string; ordre: number; notes: string | null };
+export type NewChantier = NormalizedChantierDraft & { id: ChantierId; releveId: ReleveId };
+export type NewBatiment = { id: BatimentId; releveId: ReleveId; chantierId: ChantierId; nom: string; ordre: number; notes: string | null };
 export type NewEtage = { id: EtageId; releveId: ReleveId; batimentId: BatimentId; nom: string; niveau: number; altitudeMm: number | null; hauteurSousPlafondMm: number | null; etat: Etage["etat"]; ordre: number };
 export type NewZone = { id: ZoneId; releveId: ReleveId; etageId: EtageId; nom: string; type: Zone["type"]; ordre: number };
 export type NewPiece = { id: PieceId; releveId: ReleveId; etageId: EtageId; zoneId: ZoneId | null; nom: string; usage: Piece["usage"]; hauteurSousPlafondMm: number | null; ordre: number };
 
 export type RelevePatch = Partial<Omit<NormalizedReleveDraft, never>>;
 export type StructurePatch = { nom?: string; ordre?: number };
+export type NewVersion = { libelle: string | null; type: VersionType; baseId: string | null };
 
 export class ReleveConflictError extends Error {
   constructor(public readonly currentRevision: number) { super("Le relevé a été modifié ailleurs : rechargez avant d'enregistrer."); this.name = "ReleveConflictError"; }
@@ -41,14 +44,16 @@ export interface ReleveRepository {
   /** `expectedRevision` : contrôle optimiste ; conflit → {@link ReleveConflictError}. */
   updateReleve(releveId: ReleveId, patch: RelevePatch, expectedRevision: number): Promise<Releve>;
   setReleveDeleted(releveId: ReleveId, deleted: boolean): Promise<Releve>;
+  createChantier(input: NewChantier): Promise<Chantier>;
   createBatiment(input: NewBatiment): Promise<Batiment>;
   createEtage(input: NewEtage): Promise<Etage>;
   createZone(input: NewZone): Promise<Zone>;
   createPiece(input: NewPiece): Promise<Piece>;
   updateStructureNode(kind: StructureKind, id: string, patch: StructurePatch): Promise<void>;
-  /** Suppression douce ; bâtiment et étage emportent leurs descendants (et les restaurent). */
+  /** Suppression douce ; chantier, bâtiment et étage emportent leurs descendants (et les restaurent). */
   setStructureNodeDeleted(kind: StructureKind, id: string, deleted: boolean): Promise<void>;
-  createVersion(releveId: ReleveId, libelle: string | null): Promise<Version>;
+  /** Version typée ; le serveur applique les mêmes règles que {@link planVersion}. */
+  createVersion(releveId: ReleveId, input: NewVersion): Promise<Version>;
   listVersions(releveId: ReleveId): Promise<Version[]>;
 }
 
@@ -66,6 +71,7 @@ export type MemoryRepositoryOptions = { actorId: UserId; now?: () => string; uui
  */
 export class InMemoryReleveRepository implements ReleveRepository {
   private readonly releves = new Map<string, Mutable<Releve>>();
+  private readonly chantiers = new Map<string, Mutable<Chantier>>();
   private readonly batiments = new Map<string, Mutable<Batiment>>();
   private readonly etages = new Map<string, Mutable<Etage>>();
   private readonly zones = new Map<string, Mutable<Zone>>();
@@ -93,7 +99,7 @@ export class InMemoryReleveRepository implements ReleveRepository {
   }
 
   private table(kind: StructureKind): Map<string, Row> {
-    return ({ batiment: this.batiments, etage: this.etages, zone: this.zones, piece: this.pieces } as Record<StructureKind, Map<string, Row>>)[kind];
+    return ({ chantier: this.chantiers, batiment: this.batiments, etage: this.etages, zone: this.zones, piece: this.pieces } as Record<StructureKind, Map<string, Row>>)[kind];
   }
 
   async listReleves(tenantId: TenantId) {
@@ -104,7 +110,7 @@ export class InMemoryReleveRepository implements ReleveRepository {
     const releve = this.releves.get(releveId);
     if (!releve) return null;
     const of = <T extends { releveId: string }>(map: Map<string, T>) => [...map.values()].filter((row) => row.releveId === releveId).map((row) => ({ ...row }));
-    return { releve: { ...releve }, batiments: of(this.batiments), etages: of(this.etages), zones: of(this.zones), pieces: of(this.pieces) };
+    return { releve: { ...releve }, chantiers: of(this.chantiers), batiments: of(this.batiments), etages: of(this.etages), zones: of(this.zones), pieces: of(this.pieces) };
   }
 
   async createReleve(input: NewReleve): Promise<Releve> {
@@ -153,8 +159,15 @@ export class InMemoryReleveRepository implements ReleveRepository {
     if (!parent || parent.releveId !== releveId || parent.deletedAt) throw new ReleveNotFoundError(label);
   }
 
+  async createChantier(input: NewChantier): Promise<Chantier> {
+    const releve = this.requireReleve(input.releveId);
+    const row: Mutable<Chantier> = { ...this.meta(releve.entrepriseId), ...input, id: input.id };
+    this.chantiers.set(row.id, row); return { ...row };
+  }
+
   async createBatiment(input: NewBatiment): Promise<Batiment> {
     const releve = this.requireReleve(input.releveId);
+    this.checkParent(this.chantiers, input.chantierId, input.releveId, "Chantier");
     const row: Mutable<Batiment> = { ...this.meta(releve.entrepriseId), ...input };
     this.batiments.set(row.id, row); return { ...row };
   }
@@ -207,18 +220,22 @@ export class InMemoryReleveRepository implements ReleveRepository {
     // Même règle que le trigger SQL : la restauration ne ranime que les descendants
     // supprimés par CETTE cascade (même horodatage), jamais une suppression antérieure.
     const eligible = (target: Row | undefined): target is Row => Boolean(target) && (deleted ? !target!.deletedAt : target!.deletedAt === previous);
+    for (const batimentId of descendants.batiments) { const target = this.batiments.get(batimentId); if (eligible(target)) apply(target); }
     for (const etageId of descendants.etages) { const target = this.etages.get(etageId); if (eligible(target)) apply(target); }
     for (const zoneId of descendants.zones) { const target = this.zones.get(zoneId); if (eligible(target)) apply(target); }
     for (const pieceId of descendants.pieces) { const target = this.pieces.get(pieceId); if (eligible(target)) apply(target); }
   }
 
-  async createVersion(releveId: ReleveId, libelle: string | null): Promise<Version> {
+  async createVersion(releveId: ReleveId, input: NewVersion): Promise<Version> {
     const releve = this.requireReleve(releveId);
-    const numero = [...this.versions.values()].filter((version) => version.releveId === releveId).length + 1;
+    const planned = planVersion([...this.versions.values()].filter((version) => version.releveId === releveId), { type: input.type, baseId: input.baseId });
+    if (!planned.ok) throw new Error(planned.message);
     const structure = await this.getStructure(releveId);
+    const { numero, type, baseId } = planned.plan;
     const version: Version = {
-      id: this.uuid() as VersionId, entrepriseId: releve.entrepriseId, releveId, numero, libelle, revisionSource: releve.revision,
-      empreinte: fingerprint(JSON.stringify(structure)), createdAt: this.now(), createdBy: this.options.actorId,
+      id: this.uuid() as VersionId, entrepriseId: releve.entrepriseId, releveId, numero, typeVersion: type, versionBaseId: baseId,
+      libelle: input.libelle, revisionSource: releve.revision,
+      empreinte: fingerprint(JSON.stringify({ type, baseId, structure })), createdAt: this.now(), createdBy: this.options.actorId,
     };
     this.versions.set(version.id, version);
     return version;

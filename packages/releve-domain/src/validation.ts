@@ -183,6 +183,29 @@ export function validateReleveDraft(input: unknown): ReleveValidationResult<Norm
   return c.result(value);
 }
 
+export type ChantierDraft = {
+  nom: string; adresse?: string | null; codePostal?: string | null; ville?: string | null;
+  gpChantierId?: string | null; ordre?: number; notes?: string | null;
+};
+export type NormalizedChantierDraft = {
+  nom: string; adresse: string | null; codePostal: string | null; ville: string | null;
+  gpChantierId: string | null; ordre: number; notes: string | null;
+};
+export function validateChantierDraft(input: unknown): ReleveValidationResult<NormalizedChantierDraft> {
+  const c = new Collector(); const raw = isRecord(input) ? input : {};
+  const codePostal = c.text("codePostal", raw.codePostal, 12, false);
+  if (codePostal && !CODE_POSTAL.test(codePostal)) c.add("codePostal", "invalid_format", "Code postal invalide.");
+  return c.result({
+    nom: c.text("nom", raw.nom, RELEVE_LIMITS.chantierNom, true) ?? "",
+    adresse: c.text("adresse", raw.adresse, RELEVE_LIMITS.adresse, false),
+    codePostal,
+    ville: c.text("ville", raw.ville, RELEVE_LIMITS.ville, false),
+    gpChantierId: c.uuid("gpChantierId", raw.gpChantierId, true),
+    ordre: c.integer("ordre", raw.ordre, 0, RELEVE_LIMITS.ordreMax, 0),
+    notes: c.text("notes", raw.notes, RELEVE_LIMITS.notes, false),
+  });
+}
+
 export type BatimentDraft = { nom: string; ordre?: number; notes?: string | null };
 export function validateBatimentDraft(input: unknown): ReleveValidationResult<{ nom: string; ordre: number; notes: string | null }> {
   const c = new Collector(); const raw = isRecord(input) ? input : {};
