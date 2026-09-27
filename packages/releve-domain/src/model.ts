@@ -235,7 +235,8 @@ export const ELEMENT_TYPES = [
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
 /** Référence typée vers une entité du relevé (cible d'une mesure, d'une annotation…). */
-export const ENTITY_REF_KINDS = ["releve", "batiment", "etage", "zone", "piece", "element"] as const;
+/** Lot 4 : `chantier` ajouté (hiérarchie du Lot 3 : relevé → chantier → bâtiment…). */
+export const ENTITY_REF_KINDS = ["releve", "chantier", "batiment", "etage", "zone", "piece", "element"] as const;
 export type EntityRefKind = (typeof ENTITY_REF_KINDS)[number];
 export type EntityRef = { readonly kind: EntityRefKind; readonly id: string };
 

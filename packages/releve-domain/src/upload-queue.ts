@@ -7,6 +7,12 @@
  *
  *   fichier (bucket) → ligne média → PhotoAnchor → [remplacement de l'ancienne photo]
  *
+ * (miniature déposée avant la photo quand elle existe.)
+ *
+ * États (contrat de la file) : `en_attente` = PENDING_UPLOAD, `en_cours` = UPLOADING,
+ * `synchronise` = SYNCED (octets locaux libérés, conservé brièvement pour la déduplication et
+ * l'affichage), `echec` = ERROR (refus serveur, action requise).
+ *
  * Chaque étape est idempotente (identifiants client, « déjà présent » = succès) et mémorisée :
  * une reprise après coupure ne rejoue que ce qui manque. Une erreur réseau reprogramme
  * l'élément (délai croissant) ; un refus serveur (droits, validation) le met en échec visible,
@@ -16,17 +22,28 @@
 import type { MediaId } from "./ids";
 import { MediaRemoteError, type NewElementRow, type NewMediaRow, type PreparedPhoto, type ReleveMediaRepository } from "./media-service";
 
-export const UPLOAD_STATUSES = ["en_attente", "en_cours", "echec"] as const;
+export const UPLOAD_STATUSES = ["en_attente", "en_cours", "synchronise", "echec"] as const;
 export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
-export const UPLOAD_STATUS_LABELS: Record<UploadStatus, string> = { en_attente: "À synchroniser", en_cours: "Envoi en cours", echec: "Échec — action requise" };
+export const UPLOAD_STATUS_LABELS: Record<UploadStatus, string> = {
+  en_attente: "À synchroniser", en_cours: "Envoi en cours", synchronise: "Synchronisée", echec: "Échec — action requise",
+};
+/** Noms du contrat de file (mission Lot 4) → valeurs persistées. */
+export const UPLOAD_STATUS_CONTRACT = {
+  PENDING_UPLOAD: "en_attente", UPLOADING: "en_cours", SYNCED: "synchronise", ERROR: "echec",
+} as const satisfies Record<string, UploadStatus>;
 
-export type UploadSteps = { fichier: boolean; media: boolean; ancre: boolean; remplacement: boolean };
+/** Durée de conservation d'un élément synchronisé (sans ses octets) avant nettoyage. */
+export const SYNCED_RETENTION_MS = 24 * 3_600_000;
+
+export type UploadSteps = { miniature?: boolean; fichier: boolean; media: boolean; ancre: boolean; remplacement: boolean };
 
 export type PendingPhoto = {
   readonly id: string;
   readonly releveId: string;
   readonly entrepriseId: string;
   readonly storagePath: string;
+  /** Chemin de la miniature (absente : photo sans miniature). */
+  readonly miniaturePath?: string | null;
   readonly mimeType: string;
   readonly media: NewMediaRow;
   readonly anchor: NewElementRow;
@@ -39,13 +56,18 @@ export type PendingPhoto = {
   readonly createdAt: string;
   nextAttemptAt: string | null;
   steps: UploadSteps;
+  syncedAt?: string | null;
 };
+
+export type StoredBytesKind = "photo" | "miniature";
 
 export interface UploadQueueStore {
   list(): Promise<PendingPhoto[]>;
-  /** Enregistre (ou met à jour) un élément ; `bytes` n'est fourni qu'à la création. */
-  put(item: PendingPhoto, bytes?: Blob | Uint8Array): Promise<void>;
-  bytes(id: string): Promise<Blob | Uint8Array | null>;
+  /** Enregistre (ou met à jour) un élément ; les octets ne sont fournis qu'à la création. */
+  put(item: PendingPhoto, bytes?: Blob | Uint8Array, miniature?: Blob | Uint8Array | null): Promise<void>;
+  bytes(id: string, kind?: StoredBytesKind): Promise<Blob | Uint8Array | null>;
+  /** Libère les octets locaux (élément synchronisé) sans retirer l'élément. */
+  release(id: string): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -55,13 +77,15 @@ export class MemoryUploadQueueStore implements UploadQueueStore {
   private readonly blobs = new Map<string, Blob | Uint8Array>();
   readonly persistent = false;
   async list() { return [...this.items.values()].map((item) => ({ ...item, steps: { ...item.steps } })).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
-  async put(item: PendingPhoto, bytes?: Blob | Uint8Array) {
+  async put(item: PendingPhoto, bytes?: Blob | Uint8Array, miniature?: Blob | Uint8Array | null) {
     if (!this.items.has(item.id) && !bytes) throw new Error("Octets requis à la mise en file.");
     this.items.set(item.id, { ...item, steps: { ...item.steps } });
     if (bytes) this.blobs.set(item.id, bytes);
+    if (miniature) this.blobs.set(`${item.id}:miniature`, miniature);
   }
-  async bytes(id: string) { return this.blobs.get(id) ?? null; }
-  async remove(id: string) { this.items.delete(id); this.blobs.delete(id); }
+  async bytes(id: string, kind: StoredBytesKind = "photo") { return this.blobs.get(kind === "photo" ? id : `${id}:miniature`) ?? null; }
+  async release(id: string) { this.blobs.delete(id); this.blobs.delete(`${id}:miniature`); }
+  async remove(id: string) { this.items.delete(id); await this.release(id); }
 }
 
 /** Nom de base IndexedDB : une file par utilisateur ET par entreprise (jamais d'envoi sous un autre compte). */
@@ -74,16 +98,33 @@ export function retryDelayMs(attempts: number): number {
   return Math.min(5_000 * 2 ** Math.max(0, attempts - 1), 300_000);
 }
 
-export async function enqueuePhoto(store: UploadQueueStore, prepared: PreparedPhoto, bytes: Blob | Uint8Array, options: { label: string; replaceMediaId?: string | null; now?: () => Date }): Promise<PendingPhoto> {
+/** Photo déjà en file (même SHA-256, même relevé), non abandonnée : on ne la remet pas en file. */
+export class DuplicatePendingPhotoError extends Error {
+  constructor(public readonly existing: PendingPhoto) { super("Cette photo est déjà en file d'envoi."); this.name = "DuplicatePendingPhotoError"; }
+}
+
+export async function findPendingDuplicate(store: UploadQueueStore, releveId: string, empreinteSha256: string): Promise<PendingPhoto | null> {
+  return (await store.list()).find((item) => item.releveId === releveId && item.media.metadata.empreinteSha256 === empreinteSha256) ?? null;
+}
+
+export async function enqueuePhoto(
+  store: UploadQueueStore, prepared: PreparedPhoto, bytes: Blob | Uint8Array,
+  options: { label: string; replaceMediaId?: string | null; now?: () => Date; miniature?: Blob | Uint8Array | null },
+): Promise<PendingPhoto> {
   const now = (options.now ?? (() => new Date()))().toISOString();
+  const duplicate = await findPendingDuplicate(store, prepared.media.releveId, prepared.media.metadata.empreinteSha256);
+  if (duplicate) throw new DuplicatePendingPhotoError(duplicate);
+  const withMiniature = Boolean(prepared.miniaturePath && options.miniature);
   const item: PendingPhoto = {
     id: prepared.mediaId, releveId: prepared.media.releveId, entrepriseId: prepared.media.entrepriseId, storagePath: prepared.storagePath,
-    mimeType: prepared.media.mimeType, media: prepared.media, anchor: prepared.anchor, replaceMediaId: options.replaceMediaId ?? null,
+    miniaturePath: withMiniature ? prepared.miniaturePath : null,
+    mimeType: prepared.media.mimeType, media: withMiniature ? prepared.media : { ...prepared.media, miniatureStoragePath: null }, anchor: prepared.anchor, replaceMediaId: options.replaceMediaId ?? null,
     label: options.label, status: "en_attente", attempts: 0, lastError: null, createdAt: now, nextAttemptAt: null,
     // Remplacement : la nouvelle photo hérite des rattachements de l'ancienne (RPC), elle n'en crée pas.
-    steps: { fichier: false, media: false, ancre: Boolean(options.replaceMediaId), remplacement: !options.replaceMediaId },
+    steps: { miniature: !withMiniature, fichier: false, media: false, ancre: Boolean(options.replaceMediaId), remplacement: !options.replaceMediaId },
+    syncedAt: null,
   };
-  await store.put(item, bytes);
+  await store.put(item, bytes, withMiniature ? options.miniature : null);
   return item;
 }
 
@@ -112,12 +153,23 @@ export async function processUploadQueue(
   const now = options.now ?? (() => new Date());
   try {
     for (const item of await store.list()) {
+      if (item.status === "synchronise") {
+        // Nettoyage : un élément synchronisé n'est gardé qu'un temps (sans ses octets).
+        if (item.syncedAt && now().getTime() - Date.parse(item.syncedAt) > SYNCED_RETENTION_MS) await store.remove(item.id);
+        continue;
+      }
       if (options.releveId && item.releveId !== options.releveId) continue;
       if (item.status === "echec" && !options.force) continue;
       if (!options.force && item.nextAttemptAt && item.nextAttemptAt > now().toISOString()) continue;
       item.status = "en_cours"; item.attempts += 1; item.lastError = null;
       await store.put(item); options.hooks?.onChange?.(item);
       try {
+        if (item.steps.miniature === false && item.miniaturePath) {
+          const miniature = await store.bytes(item.id, "miniature");
+          if (!miniature) throw new MediaRemoteError("Miniature locale introuvable (stockage du navigateur effacé ?).", "invalid");
+          await repository.uploadObject(item.miniaturePath, miniature, "image/jpeg");
+          item.steps.miniature = true; await store.put(item);
+        }
         if (!item.steps.fichier) {
           const bytes = await store.bytes(item.id);
           if (!bytes) throw new MediaRemoteError("Fichier local introuvable (stockage du navigateur effacé ?).", "invalid");
@@ -131,7 +183,8 @@ export async function processUploadQueue(
           else await repository.replacePhoto(item.replaceMediaId as MediaId, item.media.id);
           item.steps.remplacement = true; await store.put(item);
         }
-        await store.remove(item.id);
+        item.status = "synchronise"; item.syncedAt = now().toISOString(); item.nextAttemptAt = null;
+        await store.put(item); await store.release(item.id);
         result.synced.push(item);
       } catch (error) {
         const remote = error instanceof MediaRemoteError ? error : null;
@@ -161,8 +214,14 @@ export async function processUploadQueue(
  */
 export async function discardPending(store: UploadQueueStore, id: string, repository?: ReleveMediaRepository): Promise<void> {
   const item = (await store.list()).find((candidate) => candidate.id === id);
-  if (item && repository && item.steps.fichier && !item.steps.media) {
-    try { await repository.removeObjects([item.storagePath]); } catch { /* meilleur effort */ }
+  if (item && repository && !item.steps.media) {
+    const paths = [...(item.steps.fichier ? [item.storagePath] : []), ...(item.steps.miniature && item.miniaturePath ? [item.miniaturePath] : [])];
+    if (paths.length) { try { await repository.removeObjects(paths); } catch { /* meilleur effort */ } }
   }
   await store.remove(id);
+}
+
+/** Éléments à montrer à l'utilisateur (non synchronisés) pour un relevé. */
+export function visiblePending(items: readonly PendingPhoto[], releveId: string): PendingPhoto[] {
+  return items.filter((item) => item.releveId === releveId && item.status !== "synchronise");
 }

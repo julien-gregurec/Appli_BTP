@@ -15,15 +15,15 @@ import type { ElementId, EtageId, PieceId } from "./ids";
 import type { Ancre, AnnotationDonnees, EntityRef, PhotoAnchorDonnees, PhotoRepere, ReleveElement, ReleveStructure } from "./model";
 import { RELEVE_LIMITS, type PHOTO_ANNOTATION_COULEURS } from "./validation";
 
-export const PHOTO_TARGET_KINDS = ["releve", "batiment", "etage", "zone", "piece", "mur", "equipement", "plan"] as const;
+export const PHOTO_TARGET_KINDS = ["releve", "chantier", "batiment", "etage", "zone", "piece", "mur", "equipement", "plan"] as const;
 export type PhotoTargetKind = (typeof PHOTO_TARGET_KINDS)[number];
 export const PHOTO_TARGET_LABELS: Record<PhotoTargetKind, string> = {
-  releve: "Relevé", batiment: "Bâtiment", etage: "Étage", zone: "Zone", piece: "Pièce", mur: "Mur", equipement: "Équipement", plan: "Point du plan",
+  releve: "Relevé", chantier: "Chantier", batiment: "Bâtiment", etage: "Étage", zone: "Zone", piece: "Pièce", mur: "Mur", equipement: "Équipement", plan: "Point du plan",
 };
 
 export type PhotoTarget =
   | { readonly kind: "releve" }
-  | { readonly kind: "batiment" | "etage" | "zone" | "piece" | "mur" | "equipement"; readonly id: string }
+  | { readonly kind: "chantier" | "batiment" | "etage" | "zone" | "piece" | "mur" | "equipement"; readonly id: string }
   | { readonly kind: "plan"; readonly etageId: string; readonly x: number; readonly y: number };
 
 export type PhotoPlacement = { readonly ancre: Ancre; readonly etageId: EtageId | null; readonly pieceId: PieceId | null };
@@ -48,6 +48,8 @@ export function resolvePhotoPlacement(target: PhotoTarget, structure: ReleveStru
   switch (target.kind) {
     case "releve":
       return { ancre: ref("releve", structure.releve.id), etageId: null, pieceId: null };
+    case "chantier":
+      return { ancre: ref("chantier", alive(structure.chantiers, target.id, "Chantier").id), etageId: null, pieceId: null };
     case "batiment":
       return { ancre: ref("batiment", alive(structure.batiments, target.id, "Bâtiment").id), etageId: null, pieceId: null };
     case "etage": {
@@ -84,6 +86,7 @@ export function describeAnchor(ancre: Ancre, structure: ReleveStructure, element
   const { kind, id } = ancre.ref;
   switch (kind) {
     case "releve": return PHOTO_TARGET_LABELS.releve;
+    case "chantier": return `${PHOTO_TARGET_LABELS.chantier} · ${name(structure.chantiers, id)}`;
     case "batiment": return `${PHOTO_TARGET_LABELS.batiment} · ${name(structure.batiments, id)}`;
     case "etage": return `${PHOTO_TARGET_LABELS.etage} · ${name(structure.etages, id)}`;
     case "zone": return `${PHOTO_TARGET_LABELS.zone} · ${name(structure.zones, id)}`;
@@ -163,6 +166,25 @@ export function updateRepere(reperes: readonly PhotoRepere[], id: string, patch:
 
 export const PHOTO_ANNOTATION_FORMES = ["texte", "fleche", "cercle"] as const;
 export type PhotoAnnotationForme = (typeof PHOTO_ANNOTATION_FORMES)[number];
+
+/**
+ * Registre des formes d'annotation sur photo. V1 : texte, flèche, cercle (dessinables,
+ * modifiables, supprimables, acceptées par le serveur). Les suivantes sont PRÉPARÉES : nom,
+ * géométrie normalisée prévue, forme persistée — mais refusées par le serveur tant qu'elles ne
+ * sont pas livrées (`disponible: false`), pour ne jamais stocker une forme sans éditeur.
+ */
+export const PHOTO_ANNOTATION_REGISTRY = [
+  { forme: "texte", label: "Texte", disponible: true, geometrie: "x, y" },
+  { forme: "fleche", label: "Flèche", disponible: true, geometrie: "x1, y1, x2, y2" },
+  { forme: "cercle", label: "Cercle", disponible: true, geometrie: "cx, cy, r (fraction du petit côté)" },
+  { forme: "rectangle", label: "Rectangle", disponible: false, geometrie: "x, y, largeur, hauteur" },
+  { forme: "zone", label: "Zone", disponible: false, geometrie: "points[] (polygone fermé)" },
+  { forme: "cote", label: "Dimension", disponible: false, geometrie: "x1, y1, x2, y2 + valeur mm" },
+  { forme: "symbole", label: "Symbole", disponible: false, geometrie: "x, y, code du symbole" },
+] as const;
+export type PhotoAnnotationRegistryEntry = (typeof PHOTO_ANNOTATION_REGISTRY)[number];
+export const PHOTO_ANNOTATION_FORMES_PREVUES = PHOTO_ANNOTATION_REGISTRY.filter((entry) => !entry.disponible).map((entry) => entry.forme);
+
 export type PhotoAnnotationCouleur = (typeof PHOTO_ANNOTATION_COULEURS)[number];
 
 export type PhotoAnnotationGeometrie =
@@ -195,6 +217,28 @@ export function buildPhotoAnnotation(anchorId: ElementId, draft: PhotoAnnotation
   const r = Math.min(1, Math.max(0, draft.r));
   if (r < 0.01) throw new PhotoTargetError("Cercle trop petit.");
   return { ancre, texte, forme: "cercle", geometrie: { espace: "photo", cx: clamp01(draft.cx), cy: clamp01(draft.cy), r, couleur }, mediaAudioId: null };
+}
+
+/** Brouillon équivalent à une annotation existante (pour la modifier). */
+export function annotationDraftOf(annotation: ReleveElement<"annotation">): PhotoAnnotationDraft | null {
+  const g = (annotation.donnees.geometrie ?? {}) as Record<string, unknown>;
+  const n = (key: string) => Number(g[key]);
+  const couleur = (g.couleur as PhotoAnnotationCouleur | undefined) ?? "rouge";
+  const texte = annotation.donnees.texte;
+  switch (annotation.donnees.forme ?? "texte") {
+    case "texte": return { forme: "texte", x: n("x"), y: n("y"), texte, couleur };
+    case "fleche": return { forme: "fleche", x1: n("x1"), y1: n("y1"), x2: n("x2"), y2: n("y2"), texte, couleur };
+    case "cercle": return { forme: "cercle", cx: n("cx"), cy: n("cy"), r: n("r"), texte, couleur };
+    default: return null;
+  }
+}
+
+/** Déplacement d'une annotation (dx, dy en fraction de l'image), bornes respectées. */
+export function translateAnnotationDraft(draft: PhotoAnnotationDraft, dx: number, dy: number): PhotoAnnotationDraft {
+  const cx = (value: number) => clamp01(value + dx); const cy = (value: number) => clamp01(value + dy);
+  if (draft.forme === "texte") return { ...draft, x: cx(draft.x), y: cy(draft.y) };
+  if (draft.forme === "fleche") return { ...draft, x1: cx(draft.x1), y1: cy(draft.y1), x2: cx(draft.x2), y2: cy(draft.y2) };
+  return { ...draft, cx: cx(draft.cx), cy: cy(draft.cy) };
 }
 
 /** Vrai si l'annotation est dessinée sur la photo portée par ce `PhotoAnchor`. */

@@ -5,14 +5,15 @@ import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_C
 import {
   ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
   MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
-  RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES, ZONE_TYPES_LOT2, PIECE_USAGES_LOT2, CHANTIER_STATUTS, ETAGE_TYPES_NIVEAU, PIECE_STATUTS,
+  RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES, ENTITY_REF_KINDS, ZONE_TYPES_LOT2, PIECE_USAGES_LOT2, CHANTIER_STATUTS, ETAGE_TYPES_NIVEAU, PIECE_STATUTS,
 } from "./model";
 import { ACTIVITY_ACTIONS } from "./terrain";
 import { RELEVE_ACTIONS, RELEVE_ROLES } from "./permissions";
 import { MEDIA_CATEGORY_POLICIES, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES } from "./storage";
 import { PHOTO_ANNOTATION_COULEURS, RELEVE_LIMITS } from "./validation";
 import { FORBIDDEN_LOCATION_KEYS, PHOTO_DATE_SOURCES, PHOTO_METADATA_KEYS, PHOTO_METADATA_REQUIRED_KEYS, PHOTO_ORIENTATIONS, PHOTO_SOURCES } from "./media";
-import { PHOTO_ANNOTATION_FORMES } from "./photo";
+import { PHOTO_ANNOTATION_FORMES, PHOTO_ANNOTATION_FORMES_PREVUES, PHOTO_TARGET_KINDS } from "./photo";
+import { PHOTO_COMMENT_MAX } from "./media-service";
 
 /**
  * Parité TypeScript ↔ SQL. Le domaine et la migration sont deux copies d'un même contrat :
@@ -163,5 +164,20 @@ describe("parité domaine ↔ migration tools_releve_metre_capture_media_v1 (Lot
 
   it("formes dessinables sur photo : texte, flèche, cercle", () => {
     for (const forme of PHOTO_ANNOTATION_FORMES) expect(capture).toContain(`when '${forme}' then public.tools_releve_nombre_unitaire`);
+  });
+
+  it("colonnes Lot 4 : états documentés = types de version, commentaire borné comme le domaine", () => {
+    expect(capture).toContain(`etat_documente in (${VERSION_TYPES.map((value) => `'${value}'`).join(",")})`);
+    expect(capture).toContain(`char_length(commentaire) <= ${PHOTO_COMMENT_MAX}`);
+  });
+
+  it("garde de rattachement : chaque nature de cible du domaine est contrôlée par le serveur", () => {
+    for (const kind of ENTITY_REF_KINDS) expect(capture).toContain(`when '${kind}' then`);
+    for (const kind of PHOTO_TARGET_KINDS.filter((kind) => kind === "plan")) expect(capture).toContain(`v_kind = '${kind}'`);
+  });
+
+  it("formes prévues (rectangle, zone, dimension, symbole) refusées sur photo tant qu'elles ne sont pas livrées", () => {
+    const geometrie = /function public\.tools_releve_geometrie_photo_valide[\s\S]*?\$\$;/.exec(capture)?.[0] ?? "";
+    for (const forme of PHOTO_ANNOTATION_FORMES_PREVUES) expect(geometrie).not.toContain(`when '${forme}'`);
   });
 });

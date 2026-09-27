@@ -10,7 +10,7 @@ import {
 } from "./photo";
 import { InMemoryReleveRepository } from "./repository";
 import { RelevePermissionError, ReleveService } from "./service";
-import { discardPending, enqueuePhoto, MemoryUploadQueueStore, processUploadQueue, retryDelayMs, uploadQueueDatabaseName } from "./upload-queue";
+import { discardPending, enqueuePhoto, MemoryUploadQueueStore, processUploadQueue, retryDelayMs, uploadQueueDatabaseName, visiblePending } from "./upload-queue";
 import { validateElementDraft, ReleveValidationError } from "./validation";
 
 const metadata = (overrides: Partial<PhotoMetadata> = {}): PhotoMetadata => ({
@@ -38,9 +38,12 @@ async function setup() {
 
 type Ctx = Awaited<ReturnType<typeof setup>>;
 
+let shots = 0;
 async function shoot(ctx: Ctx, target: PhotoTarget, service = ctx.owner, replaceMediaId?: string) {
   const library = await service.library(ctx.releve.id);
-  const prepared = service.preparePhoto({ structure: library.structure, elements: library.elements, target, mimeType: "image/jpeg", bytes: 1_200_000, metadata: metadata(replaceMediaId ? { remplaceMediaId: replaceMediaId } : {}), nomFichier: "IMG_0001.jpg" });
+  // Chaque prise a ses propres octets (empreinte distincte) : une même photo n'est déposée qu'une fois.
+  const empreinteSha256 = (shots += 1).toString(16).padStart(2, "0").repeat(32);
+  const prepared = service.preparePhoto({ structure: library.structure, elements: library.elements, target, mimeType: "image/jpeg", bytes: 1_200_000, metadata: metadata({ empreinteSha256, ...(replaceMediaId ? { remplaceMediaId: replaceMediaId } : {}) }), nomFichier: "IMG_0001.jpg" });
   const store = new MemoryUploadQueueStore();
   await enqueuePhoto(store, prepared, new Uint8Array(1_200_000), { label: "Photo", replaceMediaId });
   const run = await processUploadQueue(store, ctx.media, { hooks: service.queueHooks(library.structure.releve) });
@@ -89,7 +92,10 @@ describe("capture → file locale → synchronisation", () => {
     const ctx = await setup();
     const { prepared, run, store } = await shoot(ctx, { kind: "piece", id: ctx.sejour.id });
     expect(run.synced.map((item) => item.id)).toEqual([prepared.mediaId]);
-    expect(await store.list()).toEqual([]);
+    // SYNCED : l'élément reste (sans ses octets) pour la déduplication, invisible dans la file.
+    expect((await store.list()).map((item) => item.status)).toEqual(["synchronise"]);
+    expect(await store.bytes(prepared.mediaId)).toBeNull();
+    expect(visiblePending(await store.list(), ctx.releve.id)).toEqual([]);
     expect(prepared.storagePath).toBe(`${TENANT_A}/${ctx.releve.id}/photos/${prepared.mediaId}.jpg`);
     const entry = await entryOf(ctx, prepared.mediaId);
     expect(entry.media.metadata).toMatchObject({ source: "camera_appareil", priseLeSource: "capture", orientation: "paysage" });
@@ -129,7 +135,7 @@ describe("capture → file locale → synchronisation", () => {
     let cut = true;
     ctx.media.insertMedia = async (row) => { if (cut) { cut = false; throw new MediaRemoteError("Connexion perdue.", "network"); } return insertMedia(row); };
     await processUploadQueue(store, ctx.media);
-    expect((await store.list())[0].steps).toEqual({ fichier: true, media: false, ancre: false, remplacement: true });
+    expect((await store.list())[0].steps).toEqual({ miniature: true, fichier: true, media: false, ancre: false, remplacement: true });
     // Le fichier est déjà là : la reprise le signale « déjà présent » et poursuit.
     const again = await processUploadQueue(store, ctx.media, { force: true });
     expect(again.synced).toHaveLength(1);
@@ -187,7 +193,7 @@ describe("lecture, suppression, remplacement", () => {
     await ctx.owner.annotate(ctx.structure.releve, entry.anchors[0], { forme: "cercle", cx: 0.5, cy: 0.5, r: 0.1 });
     entry = await entryOf(ctx, prepared.mediaId);
     expect(entry.annotations).toHaveLength(1);
-    expect(await ctx.owner.deletePhoto(ctx.structure.releve, entry.media)).toEqual({ fileRemoved: true });
+    expect(await ctx.owner.deletePhoto(ctx.structure.releve, entry.media)).toEqual({ fileRemoved: true, kept: null });
     expect(await entryOf(ctx, prepared.mediaId)).toBeUndefined();
     expect(ctx.media.objects.size).toBe(0);
     expect([...ctx.media.elements.values()].filter((element) => element.type !== "mur" && element.type !== "equipement" && !element.deletedAt)).toEqual([]);
@@ -200,7 +206,7 @@ describe("lecture, suppression, remplacement", () => {
     const collegue = new ReleveMediaService(ctx.media, ctx.releves, actor({ userId: USER_OTHER }));
     const entry = await entryOf(ctx, prepared.mediaId, collegue);
     expect(collegue.canRemoveFile(shared, entry.media)).toBe(false);
-    expect(await collegue.deletePhoto(shared, entry.media)).toEqual({ fileRemoved: false });
+    expect(await collegue.deletePhoto(shared, entry.media)).toEqual({ fileRemoved: false, kept: "droits" });
     expect(ctx.media.objects.has(prepared.storagePath)).toBe(true);
     await expect(collegue.purgeRetiredFiles(ctx.releve.id)).rejects.toThrow(RelevePermissionError);
     const admin = new ReleveMediaService(ctx.media, ctx.releves, actor({ userId: USER_ADMIN, role: "tools_releve_admin" }));
@@ -216,7 +222,7 @@ describe("lecture, suppression, remplacement", () => {
     const { prepared } = await shoot(ctx, { kind: "releve" }, collegue);
     const entry = await entryOf(ctx, prepared.mediaId, collegue);
     expect(entry.media.createdBy).toBe(USER_OTHER);
-    expect(await collegue.deletePhoto(shared, entry.media)).toEqual({ fileRemoved: true });
+    expect(await collegue.deletePhoto(shared, entry.media)).toEqual({ fileRemoved: true, kept: null });
   });
 
   it("remplacement : les ancres suivent la nouvelle photo (repères et annotations de l'ancienne retirés), lignée conservée", async () => {
