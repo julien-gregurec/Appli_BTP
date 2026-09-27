@@ -6,11 +6,11 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 117 | 19 | 78 | 20 | 0 | 11 | 17 | 12 |
+| gestion_pro | 123 | 19 | 83 | 21 | 0 | 11 | 18 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 9 | 5 | 2 | 2 | 0 | 3 | 2 | 4 |
-| studio | 13 | 6 | 2 | 5 | 0 | 3 | 1 | 3 |
+| studio | 23 | 7 | 8 | 8 | 0 | 3 | 3 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
 
 ### gestion_pro — ELSATIA Gestion Pro (inclut Boutique, DOE, API de facturation Tools)
@@ -38,6 +38,10 @@
 | `TOOLS_STORE_ENVIRONMENT` | REQUIRED |  |  |  |  |  |  |  |  |
 | `APPLE_ROOT_CA_BASE64` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats iOS Tools sont ouverts |
 | `BREVO_API_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
+| `ELSATIA_IDENTITY_ISSUER` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé (GP émetteur et Studio vérificateur) |
+| `ELSATIA_IDENTITY_SIGNING_KEYS` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
+| `ELSATIA_STUDIO_EXCHANGE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
+| `ELSATIA_STUDIO_LIFECYCLE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
 | `EMAIL_FROM_ADDRESS` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `GOOGLE_PLAY_RTDN_AUDIENCE` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
 | `GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
@@ -108,6 +112,7 @@
 | `STRIPE_TOOLS_WEBHOOK_SECRET` | CONDITIONAL |  | oui |  |  |  |  |  | dès que la facturation Tools est ouverte |
 | `STRIPE_WEBHOOK_BOUTIQUE_SECRET` | CONDITIONAL |  | oui |  |  |  |  |  | dès que la Boutique est ouverte (FEATURE_BOUTIQUE_ENABLED=true) |
 | `STRIPE_WEBHOOK_SECRET` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Stripe Connect est activé |
+| `STUDIO_ACCESS_ALLOWLIST` | CONDITIONAL |  |  |  |  |  |  |  | quand STUDIO_ACCESS_MODE=allowlist |
 | `SUPPORT_EMAIL` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `TOOLS_ALLOWED_ORIGINS` | CONDITIONAL |  |  |  |  |  |  |  | dès que Tools appelle l'API de facturation |
 | `TOOLS_APP_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que la facturation Tools est ouverte |
@@ -133,6 +138,7 @@
 | `RGPD_PURGE_PLANIFICATEUR_MODE` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `SENTRY_DSN` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `STRIPE_PORTAL_CONFIGURATION_ID` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `STUDIO_ACCESS_MODE` | OPTIONAL |  |  |  |  |  | open, allowlist, closed |  |  |
 | `TOOLS_STORE_ALLOW_SANDBOX` | OPTIONAL |  |  |  |  |  |  |  |  |
 
 ### colors — ELSATIA Colors
@@ -176,17 +182,27 @@
 
 | Variable | Classe | Public | Secret | Build | Preview-only | Valeur imposée preview | Valeurs admises | Interdite preview | Condition |
 |---|---|---|---|---|---|---|---|---|---|
+| `ELSATIA_APPLICATION_ENV` | REQUIRED |  |  | oui |  | `preview` | local, test, preview, production |  |  |
 | `NEXT_PUBLIC_STUDIO_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `STUDIO_LEGAL_PUBLISHED` | REQUIRED |  |  |  |  |  | 0, 1 |  |  |
 | `STUDIO_SIGNUP_MODE` | REQUIRED |  |  |  |  |  | open, allowlist, closed |  |  |
 | `STUDIO_STORAGE_SERVICE_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
+| `ELSATIA_IDENTITY_HANDOFF_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
+| `ELSATIA_IDENTITY_ISSUER` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé (GP émetteur et Studio vérificateur) |
+| `ELSATIA_IDENTITY_JWKS` | CONDITIONAL |  |  |  |  |  |  |  | si ELSATIA_IDENTITY_JWKS_URL n'est pas posée |
+| `ELSATIA_IDENTITY_JWKS_URL` | CONDITIONAL |  |  |  |  |  |  |  | si ELSATIA_IDENTITY_JWKS n'est pas posée |
 | `STUDIO_ANALYSIS_PYTHON` | CONDITIONAL |  |  |  |  |  |  |  | quand STUDIO_AI_ANALYSIS=1 |
+| `STUDIO_AUTH_SERVICE_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
+| `STUDIO_CRON_SECRET` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
 | `STUDIO_SIGNUP_ALLOWLIST` | CONDITIONAL |  |  |  |  |  |  |  | quand STUDIO_SIGNUP_MODE=allowlist |
 | `STUDIO_ACCEPTANCE` | OPTIONAL |  |  |  |  |  | 0, 1 | **oui** |  |
 | `STUDIO_AI_ANALYSIS` | OPTIONAL |  |  |  |  |  | 0, 1 |  |  |
 | `STUDIO_ENABLED` | OPTIONAL |  |  |  |  |  | 1, 0, true, false, on, off |  |  |
+| `STUDIO_IDENTITY_MAX_SESSION_S` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `STUDIO_IDENTITY_MODE` | OPTIONAL |  |  |  |  |  | elsatia, local |  |  |
+| `STUDIO_IDENTITY_REVALIDATE_S` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `STUDIO_RENDER_INTERNAL_PREVIEW` | OPTIONAL |  |  |  |  |  | 0, 1 | **oui** |  |
 | `STUDIO_RUNTIME_TRACE` | OPTIONAL |  |  |  |  |  | 0, 1 | **oui** |  |
 

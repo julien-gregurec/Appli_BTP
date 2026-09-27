@@ -5,7 +5,7 @@
 | Date | 2026-09-26 → 2026-09-27 |
 | Base | `integration/elsatia-canonical-train-v2` @ `819ebe56` (335 migrations, dernière `20260923000400`) |
 | Branche | `integration/elsatia-canonical-train-v3` |
-| Migrations | **<!--train:nb-->342<!--/train:nb-->**, dernière **`<!--train:derniere-->20260927000507<!--/train:derniere-->`** (valeurs générées : `npm run sync:train-expectations`) |
+| Migrations | **340**, dernière **`20260926000505`** (valeurs **figées** à l'état V3 ; train courant : `ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE.md`) |
 | Moteur | PostgreSQL 16.13 réel + pgTAP 1.3, amorce `scripts/local-postgres-bootstrap` (sans Docker) |
 | Navigateur | Chromium 1194 (Playwright), apps compilées (`next build` + `next start`) |
 | Actions distantes | **Aucune.** Aucune Preview, aucune Production, aucun merge vers `main`. |

@@ -220,13 +220,16 @@ describe("migration ELS-REC-004 : conversion des préfixes QR LGP-* vers ELS-* (
     expect(sql).not.toContain("create or replace function public.enregistrer_mouvement_stock_borne_v3");
   });
 
+  // Empreintes mises à jour par le train canonique V4 : devis et commandes du seed insérés en
+  // brouillon puis finalisés après leurs lignes (verrous 20260926000506 / 20260927000508) ;
+  // aucune ligne liée aux préfixes QR n'a changé.
   it("les scripts de seed ELSATIA Preview restent strictement inchangés (empreintes déjà vérifiées)", () => {
     const empreinte = (chemin: string) => createHash("sha256").update(readFileSync(resolve(racine, chemin))).digest("hex");
     expect(empreinte("scripts/seed-elsatia-preview-year.mjs")).toBe(
-      "6ebc261878f0243289c52d4e0382d1bb77e39eec578617812bd9342149fd2803",
+      "784e30d52548cbc2b0788b883cb6189bec09623c29a70834c6bc6009f1ad2620",
     );
     expect(empreinte("scripts/seed-elsatia-preview-year.test.mjs")).toBe(
-      "e0ca3867c25ac2447342075999905783e29f54f1a8136312b4df328813227738",
+      "603e614b54100949949a437011905c4fbb6318e8e3bf3c7384ffbd478bba1037",
     );
   });
 });

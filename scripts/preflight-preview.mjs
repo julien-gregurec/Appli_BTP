@@ -57,6 +57,8 @@ export const EXPECTED_BUCKETS = [
   "fiches-techniques", "documents-paie", "messagerie-medias", "devis-medias",
   "colors-seaux", "reserves-photos", "reserves-plans", "communications-elsatia",
   "studio-originals", "studio-renders",
+  // Train canonique V4 : bucket privé Relevé & Métré (20260927000601).
+  "tools-releves",
 ];
 
 /** Pure : ne fait aucun appel réseau. Testable indépendamment (tests/preflight-preview.test.mjs). */

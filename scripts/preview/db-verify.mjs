@@ -104,6 +104,13 @@ export const RPC_SERVICE_SEULEMENT = [
   "stripe_connect_encaisser_facture_service", "stripe_connect_expirer_checkout_facture_service", "tools_server_appliquer_abonnement",
   "reserves_produire_echeances", "reserves_notifications_preparer", "reserves_notifications_a_expedier", "reserves_notification_envoi_statuer",
   "studio_claim_render", "studio_render_progress", "studio_complete_render", "studio_render_dispatch",
+  // Train canonique V4 : ordre des webhooks Stripe (…506) et identité centrale Studio (…100000, inerte Studio OFF).
+  "synchroniser_abonnement_stripe_ordonne_service", "journaliser_evenement_stripe_ordre_service",
+  "liberer_evenement_webhook_stripe_service", "appliquer_evenement_facture_abonnement_service",
+  "stripe_connect_maj_compte_service", "tools_server_appliquer_abonnement_ordonne",
+  "elsatia_identity_account_of", "elsatia_identity_prepare_handoff", "elsatia_identity_claim_outbox",
+  "elsatia_identity_outbox_delivered", "elsatia_identity_outbox_failed", "elsatia_identity_resync",
+  "elsatia_identity_enqueue_entitlement",
 ];
 
 export function sqlServiceSeulement() {
@@ -232,7 +239,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   if (r.code !== 0) ko("DB-RLS", "smoke structurel", r.stderr.trim().split("\n").at(-1));
   else {
     const mesures = Object.fromEntries(r.stdout.trim().split("\n").map((s) => s.split("|")).map(([k, n]) => [k, Number(n)]));
-    const attendu = { tables_public_sans_rls: 0, tables_rls_sans_policy: null, anon_ecriture_public: 0, buckets_publics: 1, buckets_total: 18 };
+    const attendu = { tables_public_sans_rls: 0, tables_rls_sans_policy: null, anon_ecriture_public: 0, buckets_publics: 1, buckets_total: 19 };
     for (const [k, n] of Object.entries(mesures)) {
       const a = attendu[k];
       if (a === null || a === undefined) log(ligne("info", "DB-RLS", k, String(n)));

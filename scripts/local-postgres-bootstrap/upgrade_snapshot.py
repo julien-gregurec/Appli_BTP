@@ -45,6 +45,9 @@ TABLES_METIER = [
     "tools_monetization_subscriptions",
     # RGPD × commandes fournisseurs V1 (ELSATIA_RGPD_PURCHASE_ORDERS_RECONCILIATION_V1).
     "lignes_commande", "fournisseurs", "receptions_idempotence",
+    # Train V4 (ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE §11) : Stripe (journal d'abonnement),
+    # historique des affectations (RGPD dette résiduelle), documents GP (plans Réserves).
+    "abonnement_evenements", "affectations_historique",
 ]
 TABLES_SONDE_RLS = [
     "entreprises", "employes", "clients", "chantiers", "devis", "factures",

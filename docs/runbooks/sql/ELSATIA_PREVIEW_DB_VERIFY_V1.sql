@@ -9,17 +9,20 @@
 -- Validé sur PostgreSQL 16 + socle Supabase reconstruit (scripts/local-postgres-bootstrap).
 -- Attendu du contrôle 1 : CTE `attendu_train` ci-dessous, GÉNÉRÉ depuis supabase/migrations par
 -- `npm run sync:train-expectations` et vérifié en CI (`npm run verify:train-expectations`) :
--- aucun nombre de migrations n'est maintenu à la main (train canonique V3 — rapport
--- ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE). Contrôles 14-17 : garde-fous du train V3
+-- aucun nombre de migrations n'est maintenu à la main (train canonique V4 — rapport
+-- ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE ; V3 : ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE). Contrôles 14-17 : garde-fous du train V3
 -- (RGPD factures/contrats, Réserves). Contrôle 18 : contrat d'ordre Stripe (…506) et essai
 -- borné (…507, ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
+-- Contrôles 19-23 (train canonique V4) : commandes fournisseurs RGPD (…0926 506), dette RGPD
+-- résiduelle (…508), GP ↔ Réserves (…402), Relevé & Métré non commercial (601-801), identité
+-- Studio fermée et inerte (…100000, Studio OFF en première Preview).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (342, '20260927000507')),
+attendu_train(nb, derniere) as (values (352, '20260927100000')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -52,12 +55,21 @@ fonction_exec as (
   where n.nspname = 'public' and p.proname in ('est_membre_actif', 'entreprise_sans_membres')
   group by p.proname
 ),
+-- Lecture dynamique (comme politique_contrats) : absente d'une base encore au train V3.
+releve_pro as (
+  select case when to_regclass('public.tools_offres_catalogue') is null then null
+              else (xpath('/row/e/text()', query_to_xml(
+                'select code || '':'' || statut || case when commercialement_active then '':ACTIF'' else '''' end '
+                || '|| '':inclut '' || array_to_string(offres_incluses, ''+'') as e '
+                || 'from public.tools_offres_catalogue where code = ''releve_pro''', false, true, '')))[1]::text
+         end as etat
+),
 buckets_attendus(id) as (
   values ('chantier-documents'), ('entreprise-assets'), ('pointage-preuves'), ('factures-fournisseurs'),
          ('documents-employes'), ('notes-frais'), ('notes-frais-exports'), ('bulletins-paie'),
          ('fiches-techniques'), ('documents-paie'), ('messagerie-medias'), ('devis-medias'),
          ('colors-seaux'), ('reserves-photos'), ('reserves-plans'), ('communications-elsatia'),
-         ('studio-originals'), ('studio-renders')
+         ('studio-originals'), ('studio-renders'), ('tools-releves')
 ),
 controles(ordre, controle, attendu, observe, ok, bloquant) as (
   select 1, 'migrations appliquées (registre CLI)', a.nb::text || ', dernière ' || a.derniere,
@@ -97,10 +109,10 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select string_agg(proname || '=' || exec_auth, ', ' order by proname) from fonction_exec), 'fonctions absentes'),
          coalesce((select bool_and(exec_auth) and count(*) = 2 from fonction_exec), false), true
   union all
-  select 7, 'buckets Storage', '18 attendus, seul entreprise-assets public',
-         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id)::text || '/18 présents, publics : '
+  select 7, 'buckets Storage', '19 attendus (dont tools-releves, V4), seul entreprise-assets public',
+         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id)::text || '/19 présents, publics : '
            || coalesce((select string_agg(id, ', ') from storage.buckets where public), 'aucun'),
-         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id) = 18
+         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id) = 19
            and (select coalesce(array_agg(id::text), '{}') from storage.buckets where public) = array['entreprise-assets'], true
   union all
   select 8, 'catalogue applications_elsatia', 'colors, drone, gestion_pro, reserves, tools',
@@ -179,6 +191,69 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and to_regclass('public.stripe_essai_ecarts') is not null
            and exists (select 1 from pg_trigger where tgname = 'borner_essai_entreprise' and tgrelid = 'public.entreprises'::regclass and not tgisinternal)
            and not exists (select 1 from public.entreprises where abonnement_essai_fin > abonnement_essai_debut + 30), true
+  union all
+  -- Contrôles 19-23 : garde-fous du train canonique V4 (ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE).
+  select 19, 'RGPD commandes fournisseurs engagées (20260926000506)', 'verrous commande + lignes, instantané purgé immuable',
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in (
+            'verrouiller_commande_fournisseur_engagee', 'verrouiller_lignes_commande_engagee',
+            'commandes_fournisseurs_purgees_immuables', 'commandes_fournisseurs_purgees_sans_truncate'))::text || '/4 triggers'
+           || case when to_regclass('platform.commandes_fournisseurs_purgees') is null then ', table purgée ABSENTE' else '' end,
+         (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in (
+            'verrouiller_commande_fournisseur_engagee', 'verrouiller_lignes_commande_engagee',
+            'commandes_fournisseurs_purgees_immuables', 'commandes_fournisseurs_purgees_sans_truncate')) = 4
+           and to_regclass('platform.commandes_fournisseurs_purgees') is not null, true
+  union all
+  select 20, 'RGPD dette résiduelle (20260927000508)', 'identité figée à l''envoi, historique des affectations en un passage',
+         concat_ws(', ',
+           case when exists (select 1 from information_schema.columns where table_schema = 'public'
+                              and table_name = 'commandes_fournisseurs' and column_name = 'fournisseur_snapshot')
+                then 'fournisseur_snapshot' else 'fournisseur_snapshot ABSENTE' end,
+           case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'capturer_identite_commande_fournisseur'
+                              and tgrelid = 'public.commandes_fournisseurs'::regclass) then 'capture' else 'capture ABSENTE' end,
+           case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'trg_historiser_affectation'
+                              and tgrelid = 'public.affectations'::regclass) then 'historique' else 'historique ABSENT' end),
+         exists (select 1 from information_schema.columns where table_schema = 'public'
+                  and table_name = 'commandes_fournisseurs' and column_name = 'fournisseur_snapshot')
+           and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'capturer_identite_commande_fournisseur'
+                        and tgrelid = 'public.commandes_fournisseurs'::regclass)
+           and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'trg_historiser_affectation'
+                        and tgrelid = 'public.affectations'::regclass), true
+  union all
+  select 21, 'GP ↔ Réserves (20260927000402)', 'reserves_contacts + 4 gardes d''intégration GP',
+         (select count(*) from pg_trigger where not tgisinternal and tgname in (
+            'reserves_chantiers_garde_integration_gp', 'reserves_contacts_garde_integration_gp',
+            'reserves_intervenants_garde_integration_gp', 'reserves_plans_garde_integration_gp'))::text || '/4'
+           || case when to_regclass('public.reserves_contacts') is null then ', reserves_contacts ABSENTE' else '' end,
+         (select count(*) from pg_trigger where not tgisinternal and tgname in (
+            'reserves_chantiers_garde_integration_gp', 'reserves_contacts_garde_integration_gp',
+            'reserves_intervenants_garde_integration_gp', 'reserves_plans_garde_integration_gp')) = 4
+           and to_regclass('public.reserves_contacts') is not null, true
+  union all
+  select 22, 'Tools Relevé & Métré (601-801) : non commercial', 'Relevé Pro de référence (inclut Tools Pro), garde d''entitlement, 11 tables RLS',
+         concat_ws(', ',
+           coalesce((select etat from releve_pro), 'releve_pro ABSENTE'),
+           case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
+                then 'garde' else 'garde ABSENTE' end,
+           (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+             and c.relname like 'tools\_releves%' and c.relrowsecurity)::text || ' tables RLS'),
+         coalesce((select etat = 'releve_pro:reference:inclut tools_pro' from releve_pro), false)
+           and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
+           and (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+                 and c.relname like 'tools\_releves%' and c.relrowsecurity) = 11, true
+  union all
+  select 23, 'Identité Studio (20260927100000) : fermée, inerte (Studio OFF)', 'tables RLS sans droit d''API ; 0 sujet émis',
+         concat_ws(', ',
+           (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace
+             and c.relname in ('elsatia_identity_subjects', 'elsatia_identity_outbox') and c.relrowsecurity)::text || '/2 RLS',
+           (select count(*) from information_schema.role_table_grants where table_schema = 'public'
+             and table_name like 'elsatia\_identity\_%' and grantee in ('anon', 'authenticated', 'service_role'))::text || ' droit(s) d''API',
+           case when to_regclass('public.elsatia_identity_subjects') is null then 'sujets ?'
+                else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.elsatia_identity_subjects',
+                                                          false, true, '')))[1]::text || ' sujet(s)' end),
+         (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace
+           and c.relname in ('elsatia_identity_subjects', 'elsatia_identity_outbox') and c.relrowsecurity) = 2
+           and (select count(*) from information_schema.role_table_grants where table_schema = 'public'
+                 and table_name like 'elsatia\_identity\_%' and grantee in ('anon', 'authenticated', 'service_role')) = 0, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

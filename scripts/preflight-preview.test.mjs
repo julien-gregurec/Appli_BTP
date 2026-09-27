@@ -16,9 +16,9 @@ test("missingBuckets : liste vide de présents = tout manque", () => {
   assert.deepEqual(missingBuckets(["a", "b"], []), ["a", "b"]);
 });
 
-test("EXPECTED_BUCKETS : pas de doublon, correspond au compte documenté (18)", () => {
+test("EXPECTED_BUCKETS : pas de doublon, correspond au compte documenté (19, train V4)", () => {
   assert.equal(EXPECTED_BUCKETS.length, new Set(EXPECTED_BUCKETS).size);
-  assert.equal(EXPECTED_BUCKETS.length, 18);
+  assert.equal(EXPECTED_BUCKETS.length, 19);
 });
 
 test("PREVIEW_TARGETS : une entrée par unité du manifeste dotée d'un gabarit Preview", () => {

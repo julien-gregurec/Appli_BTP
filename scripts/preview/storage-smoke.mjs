@@ -3,7 +3,7 @@
  * ELSATIA — Pack Preview : smoke Storage Supabase.
  *
  * Lecture seule par défaut :
- *   1. liste des buckets (clé de service, GET /storage/v1/bucket) : les 18 buckets attendus,
+ *   1. liste des buckets (clé de service, GET /storage/v1/bucket) : les 19 buckets attendus,
  *      drapeau `public` exact (seul entreprise-assets est public), limite de taille posée ;
  *   2. anonyme (clé publishable) : la liste des buckets ne doit rien révéler ;
  *   3. anonyme : lecture d'un objet d'un bucket privé via l'URL publique → refus (400/401/403/404).
@@ -20,13 +20,15 @@ import {
   ligne, lireOptions, refDepuisUrlApi, refuserProduction,
 } from "./lib/preview-guard.mjs";
 
-/** Les 18 buckets créés par supabase/migrations (même liste que scripts/preflight-preview.mjs, test d'égalité). */
+/** Les 19 buckets créés par supabase/migrations (même liste que scripts/preflight-preview.mjs, test d'égalité). */
 export const EXPECTED_BUCKETS = [
   "entreprise-assets", "chantier-documents", "pointage-preuves", "factures-fournisseurs",
   "documents-employes", "notes-frais", "notes-frais-exports", "bulletins-paie",
   "fiches-techniques", "documents-paie", "messagerie-medias", "devis-medias",
   "colors-seaux", "reserves-photos", "reserves-plans", "communications-elsatia",
   "studio-originals", "studio-renders",
+  // Train canonique V4 : bucket privé Relevé & Métré (20260927000601).
+  "tools-releves",
 ];
 export const BUCKETS_PUBLICS = ["entreprise-assets"];
 export const BUCKET_SMOKE = "pointage-preuves";
