@@ -36,6 +36,8 @@
     "test:preview-pack": "node --test scripts/preview/preview-pack.test.mjs",
     "sync:train-expectations": "node scripts/preview/train-expectations.mjs --write",
     "verify:train-expectations": "node scripts/preview/train-expectations.mjs --check",
+    "test:stripe-ordering-script": "node --test scripts/qualification/stripe-ordering-test-mode.test.mjs",
+    "test:stripe-trial-script": "node --test scripts/qualification/stripe-trial-test-mode.test.mjs",
     "prebuild": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:gestion-pro": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:reserves": "node scripts/check-env-manifest.mjs --auto --app reserves",

@@ -232,7 +232,7 @@ compléter `url_preview` des apps :
 update public.applications_elsatia set url_preview = '<origine>' where code = '<gestion_pro|colors|tools|reserves>';
 ```
 
-(ou via `/plateforme/applications`). Relancer `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` : <!--train:controles-->17<!--/train:controles-->/<!--train:controles-->17<!--/train:controles--> `ok = t`.
+(ou via `/plateforme/applications`). Relancer `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` : <!--train:controles-->18<!--/train:controles-->/<!--train:controles-->18<!--/train:controles--> `ok = t`.
 
 ## STEP 11 — Preflight en direct (J)
 
@@ -351,7 +351,7 @@ Puis un rendu complet (upload → job → sortie publiée). **Sortie** : image c
 
 - [ ] STEP 0 consigné ; STEP 1 vert ;
 - [ ] aucune commande n'a touché `exhvuzegsefmoguxoiak` ni une clé live ;
-- [ ] <!--train:nb-->342<!--/train:nb--> migrations appliquées (train canonique V3, dernière <!--train:derniere-->20260927000507<!--/train:derniere-->) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` <!--train:controles-->17<!--/train:controles-->/<!--train:controles-->17<!--/train:controles--> (dont 14-17 : garde-fous V3) ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
+- [ ] <!--train:nb-->342<!--/train:nb--> migrations appliquées (train canonique V3, dernière <!--train:derniere-->20260927000507<!--/train:derniere-->) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` <!--train:controles-->18<!--/train:controles-->/<!--train:controles-->18<!--/train:controles--> (dont 14-17 : garde-fous V3) ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
 - [ ] chaque build Preview affiche `mode enforce` puis `GO : aucune erreur.` ;
 - [ ] `preflight:preview -- --live --strict` 0 erreur, 18/18 buckets ;
 - [ ] un cycle Stripe Test complet reflété en base ; aucun webhook en échec répété ;

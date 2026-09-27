@@ -8,7 +8,7 @@ import { notifierPaiementAbonnementEchoue } from "@/lib/abonnement-notifications
 import { VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
 // Next.js n'autorise dans un `route.ts` que les exports de gestionnaires HTTP
 // et la configuration de segment : la logique métier vit dans ce module.
-import { identifiant, instantDepuisUnix, synchroniserAbonnementCoordonne, type StripeReference, type SupabaseAdmin } from "@/lib/stripe-abonnement-synchronisation";
+import { identifiant, instantDepuisUnix, synchroniserAbonnementCoordonne, type EvenementOrdonne, type StripeReference, type SupabaseAdmin } from "@/lib/stripe-abonnement-synchronisation";
 
 type StripeObjet = {
   id: string;
@@ -38,7 +38,7 @@ type StripeObjet = {
   total?: number;
   total_tax_amounts?: Array<{ amount?: number }>;
 };
-type StripeEvent = { id: string; type: string; livemode: boolean; created?: number; account?: string; data: { object: StripeObjet } };
+type StripeEvent = { id: string; type: string; livemode: boolean; created: number; account?: string; data: { object: StripeObjet } };
 type EntrepriseStripe = { id: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null };
 type ResolutionEntreprise =
   | { ok: true; entrepriseId: string }
@@ -50,6 +50,10 @@ function evenementStripeMinimalValide(valeur: unknown): valeur is StripeEvent {
   return typeof candidat.id === "string" && candidat.id.trim() !== ""
     && typeof candidat.type === "string" && candidat.type.trim() !== ""
     && typeof candidat.livemode === "boolean"
+    // Contrat d'ordre : `created` (horloge Stripe de l'événement) est la seule
+    // clé d'ordonnancement. Stripe l'envoie toujours ; son absence signe un
+    // payload non Stripe, refusé plutôt qu'ordonnancé à l'aveugle.
+    && typeof candidat.created === "number" && Number.isFinite(candidat.created) && candidat.created > 0
     && !!candidat.data && typeof candidat.data === "object"
     && !!candidat.data.object && typeof candidat.data.object === "object"
     && typeof candidat.data.object.id === "string" && candidat.data.object.id.trim() !== "";
@@ -97,26 +101,76 @@ function diagnosticWebhook(niveau: "warn" | "error", evenement: Pick<StripeEvent
   });
 }
 
-async function synchroniserFactureAbonnement(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet, statut: string) {
+type DecisionFacture = {
+  decision: "applique" | "perime" | "sans_effet" | "deja_traite";
+  motif?: string | null;
+  statut_resultant: string | null;
+  notifier_echec: boolean;
+};
+
+// Contrat d'ordre Stripe (migration 20260927000506) : la transition d'accès, la
+// trace « dernière facture » et la ligne `factures_abonnement` sont décidées
+// et écrites en UNE transaction, sous verrou de la ligne entreprise, selon
+// `event.created`. Un événement plus ancien que le dernier appliqué (ex. vieux
+// `invoice.payment_failed` rejoué après `invoice.paid`) est journalisé
+// `perime` et ne modifie rien.
+async function appliquerEvenementFacture(admin: SupabaseAdmin, entrepriseId: string, evenement: StripeEvent): Promise<DecisionFacture> {
+  const objet = evenement.data.object;
   const taxes = (objet.total_tax_amounts ?? []).reduce((total, taxe) => total + Number(taxe.amount ?? 0), 0);
   const totalCentimes = Number(objet.total ?? 0);
   const htCentimes = objet.subtotal_excluding_tax == null ? Math.max(0, totalCentimes - taxes) : Number(objet.subtotal_excluding_tax);
-  // ACL canonique : `factures_abonnement` n'est plus écrite en direct par `service_role`.
-  const { error } = await admin.rpc("synchroniser_facture_abonnement_service", {
+  const { data, error } = await admin.rpc("appliquer_evenement_facture_abonnement_service", {
     p_entreprise_id: entrepriseId,
+    p_stripe_event_id: evenement.id,
+    p_stripe_event_type: evenement.type,
+    p_stripe_event_created: instantDepuisUnix(evenement.created),
     p_stripe_invoice_id: objet.id,
+    p_invoice_status: objet.status || null,
+    p_invoice_created: instantDepuisUnix(objet.created),
     p_numero: objet.number ?? null,
     p_periode_debut: instantDepuisUnix(objet.period_start),
     p_periode_fin: instantDepuisUnix(objet.period_end),
     p_montant_ht: htCentimes / 100,
     p_montant_tva: taxes / 100,
     p_montant_ttc: totalCentimes / 100,
-    p_devise: (objet.currency ?? "eur").toUpperCase(),
-    p_statut: statut,
-    p_url_facture: objet.hosted_invoice_url ?? null,
-    p_url_pdf: objet.invoice_pdf ?? null,
+    p_devise: objet.currency ?? "eur",
+    p_url_facture: objet.hosted_invoice_url || null,
+    p_url_pdf: objet.invoice_pdf || null,
   });
   if (error) throw new Error(error.message);
+  if (!data || typeof data !== "object") throw new Error("Décision d'ordonnancement absente");
+  return data as DecisionFacture;
+}
+
+// Journal d'ordonnancement des événements sans transition d'accès : purement
+// informatif, jamais bloquant (un échec ne doit pas provoquer de rejeu Stripe).
+async function journaliserSansEffet(admin: SupabaseAdmin, entrepriseId: string, evenement: StripeEvent, motif: string) {
+  try {
+    const objet = evenement.data.object;
+    const { error } = await admin.rpc("journaliser_evenement_stripe_ordre_service", {
+      p_flux: "abonnement",
+      p_stripe_event_id: evenement.id,
+      p_stripe_event_type: evenement.type,
+      p_stripe_event_created: instantDepuisUnix(evenement.created),
+      p_objet_type: objet.object ?? "inconnu",
+      p_objet_id: objet.id,
+      p_entreprise_id: entrepriseId,
+      p_motif: motif,
+    });
+    if (error) throw error;
+  } catch {
+    console.warn("Journal d'ordonnancement Stripe non écrit", { categorie: "journal_ordre_indisponible", type_evenement: evenement.type });
+  }
+}
+
+function evenementOrdonne(evenement: StripeEvent): EvenementOrdonne {
+  return {
+    id: evenement.id,
+    type: evenement.type,
+    created: evenement.created,
+    objetType: evenement.data.object.object ?? "inconnu",
+    objetId: evenement.data.object.id,
+  };
 }
 
 async function notifierPaiementEchoueSansEchouer(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet) {
@@ -229,17 +283,25 @@ export async function POST(request: Request) {
       if (!entrepriseId) throw new Error("Entreprise absente de la session Stripe");
       const subscriptionId = identifiant(objet.subscription);
       if (!subscriptionId) throw new Error("Abonnement absent de la session Stripe");
-      statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenement.id);
+      statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenementOrdonne(evenement));
       await reconcilierAbonnementStripe(entrepriseId);
       // R2-B : capacité personnes = DB → Stripe (autorité DB, out-of-order safe).
       await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
     } else if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(evenement.type)) {
       const subscriptionId = objet.object === "subscription" ? objet.id : identifiant(objet.subscription);
       if (!subscriptionId) throw new Error("Abonnement Stripe introuvable");
-      statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenement.id);
+      // Le payload peut être ancien : l'abonnement est RELU chez Stripe sous
+      // verrou, puis appliqué par la RPC ordonnée (filigrane d'accès).
+      statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenementOrdonne(evenement));
       if (entrepriseId) {
         await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
       }
+    } else if (evenement.type === "customer.subscription.trial_will_end") {
+      // Annonce Stripe (J-3) : l'essai local ELSATIA fait autorité
+      // (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1) ; aucune relecture, aucune
+      // écriture d'essai ni de statut. Le prochain customer.subscription.updated
+      // porte la transition réelle.
+      await journaliserSansEffet(admin, entrepriseId, evenement, "essai_fin_annoncee");
     } else if (evenement.type === "invoice.created" && objet.billing_reason !== "subscription_create") {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       const customerId = identifiant(objet.customer);
@@ -248,50 +310,34 @@ export async function POST(request: Request) {
         ajouterDepassementAppareilsFacture({ entrepriseId, customerId, invoiceId: objet.id, montantHt: await calculerDepassementAppareils(entrepriseId) }),
         ajouterDepassementStockageFacture({ entrepriseId, customerId, invoiceId: objet.id }),
       ]);
+      await journaliserSansEffet(admin, entrepriseId, evenement, "depassements_facture");
     } else if (["invoice.paid", "invoice.payment_failed", "invoice.payment_action_required"].includes(evenement.type)) {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
-      const traceFacture = {
-        derniere_facture_stripe_id: objet.id,
-        derniere_facture_url: objet.hosted_invoice_url || null,
-        derniere_facture_pdf: objet.invoice_pdf || null,
-        derniere_facture_statut: objet.status || evenement.type,
-        derniere_facture_at: instantDepuisUnix(objet.created) || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      let miseAJour: Record<string, unknown>;
-      if (evenement.type === "invoice.paid") {
-        // Billing Security V3 (§6) : paiement réussi → restauration d'accès
-        // immédiate ET régularisation de tout impayé en cours. Sans l'effacement
-        // de suspension_prevue_at, appliquer_suspensions_impayes() (désormais
-        // appelée par le cron) re-suspendrait plus tard un client qui a payé.
-        statutResultant = "actif";
-        miseAJour = { ...traceFacture, abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null };
-      } else if (evenement.type === "invoice.payment_action_required") {
-        // Billing Security V3 (§6) : une authentification 3-D Secure à confirmer
-        // n'est PAS un échec de paiement — seule la trace de facture est mise à
-        // jour, jamais le statut d'accès.
-        statutResultant = "action_requise";
-        miseAJour = traceFacture;
-      } else {
-        // invoice.payment_failed : comportement du tronc conservé (suspension
-        // immédiate). Le délai de grâce configurable de Billing V3 n'est pas
-        // porté sur le train canonique V1 : il exige aussi de modifier la RPC
-        // synchroniser_abonnement_stripe_service (past_due → suspendu) — voir
-        // docs/qualification/ELSATIA_CANONICAL_TRAIN_EXECUTION_V1.md.
-        statutResultant = "suspendu";
-        miseAJour = { ...traceFacture, abonnement_statut: "suspendu" };
+      // Décision produit conservée (Preview) : un `invoice.payment_failed`
+      // APPLICABLE suspend immédiatement (pas de période de grâce).
+      // `invoice.payment_action_required` (3-D Secure à confirmer) n'est jamais
+      // un échec : trace de facture seulement, statut d'accès inchangé.
+      // `invoice.paid` restaure l'accès et régularise l'impayé. L'ordre, les
+      // rejeux et les livraisons concurrentes sont arbitrés en base.
+      const decision = await appliquerEvenementFacture(admin, entrepriseId, evenement);
+      statutResultant = decision.statut_resultant;
+      if (decision.decision === "perime") {
+        console.warn("Événement Stripe périmé journalisé sans effet", {
+          categorie: "evenement_perime",
+          motif: decision.motif ?? null,
+          type_evenement: evenement.type,
+          empreinte_evenement: empreinteEvenementStripe(evenement.id),
+        });
       }
-      const { error } = await admin.from("entreprises").update(miseAJour).eq("id", entrepriseId);
-      if (error) throw new Error(error.message);
-      await synchroniserFactureAbonnement(admin, entrepriseId, objet, objet.status || evenement.type.replace("invoice.", ""));
-      // P1 — un paiement d'abonnement échoué suspend l'accès (ci-dessus) : le
-      // client doit en être informé. Best-effort STRICT : l'envoi ne peut ni
-      // faire échouer le webhook, ni provoquer un rejeu Stripe (un rejeu
-      // enverrait un doublon). Le destinataire est l'email de facturation connu
-      // de Stripe, jamais une adresse reconstruite côté ELSATIA.
-      if (evenement.type === "invoice.payment_failed") {
+      // P1 — un paiement d'abonnement échoué suspend l'accès : le client doit en
+      // être informé. Best-effort STRICT, et seulement si l'échec a été
+      // réellement APPLIQUÉ : un vieux `payment_failed` rejoué (périmé) ou déjà
+      // traité ne renvoie pas d'e-mail.
+      if (decision.notifier_echec) {
         await notifierPaiementEchoueSansEchouer(admin, entrepriseId, objet);
       }
+    } else {
+      await journaliserSansEffet(admin, entrepriseId, evenement, evenement.type === "invoice.created" ? "facture_initiale" : "type_non_traite");
     }
     await admin.rpc("finaliser_evenement_abonnement_service", {
       p_stripe_event_id: evenement.id,

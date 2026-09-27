@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { calculerEssaiCheckout, parametresEssaiCheckout, suffixeIdempotenceEssai, type EssaiCheckout } from "@/lib/stripe-essai-checkout";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -26,7 +27,7 @@ export function calculerFacturationStockage(params: {
 
 type StripeErreur = { error?: { message?: string } };
 type StripeCustomer = { id: string };
-type StripeSession = { id: string; url: string | null };
+type StripeSession = { id: string; url: string | null; status?: string | null; mode?: string | null; metadata?: Record<string, string> | null };
 export type StripeSubscription = {
   id: string;
   customer: string | { id: string };
@@ -333,11 +334,52 @@ export async function creerOuRecupererClientStripe(params: {
   return client.id;
 }
 
+/**
+ * Refus d'un second Checkout : l'entreprise est déjà rattachée à une
+ * subscription Stripe. Un nouveau Checkout créerait (et facturerait) une
+ * seconde subscription que le webhook refuse de rattacher
+ * (`rattachement_stripe_incoherent`) ; le changement d'offre passe par le
+ * Portail Stripe.
+ */
+export class AbonnementStripeDejaRattache extends Error {
+  constructor() {
+    super("Un abonnement Stripe est déjà rattaché à cette entreprise");
+    this.name = "AbonnementStripeDejaRattache";
+  }
+}
+
+/**
+ * Prépare un Checkout d'abonnement : relit l'essai LOCAL (seule autorité) et
+ * calcule l'essai Stripe restant (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
+ * Lecture seule, aucun appel Stripe.
+ */
+export async function preparerCheckoutAbonnement(entrepriseId: string, maintenant: Date = new Date()): Promise<EssaiCheckout> {
+  const admin = createAdminClient();
+  const { data: entreprise, error } = await admin
+    .from("entreprises")
+    .select("id,abonnement_essai_debut,abonnement_essai_fin,stripe_subscription_id")
+    .eq("id", entrepriseId)
+    .single();
+  if (error || !entreprise) throw new Error("Entreprise introuvable");
+  if (entreprise.stripe_subscription_id) throw new AbonnementStripeDejaRattache();
+  return calculerEssaiCheckout({
+    essaiDebut: entreprise.abonnement_essai_debut as string | null,
+    essaiFin: entreprise.abonnement_essai_fin as string | null,
+  }, maintenant);
+}
+
 export async function creerSessionAbonnementStripe(params: {
   entrepriseId: string;
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  /**
+   * Essai restant calculé depuis la fenêtre locale (`preparerCheckoutAbonnement`).
+   * Obligatoire : aucune durée d'essai fixe n'est plus envoyée à Stripe.
+   */
+  essai: EssaiCheckout;
+  /** Suffixe de clé quand la session idempotente rejouée n'est plus ouverte. */
+  renouvellement?: string;
   /** Injectable pour les tests ; `process.env` en exécution réelle. */
   environnement?: Record<string, string | undefined>;
 }) {
@@ -359,7 +401,10 @@ export async function creerSessionAbonnementStripe(params: {
     "metadata[entreprise_id]": params.entrepriseId,
     "metadata[offre]": params.offre,
     "metadata[periodicite]": params.periodicite,
-    "subscription_data[trial_period_days]": String(DUREE_ESSAI_JOURS),
+    // Essai : fin ABSOLUE = fin de l'essai local (jamais `trial_period_days`,
+    // qui repartirait de la complétion de la session) ; aucun essai si expiré
+    // ou si le reliquat est sous le minimum Checkout de 48 h.
+    ...parametresEssaiCheckout(params.essai),
     "subscription_data[metadata][entreprise_id]": params.entrepriseId,
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
@@ -369,8 +414,101 @@ export async function creerSessionAbonnementStripe(params: {
   }
   return requeteStripe<StripeSession>("checkout/sessions", {
     corps,
-    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}`,
+    // La clé varie avec l'essai : Stripe refuse une clé rejouée avec d'autres
+    // paramètres (bascule « essai » → « sans essai » sous les 48 h).
+    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}-${suffixeIdempotenceEssai(params.essai)}${params.renouvellement ? `-r${params.renouvellement}` : ""}`,
   });
+}
+
+/**
+ * Statuts Stripe pour lesquels une subscription existe encore (facturable ou
+ * réactivable) : un second Checkout créerait une seconde subscription facturée
+ * que le webhook refuse de rattacher.
+ */
+const STATUTS_SUBSCRIPTION_VIVANTS = new Set(["trialing", "active", "past_due", "unpaid", "incomplete", "paused"]);
+
+type ListeStripe<T> = { data: T[] };
+
+/**
+ * Vérité Stripe (et non seulement locale) : le webhook de la subscription
+ * précédente peut ne pas encore être arrivé. Lecture seule.
+ */
+export async function verifierAucuneSubscriptionStripeVivante(customerId: string) {
+  const liste = await requeteStripe<ListeStripe<{ id: string; status: string }>>(
+    `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`,
+    { methode: "GET" },
+  );
+  if ((liste.data ?? []).some((s) => STATUTS_SUBSCRIPTION_VIVANTS.has(s.status))) {
+    throw new AbonnementStripeDejaRattache();
+  }
+}
+
+/**
+ * Exclusivité Checkout (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1, §7) : après
+ * création, toute AUTRE session d'abonnement ouverte de l'entreprise est
+ * expirée, puis la vérité Stripe est relue.
+ *
+ * Deux créations simultanées (offres différentes, ou de part et d'autre du
+ * seuil 48 h — clés d'idempotence distinctes) : chaque requête balaie APRÈS sa
+ * propre création, donc la seconde à balayer voit la session de la première
+ * et l'expire. Au plus une session reste complétable. Une session complétée
+ * avant le balayage ne peut plus être expirée (refus Stripe, ignoré) mais sa
+ * subscription existe : la relecture qui suit la détecte, et la session qu'on
+ * vient de créer est expirée à son tour (aucune seconde subscription).
+ */
+export async function garantirSessionCheckoutUnique(params: { entrepriseId: string; customerId: string; sessionId: string }) {
+  const ouvertes = await requeteStripe<ListeStripe<StripeSession>>(
+    `checkout/sessions?customer=${encodeURIComponent(params.customerId)}&status=open&limit=100`,
+    { methode: "GET" },
+  );
+  const autres = (ouvertes.data ?? []).filter((s) =>
+    s.id !== params.sessionId
+    && s.mode === "subscription"
+    && s.metadata?.entreprise_id === params.entrepriseId);
+  for (const session of autres) {
+    await expirerSessionCheckout(session.id);
+  }
+  try {
+    await verifierAucuneSubscriptionStripeVivante(params.customerId);
+  } catch (erreur) {
+    if (erreur instanceof AbonnementStripeDejaRattache) await expirerSessionCheckout(params.sessionId);
+    throw erreur;
+  }
+}
+
+async function expirerSessionCheckout(sessionId: string) {
+  // Une session déjà complétée ou expirée ne peut plus l'être : sans effet.
+  await requeteStripe(`checkout/sessions/${encodeURIComponent(sessionId)}/expire`, {
+    idempotence: `abonnement-checkout-expiration-${sessionId}`,
+  }).catch(() => undefined);
+}
+
+/**
+ * Checkout d'abonnement complet : essai = reliquat local, refus si une
+ * subscription vit déjà (base ou Stripe), session unique.
+ */
+export async function ouvrirCheckoutAbonnement(params: {
+  entrepriseId: string;
+  email: string;
+  offre: OffreAbonnement;
+  periodicite: PeriodiciteAbonnement;
+  maintenant?: Date;
+  environnement?: Record<string, string | undefined>;
+}) {
+  const essai = await preparerCheckoutAbonnement(params.entrepriseId, params.maintenant);
+  const customerId = await creerOuRecupererClientStripe({ entrepriseId: params.entrepriseId, email: params.email });
+  await verifierAucuneSubscriptionStripeVivante(customerId);
+  const base = { entrepriseId: params.entrepriseId, customerId, offre: params.offre, periodicite: params.periodicite, essai, environnement: params.environnement };
+  let session = await creerSessionAbonnementStripe(base);
+  // Une clé rejouée renvoie la réponse D'ORIGINE (« open ») même si la session
+  // a depuis été expirée (balayage, 24 h) : l'état réel est relu, et une
+  // session morte est remplacée sous une nouvelle clé.
+  const etat = await requeteStripe<StripeSession>(`checkout/sessions/${encodeURIComponent(session.id)}`, { methode: "GET" });
+  if (etat.status !== "open") {
+    session = await creerSessionAbonnementStripe({ ...base, renouvellement: String((params.maintenant ?? new Date()).getTime()) });
+  }
+  await garantirSessionCheckoutUnique({ entrepriseId: params.entrepriseId, customerId, sessionId: session.id });
+  return { session, essai, customerId };
 }
 
 // Contrat retenu pour l'upgrade/downgrade en self-service (mission "closure V3",

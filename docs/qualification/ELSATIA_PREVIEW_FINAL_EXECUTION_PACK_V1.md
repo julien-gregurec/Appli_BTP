@@ -2,7 +2,7 @@
 
 > **Train canonique V3 (2026-09-26)** — ce pack s'exécute désormais sur
 > `integration/elsatia-canonical-train-v3` : **<!--train:nb-->342<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260927000507<!--/train:derniere-->`**, DB verify
-> **<!--train:controles-->17<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
+> **<!--train:controles-->18<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet). Ces trois valeurs sont **générées** depuis
 > `supabase/migrations` (`npm run sync:train-expectations`) et vérifiées en CI
 > (`npm run verify:train-expectations`). Les mentions « 335 » ci-dessous décrivent les preuves
@@ -44,7 +44,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | `scripts/preview/lib/preview-guard.mjs` | Garde-fous communs (réf. Preview, Production refusée, Stripe test, origines HTTPS) |
 | `scripts/preview/env-inventory.mjs` | Inventaire depuis le manifeste (hors ligne) |
 | `scripts/preview/env-check.mjs` | Preflight manifeste **+ cohérence entre applications** (hors ligne) |
-| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->17<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
+| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->18<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
 | `scripts/preview/http-smoke.mjs` | Smoke HTTP anonyme des 5 apps (GET/OPTIONS, redirections non suivies) |
 | `scripts/preview/stripe-test-verify.mjs` | Stripe Test : endpoints, événements, portail, prix (GET uniquement) |
 | `scripts/preview/storage-smoke.mjs` | Buckets, drapeaux public, refus anonyme ; `--write` = safe-run dépôt/lecture signée/suppression |

@@ -62,11 +62,16 @@ export async function POST(request: Request) {
   });
   if (dedupe?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
   if (dedupe) return NextResponse.json({ error: "Journal indisponible" }, { status: 500 });
+  // Replay après échec (D3) : un 500 libère la réservation pour que la
+  // re-livraison Stripe du même événement soit rejouée, pas avalée en doublon.
+  // Sûr : finalisation et expiration sont idempotentes et verrouillées en base.
+  const liberer = () => admin.rpc("liberer_evenement_webhook_stripe_service", { p_stripe_event_id: evenement.id });
 
   if (commandeId && ["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(evenement.type) && objet.payment_status !== "unpaid") {
     const { error } = await admin.rpc("boutique_finaliser_commande_payee", { p_commande_id: commandeId, p_checkout_id: objet.id });
     if (error) {
       console.error("Échec de synchronisation du webhook boutique", error);
+      await liberer();
       return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
     }
   }
@@ -75,6 +80,7 @@ export async function POST(request: Request) {
     const { error } = await admin.rpc("boutique_expirer_commande_service", { p_commande_id: commandeId, p_checkout_id: objet.id });
     if (error) {
       console.error("Échec d'expiration du webhook boutique", error);
+      await liberer();
       return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
     }
   }

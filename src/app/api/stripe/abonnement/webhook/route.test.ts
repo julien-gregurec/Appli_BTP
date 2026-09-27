@@ -63,6 +63,8 @@ type AdminFakeOptions = {
   entreprise?: { id: string; nom?: string; abonnement_offre?: string | null; abonnement_periodicite?: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null;
   erreurLecture?: { code: string; message?: string } | null;
   erreurReservation?: { code: string; message?: string } | null;
+  // Décision renvoyée par la RPC ordonnée des factures (contrat d'ordre, migration …401).
+  decisionFacture?: Record<string, unknown>;
 };
 
 function adminFake(options: AdminFakeOptions = {}) {
@@ -94,8 +96,17 @@ function adminFake(options: AdminFakeOptions = {}) {
         if (options.erreurReservation) return { data: null, error: options.erreurReservation };
         return { data: options.duplicate ? "duplicate" : "reserve", error: null };
       }
-      if (fn === "synchroniser_abonnement_stripe_service") {
-        return { data: (args.p_statut as string) ?? "actif", error: null };
+      if (fn === "synchroniser_abonnement_stripe_ordonne_service") {
+        return { data: { decision: "applique", statut_resultant: (args.p_statut as string) ?? "actif" }, error: null };
+      }
+      if (fn === "appliquer_evenement_facture_abonnement_service") {
+        const type = args.p_stripe_event_type as string;
+        const cible = type === "invoice.paid" ? "actif" : type === "invoice.payment_failed" ? "suspendu" : "actif";
+        return { data: options.decisionFacture ?? {
+          decision: type === "invoice.payment_action_required" ? "sans_effet" : "applique",
+          statut_resultant: cible,
+          notifier_echec: type === "invoice.payment_failed",
+        }, error: null };
       }
       if (fn === "lier_subscription_entreprise_service") {
         return { data: "lie", error: null };
@@ -115,9 +126,15 @@ function event(params: { livemode: boolean; type?: string; account?: string; id?
     id: params.id ?? "evt_test",
     type: params.type ?? "webhook.test",
     livemode: params.livemode,
+    created: 1_757_060_000,
     ...(params.account ? { account: params.account } : {}),
     data: { object: { id: "sub_test", object: "subscription", customer: "cus_test", metadata } },
   };
+}
+
+// Événement déclencheur d'une relecture d'abonnement (contrat d'ordre).
+function ev(id: string, created = 1_757_060_000) {
+  return { id, type: "customer.subscription.updated", created, objetType: "subscription", objetId: "sub_test" };
 }
 
 function request(payload: object, secret = SECRET) {
@@ -176,7 +193,7 @@ describe("barrière environnement avant Supabase", () => {
   it("refuse une entreprise absente sans écriture", async () => {
     vi.spyOn(console,"error").mockImplementation(() => undefined);
     const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
-    const payload = { id: "evt_sans_entreprise", type: "webhook.test", livemode: false, data: { object: { id: "objet_test", metadata: {} } } };
+    const payload = { id: "evt_sans_entreprise", type: "webhook.test", livemode: false, created: 1_757_060_000, data: { object: { id: "objet_test", metadata: {} } } };
     const response = await POST(request(payload));
     expect(response.status).toBe(422); expect(admin.appels).toHaveLength(0);
   });
@@ -217,7 +234,7 @@ describe("coordination webhook et saga", () => {
     const admin = adminFake();
     const actuel = { id:"sub_test",customer:"cus_test",status:"active",discounts:[{id:"di_actuel",source:{type:"coupon",coupon:{id:"coupon-actuel"}}}],metadata:{} };
     deps.recupererAbonnementStripe.mockResolvedValue(actuel);
-    await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_ancien");
+    await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test",ev("evt_ancien"));
     expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenCalledWith(admin,ENTREPRISE,actuel,"verrou-test",expect.any(Object));
     expect(passerelleStripeRemise.observer(actuel)).toMatchObject({ status: "present", discount_id: "di_actuel" });
     expect(deps.acquerirVerrouRemise).toHaveBeenCalledWith(admin,"sub_test",expect.stringMatching(/^webhook:/));
@@ -226,7 +243,7 @@ describe("coordination webhook et saga", () => {
   it("réconcilie la saga active sous le même verrou puis relit Stripe", async () => {
     const admin = adminFake(); const op = { id:"op-1",stripe_subscription_id:"sub_test" };
     deps.lireOperationActiveRemiseServeur.mockResolvedValue(op as never);
-    await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_saga");
+    await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test",ev("evt_saga"));
     expect(deps.reconcilierOperationRemiseSousVerrou).toHaveBeenCalledWith(admin,op,"verrou-test",expect.any(Object));
     expect(deps.recupererAbonnementStripe).toHaveBeenCalledTimes(2);
   });
@@ -236,7 +253,7 @@ describe("coordination webhook et saga", () => {
       const admin = adminFake();
       const op = { id: `op-${statut}`, stripe_subscription_id: "sub_test", statut };
       deps.lireOperationActiveRemiseServeur.mockResolvedValueOnce(op as never);
-      await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", `evt-${statut}`);
+      await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev(`evt-${statut}`));
       expect(deps.reconcilierOperationRemiseSousVerrou).toHaveBeenCalledWith(admin, op, "verrou-test", expect.any(Object));
       expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin, "sub_test", "verrou-test");
     },
@@ -245,15 +262,15 @@ describe("coordination webhook et saga", () => {
     const admin = adminFake();
     const actuel = { id: "sub_test", customer: "cus_test", status: "active", discounts: [], metadata: {} };
     deps.recupererAbonnementStripe.mockResolvedValue(actuel);
-    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_recent");
-    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_ancien_livre_apres");
+    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_recent"));
+    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_ancien_livre_apres"));
     expect(deps.recupererAbonnementStripe).toHaveBeenCalledTimes(2);
     expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenNthCalledWith(1, admin, ENTREPRISE, actuel, "verrou-test", expect.any(Object));
     expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenNthCalledWith(2, admin, ENTREPRISE, actuel, "verrou-test", expect.any(Object));
   });
   it("verrouille l'abonnement réellement ciblé, sans interférence avec un autre", async () => {
     const admin = adminFake();
-    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_autre", "evt_autre");
+    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_autre", ev("evt_autre"));
     expect(deps.acquerirVerrouRemise).toHaveBeenCalledWith(admin, "sub_autre", expect.stringMatching(/^webhook:/));
     expect(deps.lireOperationActiveRemiseServeur).toHaveBeenCalledWith(admin, "sub_autre", "verrou-test");
   });
@@ -264,12 +281,12 @@ describe("coordination webhook et saga", () => {
   });
   it("libère le verrou même si Stripe est indisponible", async () => {
     const admin = adminFake(); deps.recupererAbonnementStripe.mockRejectedValue(new Error("indisponible"));
-    await expect(synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_timeout")).rejects.toThrow();
+    await expect(synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test",ev("evt_timeout"))).rejects.toThrow();
     expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin,"sub_test","verrou-test");
   });
   it("B3 : la subscription est liée à l'entreprise avant la chaîne remise", async () => {
     const admin = adminFake();
-    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_lien");
+    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_lien"));
     const lien = admin.appels.find((a) => a.table === "lier_subscription_entreprise_service");
     expect(lien).toBeTruthy();
     expect((lien?.donnees as Record<string, unknown>).p_stripe_subscription_id).toBe("sub_test");
@@ -360,36 +377,81 @@ describe("email de paiement échoué", () => {
 
 // ── Billing Security V3 (claude/great-mayer-bzxad6), reporté sur le train ────
 // canonique : 3-D Secure non bloquant et régularisation de l'impayé au paiement.
-describe("statut d'accès sur les événements facture (Billing Security V3)", () => {
-  function miseAJourEntreprise(admin: ReturnType<typeof adminFake>) {
-    const appel = admin.appels.find((a) => a.table === "entreprises" && a.methode === "update");
+describe("statut d'accès sur les événements facture (Billing Security V3 + contrat d'ordre)", () => {
+  // Les transitions sont désormais décidées et écrites en base, atomiquement,
+  // par `appliquer_evenement_facture_abonnement_service` (verrou ligne +
+  // filigrane event.created). Leur sémantique (3DS sans effet, paid régularise,
+  // payment_failed suspend immédiatement, périmé sans effet) est prouvée par
+  // supabase/tests/stripe_event_ordering_v1.test.sql ; ici on vérifie le
+  // contrat d'appel côté route.
+  function appelFacture(admin: ReturnType<typeof adminFake>) {
+    const appel = admin.appels.find((a) => a.table === "appliquer_evenement_facture_abonnement_service");
     return appel?.donnees as Record<string, unknown> | undefined;
   }
 
-  it("invoice.payment_action_required (3-D Secure) ne suspend jamais l'accès", async () => {
-    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
-    const response = await POST(request(evenementFacture("invoice.payment_action_required")));
-    expect(response.status).toBe(200);
-    const donnees = miseAJourEntreprise(admin);
-    expect(donnees).toBeDefined();
-    expect(donnees).not.toHaveProperty("abonnement_statut");
-    expect(donnees).toMatchObject({ derniere_facture_stripe_id: "in_test" });
-  });
-
-  it("invoice.paid rétablit l'accès et efface toute suspension programmée", async () => {
-    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
-    const response = await POST(request(evenementFacture("invoice.paid")));
-    expect(response.status).toBe(200);
-    expect(miseAJourEntreprise(admin)).toMatchObject({
-      abonnement_statut: "actif", impaye_signale_at: null, suspension_prevue_at: null,
+  it.each(["invoice.paid", "invoice.payment_failed", "invoice.payment_action_required"])(
+    "%s passe par la RPC ordonnée, sans UPDATE direct de l'entreprise", async (type) => {
+      const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+      const response = await POST(request(evenementFacture(type)));
+      expect(response.status).toBe(200);
+      expect(appelFacture(admin)).toMatchObject({
+        p_entreprise_id: ENTREPRISE,
+        p_stripe_event_id: `evt_${type.replace(/\./g, "_")}`,
+        p_stripe_event_type: type,
+        // Horloge Stripe de l'événement, jamais l'heure de réception.
+        p_stripe_event_created: new Date(1_757_060_000 * 1000).toISOString(),
+        p_stripe_invoice_id: "in_test",
+      });
+      expect(admin.appels.some((a) => a.table === "entreprises" && a.methode === "update")).toBe(false);
+      expect(admin.appels.some((a) => a.table === "synchroniser_facture_abonnement_service")).toBe(false);
     });
+
+  it("le statut résultant consigné est celui décidé en base", async () => {
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    await POST(request(evenementFacture("invoice.payment_failed")));
+    const finalisation = admin.appels.find((a) => a.table === "finaliser_evenement_abonnement_service");
+    expect((finalisation?.donnees as Record<string, unknown>).p_statut_resultant).toBe("suspendu");
   });
 
-  it("invoice.payment_failed conserve la suspension immédiate du tronc", async () => {
-    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+  it("ancien invoice.payment_failed rejoué après invoice.paid : 200, périmé, AUCUN e-mail", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const admin = adminFake({ decisionFacture: { decision: "perime", motif: "evenement_anterieur_au_dernier_applique", statut_resultant: "actif", notifier_echec: false } });
+    deps.createAdminClient.mockReturnValue(admin);
     const response = await POST(request(evenementFacture("invoice.payment_failed")));
     expect(response.status).toBe(200);
-    expect(miseAJourEntreprise(admin)).toMatchObject({ abonnement_statut: "suspendu" });
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+    const finalisation = admin.appels.find((a) => a.table === "finaliser_evenement_abonnement_service");
+    expect((finalisation?.donnees as Record<string, unknown>).p_statut_resultant).toBe("actif");
+    expect(JSON.stringify(warn.mock.calls)).toContain("evenement_perime");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("evt_invoice_payment_failed");
+  });
+
+  it("événement déjà décidé en base (réservation perdue) : aucun e-mail en double", async () => {
+    const admin = adminFake({ decisionFacture: { decision: "deja_traite", statut_resultant: "suspendu", notifier_echec: false } });
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+  });
+
+  it("une erreur de la RPC ordonnée annule la réservation (rejouable) et renvoie 500", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    const rpc = admin.rpc.bind(admin);
+    admin.rpc = async (fn: string, args: Record<string, unknown>) => fn === "appliquer_evenement_facture_abonnement_service"
+      ? { data: null, error: { code: "40P01", message: "deadlock detected" } } as never
+      : rpc(fn, args);
+    const response = await POST(request(evenementFacture("invoice.paid")));
+    expect(response.status).toBe(500);
+    expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("refuse un événement sans event.created avant Supabase (pas d'ordonnancement à l'aveugle)", async () => {
+    const { created: _created, ...sansCreated } = evenementFacture("invoice.payment_failed");
+    void _created;
+    const response = await POST(request(sansCreated));
+    expect(response.status).toBe(400);
+    expect(deps.createAdminClient).not.toHaveBeenCalled();
   });
 });
 
@@ -409,7 +471,7 @@ describe("surface d'export de la route et module métier", () => {
     expect(typeof metier.synchroniserAbonnementCoordonne).toBe("function");
     const admin = adminFake();
     await expect(
-      metier.synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_module"),
+      metier.synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_module")),
     ).resolves.toBe("actif");
   });
 
@@ -420,7 +482,15 @@ describe("surface d'export de la route et module métier", () => {
     expect(response.status).toBe(200);
     expect(deps.acquerirVerrouRemise).toHaveBeenCalledTimes(1);
     expect(deps.libererVerrouRemise).toHaveBeenCalledTimes(1);
-    expect(admin.appels.filter((a) => a.table === "synchroniser_abonnement_stripe_service")).toHaveLength(1);
+    const synchro = admin.appels.filter((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service");
+    expect(synchro).toHaveLength(1);
+    expect(synchro[0].donnees).toMatchObject({
+      p_stripe_event_id: "evt_test",
+      p_stripe_event_type: "customer.subscription.updated",
+      p_stripe_event_created: new Date(1_757_060_000 * 1000).toISOString(),
+      p_objet_type: "subscription",
+      p_objet_id: "sub_test",
+    });
   });
 
   it("un type d'événement inconnu est journalisé sans erreur ni coordination", async () => {
@@ -431,6 +501,40 @@ describe("surface d'export de la route et module métier", () => {
     await expect(response.json()).resolves.toMatchObject({ received: true });
     expect(deps.acquerirVerrouRemise).not.toHaveBeenCalled();
     expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("trial_will_end : journalisé sans effet (essai local fait autorité), sans relecture ni écriture d'essai", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.trial_will_end" })));
+    expect(response.status).toBe(200);
+    expect(deps.recupererAbonnementStripe).not.toHaveBeenCalled();
+    expect(deps.acquerirVerrouRemise).not.toHaveBeenCalled();
+    expect(admin.appels.some((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service")).toBe(false);
+    const journal = admin.appels.find((a) => a.table === "journaliser_evenement_stripe_ordre_service");
+    expect(journal?.donnees).toMatchObject({ p_stripe_event_type: "customer.subscription.trial_will_end", p_motif: "essai_fin_annoncee" });
+    expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("essai : la relecture Stripe transmet trial_end tel quel ; la borne est en base (RPC)", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    // Subscription héritée (trial_period_days = 30 posé au jour 15) : trial_end hors fenêtre locale.
+    deps.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "trialing", trial_end: Date.parse("2026-11-15T08:00:00Z") / 1000, discounts: [], metadata: {} });
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(200);
+    const synchro = admin.appels.find((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service");
+    expect((synchro?.donnees as Record<string, unknown>).p_essai_fin).toBe("2026-11-15");
+  });
+
+  it("sans essai : trial_end null transmis (la base conserve l'essai local, plus de violation NOT NULL)", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    deps.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "active", trial_end: null, discounts: [], metadata: {} });
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.created" })));
+    expect(response.status).toBe(200);
+    const synchro = admin.appels.find((a) => a.table === "synchroniser_abonnement_stripe_ordonne_service");
+    expect((synchro?.donnees as Record<string, unknown>).p_essai_fin).toBeNull();
   });
 
   it("une erreur métier renvoie 500 sans détail interne et rejoue l'événement", async () => {
