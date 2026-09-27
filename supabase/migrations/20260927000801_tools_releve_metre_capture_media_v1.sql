@@ -196,9 +196,12 @@ declare
   v_kind text; v_id uuid; v_etage uuid; v_piece uuid; v_trouve boolean := false; v_media record;
   v_support record;
 begin
+  -- Seuls une création et un changement de contenu / de colonnes de rattachement sont contrôlés.
+  -- Suppression douce et restauration (cascade Lot 3) ne le sont pas : une ligne antérieure au
+  -- Lot 4 (données Lot 2 sans ces règles) ne bloque jamais la restauration de sa pièce.
   if tg_op = 'UPDATE' and new.deleted_at is not null then return new; end if;
   if tg_op = 'UPDATE' and new.donnees is not distinct from old.donnees and new.etage_id is not distinct from old.etage_id
-     and new.piece_id is not distinct from old.piece_id and old.deleted_at is null then
+     and new.piece_id is not distinct from old.piece_id then
     return new;
   end if;
 
