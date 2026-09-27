@@ -46,6 +46,14 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_identity_session_status: {
+        Args: { p_soft_max_age_s: number; p_hard_max_age_s: number };
+        Returns: {
+          status: string;
+          access?: "full" | "read_only";
+          age_s?: number;
+        };
+      };
       studio_list_analysis: {
         Args: { p_project: string };
         Returns: StudioMediaAnalysis[];

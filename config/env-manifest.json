@@ -224,6 +224,14 @@
       {
         "path": ".qualification-tools/",
         "justification": "Serveur Supabase simulé de la qualification RGPD Purge V2 (MOCK_*). Outil de preuve local, jamais déployé."
+      },
+      {
+        "path": "packages/elsatia-identity/tests/",
+        "justification": "Harnais de test de @elsatia/identity (TEST_HARNESS) : les variables PLATFORM_*/STUDIO_*_URL, *_JWT_SECRET, *_DB_URL, STUDIO_APP_URL, E2E_* désignent la pile locale jetable (packages/elsatia-identity/scripts/local-stack.sh), jamais un environnement déployé."
+      },
+      {
+        "path": "packages/elsatia-identity/scripts/",
+        "justification": "Outils locaux de @elsatia/identity (pile GoTrue/PostgREST jetable, keygen, passerelle de test). Jamais déployés."
       }
     ],
     "literal_prefixes": [
@@ -259,6 +267,22 @@
       {
         "name": "STRIPE_PRICE_IA_INTENSIVE",
         "justification": "Préfixe de famille : sert à construire STRIPE_PRICE_IA_INTENSIVE_MENSUEL et _ANNUEL, déclarées une à une."
+      },
+      {
+        "name": "STUDIO_AUTH_UNAVAILABLE",
+        "justification": "Code d'erreur stable du contrat d'identité (packages/elsatia-identity/src/contract.ts), pas une variable."
+      },
+      {
+        "name": "STUDIO_DB_UNAVAILABLE",
+        "justification": "Code d'erreur stable du contrat d'identité, pas une variable."
+      },
+      {
+        "name": "EMAIL_NOT_VERIFIED",
+        "justification": "Code d'erreur stable du contrat d'identité, pas une variable."
+      },
+      {
+        "name": "EMAIL_EXISTS",
+        "justification": "Code d'erreur GoTrue / contrat d'identité, pas une variable."
       }
     ],
     "reference_only": [
@@ -555,7 +579,7 @@
     {
       "id": "DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION",
       "owner": "Julien",
-      "question": "TRANCHÉE le 2026-09-26 par le propriétaire : B + I1 — projet Supabase DÉDIÉ pour Studio + échange de jeton signé (docs/architecture/ELSATIA_STUDIO_SUPABASE_DECISION_RECORD_V1.md). L'entrée reste listée tant que l'implémentation (2 projets, pont I1, webhook de révocation, portage de fix/studio-signup-closed-v1 dans apps/studio/supabase) n'est pas livrée ; Studio reste exclu de la Preview d'ici là. Question d'origine : Studio rejoint-il le projet Supabase partagé (GP/Colors/Tools/Reserves) ou reçoit-il son propre projet dédié ? Structurant pour la fermeture réelle de l'inscription : le correctif déjà écrit (branche fix/studio-signup-closed-v1 — table studio_signup_policy, hook Auth before_user_created, garde applicative en profondeur) présuppose un projet dédié et n'est pas porté dans ce train tant que ce choix n'est pas fait. Sans lui, la garde actuelle (STUDIO_SIGNUP_MODE/STUDIO_SIGNUP_ALLOWLIST, fail-closed par défaut — voir F-STUDIO-SIGNUP-DEFAULT-OPEN) reste contournable par un appel direct POST /auth/v1/signup avec la clé publique, hors de la couche Next.js qui porte la garde.",
+      "question": "TRANCHÉE le 2026-09-26 par le propriétaire : B + I1 — projet Supabase DÉDIÉ pour Studio + échange de jeton signé (docs/architecture/ELSATIA_STUDIO_SUPABASE_DECISION_RECORD_V1.md). L'entrée reste listée tant que l'implémentation (2 projets, pont I1, webhook de révocation, portage de fix/studio-signup-closed-v1 dans apps/studio/supabase) n'est pas livrée ; Studio reste exclu de la Preview d'ici là. Avancement 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md) : pont I1, révocation, réconciliation et chaîne de migrations du projet dédié (apps/studio/supabase, garde scripts/verify-migration-targets.mjs) portés sur le train V3 et qualifiés localement ; reste la mise en service hébergée (checklist du rapport) et le lot post-H. Question d'origine : Studio rejoint-il le projet Supabase partagé (GP/Colors/Tools/Reserves) ou reçoit-il son propre projet dédié ? Structurant pour la fermeture réelle de l'inscription : le correctif déjà écrit (branche fix/studio-signup-closed-v1 — table studio_signup_policy, hook Auth before_user_created, garde applicative en profondeur) présuppose un projet dédié et n'est pas porté dans ce train tant que ce choix n'est pas fait. Sans lui, la garde actuelle (STUDIO_SIGNUP_MODE/STUDIO_SIGNUP_ALLOWLIST, fail-closed par défaut — voir F-STUDIO-SIGNUP-DEFAULT-OPEN) reste contournable par un appel direct POST /auth/v1/signup avec la clé publique, hors de la couche Next.js qui porte la garde.",
       "options": [
         "projet Supabase dédié pour Studio (porter fix/studio-signup-closed-v1)",
         "Studio rejoint le projet partagé (réconcilier autrement la fermeture d'inscription au niveau Auth)"
@@ -931,7 +955,8 @@
       "applications": [
         "gestion_pro",
         "colors",
-        "reserves"
+        "reserves",
+        "studio"
       ],
       "required": true,
       "environments": [
@@ -945,7 +970,7 @@
       "build_time": true,
       "runtime": true,
       "category": "env_indicator",
-      "description": "INDICATEUR D'ENVIRONNEMENT CANONIQUE : local | test | preview | production. Doit être posé explicitement sur tout déploiement. Repli actuel du code quand il est absent ou inconnu : « local » (URL localhost dans le sélecteur d'applications) : un déploiement mal configuré se croit local.",
+      "description": "INDICATEUR D'ENVIRONNEMENT CANONIQUE : local | test | preview | production. Doit être posé explicitement sur tout déploiement. Repli actuel du code quand il est absent ou inconnu : « local » (URL localhost dans le sélecteur d'applications) : un déploiement mal configuré se croit local. Studio (2026-09-27) : lue pour interdire STUDIO_IDENTITY_MODE=local en preview|production (apps/studio/src/lib/identity-policy.ts, garde de build apps/studio/scripts/verify-identity-mode.mjs).",
       "fail_mode": "default",
       "deprecated": false,
       "replacement": null,
@@ -6284,6 +6309,380 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true
+    },
+    {
+      "name": "ELSATIA_IDENTITY_ISSUER",
+      "applications": [
+        "gestion_pro",
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "Émetteur (iss) des jetons signés de l'identité centrale ELSATIA, propre à l'environnement (Preview ≠ Production), ex. https://app.elsatia.fr/identity. GP l'inscrit dans les jetons, Studio l'exige à la vérification : les deux valeurs doivent être identiques. Absent : GP refuse d'émettre (CONFIG_INVALID), Studio refuse tout passage. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé (GP émetteur et Studio vérificateur)",
+      "url_class": "api_endpoint"
+    },
+    {
+      "name": "ELSATIA_IDENTITY_SIGNING_KEYS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "security",
+      "description": "Trousseau de signature ES256 de l'identité centrale, JSON {current, previous?, previous_retire_at?} (JWK privés P-256). Généré par node packages/elsatia-identity/scripts/keygen.mjs (--rotate pour une rotation). previous publiée au plus 7 jours. Serveur GP uniquement, jamais dans le dépôt ni dans Studio. Absent ou invalide : aucun jeton émis (fail-closed). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé"
+    },
+    {
+      "name": "ELSATIA_STUDIO_EXCHANGE_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "URL de la route d'échange Studio (https://<studio>/auth/elsatia/exchange) vers laquelle GP poste le jeton de passage. Jamais tirée de la requête. Son origine est ajoutée à la CSP form-action de la seule route /identity/studio/handoff. Absente : passage refusé. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "url_class": "cross_app_link"
+    },
+    {
+      "name": "ELSATIA_STUDIO_LIFECYCLE_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Webhook Studio recevant les événements signés de cycle de vie de compte (https://<studio>/api/elsatia/lifecycle). Absent : l'outbox n'est pas livrée (503), les événements restent en attente et sont livrés quand l'URL est posée. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "url_class": "api_endpoint"
+    },
+    {
+      "name": "STUDIO_ACCESS_MODE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Décision d'accès Studio portée dans le jeton (ent) : open | allowlist | closed. FAIL-CLOSED : absent ou inconnu = closed (aucun passage). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "open",
+        "allowlist",
+        "closed"
+      ],
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Studio — Produit",
+        "criticality": "critical",
+        "expected": {
+          "local": "open",
+          "preview": "closed",
+          "production": "decision"
+        },
+        "must_be_defined_in": []
+      }
+    },
+    {
+      "name": "STUDIO_ACCESS_ALLOWLIST",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "Adresses ou @domaines autorisés quand STUDIO_ACCESS_MODE=allowlist. FAIL-CLOSED : vide n'autorise personne. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "quand STUDIO_ACCESS_MODE=allowlist"
+    },
+    {
+      "name": "STUDIO_IDENTITY_MODE",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Mode d'identité Studio : elsatia (défaut, FAIL-CLOSED — connexion uniquement par « Continuer avec mon compte ELSATIA ») | local (mot de passe GoTrue, instances de test jetables seulement). INTERDIT en Preview/Production : studioIdentityModeViolation() refuse « local » quand ELSATIA_APPLICATION_ENV ou VERCEL_ENV vaut preview|production (connexion et inscription refusées, middleware et pages). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "elsatia",
+        "local"
+      ],
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Studio — Sécurité",
+        "criticality": "critical",
+        "expected": {
+          "local": "local",
+          "preview": "elsatia",
+          "production": "elsatia"
+        },
+        "must_be_defined_in": []
+      }
+    },
+    {
+      "name": "ELSATIA_IDENTITY_JWKS",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "JWKS PUBLIC épinglé de l'identité centrale (JSON). Prioritaire sur ELSATIA_IDENTITY_JWKS_URL. Une composante privée le fait refuser entièrement. À mettre à jour dans la fenêtre de rotation (≤ 7 jours). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "si ELSATIA_IDENTITY_JWKS_URL n'est pas posée"
+    },
+    {
+      "name": "ELSATIA_IDENTITY_JWKS_URL",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "URL du JWKS publié par GP (https://<gp>/api/elsatia-identity/jwks). Cache 5 min, servi périmé ≤ 24 h, relecture unique sur kid inconnu. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "si ELSATIA_IDENTITY_JWKS n'est pas posée",
+      "url_class": "cross_app_link"
+    },
+    {
+      "name": "ELSATIA_IDENTITY_HANDOFF_URL",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Route GP émettant le jeton de passage (https://<gp>/identity/studio/handoff). https exigé hors localhost. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "url_class": "cross_app_link"
+    },
+    {
+      "name": "STUDIO_AUTH_SERVICE_KEY",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "supabase_service_role",
+      "description": "Clé service du projet Supabase DÉDIÉ Studio (jamais celle du projet partagé GP). Confinée à apps/studio/src/lib/identity.ts (server-only, garde statique boundaries.test.ts) : création des utilisateurs dérivés, bans, RPC studio_identity_*. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé. Même valeur que STUDIO_STORAGE_SERVICE_KEY (clé service_role du même projet Studio) : second nom non canonique, rattaché au même constat F-STUDIO-SERVICE-KEY-NAME.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "finding_ids": [
+        "F-STUDIO-SERVICE-KEY-NAME"
+      ]
+    },
+    {
+      "name": "STUDIO_IDENTITY_REVALIDATE_S",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "Âge (s) au-delà duquel une navigation Studio repasse silencieusement par l'identité centrale. Défaut 43200 (12 h). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "open",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_IDENTITY_MAX_SESSION_S",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "Âge maximal (s) d'une session Studio ouverte par le pont. Défaut 86400 (24 h). Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "open",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_CRON_SECRET",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "cron",
+      "description": "Secret Bearer de POST /api/elsatia/reconcile (réconciliation Studio planifiée). Absent : 503. Distinct de CRON_SECRET de GP. Lot STUDIO DEDICATED FOUNDATION (décision B + I1), porté sur le train V3 le 2026-09-27 (docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé"
     }
   ]
 }

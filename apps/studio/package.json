@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3030",
-    "prebuild": "node ../../scripts/check-env-manifest.mjs --auto --app studio",
+    "prebuild": "node ../../scripts/check-env-manifest.mjs --auto --app studio && node scripts/verify-identity-mode.mjs",
     "build": "next build --webpack",
     "start": "next start -p 3030",
     "typecheck": "tsc --noEmit --incremental false",
@@ -14,6 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@elsatia/identity": "file:../../packages/elsatia-identity",
     "@elsatia/studio-domain": "file:../../packages/studio-domain",
     "@supabase/ssr": "0.12.0",
     "@supabase/supabase-js": "2.110.2",

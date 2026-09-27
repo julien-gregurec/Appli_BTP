@@ -1,5 +1,12 @@
 # POC — Studio dédié + échange d'identité ELSATIA (jeton signé)
 
+> **Remplacé par la fondation de production** (décision « B + I1 », 2026-09-26) :
+> `packages/elsatia-identity`, `apps/studio/src/app/auth/elsatia/*`, `apps/studio/src/app/api/elsatia/*`,
+> `src/app/identity/studio/handoff`, migrations `supabase/migrations/20260927100000_elsatia_identity_broker.sql`
+> et `apps/studio/supabase/migrations/20260926120000_studio_identity_foundation.sql`.
+> Rapport : `docs/qualification/ELSATIA_STUDIO_DEDICATED_IDENTITY_FOUNDATION_V1.md`. Ce dossier reste
+> comme preuve historique ; ne pas l'étendre.
+
 > **POC jetable, pas du code de production.** Rien ici n'est importé par une application,
 > aucun `package.json`, aucune dépendance. Il sert uniquement de preuve au dossier
 > `../../ELSATIA_STUDIO_SUPABASE_DECISION_DOSSIER_V1.md` (§3, §5, §6, §9). Si l'option B est

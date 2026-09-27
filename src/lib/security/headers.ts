@@ -25,11 +25,14 @@ export function construireContentSecurityPolicy({
   isDevelopment,
   supabaseUrl,
   sentryDsn,
+  formActionOrigins = [],
 }: {
   nonce: string;
   isDevelopment: boolean;
   supabaseUrl?: string;
   sentryDsn?: string;
+  /** Origines additionnelles autorisées en form-action (passage d'identité vers Studio uniquement). */
+  formActionOrigins?: string[];
 }) {
   const supabase = origineHttps(supabaseUrl) ?? origineSupabaseLocale(supabaseUrl, isDevelopment);
   const supabaseWs = supabase?.replace(/^https:/, "wss:").replace(/^http:/, "ws:") ?? null;
@@ -53,7 +56,7 @@ export function construireContentSecurityPolicy({
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    `form-action ${["'self'", ...formActionOrigins.map((o) => origineHttps(o) ?? origineSupabaseLocale(o, isDevelopment)).filter(Boolean)].join(" ")}`,
     "frame-ancestors 'none'",
     ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");

@@ -4,9 +4,11 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   authorize: vi.fn(),
   context: vi.fn(),
+  writable: vi.fn(),
 }));
 vi.mock("../src/lib/media-service", () => ({
   mediaContext: mocks.context,
+  writableContext: mocks.writable,
   authorizeProject: mocks.authorize,
   MediaError: class extends Error {
     constructor(
@@ -45,6 +47,7 @@ const input = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.context.mockResolvedValue({ client: { rpc: mocks.rpc } });
+  mocks.writable.mockResolvedValue({ client: { rpc: mocks.rpc } });
   mocks.authorize.mockResolvedValue({
     client: { rpc: mocks.rpc },
     project: { workspace_id: id },
@@ -53,11 +56,22 @@ beforeEach(() => {
 });
 it("création valide et session demandée", async () => {
   expect(await createStudioProject(id, input)).toBe(id);
-  expect(mocks.context).toHaveBeenCalledTimes(1);
+  // Création = écriture : contexte en écriture (lecture seule refusée), jamais le contexte simple.
+  expect(mocks.writable).toHaveBeenCalledTimes(1);
+  expect(mocks.context).not.toHaveBeenCalled();
   expect(mocks.rpc).toHaveBeenCalledWith(
     "studio_save_project",
     expect.objectContaining({ p_workspace: id, p_project: null }),
   );
+});
+it("lecture seule : création refusée avant toute RPC", async () => {
+  mocks.writable.mockRejectedValue(Object.assign(new Error("lecture seule"), { status: 403 }));
+  await expect(createStudioProject(id, input)).rejects.toMatchObject({ status: 403 });
+  expect(mocks.rpc).not.toHaveBeenCalled();
+});
+it("duplication = écriture : contrôle projet en écriture", async () => {
+  await duplicateStudioProject(id);
+  expect(mocks.authorize).toHaveBeenCalledWith(id, true);
 });
 it("validation avant mutation", async () => {
   await expect(
@@ -86,9 +100,9 @@ for (const [name, fn] of [
     mocks.rpc.mockResolvedValue({ error: { code: "42501" } });
     await expect(fn(id)).rejects.toThrow(/réservée/);
   });
-  it(`${name} passe par contrôle projet`, async () => {
+  it(`${name} passe par contrôle projet en écriture (lecture seule refusée)`, async () => {
     await fn(id);
-    expect(mocks.authorize).toHaveBeenCalledWith(id);
+    expect(mocks.authorize).toHaveBeenCalledWith(id, true);
   });
 }
 it("duplication conserve les erreurs métier", async () => {

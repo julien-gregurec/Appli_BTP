@@ -6,6 +6,9 @@ export default defineConfig({
       "@elsatia/studio-domain": fileURLToPath(
         new URL("../../packages/studio-domain/src/index.ts", import.meta.url),
       ),
+      "@elsatia/identity": fileURLToPath(
+        new URL("../../packages/elsatia-identity/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: { include: ["tests/**/*.test.ts"] },

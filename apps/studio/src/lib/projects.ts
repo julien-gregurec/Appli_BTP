@@ -6,7 +6,7 @@ import {
   validateProject,
   type ProjectInput,
 } from "@elsatia/studio-domain";
-import { mediaContext, authorizeProject, MediaError } from "./media-service";
+import { mediaContext, writableContext, authorizeProject, MediaError } from "./media-service";
 function result<T>(
   data: T | null,
   error: { code?: string } | null,
@@ -25,7 +25,7 @@ function result<T>(
 export async function createStudioProject(workspace: string, input: unknown) {
   if (!isStudioId(workspace)) throw new MediaError("Espace inaccessible.", 404);
   const data = validateProject(input),
-    { client } = await mediaContext();
+    { client } = await writableContext();
   const r = await client.rpc("studio_save_project", {
     p_workspace: workspace,
     p_project: null,
@@ -105,7 +105,7 @@ export async function dashboardStats(workspace: string) {
 }
 async function lifecycle(id: string, action: "archive" | "restore" | "delete") {
   // SQL rechecks owner/admin and permits the archived source for restore/delete.
-  const { client } = await authorizeProject(id);
+  const { client } = await authorizeProject(id, true);
   const r = await client.rpc("studio_project_lifecycle", {
     p_project: id,
     p_action: action,
@@ -120,7 +120,7 @@ export const archiveStudioProject = (id: string) => lifecycle(id, "archive");
 export const restoreStudioProject = (id: string) => lifecycle(id, "restore");
 export const deleteStudioProject = (id: string) => lifecycle(id, "delete");
 export async function duplicateStudioProject(id: string) {
-  const { client } = await authorizeProject(id);
+  const { client } = await authorizeProject(id, true);
   const r = await client.rpc("studio_duplicate_project", { p_project: id });
   return result(
     r.data,
