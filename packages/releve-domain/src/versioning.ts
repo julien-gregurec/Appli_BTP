@@ -1,6 +1,6 @@
 /**
  * Règles de versionnement Relevé & Métré (miroir de `tools_releve_creer_version()`,
- * migration 20260926000501).
+ * migration 20260927000602).
  *
  * Une version est un instantané immuable. Son **type** dit ce qu'elle représente :
  * `initial` (relevé de l'existant), `corrige`, `projete`, `as_built`. La chaîne commence

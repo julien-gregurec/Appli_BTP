@@ -1,6 +1,6 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 2 — FOUNDATION V1
 --
--- Qualifie la migration 20260926000401_tools_releve_metre_foundation_v1 :
+-- Qualifie la migration 20260927000601_tools_releve_metre_foundation_v1 :
 --   A. surface (tables, RLS, droits) ;
 --   B. entitlement add-on `releve-metre` et garde-fou de non-commercialisation ;
 --   C. hiérarchie chantier → bâtiment → étage → zone → pièce et intégrité composite ;

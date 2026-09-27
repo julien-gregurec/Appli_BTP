@@ -81,7 +81,7 @@ export type ToolsOffer = {
 };
 
 /**
- * Miroir de `tools_offres_catalogue` (migration 20260926000501). Aucun prix ici : le prix de
+ * Miroir de `tools_offres_catalogue` (migration 20260927000602). Aucun prix ici : le prix de
  * référence n'existe qu'en un seul endroit, {@link RELEVE_METRE_OFFER}.
  */
 export const TOOLS_OFFERS: Readonly<Record<ToolsOfferCode, ToolsOffer>> = Object.freeze({

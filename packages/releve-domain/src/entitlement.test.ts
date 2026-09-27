@@ -40,7 +40,7 @@ describe("prix de référence : une seule source, jamais codée en dur ailleurs"
       }
     };
     scanned.forEach(walk);
-    for (const migration of ["20260926000401_tools_releve_metre_foundation_v1.sql", "20260926000501_tools_releve_metre_lot2_complements.sql"]) {
+    for (const migration of ["20260927000601_tools_releve_metre_foundation_v1.sql", "20260927000602_tools_releve_metre_lot2_complements.sql"]) {
       if (/\b(2490|24900)\b|24,90/.test(readFileSync(join(root, "supabase/migrations", migration), "utf8"))) hits.push(migration);
     }
     expect(hits).toEqual(["packages/releve-domain/src/entitlement.ts"]);

@@ -16,12 +16,12 @@ import { RELEVE_LIMITS } from "./validation";
  * ce test échoue dès qu'une énumération, une borne ou un chemin diverge.
  */
 const sql = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/20260926000401_tools_releve_metre_foundation_v1.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/20260927000601_tools_releve_metre_foundation_v1.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ");
 
 const complements = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/20260926000501_tools_releve_metre_lot2_complements.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/20260927000602_tools_releve_metre_lot2_complements.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ");
 

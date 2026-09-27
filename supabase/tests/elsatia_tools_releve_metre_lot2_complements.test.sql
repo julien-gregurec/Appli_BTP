@@ -1,6 +1,6 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 2 — FOUNDATION V1 — COMPLÉMENTS
 --
--- Qualifie la migration 20260926000501_tools_releve_metre_lot2_complements :
+-- Qualifie la migration 20260927000602_tools_releve_metre_lot2_complements :
 --   K. catalogue d'offres : Relevé Pro inclut Tools Pro, sans activation commerciale ;
 --   L. niveau Chantier : Projet → Chantier → Bâtiment → Étage → Zone → Pièce ;
 --   M. matrice RLS par acteur : owner, org member, unauthorized, other tenant, anon, service role ;

@@ -1,6 +1,6 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 2 — FOUNDATION V1 — COMPLÉMENTS
 --
--- Complète 20260926000401_tools_releve_metre_foundation_v1 pour couvrir intégralement le
+-- Complète 20260927000601_tools_releve_metre_foundation_v1 pour couvrir intégralement le
 -- contrat du lot 2 (rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_V1.md) :
 --
 --   1. niveau **Chantier** explicite dans la hiérarchie :
@@ -83,7 +83,7 @@ revoke all on function public.tools_capabilities_offre(text) from public, anon;
 revoke all on function public.tools_capabilities_etendues(text[]) from public, anon;
 grant execute on function public.tools_capabilities_offre(text), public.tools_capabilities_etendues(text[]) to authenticated, service_role;
 
--- Résolveur : identique à 20260926000401, à UNE ligne près (extension par offre dans la
+-- Résolveur : identique à 20260927000601, à UNE ligne près (extension par offre dans la
 -- branche Pro). Free inchangé ; Pro sans `releve-metre` : même ensemble, trié.
 create or replace function public.tools_resoudre_entitlements()
 returns jsonb
