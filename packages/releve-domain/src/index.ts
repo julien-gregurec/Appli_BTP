@@ -30,3 +30,8 @@ export * from "./repository";
 export * from "./service";
 export * from "./autosave";
 export * from "./fiche";
+export * from "./exif";
+export * from "./media";
+export * from "./photo";
+export * from "./media-service";
+export * from "./upload-queue";

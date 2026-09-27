@@ -1,7 +1,9 @@
 # ELSATIA Tools — Relevé & Métré — Lot 4 (travail suspendu) — Classement
 
 **Date** : 2026-09-27
-**Statut** : **LOT 4 SUSPENDU — aucun verdict.** Le verdict « LOCALLY QUALIFIED » du rapport Lot 4 initial est **retiré** : le Lot 4 avait été démarré sur le Lot 2 alors que sa dépendance officielle (Lot 3 « Structure terrain ») n'existait pas.
+**Mise à jour 2026-09-28** : Lot 3 qualifié ; le Lot 4 a été **repris** sur le Lot 3 (réapplication de `3da5e893`, migration renumérotée `…0801`) et requalifié : voir [`ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md`](./ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md). Le classement ci-dessous reste l'historique du gel.
+
+**Statut au moment du gel** : **LOT 4 SUSPENDU — aucun verdict.** Le verdict « LOCALLY QUALIFIED » du rapport Lot 4 initial est **retiré** : le Lot 4 avait été démarré sur le Lot 2 alors que sa dépendance officielle (Lot 3 « Structure terrain ») n'existait pas.
 
 Dépendance officielle : **Lot 2 → Lot 3 Structure terrain → Lot 4 Capture photo / média.**
 

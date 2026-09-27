@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   allowedActions, breadcrumbOf, deletionImpact, pieceFiche, PIECE_STATUTS, PIECE_TYPES_PRINCIPAUX, surfaceM2, surfaceMm2FromM2, volumeM3,
-  type Piece, type PieceStatut, type PieceUsage, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure,
+  type Piece, type PieceStatut, type PieceUsage, type ReleveActorContext, type ReleveElement, type ReleveId, type ReleveService, type ReleveStructure,
 } from "@elsatia/releve-domain";
-import { ficheHref, pieceHref, readPieceSelection, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
+import { getElsatiaClient } from "@/lib/auth/client";
+import { ficheHref, photosHref, pieceHref, readPieceSelection, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { PIECE_STATUT_LABELS, USAGE_LABELS } from "./labels";
 import styles from "./releve.module.css";
@@ -44,9 +45,21 @@ function PieceEditor({ service, actor, releveId, pieceId }: { service: ReleveSer
   const [structure, setStructure] = useState<ReleveStructure | null>(null);
   const [feedback, setFeedback] = useState("");
   const [generation, setGeneration] = useState(0);
+  const [elements, setElements] = useState<ReleveElement[]>([]);
   const reload = useCallback(async () => {
     try { setStructure(await service.get(releveId)); } catch (error) { setFeedback(error instanceof Error ? error.message : "Chargement impossible."); }
   }, [service, releveId]);
+  // Éléments rattachés à la pièce (photos, mesures, revêtements, équipements) : compteurs de la fiche.
+  useEffect(() => {
+    let cancelled = false;
+    void getElsatiaClient().from("tools_releves_elements").select("id,type,piece_id,deleted_at").eq("piece_id", pieceId).is("deleted_at", null)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setElements((data as Array<{ id: string; type: ReleveElement["type"]; piece_id: string; deleted_at: string | null }>)
+          .map((row) => ({ id: row.id, type: row.type, pieceId: row.piece_id, deletedAt: row.deleted_at }) as unknown as ReleveElement));
+      });
+    return () => { cancelled = true; };
+  }, [pieceId]);
   // Après un conflit : recharger ET repartir des valeurs serveur (remontage du formulaire).
   const hardReload = useCallback(async () => { await reload(); setGeneration((value) => value + 1); }, [reload]);
   useEffect(() => {
@@ -59,10 +72,10 @@ function PieceEditor({ service, actor, releveId, pieceId }: { service: ReleveSer
   const piece = structure?.pieces.find((item) => item.id === pieceId && !item.deletedAt) ?? null;
   if (!structure) return <p className={`shell ${styles.feedback}`} role="status">{feedback || "Chargement de la pièce…"}</p>;
   if (!piece) return <p className={`shell ${styles.feedback}`} role="alert">Pièce introuvable ou supprimée. <Link href={ficheHref(releveId)}>Retour au relevé</Link></p>;
-  return <PieceForm key={`${piece.id}:${generation}`} service={service} actor={actor} structure={structure} piece={piece} reload={reload} hardReload={hardReload} feedback={feedback} setFeedback={setFeedback} />;
+  return <PieceForm key={`${piece.id}:${generation}`} service={service} actor={actor} structure={structure} elements={elements} piece={piece} reload={reload} hardReload={hardReload} feedback={feedback} setFeedback={setFeedback} />;
 }
 
-function PieceForm({ service, actor, structure, piece, reload, hardReload, feedback, setFeedback }: { service: ReleveService; actor: ReleveActorContext; structure: ReleveStructure; piece: Piece; reload(): Promise<void>; hardReload(): Promise<void>; feedback: string; setFeedback(value: string): void }) {
+function PieceForm({ service, actor, structure, elements, piece, reload, hardReload, feedback, setFeedback }: { service: ReleveService; actor: ReleveActorContext; structure: ReleveStructure; elements: readonly ReleveElement[]; piece: Piece; reload(): Promise<void>; hardReload(): Promise<void>; feedback: string; setFeedback(value: string): void }) {
   const router = useRouter();
   const releveId = structure.releve.id;
   const canEdit = useMemo(() => allowedActions(actor, structure.releve).includes("edit"), [actor, structure]);
@@ -74,7 +87,7 @@ function PieceForm({ service, actor, structure, piece, reload, hardReload, feedb
   const initial = useMemo(() => fieldsOf(piece), [piece]);
   const autosave = useNodeAutosave<Fields>(initial, piece.revision, save);
   const values = autosave.values;
-  const fiche = pieceFiche(structure, piece.id)!;
+  const fiche = pieceFiche(structure, piece.id, elements)!;
   const zones = structure.zones.filter((zone) => zone.etageId === piece.etageId && !zone.deletedAt);
   const crumbs = breadcrumbOf(structure, { kind: "piece", id: piece.id });
   const etageHref = fiche.etage && fiche.batiment ? structureHref({ releveId, chantierId: fiche.batiment.chantierId, batimentId: fiche.batiment.id, etageId: fiche.etage.id }) : ficheHref(releveId);
@@ -136,9 +149,10 @@ function PieceForm({ service, actor, structure, piece, reload, hardReload, feedb
         </dl>
         <h2>Préparé pour la suite</h2>
         <ul className={styles.pieces}>
-          {([["Revêtements", fiche.preparation.revetements, "lot 10"], ["Photos", fiche.preparation.photos, "lot 4"], ["Mesures", fiche.preparation.mesures, "lot 4"], ["Équipements", fiche.preparation.equipements, "lot 8"]] as const)
-            .map(([label, count, lot]) => <li key={label} className={styles.piece}><span><strong>{label}</strong> <small>{count ? `${count} rattaché(s)` : `à venir (${lot})`}</small></span></li>)}
+          {([["Revêtements", fiche.preparation.revetements, "lot 10"], ["Photos", fiche.preparation.photos, "aucune"], ["Mesures", fiche.preparation.mesures, "lot 5"], ["Équipements", fiche.preparation.equipements, "lot 8"]] as const)
+            .map(([label, count, lot]) => <li key={label} className={styles.piece}><span><strong>{label}</strong> <small>{count ? `${count} rattaché(s)` : lot === "aucune" ? "aucune pour l’instant" : `à venir (${lot})`}</small></span></li>)}
         </ul>
+        <Link className={styles.open} href={photosHref(releveId, { kind: "piece", id: piece.id })}>Photos de la pièce</Link>
         {canEdit && <div className={styles.toolButtons}>
           <button type="button" className={styles.secondary} onClick={() => void action(async () => { const id = await service.duplicate(releveId, "piece", piece.id); await reload(); router.push(pieceHref(releveId, id)); }, "Pièce dupliquée (sans photos ni mesures).")}>Dupliquer la pièce</button>
           <button type="button" className={styles.danger} onClick={() => {

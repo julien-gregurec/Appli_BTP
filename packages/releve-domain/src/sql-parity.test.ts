@@ -11,6 +11,9 @@ import { RELEVE_ACTIONS, RELEVE_ROLES } from "./permissions";
 import { JOURNAL_ACTIONS, SEARCH_FILTERS } from "./repository";
 import { MEDIA_CATEGORY_POLICIES, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES } from "./storage";
 import { RELEVE_LIMITS } from "./validation";
+import { PHOTO_ANNOTATION_COULEURS } from "./validation";
+import { FORBIDDEN_LOCATION_KEYS, PHOTO_DATE_SOURCES, PHOTO_METADATA_KEYS, PHOTO_METADATA_REQUIRED_KEYS, PHOTO_ORIENTATIONS, PHOTO_SOURCES } from "./media";
+import { PHOTO_ANNOTATION_FORMES } from "./photo";
 
 /**
  * Parité TypeScript ↔ SQL. Le domaine et la migration sont deux copies d'un même contrat :
@@ -143,5 +146,36 @@ describe("parité domaine ↔ migration tools_releve_metre_structure_terrain_v1 
 
   it("filtres de recherche identiques à tools_releve_rechercher", () => {
     for (const filtre of SEARCH_FILTERS) if (filtre !== "actif") expect(terrain).toContain(`when '${filtre}' then`);
+  });
+});
+
+describe("parité domaine ↔ migration tools_releve_metre_capture_media_v1 (Lot 4)", () => {
+  const capture = readFileSync(
+    fileURLToPath(new URL("../../../supabase/migrations/20260928000801_tools_releve_metre_capture_media_v1.sql", import.meta.url)),
+    "utf8",
+  ).replace(/\s+/g, " ").replace(/, /g, ",");
+
+  it.each([
+    ["clés de métadonnées (liste fermée)", PHOTO_METADATA_KEYS], ["sources de photo", PHOTO_SOURCES],
+    ["origines de date", PHOTO_DATE_SOURCES], ["orientations", PHOTO_ORIENTATIONS], ["couleurs d'annotation", PHOTO_ANNOTATION_COULEURS],
+  ] as const)("énumération %s identique", (_label, values) => {
+    expect(capture).toContain(quoted(values));
+  });
+
+  it("clés obligatoires, bornes des repères et du libellé identiques", () => {
+    for (const key of PHOTO_METADATA_REQUIRED_KEYS) expect(capture).toMatch(new RegExp(`'${key}'`));
+    expect(capture).toContain(`jsonb_array_length(p_reperes) <= ${RELEVE_LIMITS.reperesMax}`);
+    expect(capture).toContain(`char_length(r->>'label') <= ${RELEVE_LIMITS.labelRepere}`);
+    expect(capture).toContain(`tools_releve_entier_facultatif_valide(p_donnees->'ordre',0,${RELEVE_LIMITS.ordreMax})`);
+  });
+
+  it("aucune clé de localisation n'est admise par la liste fermée SQL", () => {
+    const liste = /k not in \(([^)]*)\)/.exec(capture)?.[1] ?? "";
+    expect(liste).not.toBe("");
+    for (const interdite of FORBIDDEN_LOCATION_KEYS) expect(liste.toLowerCase()).not.toContain(`'${interdite}'`);
+  });
+
+  it("formes dessinables sur photo : texte, flèche, cercle", () => {
+    for (const forme of PHOTO_ANNOTATION_FORMES) expect(capture).toContain(`when '${forme}' then public.tools_releve_nombre_unitaire`);
   });
 });

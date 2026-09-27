@@ -72,6 +72,8 @@ Total estimé : **≈ 173 – 265 j** hors AR/LiDAR natifs avancés (voir lot 4b
 
 ## Lot 4 — Capture terrain
 
+> **Réalisé (4a, web), après le Lot 3** : [ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md) — verdict **RELEVE METRE LOT 4 LOCALLY QUALIFIED** (migration 801). Restent : essais sur appareils physiques, 4b (AR / LiDAR / laser) non engagé.
+
 | | |
 |---|---|
 | Scope | **4a (engagé)** : saisie guidée pièce par pièce (longueurs de murs, hauteur sous plafond, diagonales de contrôle) ; capture photo : `@capacitor/camera` en natif + `<input capture>` Web ; permissions iOS/Android + mise à jour déclarations de confidentialité ; levée **ciblée** de `Permissions-Policy` (`camera=(self)` uniquement) ; compression photo. **4b (exploratoire, non engagé)** : spike ARKit/ARCore mesure de distance ; spike RoomPlan (LiDAR, iOS 16+) ; spike laser Bluetooth (DISTO) en natif |

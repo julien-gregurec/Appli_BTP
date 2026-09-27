@@ -6,7 +6,7 @@ import {
   allowedActions, buildReleveTree, CHANTIER_STATUTS, structureStats, trashOf, VERSION_TYPE_LABELS, VERSION_TYPES,
   type Chantier, type ChantierStatut, type JournalEntry, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type Version, type VersionType,
 } from "@elsatia/releve-domain";
-import { readReleveId, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
+import { photosHref, readReleveId, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { CHANTIER_STATUT_LABELS, ENTITE_LABELS, JOURNAL_ACTION_LABELS, RELEVE_STATUT_LABELS } from "./labels";
 import { AutosaveBadge, useNodeAutosave } from "./useNodeAutosave";
@@ -81,6 +81,7 @@ function Fiche({ service, actor, releveId }: { service: ReleveService; actor: Re
         <div><dt>Structure</dt><dd>{stats.chantiers} chantier(s), {stats.batiments} bâtiment(s), {stats.etages} étage(s), {stats.pieces} pièce(s)</dd></div>
       </dl>
       <div className={styles.toolbar}>
+        <Link className={styles.secondary} href={photosHref(releveId)}>Photos terrain</Link>
         {actions.has("share") && <button className={styles.secondary} type="button" onClick={() => void run(() => service.setVisibility(releveId, releve.visibilite === "prive" ? "entreprise" : "prive"), releve.visibilite === "prive" ? "Relevé partagé avec l'entreprise." : "Relevé redevenu privé.")}>{releve.visibilite === "prive" ? "Partager avec l'entreprise" : "Rendre privé"}</button>}
       </div>
       <p className={styles.feedback} role="status" aria-live="polite">{feedback}</p>

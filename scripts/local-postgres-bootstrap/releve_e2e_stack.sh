@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Pile locale RÉELLE pour la recette Playwright Relevé & Métré (Lot 2 Recovery V2) :
+# Pile locale RÉELLE pour la recette Playwright Relevé & Métré (Lot 2 Recovery V2, Lot 4) :
 # GoTrue (compilé depuis les sources) + PostgREST (binaire GitHub) + PostgreSQL 16 avec les
 # vraies migrations et la vraie RLS, derrière local_supabase_proxy.mjs (CORS ouvert à Tools).
+# Lot 4 : + local_storage_mock.mjs (policies réelles de storage.objects, octets sur disque).
 # Aucun Docker, aucun service distant. Tools lui-même se lance à part (commande affichée à la fin).
 #
 # Usage : releve_e2e_stack.sh [db]   (défaut : releve_e2e)
@@ -14,6 +15,7 @@ BUILD_DIR="${GOTRUE_BUILD_DIR:-/tmp/gotrue-build}"
 POSTGREST_DIR="${POSTGREST_BUILD_DIR:-/tmp/postgrest-build}"
 POSTGREST_VERSION="v12.2.3"
 PROXY_PORT="${PILOT_PROXY_PORT:-54321}"
+STORAGE_PORT="${RELEVE_STORAGE_PORT:-5000}"
 TOOLS_ORIGIN="${TOOLS_ORIGIN:-http://localhost:3020}"
 PASSWORD="${RELEVE_E2E_PASSWORD:-Releve-Test-2026!}"
 fail() { echo "FAIL: $1" >&2; exit 1; }
@@ -44,7 +46,14 @@ CONF
 (cd "$POSTGREST_DIR" && nohup ./postgrest postgrest.conf > postgrest.log 2>&1 &)
 sleep 2
 curl -sS -o /dev/null "http://localhost:3001/" || fail "PostgREST ne répond pas sur :3001"
-(cd "$REPO" && PORT="$PROXY_PORT" GOTRUE_URL=http://localhost:9999 POSTGREST_URL=http://localhost:3001 CORS_ORIGINS="$TOOLS_ORIGIN" \
+# Lot 4 : surface Storage locale (métadonnées + RLS réelles dans storage.objects, octets sur disque),
+# limites du bucket appliquées comme le vrai storage-api. Voir local_storage_mock.mjs.
+pkill -9 -f "node scripts/local-postgres-bootstrap/local_storage_mock" >/dev/null 2>&1 || true
+rm -rf "${STORAGE_ROOT:-/tmp/releve-e2e-storage}"
+(cd "$REPO" && PORT="$STORAGE_PORT" DB="$DB" GOTRUE_JWT_SECRET="$(cat "$BUILD_DIR/jwt_secret.txt")" STORAGE_ROOT="${STORAGE_ROOT:-/tmp/releve-e2e-storage}" \
+  STORAGE_ENFORCE_BUCKET_LIMITS=1 nohup node scripts/local-postgres-bootstrap/local_storage_mock.mjs > "$POSTGREST_DIR/storage.log" 2>&1 &)
+sleep 1
+(cd "$REPO" && PORT="$PROXY_PORT" GOTRUE_URL=http://localhost:9999 POSTGREST_URL=http://localhost:3001 STORAGE_URL="http://localhost:$STORAGE_PORT" CORS_ORIGINS="$TOOLS_ORIGIN" \
   nohup node scripts/local-postgres-bootstrap/local_supabase_proxy.mjs > "$POSTGREST_DIR/proxy.log" 2>&1 &)
 sleep 1
 curl -sS -o /dev/null "http://localhost:$PROXY_PORT/auth/v1/health" || fail "proxy ne répond pas sur :$PROXY_PORT"
@@ -71,4 +80,6 @@ Pile Relevé prête (DB=$DB, proxy http://localhost:$PROXY_PORT, CORS $TOOLS_ORI
    PW_CHROME_PATH=/opt/pw-browsers/chromium RELEVE_E2E_BASE_URL=$TOOLS_ORIGIN RELEVE_E2E_EMAIL_A=releve-a@example.test \\
      RELEVE_E2E_EMAIL_B=releve-b@example.test RELEVE_E2E_PASSWORD='$PASSWORD' \\
      npx playwright test tests/e2e/tools-releve-lot2.spec.ts --project=desktop-chromium
+   Lot 4 (photos, Storage, mobile) : RELEVE_E2E_SUPABASE_URL=http://localhost:$PROXY_PORT RELEVE_E2E_ANON_KEY=$ANON_JWT \
+     npx playwright test tests/e2e/tools-releve-lot4.spec.ts --project=desktop-chromium
 INFO

@@ -6,7 +6,7 @@ import {
   allowedActions, breadcrumbOf, buildReleveTree, deletionImpact, etageLabel, PIECE_TYPES_PRINCIPAUX, suggestNextEtage,
   type EtageCategorie, type NodeKind, type PieceUsage, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type ZoneType,
 } from "@elsatia/releve-domain";
-import { ficheHref, pieceHref, readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
+import { ficheHref, photosHref, pieceHref, readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { ETAGE_CATEGORIE_CHOIX, PIECE_STATUT_LABELS, USAGE_LABELS, ZONE_TYPE_LABELS, ZONE_TYPES_PROPOSES } from "./labels";
 import { ETAGE_CATEGORIE_LABELS } from "@elsatia/releve-domain";
@@ -103,6 +103,7 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
             {tree.chantiers.map(({ chantier }) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}
           </select></label>}
         <Link className={styles.secondary} href={ficheHref(releveId)}>Fiche du relevé</Link>
+        <Link className={styles.secondary} href={photosHref(releveId, etageNode && selection.etageId ? { kind: "etage", id: etageNode.etage.id } : undefined)}>Photos terrain</Link>
       </div>
       <p className={styles.feedback} role="status" aria-live="polite" data-testid="structure-feedback">{feedback}</p>
     </div></section>

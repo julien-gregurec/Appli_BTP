@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ficheHref, readReleveId, readStructureSelection, structureHref } from "./navigation";
+import { ficheHref, photosHref, readPhotoCible, readReleveId, readStructureSelection, structureHref } from "./navigation";
 
 const R = "e1000000-0000-0000-0000-000000000001";
 const C = "e9000000-0000-0000-0000-000000000001";
@@ -14,6 +14,10 @@ describe("navigation Relevé & Métré (routes statiques)", () => {
     expect(structureHref({ releveId: R, batimentId: B, etageId: E })).toBe(`/releves/structure?id=${R}`);
     expect(structureHref({ releveId: R, chantierId: C, etageId: E })).toBe(`/releves/structure?id=${R}&chantier=${C}`);
     expect(ficheHref(R)).toBe(`/releves/fiche?id=${R}`);
+    expect(photosHref(R)).toBe(`/releves/photos?id=${R}`);
+    expect(photosHref(R, { kind: "piece", id: E })).toBe(`/releves/photos?id=${R}&cible=piece%3A${E}`);
+    expect(readPhotoCible(`?id=${R}&cible=piece:${E}`)).toEqual({ kind: "piece", id: E });
+    expect([readPhotoCible(`?cible=mur:${E}`), readPhotoCible("?cible=piece:../x"), readPhotoCible("")]).toEqual([null, null, null]);
   });
 
   it("relit la sélection et ignore tout identifiant forgé", () => {
