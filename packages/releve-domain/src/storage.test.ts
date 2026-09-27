@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { asMediaId, asReleveId, asTenantId } from "./ids";
-import { buildStoragePath, checkMediaUpload, parseStoragePath, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES, RELEVE_STORAGE_MIME_TYPES } from "./storage";
+import { buildStoragePath, checkMediaUpload, parseStoragePath, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES, RELEVE_STORAGE_MIME_TYPES, signedUrlRequest } from "./storage";
 
 const entrepriseId = asTenantId("a0000000-0000-0000-0000-000000000001");
 const releveId = asReleveId("e1000000-0000-0000-0000-000000000001");
@@ -42,3 +42,15 @@ describe("contrat de stockage tools-releves", () => {
     expect(RELEVE_STORAGE_MIME_TYPES).toEqual(expect.arrayContaining(["image/jpeg", "audio/webm", "application/pdf", "text/csv", "image/vnd.dxf"]));
   });
 });
+
+describe("Recovery V2 : lecture par URL signée uniquement", () => {
+  const path = buildStoragePath({ entrepriseId, releveId, categorie: "photos", mediaId, mimeType: "image/jpeg" });
+  it("signe un chemin canonique du relevé attendu, avec une durée courte", () => {
+    expect(signedUrlRequest(path, { entrepriseId, releveId })).toEqual({ bucket: "tools-releves", path, expiresIn: 600 });
+  });
+  it("refuse un chemin d'un autre tenant ou non canonique", () => {
+    expect(() => signedUrlRequest(path, { entrepriseId: asTenantId("b0000000-0000-0000-0000-000000000001"), releveId })).toThrow(/autre entreprise/);
+    expect(() => signedUrlRequest(`../${path}`, { entrepriseId, releveId })).toThrow(/non canonique/);
+  });
+});
+

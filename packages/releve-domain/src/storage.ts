@@ -127,3 +127,20 @@ export function checkMediaUpload(categorie: MediaCategorie, mimeType: string, by
   if (bytes > policy.maxBytes) return { ok: false, message: `Fichier trop volumineux (${Math.round(policy.maxBytes / MB)} Mo maximum).` };
   return { ok: true };
 }
+
+/**
+ * Recovery V2 — lecture d'un fichier du bucket PRIVÉ : uniquement par URL signée de courte
+ * durée, jamais par URL publique. L'adaptateur (web, mobile, worker) appelle
+ * `storage.from(bucket).createSignedUrl(path, expiresIn)` ; Supabase ne signe que si la policy
+ * SELECT de `storage.objects` (`tools_releve_storage_autorise`) l'autorise pour l'appelant.
+ */
+export const RELEVE_SIGNED_URL_TTL_SECONDS = 600;
+
+export function signedUrlRequest(path: string, expected: { entrepriseId: TenantId; releveId: ReleveId }): { bucket: typeof RELEVE_STORAGE_BUCKET; path: string; expiresIn: number } {
+  const parsed = parseStoragePath(path);
+  if (!parsed) throw new ReleveStoragePathError("Chemin de fichier non canonique.");
+  if (parsed.entrepriseId !== expected.entrepriseId || parsed.releveId !== expected.releveId) {
+    throw new ReleveStoragePathError("Fichier d'une autre entreprise ou d'un autre relevé.");
+  }
+  return { bucket: RELEVE_STORAGE_BUCKET, path, expiresIn: RELEVE_SIGNED_URL_TTL_SECONDS };
+}
