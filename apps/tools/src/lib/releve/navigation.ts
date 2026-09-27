@@ -2,28 +2,53 @@
  * Navigation Relevé & Métré. Routes STATIQUES (compatibles export natif Capacitor) :
  * l'identifiant du relevé et la sélection courante voyagent en paramètres de requête,
  * jamais en segment dynamique — comme `/atelier/tracer?projectId=`.
+ *
+ * | Écran | Route |
+ * |---|---|
+ * | Mes relevés | `/releves` |
+ * | Nouveau relevé | `/releves/nouveau` |
+ * | Fiche relevé (chantiers, versions) | `/releves/fiche?id=` |
+ * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
  */
 import { isUuid } from "@elsatia/releve-domain";
 
 export const RELEVES_PATH = "/releves";
+export const RELEVE_NEW_PATH = "/releves/nouveau";
+export const RELEVE_FICHE_PATH = "/releves/fiche";
 export const RELEVE_STRUCTURE_PATH = "/releves/structure";
 
-export type StructureSelection = { releveId: string; batimentId: string | null; etageId: string | null };
+export type StructureSelection = { releveId: string; chantierId: string | null; batimentId: string | null; etageId: string | null };
 
-export function structureHref(selection: { releveId: string; batimentId?: string | null; etageId?: string | null }): string {
+export function ficheHref(releveId: string): string {
+  return `${RELEVE_FICHE_PATH}?${new URLSearchParams({ id: releveId }).toString()}`;
+}
+
+/** Chaque niveau n'est encodé que si son parent l'est : la sélection reste un chemin cohérent. */
+export function structureHref(selection: { releveId: string; chantierId?: string | null; batimentId?: string | null; etageId?: string | null }): string {
   const params = new URLSearchParams({ id: selection.releveId });
-  if (selection.batimentId) params.set("batiment", selection.batimentId);
-  if (selection.batimentId && selection.etageId) params.set("etage", selection.etageId);
+  if (selection.chantierId) {
+    params.set("chantier", selection.chantierId);
+    if (selection.batimentId) {
+      params.set("batiment", selection.batimentId);
+      if (selection.etageId) params.set("etage", selection.etageId);
+    }
+  }
   return `${RELEVE_STRUCTURE_PATH}?${params.toString()}`;
 }
 
-/** Lit la sélection depuis une query string ; tout identifiant non UUID est ignoré. */
+export function readReleveId(search: string): string | null {
+  const id = new URLSearchParams(search).get("id");
+  return isUuid(id) ? id : null;
+}
+
+/** Lit la sélection depuis une query string ; tout identifiant non UUID est ignoré (et ses enfants). */
 export function readStructureSelection(search: string): StructureSelection | null {
   const params = new URLSearchParams(search);
   const releveId = params.get("id");
   if (!isUuid(releveId)) return null;
-  const batimentId = params.get("batiment");
-  const etageId = params.get("etage");
-  const validBatiment = isUuid(batimentId) ? batimentId : null;
-  return { releveId, batimentId: validBatiment, etageId: validBatiment && isUuid(etageId) ? etageId : null };
+  const pick = (key: string, parentOk: boolean) => { const value = params.get(key); return parentOk && isUuid(value) ? value : null; };
+  const chantierId = pick("chantier", true);
+  const batimentId = pick("batiment", chantierId !== null);
+  const etageId = pick("etage", batimentId !== null);
+  return { releveId, chantierId, batimentId, etageId };
 }

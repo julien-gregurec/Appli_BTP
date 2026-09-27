@@ -8,20 +8,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ReleveConflictError, ReleveNotFoundError,
-  type NewBatiment, type NewEtage, type NewPiece, type NewReleve, type NewZone, type ReleveId, type RelevePatch,
+  type NewBatiment, type NewChantier, type NewEtage, type NewPiece, type NewReleve, type NewVersion, type NewZone, type ReleveId, type RelevePatch,
   type ReleveRepository, type StructureKind, type StructurePatch, type TenantId,
 } from "@elsatia/releve-domain";
 import {
-  batimentFromRow, etageFromRow, pieceFromRow, releveFromRow, relevePatchToRow, versionFromRow, zoneFromRow,
-  type BatimentRow, type EtageRow, type PieceRow, type ReleveRow, type VersionRow, type ZoneRow,
+  batimentFromRow, chantierFromRow, etageFromRow, pieceFromRow, releveFromRow, relevePatchToRow, versionFromRow, zoneFromRow,
+  type BatimentRow, type ChantierRow, type EtageRow, type PieceRow, type ReleveRow, type VersionRow, type ZoneRow,
 } from "./mapping";
 
 export type ReleveSupabaseClient = Pick<SupabaseClient, "from" | "rpc">;
 
 const TABLES: Record<StructureKind, string> = {
-  batiment: "tools_releves_batiments", etage: "tools_releves_etages", zone: "tools_releves_zones", piece: "tools_releves_pieces",
+  chantier: "tools_releves_chantiers", batiment: "tools_releves_batiments", etage: "tools_releves_etages", zone: "tools_releves_zones", piece: "tools_releves_pieces",
 };
-const VERSION_COLUMNS = "id,entreprise_id,releve_id,numero,libelle,revision_source,empreinte,created_at,created_by";
+const VERSION_COLUMNS = "id,entreprise_id,releve_id,numero,type_version,version_base_id,libelle,revision_source,empreinte,created_at,created_by";
 
 export class ReleveRemoteError extends Error {
   constructor(message: string, public readonly code?: string) { super(message); this.name = "ReleveRemoteError"; }
@@ -45,17 +45,19 @@ export class SupabaseReleveRepository implements ReleveRepository {
   }
 
   async getStructure(releveId: ReleveId) {
-    const [releve, batiments, etages, zones, pieces] = await Promise.all([
+    const [releve, chantiers, batiments, etages, zones, pieces] = await Promise.all([
       this.client.from("tools_releves").select("*").eq("id", releveId).maybeSingle(),
+      this.client.from(TABLES.chantier).select("*").eq("releve_id", releveId),
       this.client.from(TABLES.batiment).select("*").eq("releve_id", releveId),
       this.client.from(TABLES.etage).select("*").eq("releve_id", releveId),
       this.client.from(TABLES.zone).select("*").eq("releve_id", releveId),
       this.client.from(TABLES.piece).select("*").eq("releve_id", releveId),
     ]);
-    for (const result of [releve, batiments, etages, zones, pieces]) if (result.error) fail("Chargement du relevé", result.error);
+    for (const result of [releve, chantiers, batiments, etages, zones, pieces]) if (result.error) fail("Chargement du relevé", result.error);
     if (!releve.data) return null;
     return {
       releve: releveFromRow(releve.data as ReleveRow),
+      chantiers: ((chantiers.data ?? []) as ChantierRow[]).map(chantierFromRow),
       batiments: ((batiments.data ?? []) as BatimentRow[]).map(batimentFromRow),
       etages: ((etages.data ?? []) as EtageRow[]).map(etageFromRow),
       zones: ((zones.data ?? []) as ZoneRow[]).map(zoneFromRow),
@@ -90,8 +92,17 @@ export class SupabaseReleveRepository implements ReleveRepository {
     return releveFromRow(data as ReleveRow);
   }
 
+  async createChantier(input: NewChantier) {
+    const { data, error } = await this.client.from(TABLES.chantier).insert({
+      id: input.id, releve_id: input.releveId, nom: input.nom, adresse: input.adresse, code_postal: input.codePostal,
+      ville: input.ville, chantier_gp_id: input.gpChantierId, ordre: input.ordre, notes: input.notes,
+    }).select("*").single();
+    if (error) fail("Ajout du chantier", error);
+    return chantierFromRow(data as ChantierRow);
+  }
+
   async createBatiment(input: NewBatiment) {
-    const { data, error } = await this.client.from(TABLES.batiment).insert({ id: input.id, releve_id: input.releveId, nom: input.nom, ordre: input.ordre, notes: input.notes }).select("*").single();
+    const { data, error } = await this.client.from(TABLES.batiment).insert({ id: input.id, releve_id: input.releveId, chantier_id: input.chantierId, nom: input.nom, ordre: input.ordre, notes: input.notes }).select("*").single();
     if (error) fail("Ajout du bâtiment", error);
     return batimentFromRow(data as BatimentRow);
   }
@@ -129,13 +140,15 @@ export class SupabaseReleveRepository implements ReleveRepository {
   }
 
   async setStructureNodeDeleted(kind: StructureKind, id: string, deleted: boolean) {
-    // La cascade (étages, zones, pièces, éléments) est exécutée par le serveur.
+    // La cascade (bâtiments, étages, zones, pièces, éléments) est exécutée par le serveur.
     const { error } = await this.client.from(TABLES[kind]).update({ deleted_at: deleted ? new Date().toISOString() : null }).eq("id", id);
     if (error) fail(deleted ? "Suppression" : "Restauration", error);
   }
 
-  async createVersion(releveId: ReleveId, libelle: string | null) {
-    const { data, error } = await this.client.rpc("tools_releve_creer_version", { p_releve_id: releveId, p_libelle: libelle });
+  async createVersion(releveId: ReleveId, input: NewVersion) {
+    const { data, error } = await this.client.rpc("tools_releve_creer_version", {
+      p_releve_id: releveId, p_libelle: input.libelle, p_type_version: input.type, p_version_base_id: input.baseId,
+    });
     if (error) fail("Création de version", error);
     return versionFromRow(data as VersionRow);
   }

@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { TOOLS_ADDON_CAPABILITIES } from "./entitlement";
+import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_CAPABILITIES, expandOfferCapabilities, offerCapabilities } from "./entitlement";
 import {
   ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
   MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
-  RELEVE_VISIBILITES, ZONE_TYPES,
+  RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES,
 } from "./model";
 import { RELEVE_ACTIONS, RELEVE_ROLES } from "./permissions";
 import { MEDIA_CATEGORY_POLICIES, RELEVE_STORAGE_BUCKET, RELEVE_STORAGE_MAX_BYTES } from "./storage";
@@ -17,6 +17,11 @@ import { RELEVE_LIMITS } from "./validation";
  */
 const sql = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/20260926000401_tools_releve_metre_foundation_v1.sql", import.meta.url)),
+  "utf8",
+).replace(/\s+/g, " ");
+
+const complements = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260926000501_tools_releve_metre_lot2_complements.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ");
 
@@ -50,5 +55,28 @@ describe("parité domaine ↔ migration tools_releve_metre_foundation_v1", () =>
     for (const [categorie, policy] of Object.entries(MEDIA_CATEGORY_POLICIES)) {
       expect(sql.replace(/, /g, ",")).toContain(`when '${categorie}' then mime_type in (${quoted(Object.keys(policy.mimeTypes))})`);
     }
+  });
+});
+
+describe("parité domaine ↔ migration tools_releve_metre_lot2_complements", () => {
+  it("types de version identiques au CHECK SQL", () => {
+    expect(complements.replace(/, /g, ",")).toContain(`type_version in (${quoted(VERSION_TYPES)})`);
+  });
+
+  it("18 capabilities Tools Pro identiques à tools_capabilities_pro()", () => {
+    expect(sql.replace(/, ?/g, ",")).toContain(quoted(TOOLS_PRO_CAPABILITIES));
+  });
+
+  it("catalogue d'offres : releve_pro inclut tools_pro, non commercial, sans prix", () => {
+    expect(complements).toContain("('releve_pro', 'Relevé & Métré Pro', 'releve-metre', public.tools_capabilities_addon(), array['tools_pro'], false, 'reference')");
+    expect(TOOLS_OFFERS.releve_pro).toMatchObject({ offresIncluses: ["tools_pro"], commercialementActive: false });
+    expect(complements).not.toMatch(new RegExp(`${RELEVE_METRE_OFFER.monthlyPriceCents}|${RELEVE_METRE_OFFER.annualPriceCents}|24,90|249 €`));
+  });
+
+  it("extension d'offre : miroir de tools_capabilities_etendues", () => {
+    expect(offerCapabilities("releve_pro")).toHaveLength(19);
+    expect(expandOfferCapabilities(["releve-metre"])).toEqual(offerCapabilities("releve_pro"));
+    expect(expandOfferCapabilities(TOOLS_PRO_CAPABILITIES)).toEqual([...TOOLS_PRO_CAPABILITIES].sort());
+    expect(expandOfferCapabilities(["basic-calculation"])).toEqual(["basic-calculation"]);
   });
 });

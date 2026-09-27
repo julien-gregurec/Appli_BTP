@@ -56,3 +56,17 @@ describe("capability d'add-on releve-metre", () => {
     expect([...ADDON_CAPABILITIES]).toEqual([...TOOLS_ADDON_CAPABILITIES]);
   });
 });
+
+describe("Relevé Pro ⊃ Tools Pro (catalogue d'offres du domaine)", () => {
+  it("les 18 capabilities Pro de Tools sont celles du domaine et du SQL", async () => {
+    const { TOOLS_PRO_CAPABILITIES } = await import("@elsatia/releve-domain");
+    expect([...PRO_CAPABILITIES].sort()).toEqual([...TOOLS_PRO_CAPABILITIES].sort());
+  });
+
+  it("une ligne serveur ne portant que releve-metre se résout en Tools Pro complet + add-on", async () => {
+    const { expandOfferCapabilities } = await import("@elsatia/releve-domain");
+    const access = entitlementToAccess({ application: "tools", tier: "pro", source: "internal", capabilities: expandOfferCapabilities(["releve-metre"]) } as never);
+    expect(hasCapability(access, "releve-metre")).toBe(true);
+    expect(hasCapability(access, "export-pdf")).toBe(true);
+  });
+});
