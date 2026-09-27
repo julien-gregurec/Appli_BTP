@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
   title: "Structure du relevé",
-  description: "Naviguez dans la structure d'un relevé : bâtiments, étages, zones et pièces.",
+  description: "Structure d’un chantier relevé : bâtiments, étages, zones et pièces.",
   path: "/releves/structure",
   index: false,
 });

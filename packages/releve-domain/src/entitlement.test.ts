@@ -22,3 +22,27 @@ describe("entitlement premium releve-metre", () => {
     expect(Object.isFrozen(RELEVE_METRE_OFFER)).toBe(true);
   });
 });
+
+describe("prix de référence : une seule source, jamais codée en dur ailleurs", () => {
+  it("aucun fichier source de Tools, du domaine ni des migrations ne recopie le prix", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join, relative } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const root = fileURLToPath(new URL("../../../", import.meta.url));
+    const scanned = ["apps/tools/src", "packages/releve-domain/src"].map((dir) => join(root, dir));
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) { walk(path); continue; }
+        if (!/\.(ts|tsx)$/.test(name) || /\.test\.tsx?$/.test(name)) continue;
+        if (/\b(2490|24900)\b|24,90|249 ?€/.test(readFileSync(path, "utf8"))) hits.push(relative(root, path));
+      }
+    };
+    scanned.forEach(walk);
+    for (const migration of ["20260926000401_tools_releve_metre_foundation_v1.sql", "20260926000501_tools_releve_metre_lot2_complements.sql"]) {
+      if (/\b(2490|24900)\b|24,90/.test(readFileSync(join(root, "supabase/migrations", migration), "utf8"))) hits.push(migration);
+    }
+    expect(hits).toEqual(["packages/releve-domain/src/entitlement.ts"]);
+  });
+});

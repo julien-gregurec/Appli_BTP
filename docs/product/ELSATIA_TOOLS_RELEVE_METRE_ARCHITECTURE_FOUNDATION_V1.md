@@ -6,6 +6,8 @@
 **Entrées** : [Audit lot 1](./ELSATIA_TOOLS_RELEVE_METRE_EXISTING_AUDIT_V1.md) · [Roadmap V1](./ELSATIA_TOOLS_RELEVE_METRE_ROADMAP_V1.md)
 **Hors périmètre, volontairement** : capture caméra / AR / LiDAR, moteur de plan, synchronisation GP réelle, paiement, SKU, activation commerciale.
 
+> **Complété et remplacé comme référence par** [ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_V1.md) (migration `20260926000501`). Ce document décrit la première passe ; les sections hiérarchie, versions, offres, contrat GP et UI y sont mises à jour.
+
 ---
 
 ## 0. Verdict

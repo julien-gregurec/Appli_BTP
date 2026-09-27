@@ -44,7 +44,9 @@ Total estimé : **≈ 173 – 265 j** hors AR/LiDAR natifs avancés (voir lot 4b
 
 ## Lot 2 — Architecture ✅
 
-> Réalisé sur le train canonique V2 : [ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md) — verdict **RELEVE METRE LOT 2 FOUNDATION QUALIFIED**. Le lot a aussi livré, par anticipation, la table `tools_releves` et ses enfants, le gate serveur `releve-metre` et les écrans liste / structure prévus au lot 3 (en ligne ; le dépôt IndexedDB reste au lot 3).
+> **Rapport de référence** : [ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_LOT2_FOUNDATION_V1.md) — verdict **RELEVE METRE LOT 2 LOCALLY QUALIFIED** (niveau Chantier, versions typées initial/corrigé/projeté/as-built, offre Relevé Pro ⊃ Tools Pro, contrat GP 13 sections, écrans Mes relevés / Nouveau relevé / fiche / structure).
+>
+> Première passe sur le train canonique V2 : [ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md](./ELSATIA_TOOLS_RELEVE_METRE_ARCHITECTURE_FOUNDATION_V1.md) — verdict **RELEVE METRE LOT 2 FOUNDATION QUALIFIED**. Le lot a aussi livré, par anticipation, la table `tools_releves` et ses enfants, le gate serveur `releve-metre` et les écrans liste / structure prévus au lot 3 (en ligne ; le dépôt IndexedDB reste au lot 3).
 
 | | |
 |---|---|

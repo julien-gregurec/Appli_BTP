@@ -56,14 +56,17 @@ describe("mapping SQL ↔ domaine", () => {
 });
 
 describe("SupabaseReleveRepository", () => {
-  it("création : identifiant client, tenant explicite, aucune colonne de propriété envoyée", async () => {
-    const { client, calls } = fakeClient([{ data: row, error: null }]);
+  it("création : identifiant client, tenant explicite, aucune colonne de propriété envoyée, premier chantier", async () => {
+    const chantierRow = { ...row, releve_id: row.id, nom: "Rue des Lilas", adresse: null, code_postal: null, ville: null, chantier_gp_id: null, ordre: 0, notes: null };
+    const { client, calls } = fakeClient([{ data: row, error: null }, { data: chantierRow, error: null }]);
     const service = new ReleveService(new SupabaseReleveRepository(client), actorContextFromRow(USER, { entreprise_id: TENANT, tenant_has_tools: true, has_releve_capability: true, role: "tools_releve_metreur", gp_gerer_ouvrages: false }), () => row.id);
     await service.create({ nom: "Relevé T3", chantierNom: "Rue des Lilas" });
     expect(calls[0]).toMatchObject({ table: "tools_releves", op: "insert" });
     expect(calls[0].payload).toMatchObject({ id: row.id, entreprise_id: TENANT, nom: "Relevé T3", chantier_nom: "Rue des Lilas" });
     expect(calls[0].payload).not.toHaveProperty("proprietaire_id");
     expect(calls[0].payload).not.toHaveProperty("revision");
+    expect(calls[1]).toMatchObject({ table: "tools_releves_chantiers", op: "insert", payload: { releve_id: row.id, nom: "Rue des Lilas", ordre: 0 } });
+    expect(calls[1].payload).not.toHaveProperty("entreprise_id");
   });
 
   it("mise à jour conditionnée par la révision ; conflit détecté", async () => {
@@ -74,15 +77,15 @@ describe("SupabaseReleveRepository", () => {
 
   it("refus RLS traduit en message utilisateur, sans détail SQL", async () => {
     const { client } = fakeClient([{ data: null, error: { code: "42501", message: "new row violates row-level security policy for table tools_releves" } }]);
-    const promise = new SupabaseReleveRepository(client).createBatiment({ id: "b" as never, releveId: row.id as never, nom: "A", ordre: 0, notes: null });
+    const promise = new SupabaseReleveRepository(client).createBatiment({ id: "b" as never, releveId: row.id as never, chantierId: "c" as never, nom: "A", ordre: 0, notes: null });
     await expect(promise).rejects.toBeInstanceOf(ReleveRemoteError);
     await expect(promise).rejects.not.toThrow(/row-level/);
   });
 
   it("versions : RPC serveur, jamais d'écriture directe", async () => {
-    const { client, calls } = fakeClient([{ data: { id: "v", entreprise_id: TENANT, releve_id: row.id, numero: 1, libelle: null, revision_source: 3, empreinte: "a".repeat(64), created_at: "2026-09-26T10:00:00Z", created_by: USER }, error: null }]);
-    const version = await new SupabaseReleveRepository(client).createVersion(row.id as never, null);
-    expect(calls[0]).toMatchObject({ table: "tools_releve_creer_version", op: "rpc", payload: { p_releve_id: row.id, p_libelle: null } });
-    expect(version.numero).toBe(1);
+    const { client, calls } = fakeClient([{ data: { id: "v", entreprise_id: TENANT, releve_id: row.id, numero: 1, type_version: "initial", version_base_id: null, libelle: null, revision_source: 3, empreinte: "a".repeat(64), created_at: "2026-09-26T10:00:00Z", created_by: USER }, error: null }]);
+    const version = await new SupabaseReleveRepository(client).createVersion(row.id as never, { libelle: null, type: "initial", baseId: null });
+    expect(calls[0]).toMatchObject({ table: "tools_releve_creer_version", op: "rpc", payload: { p_releve_id: row.id, p_libelle: null, p_type_version: "initial", p_version_base_id: null } });
+    expect([version.numero, version.typeVersion, version.versionBaseId]).toEqual([1, "initial", null]);
   });
 });

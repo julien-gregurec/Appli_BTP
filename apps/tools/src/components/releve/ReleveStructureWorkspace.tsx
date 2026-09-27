@@ -3,20 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  allowedActions, buildReleveTree, niveauLabel, PIECE_USAGES, structureStats,
+  allowedActions, buildReleveTree, niveauLabel, PIECE_USAGES,
   type PieceUsage, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type StructureKind,
 } from "@elsatia/releve-domain";
-import { readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
+import { ficheHref, readStructureSelection, RELEVES_PATH, structureHref, type StructureSelection } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
+import { USAGE_LABELS } from "./labels";
 import styles from "./releve.module.css";
 import { ReleveLocked } from "./ReleveLocked";
 import { useReleveService } from "./use-releve-service";
 
-const USAGE_LABELS: Record<PieceUsage, string> = {
-  sejour: "Séjour", chambre: "Chambre", cuisine: "Cuisine", salle_de_bain: "Salle de bain", salle_d_eau: "Salle d'eau", wc: "WC",
-  entree: "Entrée", degagement: "Dégagement", bureau: "Bureau", cellier: "Cellier", buanderie: "Buanderie", garage: "Garage",
-  cave: "Cave", combles: "Combles", escalier: "Escalier", exterieur: "Extérieur", autre: "Autre",
-};
 
 export function ReleveStructureWorkspace() {
   const state = useReleveService();
@@ -49,18 +45,14 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
   const releveId = selection.releveId as ReleveId;
   const [structure, setStructure] = useState<ReleveStructure | null>(null);
   const [feedback, setFeedback] = useState("");
-  const [versions, setVersions] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
-    try {
-      setStructure(await service.get(releveId));
-      setVersions((await service.listVersions(releveId)).length);
-    } catch (error) { setFeedback(error instanceof Error ? error.message : "Chargement impossible."); }
+    try { setStructure(await service.get(releveId)); } catch (error) { setFeedback(error instanceof Error ? error.message : "Chargement impossible."); }
   }, [service, releveId]);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([service.get(releveId), service.listVersions(releveId)])
-      .then(([loaded, list]) => { if (!cancelled) { setStructure(loaded); setVersions(list.length); } })
+    service.get(releveId)
+      .then((loaded) => { if (!cancelled) setStructure(loaded); })
       .catch((error: unknown) => { if (!cancelled) setFeedback(error instanceof Error ? error.message : "Chargement impossible."); });
     return () => { cancelled = true; };
   }, [service, releveId]);
@@ -79,24 +71,29 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
 
   if (!structure || !tree) return <p className={`shell ${styles.feedback}`} role="status">{feedback || "Chargement du relevé…"}</p>;
   const { releve } = structure;
-  const batimentNode = tree.batiments.find((node) => node.batiment.id === selection.batimentId) ?? tree.batiments[0] ?? null;
+  const chantierNode = tree.chantiers.find((node) => node.chantier.id === selection.chantierId) ?? tree.chantiers[0] ?? null;
+  const batiments = chantierNode?.batiments ?? [];
+  const batimentNode = batiments.find((node) => node.batiment.id === selection.batimentId) ?? batiments[0] ?? null;
   const etageNode = batimentNode?.etages.find((node) => node.etage.id === selection.etageId) ?? batimentNode?.etages[0] ?? null;
-  const stats = structureStats(structure);
+  const chantierId = chantierNode?.chantier.id ?? null;
 
   return <>
     <section className="tool-hero"><div className="shell">
       <nav aria-label="Fil d'Ariane"><ol className={styles.breadcrumb}>
-        <li><Link href={RELEVES_PATH}>Relevés</Link></li>
-        <li>{releve.chantier.nom}</li>
+        <li><Link href={RELEVES_PATH}>Mes relevés</Link></li>
+        <li><Link href={ficheHref(releveId)}>{releve.nom}</Link></li>
+        {chantierNode && <li>{chantierNode.chantier.nom}</li>}
         {batimentNode && <li>{batimentNode.batiment.nom}</li>}
         {etageNode && <li>{etageNode.etage.nom}</li>}
       </ol></nav>
-      <p className="eyebrow">RELEVÉ · {releve.visibilite === "entreprise" ? "PARTAGÉ AVEC L'ENTREPRISE" : "PRIVÉ"}</p>
+      <p className="eyebrow">STRUCTURE · {releve.visibilite === "entreprise" ? "PARTAGÉ AVEC L'ENTREPRISE" : "PRIVÉ"}</p>
       <h1 className="projects-title">{releve.nom}</h1>
-      <p>Chantier {releve.chantier.nom}{releve.chantier.ville ? ` — ${releve.chantier.ville}` : ""} · {stats.batiments} bâtiment(s), {stats.etages} étage(s), {stats.zones} zone(s), {stats.pieces} pièce(s) · {versions ?? "…"} version(s)</p>
       <div className={styles.toolbar}>
-        {actions.has("share") && <button className={styles.secondary} type="button" onClick={() => void run(() => service.setVisibility(releveId, releve.visibilite === "prive" ? "entreprise" : "prive"), releve.visibilite === "prive" ? "Relevé partagé avec l'entreprise." : "Relevé redevenu privé.")}>{releve.visibilite === "prive" ? "Partager avec l'entreprise" : "Rendre privé"}</button>}
-        {canEdit && <button className={styles.secondary} type="button" onClick={() => void run(() => service.createVersion(releveId, window.prompt("Libellé de la version (facultatif)") ?? null), "Version figée.")}>Figer une version</button>}
+        {tree.chantiers.length > 1 && <label className={styles.field}><span>Chantier</span>
+          <select value={chantierId ?? ""} onChange={(event) => navigate({ releveId, chantierId: event.target.value, batimentId: null, etageId: null })}>
+            {tree.chantiers.map(({ chantier }) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}
+          </select></label>}
+        <Link className={styles.secondary} href={ficheHref(releveId)}>Fiche du relevé</Link>
       </div>
       <p className={styles.feedback} role="status" aria-live="polite">{feedback}</p>
     </div></section>
@@ -104,18 +101,18 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
     <div className={`shell ${styles.levels}`}>
       <section className={styles.column} aria-label="Bâtiments">
         <h2>Bâtiments</h2>
-        {tree.batiments.map(({ batiment }) => <div key={batiment.id} className={styles.node} aria-current={batiment.id === batimentNode?.batiment.id}>
-          <button type="button" className={styles.select} onClick={() => navigate({ releveId, batimentId: batiment.id, etageId: null })}><span>{batiment.nom}</span></button>
+        {batiments.map(({ batiment }) => <div key={batiment.id} className={styles.node} aria-current={batiment.id === batimentNode?.batiment.id}>
+          <button type="button" className={styles.select} onClick={() => navigate({ releveId, chantierId, batimentId: batiment.id, etageId: null })}><span>{batiment.nom}</span></button>
           {canEdit && <button type="button" className={styles.remove} aria-label={`Retirer ${batiment.nom}`} onClick={() => remove("batiment", batiment.id, batiment.nom)}>×</button>}
         </div>)}
-        {tree.batiments.length === 0 && <p className={styles.feedback}>Aucun bâtiment.</p>}
-        {canEdit && <InlineForm label="Ajouter un bâtiment" placeholder="Bâtiment A" onSubmit={(nom) => run(() => service.addBatiment(releveId, { nom }), "Bâtiment ajouté.")} />}
+        {batiments.length === 0 && <p className={styles.feedback}>Aucun bâtiment.</p>}
+        {canEdit && <InlineForm label="Ajouter un bâtiment" placeholder="Bâtiment A" onSubmit={(nom) => run(() => service.addBatiment(releveId, { nom, chantierId }), "Bâtiment ajouté.")} />}
       </section>
 
       <section className={styles.column} aria-label="Étages">
         <h2>Étages{batimentNode ? ` · ${batimentNode.batiment.nom}` : ""}</h2>
         {batimentNode?.etages.map(({ etage }) => <div key={etage.id} className={styles.node} aria-current={etage.id === etageNode?.etage.id}>
-          <button type="button" className={styles.select} onClick={() => navigate({ releveId, batimentId: batimentNode.batiment.id, etageId: etage.id })}><span>{etage.nom}</span> <small>{niveauLabel(etage.niveau)}{etage.etat === "projet" ? " · projet" : ""}</small></button>
+          <button type="button" className={styles.select} onClick={() => navigate({ releveId, chantierId, batimentId: batimentNode.batiment.id, etageId: etage.id })}><span>{etage.nom}</span> <small>{niveauLabel(etage.niveau)}{etage.etat === "projet" ? " · projet" : ""}</small></button>
           {canEdit && <button type="button" className={styles.remove} aria-label={`Retirer ${etage.nom}`} onClick={() => remove("etage", etage.id, etage.nom)}>×</button>}
         </div>)}
         {batimentNode && batimentNode.etages.length === 0 && <p className={styles.feedback}>Aucun étage.</p>}

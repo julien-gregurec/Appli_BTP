@@ -6,7 +6,7 @@ import type { ElementType, MediaFile, ReleveAggregate, ReleveElement, Version } 
 const meta = { entrepriseId: TENANT_A, createdAt: "2026-09-26T10:00:00Z", updatedAt: "2026-09-26T10:00:00Z", createdBy: USER_OWNER, updatedBy: USER_OWNER, revision: 1, deletedAt: null };
 const GP_CHANTIER = "a4000000-0000-0000-0000-000000000001";
 const releve = releveFixture({ chantier: { nom: "Rue des Lilas", adresse: "3 rue des Lilas", codePostal: "67000", ville: "Strasbourg", gpChantierId: GP_CHANTIER }, client: { nom: "M. Martin", gpClientId: "a3000000-0000-0000-0000-000000000001" } });
-const ids = { bat: "e2000000-0000-0000-0000-000000000001", etage: "e3000000-0000-0000-0000-000000000001", piece: "e5000000-0000-0000-0000-000000000001", photo: "e7000000-0000-0000-0000-000000000001", export: "e7000000-0000-0000-0000-000000000002" };
+const ids = { chantier: "e9000000-0000-0000-0000-000000000001", bat: "e2000000-0000-0000-0000-000000000001", etage: "e3000000-0000-0000-0000-000000000001", piece: "e5000000-0000-0000-0000-000000000001", photo: "e7000000-0000-0000-0000-000000000001", export: "e7000000-0000-0000-0000-000000000002" };
 
 function element<T extends ElementType>(id: string, type: T, donnees: unknown, extra: Partial<ReleveElement> = {}): ReleveElement {
   return { ...meta, id, releveId: releve.id, type, etageId: ids.etage, pieceId: ids.piece, parentElementId: null, schemaVersion: 1, donnees, ...extra } as unknown as ReleveElement;
@@ -14,9 +14,11 @@ function element<T extends ElementType>(id: string, type: T, donnees: unknown, e
 const media = (id: string, categorie: MediaFile["categorie"], mimeType: string, ext: string): MediaFile =>
   ({ ...meta, id, releveId: releve.id, categorie, mimeType, tailleOctets: 2048, nomFichier: null, storagePath: `${TENANT_A}/${releve.id}/${categorie}/${id}.${ext}` }) as MediaFile;
 
+const chantier = { ...meta, id: ids.chantier, releveId: releve.id, nom: "Rue des Lilas — lot A", adresse: "3 rue des Lilas", codePostal: "67000", ville: "Strasbourg", gpChantierId: null, ordre: 0, notes: null };
 const aggregate: ReleveAggregate = {
   releve,
-  batiments: [{ ...meta, id: ids.bat, releveId: releve.id, nom: "Bâtiment A", ordre: 0, notes: null }] as never,
+  chantiers: [chantier] as never,
+  batiments: [{ ...meta, id: ids.bat, releveId: releve.id, chantierId: ids.chantier, nom: "Bâtiment A", ordre: 0, notes: null }] as never,
   etages: [{ ...meta, id: ids.etage, releveId: releve.id, batimentId: ids.bat, nom: "RDC", niveau: 0, altitudeMm: null, hauteurSousPlafondMm: 2500, etat: "existant", ordre: 0 }] as never,
   zones: [],
   pieces: [{ ...meta, id: ids.piece, releveId: releve.id, etageId: ids.etage, zoneId: null, nom: "Séjour", usage: "sejour", hauteurSousPlafondMm: null, ordre: 0 }] as never,
@@ -32,11 +34,14 @@ const aggregate: ReleveAggregate = {
   ],
   medias: [media(ids.photo, "photos", "image/jpeg", "jpg"), media(ids.export, "exports", "application/pdf", "pdf")],
 };
-const version: Version = { id: "e8000000-0000-0000-0000-000000000001" as never, entrepriseId: TENANT_A, releveId: releve.id, numero: 3, libelle: null, revisionSource: 12, empreinte: "f".repeat(64), createdAt: "2026-09-26T12:00:00Z", createdBy: USER_OWNER };
+const version: Version = { id: "e8000000-0000-0000-0000-000000000001" as never, entrepriseId: TENANT_A, releveId: releve.id, numero: 3, typeVersion: "corrige", versionBaseId: "e8000000-0000-0000-0000-000000000002" as never, libelle: null, revisionSource: 12, empreinte: "f".repeat(64), createdAt: "2026-09-26T12:00:00Z", createdBy: USER_OWNER };
 
 describe("contrat GP v1 (non branché)", () => {
-  it("couvre les onze sections demandées et reste au statut contract-only", () => {
-    expect(GP_SYNC_SECTIONS).toEqual(["client", "chantier", "structure", "plan", "measures", "quantities", "photos", "annotations", "materials", "openings", "exports"]);
+  it("couvre les treize sections du contrat et reste au statut contract-only", () => {
+    expect(GP_SYNC_SECTIONS).toEqual([
+      "client", "chantier", "building", "floor", "room", "walls", "openings", "measurements",
+      "quantities", "photos", "annotations", "materials", "exports",
+    ]);
     expect(GP_SYNC_READINESS.status).toBe("contract-only");
     expect(GP_SYNC_READINESS.targets.import_rpc).toBe("missing");
   });
@@ -48,11 +53,14 @@ describe("contrat GP v1 (non branché)", () => {
     const { envelope } = result;
     for (const section of GP_SYNC_SECTIONS) expect(envelope).toHaveProperty(section);
     expect(envelope.idempotencyKey).toBe(gpIdempotencyKey(releve.id, 3, GP_CHANTIER));
-    expect(envelope.chantier.gpChantierId).toBe(GP_CHANTIER);
-    expect(envelope.structure[0].etages[0].pieces[0]).toMatchObject({ nom: "Séjour", hauteurSousPlafondM: 2.5 });
-    expect(envelope.plan.murs).toEqual([expect.objectContaining({ ref: "m1", b: { x: 4.2, y: 0 }, epaisseurM: 0.2 })]);
-    expect(envelope.openings).toEqual([expect.objectContaining({ murRef: "m1", largeurM: 0.9, decalageM: 0.6 })]);
-    expect(envelope.measures[0]).toMatchObject({ valeur: 4.203, unite: "m" });
+    expect(envelope.chantier).toMatchObject({ ref: ids.chantier, gpChantierId: GP_CHANTIER, nom: "Rue des Lilas — lot A" });
+    expect(envelope.source).toMatchObject({ versionType: "corrige", chantierRef: ids.chantier });
+    expect(envelope.building).toEqual([{ ref: ids.bat, nom: "Bâtiment A", ordre: 0 }]);
+    expect(envelope.floor[0]).toMatchObject({ ref: ids.etage, buildingRef: ids.bat, niveau: 0, hauteurSousPlafondM: 2.5 });
+    expect(envelope.room[0]).toMatchObject({ nom: "Séjour", floorRef: ids.etage, hauteurSousPlafondM: 2.5 });
+    expect(envelope.walls).toEqual([expect.objectContaining({ ref: "m1", b: { x: 4.2, y: 0 }, epaisseurM: 0.2 })]);
+    expect(envelope.openings).toEqual([expect.objectContaining({ wallRef: "m1", family: "door", largeurM: 0.9, decalageM: 0.6 })]);
+    expect(envelope.measurements[0]).toMatchObject({ valeur: 4.203, unite: "m" });
     expect(envelope.quantities[0]).toMatchObject({ designation: "Séjour — Sol — Carrelage 60×60", resultat: 18.457, unite: "m²" });
     expect(envelope.photos[0]).toMatchObject({ storagePath: aggregate.medias[0].storagePath, ancre: { kind: "point", point: { x: 1.5, y: 0.25 } } });
     expect(envelope.annotations[0]).toMatchObject({ texte: "Mur humide", ancre: { kind: "entite", ref: "m1" } });
@@ -63,6 +71,11 @@ describe("contrat GP v1 (non branché)", () => {
   it("refuse une version sans chantier GP, d'un autre tenant, ou incohérente", () => {
     const unlinked = buildGpEnvelope({ ...aggregate, releve: releveFixture() }, version, "2026-09-26T12:30:00Z");
     expect(unlinked.ok ? [] : unlinked.issues.map((issue) => issue.code)).toEqual(["gp_chantier_missing"]);
+    const two = { ...aggregate, chantiers: [chantier, { ...chantier, id: "e9000000-0000-0000-0000-000000000002", gpChantierId: GP_CHANTIER }] } as never;
+    const ambiguous = buildGpEnvelope(two, version, "2026-09-26T12:30:00Z");
+    expect(ambiguous.ok ? [] : ambiguous.issues.map((issue) => issue.code)).toEqual(["chantier_ambiguous"]);
+    const scoped = buildGpEnvelope(two, version, "2026-09-26T12:30:00Z", "e9000000-0000-0000-0000-000000000002");
+    expect(scoped.ok && [scoped.envelope.building.length, scoped.envelope.walls.length, scoped.envelope.materials.length]).toEqual([0, 0, 0]);
     const foreign = buildGpEnvelope(aggregate, { ...version, entrepriseId: TENANT_B }, "2026-09-26T12:30:00Z");
     expect(foreign.ok ? [] : foreign.issues.map((issue) => issue.code)).toEqual(["tenant_mismatch"]);
     const orphan = buildGpEnvelope({ ...aggregate, elements: aggregate.elements.filter((item) => item.id !== "m1"), medias: [] }, version, "2026-09-26T12:30:00Z");

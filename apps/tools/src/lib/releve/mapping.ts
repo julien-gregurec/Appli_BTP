@@ -4,7 +4,7 @@
  * (`numeric` PostgREST peut arriver en chaîne).
  */
 import type {
-  Batiment, Etage, EntityMeta, Piece, Releve, ReleveId, TenantId, UserId, Version, Zone,
+  Batiment, Chantier, Etage, EntityMeta, Piece, Releve, ReleveId, TenantId, UserId, Version, Zone,
 } from "@elsatia/releve-domain";
 
 export type MetaRow = {
@@ -17,7 +17,11 @@ export type ReleveRow = MetaRow & {
   chantier_ville: string | null; chantier_gp_id: string | null; client_nom: string | null; client_gp_id: string | null;
   date_releve: string | null; notes: string | null;
 };
-export type BatimentRow = MetaRow & { id: string; releve_id: string; nom: string; ordre: number; notes: string | null };
+export type ChantierRow = MetaRow & {
+  id: string; releve_id: string; nom: string; adresse: string | null; code_postal: string | null; ville: string | null;
+  chantier_gp_id: string | null; ordre: number; notes: string | null;
+};
+export type BatimentRow = MetaRow & { id: string; releve_id: string; chantier_id: string; nom: string; ordre: number; notes: string | null };
 export type EtageRow = MetaRow & {
   id: string; releve_id: string; batiment_id: string; nom: string; niveau: number; altitude_mm: number | string | null;
   hauteur_sous_plafond_mm: number | string | null; etat: Etage["etat"]; ordre: number;
@@ -28,7 +32,8 @@ export type PieceRow = MetaRow & {
   hauteur_sous_plafond_mm: number | string | null; ordre: number;
 };
 export type VersionRow = {
-  id: string; entreprise_id: string; releve_id: string; numero: number; libelle: string | null; revision_source: number | string;
+  id: string; entreprise_id: string; releve_id: string; numero: number; type_version: Version["typeVersion"]; version_base_id: string | null;
+  libelle: string | null; revision_source: number | string;
   empreinte: string; created_at: string; created_by: string | null;
 };
 
@@ -52,8 +57,15 @@ export function releveFromRow(row: ReleveRow): Releve {
   };
 }
 
+export function chantierFromRow(row: ChantierRow): Chantier {
+  return {
+    ...meta(row), id: row.id as Chantier["id"], releveId: row.releve_id as ReleveId, nom: row.nom, adresse: row.adresse,
+    codePostal: row.code_postal, ville: row.ville, gpChantierId: row.chantier_gp_id, ordre: row.ordre, notes: row.notes,
+  };
+}
+
 export function batimentFromRow(row: BatimentRow): Batiment {
-  return { ...meta(row), id: row.id as Batiment["id"], releveId: row.releve_id as ReleveId, nom: row.nom, ordre: row.ordre, notes: row.notes };
+  return { ...meta(row), id: row.id as Batiment["id"], releveId: row.releve_id as ReleveId, chantierId: row.chantier_id as Batiment["chantierId"], nom: row.nom, ordre: row.ordre, notes: row.notes };
 }
 
 export function etageFromRow(row: EtageRow): Etage {
@@ -78,7 +90,7 @@ export function pieceFromRow(row: PieceRow): Piece {
 export function versionFromRow(row: VersionRow): Version {
   return {
     id: row.id as Version["id"], entrepriseId: row.entreprise_id as TenantId, releveId: row.releve_id as ReleveId, numero: row.numero,
-    libelle: row.libelle, revisionSource: num(row.revision_source), empreinte: row.empreinte, createdAt: row.created_at, createdBy: row.created_by as UserId | null,
+    typeVersion: row.type_version, versionBaseId: row.version_base_id as Version["versionBaseId"], libelle: row.libelle, revisionSource: num(row.revision_source), empreinte: row.empreinte, createdAt: row.created_at, createdBy: row.created_by as UserId | null,
   };
 }
 
