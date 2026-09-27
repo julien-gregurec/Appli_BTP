@@ -10,9 +10,9 @@
  * | Fiche relevé (chantiers, versions) | `/releves/fiche?id=` |
  * | Structure (bâtiments, étages, pièces) | `/releves/structure?id=&chantier=&batiment=&etage=` |
  * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
- * | Photos terrain (Lot 4) | `/releves/photos?id=` |
+ * | Photos terrain (Lot 4) | `/releves/photos?id=&portee=&cible=&ajout=` (galerie du relevé ou d'un nœud) |
  */
-import { isUuid, type SearchHit } from "@elsatia/releve-domain";
+import { GALLERY_SCOPE_KINDS, isUuid, type GalleryScope, type SearchHit } from "@elsatia/releve-domain";
 
 export const RELEVES_PATH = "/releves";
 export const RELEVE_NEW_PATH = "/releves/nouveau";
@@ -27,8 +27,26 @@ export function ficheHref(releveId: string): string {
   return `${RELEVE_FICHE_PATH}?${new URLSearchParams({ id: releveId }).toString()}`;
 }
 
-export function photosHref(releveId: string): string {
-  return `${RELEVE_PHOTOS_PATH}?${new URLSearchParams({ id: releveId }).toString()}`;
+/**
+ * Photos terrain : galerie du relevé, ou d'un chantier / bâtiment / étage / zone / pièce
+ * (`portee` + `cible`). `ajout` ouvre directement la capture (bouton « Ajouter une photo »).
+ */
+export function photosHref(releveId: string, options: { scope?: GalleryScope; ajout?: boolean } = {}): string {
+  const params = new URLSearchParams({ id: releveId });
+  if (options.scope && options.scope.kind !== "releve") { params.set("portee", options.scope.kind); params.set("cible", options.scope.id); }
+  if (options.ajout) params.set("ajout", "1");
+  return `${RELEVE_PHOTOS_PATH}?${params.toString()}`;
+}
+
+export function readPhotosSelection(search: string): { releveId: string; scope: GalleryScope; ajout: boolean } | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id");
+  if (!isUuid(releveId)) return null;
+  const kind = params.get("portee"); const cible = params.get("cible");
+  const scope: GalleryScope = kind && kind !== "releve" && (GALLERY_SCOPE_KINDS as readonly string[]).includes(kind) && isUuid(cible)
+    ? { kind: kind as Exclude<GalleryScope["kind"], "releve">, id: cible }
+    : { kind: "releve" };
+  return { releveId, scope, ajout: params.get("ajout") === "1" };
 }
 
 /** Chaque niveau n'est encodé que si son parent l'est : la sélection reste un chemin cohérent. */

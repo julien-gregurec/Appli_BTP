@@ -9,8 +9,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   MediaRemoteError, RELEVE_STORAGE_BUCKET,
-  type ElementId, type MediaFailureKind, type MediaId, type NewElementRow, type NewMediaRow, type PhotoMedia, type ReleveElement,
-  type ReleveId, type ReleveMediaRepository, type WriteOutcome,
+  type ElementId, type MediaFailureKind, type MediaId, type MediaPatch, type NewElementRow, type NewMediaRow, type PhotoMedia, type ReleveElement,
+  type ReleveId, type ReleveMediaRepository, type RetiredFiles, type VersionType, type WriteOutcome,
 } from "@elsatia/releve-domain";
 
 export type ReleveMediaSupabaseClient = Pick<SupabaseClient, "from" | "rpc" | "storage">;
@@ -19,6 +19,7 @@ type MetaRow = { entreprise_id: string; created_at: string; updated_at: string; 
 export type MediaRow = MetaRow & {
   id: string; releve_id: string; categorie: PhotoMedia["categorie"]; storage_path: string; mime_type: string;
   taille_octets: number | string; nom_fichier: string | null; metadata: Record<string, unknown> | null;
+  commentaire?: string | null; etat_documente?: VersionType | null; version_reference_id?: string | null; miniature_storage_path?: string | null;
 };
 export type ElementRow = MetaRow & {
   id: string; releve_id: string; type: ReleveElement["type"]; etage_id: string | null; piece_id: string | null;
@@ -35,6 +36,8 @@ export function mediaFromRow(row: MediaRow): PhotoMedia {
   return {
     ...meta(row), id: row.id as MediaId, releveId: row.releve_id as ReleveId, categorie: row.categorie, storagePath: row.storage_path,
     mimeType: row.mime_type, tailleOctets: num(row.taille_octets), nomFichier: row.nom_fichier, metadata: (row.metadata ?? {}) as PhotoMedia["metadata"],
+    commentaire: row.commentaire ?? null, etatDocumente: row.etat_documente ?? "initial", versionReferenceId: row.version_reference_id ?? null,
+    miniatureStoragePath: row.miniature_storage_path ?? null,
   };
 }
 
@@ -67,6 +70,7 @@ const MESSAGES: Record<MediaFailureKind, string> = {
   forbidden: "Action non autorisée pour votre compte.",
   invalid: "Fichier ou données refusés par le serveur.",
   not_found: "Photo introuvable ou déjà retirée.",
+  duplicate: "Cette photo est déjà dans le relevé.",
   other: "Opération impossible.",
 };
 
@@ -75,6 +79,8 @@ function fail(action: string, error: AnyError): never {
   throw new MediaRemoteError(`${action} : ${MESSAGES[kind]}`, kind, error?.code ?? (error?.statusCode ? String(error.statusCode) : undefined));
 }
 
+/** Doublon de contenu (même SHA-256 active dans le relevé) : ce n'est PAS une reprise idempotente. */
+export const isContentDuplicate = (error: AnyError) => error?.code === "23505" && /empreinte/i.test(error?.message ?? "");
 const isDuplicate = (error: AnyError) => error?.code === "23505" || Number(error?.statusCode ?? error?.status) === 409 || /already exists|Duplicate/i.test(error?.message ?? "");
 
 export class SupabaseReleveMediaRepository implements ReleveMediaRepository {
@@ -128,13 +134,38 @@ export class SupabaseReleveMediaRepository implements ReleveMediaRepository {
     return data.signedUrl;
   }
 
+  async signedUrls(paths: readonly string[], expiresIn: number) {
+    if (!paths.length) return {};
+    const { data, error } = await this.bucket().createSignedUrls([...paths], expiresIn);
+    if (error) fail("Lecture des vignettes", error as AnyError);
+    const urls: Record<string, string> = {};
+    for (const item of data ?? []) if (item.path && item.signedUrl && !item.error) urls[item.path] = item.signedUrl;
+    return urls;
+  }
+
   async insertMedia(row: NewMediaRow): Promise<WriteOutcome> {
     const { error } = await this.client.from("tools_releves_medias").insert({
       id: row.id, releve_id: row.releveId, categorie: row.categorie, storage_path: row.storagePath, mime_type: row.mimeType,
       taille_octets: row.tailleOctets, nom_fichier: row.nomFichier, metadata: row.metadata,
+      miniature_storage_path: row.miniatureStoragePath, commentaire: row.commentaire, etat_documente: row.etatDocumente,
     });
-    if (error) { if (isDuplicate(error)) return "exists"; fail("Enregistrement de la photo", error); }
+    if (error) {
+      if (isContentDuplicate(error)) throw new MediaRemoteError(`Enregistrement de la photo : ${MESSAGES.duplicate}`, "duplicate", error.code);
+      if (isDuplicate(error)) return "exists";
+      fail("Enregistrement de la photo", error);
+    }
     return "created";
+  }
+
+  async updateMedia(id: MediaId, patch: MediaPatch, expectedRevision: number) {
+    const values: Record<string, unknown> = {};
+    if (patch.commentaire !== undefined) values.commentaire = patch.commentaire;
+    if (patch.etatDocumente !== undefined) values.etat_documente = patch.etatDocumente;
+    const { data, error } = await this.client.from("tools_releves_medias").update(values)
+      .eq("id", id).eq("revision", expectedRevision).select("*").maybeSingle();
+    if (error) fail("Enregistrement", error);
+    if (!data) throw new MediaRemoteError("Modifiée ailleurs ou retirée : rechargez la photo.", "invalid", "conflict");
+    return mediaFromRow(data as MediaRow);
   }
 
   async insertElement(row: NewElementRow): Promise<WriteOutcome> {
@@ -161,12 +192,19 @@ export class SupabaseReleveMediaRepository implements ReleveMediaRepository {
   async deletePhoto(mediaId: MediaId) {
     const { data, error } = await this.client.rpc("tools_releve_retirer_photo", { p_media_id: mediaId });
     if (error) fail("Retrait de la photo", error);
-    return { storagePath: String(data) };
+    return retiredFrom(data);
   }
 
   async replacePhoto(oldMediaId: MediaId, newMediaId: MediaId) {
     const { data, error } = await this.client.rpc("tools_releve_remplacer_photo", { p_ancien: oldMediaId, p_nouveau: newMediaId });
     if (error) fail("Remplacement de la photo", error);
-    return { storagePath: String(data) };
+    return retiredFrom(data);
   }
+}
+
+/** Réponse jsonb des RPC de retrait / remplacement : { chemin, miniature, fige }. */
+export function retiredFrom(data: unknown): RetiredFiles {
+  const value = (data ?? {}) as { chemin?: unknown; miniature?: unknown; fige?: unknown };
+  if (typeof value.chemin !== "string") throw new MediaRemoteError("Réponse du serveur inattendue.", "other");
+  return { storagePath: value.chemin, miniaturePath: typeof value.miniature === "string" ? value.miniature : null, fige: value.fige === true };
 }

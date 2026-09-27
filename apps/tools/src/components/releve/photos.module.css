@@ -71,7 +71,23 @@
 .cameraActions .ghost { color: white; }
 .shutter { min-width: 140px; border: 0; background: var(--amber); color: var(--navy); }
 
+.field textarea { width: 100%; min-height: 64px; padding: 9px 11px; border: 1px solid #d6dad7; border-radius: 7px; background: white; color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
+.inlineFields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.mediaFields { display: grid; gap: 8px; margin-bottom: 8px; }
+.galleryHead { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; }
+.galleryHead .field { flex: 1 1 240px; max-width: 420px; }
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 14px; }
+.filters .field { flex: 0 1 200px; }
+.check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.check input { width: 20px; height: 20px; }
+/* Barre d'action fixe au pouce sur smartphone : « Ajouter une photo » toujours accessible. */
+.actionBar { position: sticky; bottom: 0; z-index: 20; display: flex; justify-content: center; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(244,243,239,.98) 70%, rgba(244,243,239,0)); }
+.actionBar .primary { width: min(100%, 420px); min-height: 52px; font-size: 16px; }
+.piecePhotos { display: grid; gap: 10px; }
+.piecePhotos .grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
 @media (min-width: 900px) {
+  .actionBar { display: none; }
   .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
   .gallery, .detail, .queue { grid-column: 1 / -1; }
   .detailGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

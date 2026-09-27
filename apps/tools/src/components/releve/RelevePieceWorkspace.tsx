@@ -12,6 +12,7 @@ import { ficheHref, pieceHref, readPieceSelection, RELEVES_PATH, structureHref }
 import { Brand } from "../HomeDashboard";
 import { AutoNumber, AutoSelect, AutoText, SaveStatus, useAutosave } from "./autosave-ui";
 import { PIECE_STATUT_LABELS, USAGE_LABELS } from "./labels";
+import { PiecePhotosPanel } from "./PiecePhotosPanel";
 import styles from "./releve.module.css";
 import { ReleveLocked } from "./ReleveLocked";
 import { UsageOptions } from "./ReleveStructureWorkspace";
@@ -102,6 +103,8 @@ function PieceFiche({ service, actor, releveId, pieceId }: { service: ReleveServ
           <div><dt>Hauteur</dt><dd>{piece.hauteurSousPlafondMm ? `${formatHauteurCm(piece.hauteurSousPlafondMm)} cm` : "—"}</dd></div>
           <div><dt>Commentaire</dt><dd>{piece.commentaire ?? "—"}</dd></div>
         </dl>}
+
+      <PiecePhotosPanel releveId={releveId} pieceId={piece.id} actor={actor} canEdit={canEdit} />
 
       <section className={styles.column} aria-label="Métré calculé">
         <h2>Métré calculé</h2>

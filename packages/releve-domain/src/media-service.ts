@@ -384,9 +384,13 @@ export class ReleveMediaService {
     return { fileRemoved: removed.includes(retired.storagePath), kept: null };
   }
 
-  /** Photo identique (même SHA-256) déjà active dans le relevé : on ne la dépose pas deux fois. */
-  findDuplicate(library: Pick<PhotoLibrary, "photos">, empreinteSha256: string): PhotoEntry | null {
-    return library.photos.find((photo) => photo.media.metadata.empreinteSha256 === empreinteSha256) ?? null;
+  /**
+   * Photo identique déjà active dans le relevé : mêmes octets déposés (SHA-256) ou même fichier
+   * d'origine (SHA-256 avant ré-encodage). On ne la dépose pas deux fois.
+   */
+  findDuplicate(library: Pick<PhotoLibrary, "photos">, empreinteSha256: string, empreinteOrigineSha256?: string | null): PhotoEntry | null {
+    return library.photos.find((photo) => photo.media.metadata.empreinteSha256 === empreinteSha256
+      || (Boolean(empreinteOrigineSha256) && photo.media.metadata.empreinteOrigineSha256 === empreinteOrigineSha256)) ?? null;
   }
 
   async saveCommentaire(releve: Releve, media: PhotoMedia, commentaire: string | null): Promise<PhotoMedia> {

@@ -14,6 +14,7 @@ export function targetOptions(kind: PhotoTargetKind, structure: ReleveStructure,
   const alive = <T extends { deletedAt: string | null }>(rows: readonly T[]) => rows.filter((row) => !row.deletedAt);
   const etageName = (id: string | null) => structure.etages.find((etage) => etage.id === id)?.nom ?? "";
   switch (kind) {
+    case "chantier": return alive(structure.chantiers).map((row) => ({ id: row.id, label: row.nom }));
     case "batiment": return alive(structure.batiments).map((row) => ({ id: row.id, label: row.nom }));
     case "etage":
     case "plan": return alive(structure.etages).map((row) => ({ id: row.id, label: `${row.nom} (${niveauLabel(row.niveau)})` }));
@@ -26,7 +27,7 @@ export function targetOptions(kind: PhotoTargetKind, structure: ReleveStructure,
 }
 
 /**
- * Choix de la cible d'une photo : relevé, bâtiment, étage, zone, pièce, mur, équipement ou
+ * Choix de la cible d'une photo : relevé, chantier, bâtiment, étage, zone, pièce, mur, équipement ou
  * point du plan futur (clic dans le cadre de l'étage, position normalisée conservée).
  */
 export function PhotoTargetPicker({ structure, targets, value, onChange, idPrefix }: {

@@ -9,19 +9,26 @@ function fakeClient(responses: { insert?: unknown; upload?: unknown; rpc?: unkno
   const calls: Array<[string, ...unknown[]]> = [];
   const client = {
     from: (table: string) => ({ insert: async (row: unknown) => { calls.push(["insert", table, row]); return responses.insert ?? { error: null }; } }),
-    rpc: async (name: string, args: unknown) => { calls.push(["rpc", name, args]); return responses.rpc ?? { data: "chemin", error: null }; },
+    rpc: async (name: string, args: unknown) => { calls.push(["rpc", name, args]); return responses.rpc ?? { data: { chemin: "chemin", miniature: "mini", fige: false }, error: null }; },
     storage: {
       from: (bucket: string) => ({
         upload: async (path: string, _bytes: unknown, options: unknown) => { calls.push(["upload", bucket, path, options]); return responses.upload ?? { data: { path }, error: null }; },
         remove: async (paths: string[]) => { calls.push(["remove", bucket, paths]); return responses.remove ?? { data: paths.map((name) => ({ name })), error: null }; },
         createSignedUrl: async (path: string, ttl: number) => { calls.push(["sign", bucket, path, ttl]); return responses.sign ?? { data: { signedUrl: `https://x/${path}?t=${ttl}` }, error: null }; },
+        createSignedUrls: async (paths: string[], ttl: number) => {
+          calls.push(["signMany", bucket, paths, ttl]);
+          return { data: paths.map((path) => (path === "refuse" ? { path, signedUrl: null, error: "Object not found" } : { path, signedUrl: `https://x/${path}?t=${ttl}`, error: null })), error: null };
+        },
       }),
     },
   };
   return { client: client as unknown as ReleveMediaSupabaseClient, calls };
 }
 
-const mediaRow = { id: "m" as MediaId, releveId: "r" as ReleveId, entrepriseId: "t" as TenantId, categorie: "photos" as const, storagePath: "p", mimeType: "image/jpeg", tailleOctets: 10, nomFichier: null, metadata: {} as never };
+const mediaRow = {
+  id: "m" as MediaId, releveId: "r" as ReleveId, entrepriseId: "t" as TenantId, categorie: "photos" as const, storagePath: "p", mimeType: "image/jpeg", tailleOctets: 10,
+  nomFichier: null, metadata: {} as never, miniatureStoragePath: "q", commentaire: "Fissure", etatDocumente: "initial" as const,
+};
 
 describe("adaptateur Supabase des médias Relevé", () => {
   it("classe les erreurs : seul le réseau est retenté", () => {
@@ -49,7 +56,7 @@ describe("adaptateur Supabase des médias Relevé", () => {
   it("ligne média : métadonnées transmises ; doublon (23505) = succès ; refus CHECK = invalide", async () => {
     const ok = fakeClient({});
     expect(await new SupabaseReleveMediaRepository(ok.client).insertMedia(mediaRow)).toBe("created");
-    expect(ok.calls[0][2]).toMatchObject({ id: "m", categorie: "photos", metadata: {} });
+    expect(ok.calls[0][2]).toMatchObject({ id: "m", categorie: "photos", metadata: {}, miniature_storage_path: "q", commentaire: "Fissure", etat_documente: "initial" });
     const dup = fakeClient({ insert: { error: { code: "23505", message: "duplicate key" } } });
     expect(await new SupabaseReleveMediaRepository(dup.client).insertMedia(mediaRow)).toBe("exists");
     const bad = fakeClient({ insert: { error: { code: "23514", message: "violates check constraint" } } });
@@ -64,16 +71,26 @@ describe("adaptateur Supabase des médias Relevé", () => {
     expect(await repository.signedUrl("p", 600)).toBe("https://x/p?t=600");
     expect(await repository.removeObjects(["p"])).toEqual(["p"]);
     expect(await repository.removeObjects([])).toEqual([]);
-    expect(await repository.deletePhoto("m" as MediaId)).toEqual({ storagePath: "chemin" });
+    expect(await repository.deletePhoto("m" as MediaId)).toEqual({ storagePath: "chemin", miniaturePath: "mini", fige: false });
+    expect(await repository.signedUrls(["a", "refuse"], 600)).toEqual({ a: "https://x/a?t=600" });
     await repository.replacePhoto("a" as MediaId, "b" as MediaId);
     expect(calls.filter(([kind]) => kind === "rpc")).toEqual([["rpc", "tools_releve_retirer_photo", { p_media_id: "m" }], ["rpc", "tools_releve_remplacer_photo", { p_ancien: "a", p_nouveau: "b" }]]);
     const refused = fakeClient({ sign: { data: null, error: { statusCode: "400", message: "Object not found" } } });
     await expect(new SupabaseReleveMediaRepository(refused.client).signedUrl("p", 600)).rejects.toBeInstanceOf(MediaRemoteError);
   });
 
+  it("doublon de CONTENU (même SHA-256) ≠ reprise idempotente : refus explicite", async () => {
+    const dup = fakeClient({ insert: { error: { code: "23505", message: 'duplicate key value violates unique constraint "tools_releves_medias_empreinte_unique"' } } });
+    await expect(new SupabaseReleveMediaRepository(dup.client).insertMedia(mediaRow)).rejects.toMatchObject({ kind: "duplicate" });
+    const figee = fakeClient({ rpc: { data: { chemin: "c", miniature: null, fige: true }, error: null } });
+    expect(await new SupabaseReleveMediaRepository(figee.client).deletePhoto("m" as MediaId)).toEqual({ storagePath: "c", miniaturePath: null, fige: true });
+    const inattendu = fakeClient({ rpc: { data: "texte", error: null } });
+    await expect(new SupabaseReleveMediaRepository(inattendu.client).deletePhoto("m" as MediaId)).rejects.toBeInstanceOf(MediaRemoteError);
+  });
+
   it("mapping des lignes (numeric PostgREST en chaîne, métadonnées absentes → {})", () => {
     const media = mediaFromRow({ ...META, id: "m", releve_id: "r", categorie: "photos", storage_path: "p", mime_type: "image/jpeg", taille_octets: "1200", nom_fichier: null, metadata: null });
-    expect(media).toMatchObject({ tailleOctets: 1200, revision: 3, metadata: {}, createdBy: "u" });
+    expect(media).toMatchObject({ tailleOctets: 1200, revision: 3, metadata: {}, createdBy: "u", commentaire: null, etatDocumente: "initial", miniatureStoragePath: null });
     const element = elementFromRow({ ...META, id: "e", releve_id: "r", type: "photo_anchor", etage_id: null, piece_id: null, parent_element_id: null, schema_version: 1, donnees: { mediaId: "m" } });
     expect(element).toMatchObject({ type: "photo_anchor", revision: 3, donnees: { mediaId: "m" } });
   });

@@ -28,6 +28,8 @@
 //   GET    /object/<bucket>/<path...>        authenticated download
 //   GET    /object/public/<bucket>/<path...> public download (bucket.public=true)
 //   POST   /object/sign/<bucket>/<path...>   create signed URL  body {expiresIn}
+//   POST   /object/sign/<bucket>                create signed URLs (batch) body {expiresIn, paths} (Relevé Lot 4)
+//   POST   /object/list/<bucket>                list a folder body {prefix, limit, offset}           (Relevé Lot 4)
 //   GET    /object/sign/<bucket>/<path...>   consume signed URL (?token=)
 //
 // Usage: PORT=5000 DB=pilot_gp GOTRUE_JWT_SECRET=... STORAGE_ROOT=/tmp/local-storage-mock \
@@ -184,6 +186,46 @@ const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://local');
     const segments = u.pathname.split('/').filter(Boolean);
+
+    // POST /object/sign/<bucket>  (batch create, storage-js createSignedUrls) -- each path is
+    // RLS-checked with ONE select as the caller; refused paths come back with an error, like
+    // storage-api ("Either the object does not exist or you do not have access to it").
+    if (req.method === 'POST' && segments[0] === 'object' && segments[1] === 'sign' && segments.length === 3) {
+      const bucket = segments[2];
+      const bodyBuf = await readBody(req);
+      let expiresIn = 60; let paths = [];
+      try { const body = JSON.parse(bodyBuf.toString('utf8') || '{}'); expiresIn = Number(body.expiresIn) || 60; paths = Array.isArray(body.paths) ? body.paths : []; } catch {}
+      const { role, claims } = principalFromRequest(req);
+      let rows = [];
+      if (paths.length) {
+        try { rows = runAsRole(role, claims, `select name from storage.objects where bucket_id=${sqlLiteral(bucket)} and name = any(${sqlTextArrayLiteral(paths)})`); }
+        catch (e) { return json(res, 400, { statusCode: '400', error: 'bad_request', message: e.stderr || 'sign failed' }); }
+      }
+      const visible = new Set(rows.map((row) => row.name));
+      cleanupExpiredTokens();
+      return json(res, 200, paths.map((name) => {
+        if (!visible.has(name)) return { error: 'Either the object does not exist or you do not have access to it', path: name, signedURL: null };
+        const token = crypto.randomBytes(24).toString('hex');
+        signedTokens.set(token, { bucket, name, expiresAt: Date.now() + expiresIn * 1000 });
+        return { error: null, path: name, signedURL: `/object/sign/${bucket}/${name}?token=${token}` };
+      }));
+    }
+
+    // POST /object/list/<bucket>  body {prefix, limit, offset} : direct children of the folder
+    // visible to the caller (RLS), names relative to the prefix, like storage-api.
+    if (req.method === 'POST' && segments[0] === 'object' && segments[1] === 'list' && segments.length === 3) {
+      const bucket = segments[2];
+      const bodyBuf = await readBody(req);
+      let prefix = ''; let limit = 100; let offset = 0;
+      try { const body = JSON.parse(bodyBuf.toString('utf8') || '{}'); prefix = String(body.prefix || ''); limit = Number(body.limit) || 100; offset = Number(body.offset) || 0; } catch {}
+      const folder = prefix.replace(/\/+$/, '');
+      const { role, claims } = principalFromRequest(req);
+      let rows;
+      try { rows = runAsRole(role, claims, `select id, name, metadata, created_at from storage.objects where bucket_id=${sqlLiteral(bucket)} and name like ${sqlLiteral(folder + '/%')} order by name limit ${Math.max(0, limit)} offset ${Math.max(0, offset)}`); }
+      catch (e) { return json(res, 400, { statusCode: '400', error: 'bad_request', message: e.stderr || 'list failed' }); }
+      return json(res, 200, rows.filter((row) => !row.name.slice(folder.length + 1).includes('/'))
+        .map((row) => ({ name: row.name.slice(folder.length + 1), id: row.id, metadata: row.metadata, created_at: row.created_at })));
+    }
 
     // POST /object/sign/<bucket>/<path...>  (create) -- must come before the
     // generic /object/<bucket>/<path...> match below.

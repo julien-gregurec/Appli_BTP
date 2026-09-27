@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ficheHref, photosHref, pieceHref, readPieceSelection, readReleveId, readStructureSelection, searchHitHref, structureFocus, structureHref } from "./navigation";
+import { ficheHref, photosHref, pieceHref, readPhotosSelection, readPieceSelection, readReleveId, readStructureSelection, searchHitHref, structureFocus, structureHref } from "./navigation";
 
 const R = "e1000000-0000-0000-0000-000000000001";
 const C = "e9000000-0000-0000-0000-000000000001";
@@ -24,6 +24,19 @@ describe("navigation Relevé & Métré (routes statiques)", () => {
     expect(readStructureSelection("?id=<script>")).toBeNull();
     expect(readStructureSelection("")).toBeNull();
     expect([readReleveId(`?id=${R}`), readReleveId("?id=1 or 1=1")]).toEqual([R, null]);
+  });
+});
+
+describe("navigation Lot 4 : galerie par nœud et ajout direct depuis une pièce", () => {
+  const P = "e5000000-0000-0000-0000-000000000001";
+  it("encode la portée et l'ajout, relit en ignorant toute portée forgée", () => {
+    const href = photosHref(R, { scope: { kind: "piece", id: P }, ajout: true });
+    expect(href).toBe(`/releves/photos?id=${R}&portee=piece&cible=${P}&ajout=1`);
+    expect(readPhotosSelection(href.slice(href.indexOf("?")))).toEqual({ releveId: R, scope: { kind: "piece", id: P }, ajout: true });
+    expect(photosHref(R, { scope: { kind: "releve" } })).toBe(`/releves/photos?id=${R}`);
+    expect(readPhotosSelection(`?id=${R}&portee=mur&cible=${P}`)?.scope).toEqual({ kind: "releve" });
+    expect(readPhotosSelection(`?id=${R}&portee=piece&cible=../x`)?.scope).toEqual({ kind: "releve" });
+    expect(readPhotosSelection("?id=x")).toBeNull();
   });
 });
 

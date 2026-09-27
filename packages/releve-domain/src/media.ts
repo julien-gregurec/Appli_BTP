@@ -53,13 +53,18 @@ export type PhotoMetadata = {
   readonly gpsRetire: boolean;
   /** Photo remplacée par celle-ci (lignée conservée, l'ancienne est retirée). */
   readonly remplaceMediaId: string | null;
+  /**
+   * SHA-256 du fichier d'ORIGINE (avant ré-encodage), facultatif : détecte le même original
+   * choisi deux fois, même si deux navigateurs le compressent différemment.
+   */
+  readonly empreinteOrigineSha256?: string | null;
 };
 
 /** Clés admises, dans l'ordre du CHECK SQL. Toute autre clé est refusée. */
 export const PHOTO_METADATA_KEYS = [
   "source", "priseLe", "priseLeSource", "orientation", "orientationExif", "largeurPx", "hauteurPx",
   "largeurOriginePx", "hauteurOriginePx", "tailleOrigineOctets", "compressionQualite", "compressionCoteMaxPx",
-  "empreinteSha256", "gpsRetire", "remplaceMediaId",
+  "empreinteSha256", "gpsRetire", "remplaceMediaId", "empreinteOrigineSha256",
 ] as const satisfies readonly (keyof PhotoMetadata)[];
 
 export const PHOTO_METADATA_REQUIRED_KEYS = ["source", "orientation", "largeurPx", "hauteurPx", "empreinteSha256"] as const satisfies readonly (keyof PhotoMetadata)[];
@@ -131,6 +136,7 @@ export type PhotoMetadataInput = {
   stored: { width: number; height: number; quality: number | null; maxLongEdgePx: number | null };
   sha256: string;
   remplaceMediaId?: string | null;
+  originalSha256?: string | null;
 };
 
 /**
@@ -162,6 +168,7 @@ export function buildPhotoMetadata(input: PhotoMetadataInput): PhotoMetadata {
     empreinteSha256: input.sha256,
     gpsRetire: input.exif?.hasGps === true,
     remplaceMediaId: input.remplaceMediaId ?? null,
+    ...(input.originalSha256 ? { empreinteOrigineSha256: input.originalSha256 } : {}),
   };
 }
 
@@ -199,6 +206,7 @@ export function validatePhotoMetadata(value: unknown): MetadataIssue[] {
   check("empreinteSha256", typeof record.empreinteSha256 === "string" && /^[0-9a-f]{64}$/.test(record.empreinteSha256), "SHA-256 hexadécimal attendu.");
   check("gpsRetire", typeof record.gpsRetire === "boolean", "Booléen attendu.");
   check("remplaceMediaId", nullable(record.remplaceMediaId, isUuid), "UUID attendu.");
+  check("empreinteOrigineSha256", nullable(record.empreinteOrigineSha256, (v) => typeof v === "string" && /^[0-9a-f]{64}$/.test(v)), "SHA-256 hexadécimal attendu.");
   return issues;
 }
 

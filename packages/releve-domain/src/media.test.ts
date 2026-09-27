@@ -57,7 +57,11 @@ describe("métadonnées de photo", () => {
   });
 
   it("liste de clés fermée : aucune clé de localisation, aucune clé inconnue", () => {
-    const valid = buildPhotoMetadata({ ...base, source: "camera_appareil", exif: null });
+    const valid = buildPhotoMetadata({ ...base, source: "camera_appareil", exif: null, originalSha256: "c".repeat(64) });
+    expect(validatePhotoMetadata(valid)).toEqual([]);
+    expect(validatePhotoMetadata({ ...valid, empreinteOrigineSha256: "pas-un-hash" }).map((issue) => issue.key)).toEqual(["empreinteOrigineSha256"]);
+    // Facultative : absente des métadonnées construites sans empreinte d'origine.
+    expect("empreinteOrigineSha256" in buildPhotoMetadata({ ...base, source: "import", exif: null })).toBe(false);
     expect(validatePhotoMetadata({ ...valid, latitude: 48.58 }).map((issue) => issue.key)).toEqual(["latitude"]);
     expect(validatePhotoMetadata({ ...valid, gps: { lat: 1 } })[0].message).toMatch(/localisation/);
     expect(validatePhotoMetadata({ ...valid, appareil: "iPhone" })[0]).toEqual({ key: "appareil", message: "Clé non autorisée." });

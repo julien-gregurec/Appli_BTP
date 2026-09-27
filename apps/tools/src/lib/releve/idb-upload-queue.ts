@@ -5,7 +5,7 @@
  * anciens WebKit). Repli mémoire si IndexedDB est indisponible (navigation privée stricte) :
  * l'interface le signale, la photo est alors perdue si l'onglet est fermé avant l'envoi.
  */
-import { MemoryUploadQueueStore, uploadQueueDatabaseName, type PendingPhoto, type UploadQueueStore } from "@elsatia/releve-domain";
+import { MemoryUploadQueueStore, uploadQueueDatabaseName, type PendingPhoto, type StoredBytesKind, type UploadQueueStore } from "@elsatia/releve-domain";
 
 const ITEMS = "items";
 const BYTES = "bytes";
@@ -38,24 +38,37 @@ export class IndexedDbUploadQueueStore implements UploadQueueStore {
     return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
-  async put(item: PendingPhoto, bytes?: Blob | Uint8Array): Promise<void> {
-    const buffer = bytes ? (bytes instanceof Uint8Array ? bytes.slice().buffer : await bytes.arrayBuffer()) : null;
+  async put(item: PendingPhoto, bytes?: Blob | Uint8Array, miniature?: Blob | Uint8Array | null): Promise<void> {
+    const toBuffer = async (value: Blob | Uint8Array) => (value instanceof Uint8Array ? value.slice().buffer : await value.arrayBuffer());
+    // Octets lus AVANT la transaction : une transaction IndexedDB se ferme dès qu'on attend autre chose.
+    const buffer = bytes ? await toBuffer(bytes) : null;
+    const thumb = miniature ? await toBuffer(miniature) : null;
     const tx = this.db.transaction([ITEMS, BYTES], "readwrite");
     tx.objectStore(ITEMS).put(JSON.parse(JSON.stringify(item)));
     if (buffer) tx.objectStore(BYTES).put(buffer, item.id);
+    if (thumb) tx.objectStore(BYTES).put(thumb, `${item.id}:miniature`);
     await done(tx);
   }
 
-  async bytes(id: string): Promise<Uint8Array | null> {
+  async bytes(id: string, kind: StoredBytesKind = "photo"): Promise<Uint8Array | null> {
     const tx = this.db.transaction(BYTES, "readonly");
-    const buffer = await request(tx.objectStore(BYTES).get(id) as IDBRequest<ArrayBuffer | undefined>);
+    const buffer = await request(tx.objectStore(BYTES).get(kind === "photo" ? id : `${id}:miniature`) as IDBRequest<ArrayBuffer | undefined>);
     return buffer ? new Uint8Array(buffer) : null;
+  }
+
+  /** Élément synchronisé : on libère les octets (quota), l'élément reste pour la déduplication. */
+  async release(id: string): Promise<void> {
+    const tx = this.db.transaction(BYTES, "readwrite");
+    tx.objectStore(BYTES).delete(id);
+    tx.objectStore(BYTES).delete(`${id}:miniature`);
+    await done(tx);
   }
 
   async remove(id: string): Promise<void> {
     const tx = this.db.transaction([ITEMS, BYTES], "readwrite");
     tx.objectStore(ITEMS).delete(id);
     tx.objectStore(BYTES).delete(id);
+    tx.objectStore(BYTES).delete(`${id}:miniature`);
     await done(tx);
   }
 }

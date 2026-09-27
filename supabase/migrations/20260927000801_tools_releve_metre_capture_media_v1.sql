@@ -6,7 +6,8 @@
 --
 -- Strictement ADDITIF par rapport à 601–701 (aucune ligne existante invalidée, aucune donnée migrée) :
 --   1. `tools_releves_medias.metadata` : métadonnées de preuve d'une photo (date, heure, orientation,
---      dimensions, source, compression, empreinte SHA-256, lignée de remplacement). Liste de clés
+--      dimensions, source, compression, empreintes SHA-256 (fichier déposé et fichier d'origine,
+--      pour la déduplication), lignée de remplacement). Liste de clés
 --      FERMÉE : aucune géolocalisation ne peut être stockée. Défaut '{}' (lignes antérieures valides).
 --      L'auteur n'est pas déclaratif : c'est `created_by`, imposé par le trigger d'écriture.
 --   2. Immuabilité d'un média déposé (catégorie, chemin, type, taille, métadonnées) : seule la
@@ -50,7 +51,7 @@ returns boolean language sql immutable set search_path = public as $$
       select 1 from jsonb_object_keys(p_metadata) k
       where k not in ('source','priseLe','priseLeSource','orientation','orientationExif','largeurPx','hauteurPx',
                       'largeurOriginePx','hauteurOriginePx','tailleOrigineOctets','compressionQualite','compressionCoteMaxPx',
-                      'empreinteSha256','gpsRetire','remplaceMediaId')
+                      'empreinteSha256','gpsRetire','remplaceMediaId','empreinteOrigineSha256')
     )
     and (p_metadata = '{}'::jsonb or (
       p_metadata->>'source' in ('camera_web','camera_appareil','import')
@@ -70,6 +71,8 @@ returns boolean language sql immutable set search_path = public as $$
       and (coalesce(jsonb_typeof(p_metadata->'compressionQualite'), 'null') = 'null'
            or (jsonb_typeof(p_metadata->'compressionQualite') = 'number' and (p_metadata->>'compressionQualite')::numeric between 0.3 and 1))
       and coalesce(p_metadata->>'empreinteSha256', '') ~ '^[0-9a-f]{64}$'
+      and (coalesce(jsonb_typeof(p_metadata->'empreinteOrigineSha256'), 'null') = 'null'
+           or coalesce(p_metadata->>'empreinteOrigineSha256', '') ~ '^[0-9a-f]{64}$')
       and (p_metadata->'gpsRetire' is null or jsonb_typeof(p_metadata->'gpsRetire') = 'boolean')
       and public.tools_releve_uuid_facultatif_valide(p_metadata->'remplaceMediaId')
     )), false);
