@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ReleveConflictError, ReleveService } from "@elsatia/releve-domain";
 import { actorContextFromRow } from "./actor-context";
-import { etageFromRow, relevePatchToRow, releveFromRow, type ReleveRow } from "./mapping";
+import { etageFromRow, nodePatchToRow, pieceFromRow, relevePatchToRow, releveFromRow, type ReleveRow } from "./mapping";
 import { ReleveRemoteError, SupabaseReleveRepository, type ReleveSupabaseClient } from "./supabase-repository";
 
 const TENANT = "a0000000-0000-0000-0000-000000000001";
@@ -87,5 +87,46 @@ describe("SupabaseReleveRepository", () => {
     const version = await new SupabaseReleveRepository(client).createVersion(row.id as never, { libelle: null, type: "initial", baseId: null });
     expect(calls[0]).toMatchObject({ table: "tools_releve_creer_version", op: "rpc", payload: { p_releve_id: row.id, p_libelle: null, p_type_version: "initial", p_version_base_id: null } });
     expect([version.numero, version.typeVersion, version.versionBaseId]).toEqual([1, "initial", null]);
+  });
+});
+
+describe("adaptateur Lot 3", () => {
+  const pieceRow = {
+    ...row, releve_id: row.id, etage_id: "e3", zone_id: null, nom: "Bureau", usage: "bureau" as const, hauteur_sous_plafond_mm: null, ordre: 0,
+    commentaire: "RAS", statut: "releve" as const, surface_calculee_mm2: "12500000.0", volume_calcule_mm3: null,
+  };
+
+  it("mapping pièce : champs terrain, calculs numériques ; ligne antérieure au Lot 3 → valeurs par défaut", () => {
+    expect(pieceFromRow(pieceRow)).toMatchObject({ commentaire: "RAS", statut: "releve", surfaceCalculeeMm2: 12_500_000, volumeCalculeMm3: null });
+    const ancienne: Partial<typeof pieceRow> = { ...pieceRow };
+    for (const key of ["commentaire", "statut", "surface_calculee_mm2", "volume_calcule_mm3"] as const) delete ancienne[key];
+    expect(pieceFromRow(ancienne as typeof pieceRow)).toMatchObject({ commentaire: null, statut: "a_relever", surfaceCalculeeMm2: null });
+  });
+
+  it("patch de nœud : colonnes SQL, jamais de parent physique ni de colonne calculée", () => {
+    expect(nodePatchToRow({ typeNiveau: "combles", hauteurSousPlafondMm: 2500, zoneId: null })).toEqual({ type_niveau: "combles", hauteur_sous_plafond_mm: 2500, zone_id: null });
+    expect(() => nodePatchToRow({ etageId: "x" })).toThrow(/non modifiable/);
+    expect(() => nodePatchToRow({ surfaceCalculeeMm2: 1 })).toThrow(/non modifiable/);
+  });
+
+  it("modification d'un nœud conditionnée par la révision ; conflit si la ligne a changé ailleurs", async () => {
+    const { client, calls } = fakeClient([{ data: null, error: null }, { data: { revision: 8 }, error: null }]);
+    await expect(new SupabaseReleveRepository(client).updateStructureNode("piece", "p1", { commentaire: "x" }, 7)).rejects.toBeInstanceOf(ReleveConflictError);
+    expect(calls[0]).toMatchObject({ table: "tools_releves_pieces", op: "update", payload: { commentaire: "x" } });
+    expect(calls[0].filters).toEqual([["id", "p1"], ["revision", 7]]);
+  });
+
+  it("duplication, ordre et recherche : RPC serveur ; liste changée entre-temps → conflit", async () => {
+    const { client, calls } = fakeClient([
+      { data: "copie", error: null },
+      { data: null, error: { code: "40001", message: "La liste a changé" } },
+      { data: [{ releve_id: row.id, releve_nom: "P", entite: "piece", entite_id: "p", libelle: "Bureau", chantier_id: "c", batiment_id: "b", etage_id: "e", zone_id: null, piece_id: "p", updated_at: "2026-09-27T00:00:00Z" }], error: null },
+    ]);
+    const repository = new SupabaseReleveRepository(client);
+    expect(await repository.duplicateNode("batiment", "b1", "n1", null)).toBe("copie");
+    await expect(repository.reorderNodes("piece", ["a", "b"])).rejects.toBeInstanceOf(ReleveConflictError);
+    expect((await repository.search(TENANT as never, "bur"))[0]).toMatchObject({ entite: "piece", pieceId: "p", etageId: "e" });
+    expect(calls.map((call) => call.table)).toEqual(["tools_releve_dupliquer_noeud", "tools_releve_reordonner", "tools_releve_rechercher"]);
+    expect(calls[0].payload).toEqual({ p_type: "batiment", p_id: "b1", p_nouvel_id: "n1", p_nom: null });
   });
 });
