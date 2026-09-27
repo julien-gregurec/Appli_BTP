@@ -76,7 +76,7 @@ start() {
   gotrue studio 59999 55433 "$STUDIO_SECRET" true 12
 
   # Migrations applicatives (après le schéma auth de GoTrue).
-  psql -q -h 127.0.0.1 -p 55432 -U postgres -v ON_ERROR_STOP=1 -f "$ROOT/supabase/migrations/20260926000347_elsatia_identity_broker.sql"
+  psql -q -h 127.0.0.1 -p 55432 -U postgres -v ON_ERROR_STOP=1 -f "$ROOT/supabase/migrations/20260927100000_elsatia_identity_broker.sql"
   psql -q -h 127.0.0.1 -p 55433 -U postgres -v ON_ERROR_STOP=1 -f "$ROOT/apps/studio/supabase/migrations/20260926120000_studio_identity_foundation.sql"
   # Sentinelles d'isolation : une donnée « GP » et une donnée « Studio », lisibles par le
   # service_role de LEUR projet uniquement.

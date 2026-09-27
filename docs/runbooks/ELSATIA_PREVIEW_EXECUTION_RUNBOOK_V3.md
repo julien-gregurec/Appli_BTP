@@ -1,7 +1,7 @@
 # ELSATIA — Runbook d'exécution Preview (V3)
 
 > **Remplacé pour l'exécution** par `docs/qualification/ELSATIA_PREVIEW_FINAL_EXECUTION_PACK_V1.md`
-> (train canonique **V3** `integration/elsatia-canonical-train-v3`, <!--train:nb-->340<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260926000505<!--/train:derniere-->`, scripts
+> (train canonique **V3** `integration/elsatia-canonical-train-v3`, <!--train:nb-->341<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260927100000<!--/train:derniere-->`, scripts
 > `scripts/preview/*` ; nombres générés par `npm run sync:train-expectations`). Sur le train V2, ce runbook
 > contient 6 affirmations fausses (portail Stripe, script `configurer-portail-stripe.mjs`, 3-D Secure,
 > ref D1, crons GP en Preview, prix de capacité) — liste au §11 du pack.
@@ -43,7 +43,7 @@ consigner, ne pas « continuer pour voir ».
 ```bash
 git fetch origin integration/elsatia-canonical-train-v3 && git checkout integration/elsatia-canonical-train-v3   # ref V3 (ex-ref de préparation claude/fervent-dirac-eez6pk, 321 migrations, périmée)
 npm ci && for a in tools colors reserves; do npm ci --prefix apps/$a; done
-npm run verify:migrations        # attendu : <!--train:nb-->340<!--/train:nb--> migrations valides (train canonique V3, dernière <!--train:derniere-->20260926000505<!--/train:derniere-->), noms et horodatages uniques
+npm run verify:migrations        # attendu : <!--train:nb-->341<!--/train:nb--> migrations valides (train canonique V3, dernière <!--train:derniere-->20260927100000<!--/train:derniere-->), noms et horodatages uniques
 npm run verify:train-expectations # attendu : OK : attendus à jour (DB verify, runbooks)
 npm run verify:secrets           # attendu : aucun secret reconnu
 npm run verify:env-manifest      # attendu : OK : aucune erreur (14 DECISION_REQUIRED non bloquantes)
@@ -99,7 +99,7 @@ npx supabase db push --linked --dry-run
 
 ```bash
 npx supabase db push --linked
-npx supabase migration list --linked      # train canonique V3 : <!--train:nb-->340<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260926000505<!--/train:derniere--> (train V2 : 335, 20260923000400)
+npx supabase migration list --linked      # train canonique V3 : <!--train:nb-->341<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260927100000<!--/train:derniere--> (train V2 : 335, 20260923000400)
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -f docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql
 psql "$PREVIEW_DB_URL" -X -v ON_ERROR_STOP=1 -c "set elsatia.preflight_environment='preview'" -f docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql
 ```
@@ -351,7 +351,7 @@ Puis un rendu complet (upload → job → sortie publiée). **Sortie** : image c
 
 - [ ] STEP 0 consigné ; STEP 1 vert ;
 - [ ] aucune commande n'a touché `exhvuzegsefmoguxoiak` ni une clé live ;
-- [ ] <!--train:nb-->340<!--/train:nb--> migrations appliquées (train canonique V3, dernière <!--train:derniere-->20260926000505<!--/train:derniere-->) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` <!--train:controles-->17<!--/train:controles-->/<!--train:controles-->17<!--/train:controles--> (dont 14-17 : garde-fous V3) ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
+- [ ] <!--train:nb-->341<!--/train:nb--> migrations appliquées (train canonique V3, dernière <!--train:derniere-->20260927100000<!--/train:derniere-->) ; `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` <!--train:controles-->17<!--/train:controles-->/<!--train:controles-->17<!--/train:controles--> (dont 14-17 : garde-fous V3) ; `PLATFORM_SECURITY_PREFLIGHT.sql` 0 anomalie bloquante ;
 - [ ] chaque build Preview affiche `mode enforce` puis `GO : aucune erreur.` ;
 - [ ] `preflight:preview -- --live --strict` 0 erreur, 18/18 buckets ;
 - [ ] un cycle Stripe Test complet reflété en base ; aucun webhook en échec répété ;
