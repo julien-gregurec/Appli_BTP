@@ -37,7 +37,8 @@ let p: Projects;
 beforeAll(async () => {
   if (!REAL || !APP) return;
   p = await realProjects();
-  // Stub de test : la page /onboarding lit studio_workspaces (migrations Studio métier non appliquées ici).
+  // La pile applique désormais la chaîne dédiée complète (tables métier comprises) : ce stub, conservé
+  // pour une pile antérieure, est sans effet (create if not exists).
   sql(env.studioDb!, "create table if not exists public.studio_workspaces(id uuid primary key, name text, created_at timestamptz default now()); grant select on public.studio_workspaces to authenticated;");
   sql(env.studioDb!, "notify pgrst, 'reload schema'");
 });

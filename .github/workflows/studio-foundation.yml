@@ -5,6 +5,8 @@ on:
       - 'apps/studio/**'
       - 'workers/studio-video/**'
       - 'packages/studio-domain/**'
+      - 'packages/elsatia-identity/**'
+      - 'scripts/verify-migration-targets*.mjs'
       - 'supabase/migrations/**'
       - 'supabase/tests/**'
       - '.github/workflows/studio-foundation.yml'
@@ -33,7 +35,7 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix apps/studio
       - run: npm audit --prefix apps/studio --audit-level=high
-      - run: node scripts/verify-migrations.mjs
+      - run: node scripts/verify-migrations.mjs && node scripts/verify-migration-targets.mjs && node --test scripts/verify-migration-targets.test.mjs
       - run: node apps/studio/scripts/local-test.mjs setup
       - run: node apps/studio/scripts/analysis-migration-check.mjs
       - run: node --env-file=apps/studio/.env.local apps/studio/scripts/runtime-check.mjs ready
