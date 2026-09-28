@@ -300,16 +300,18 @@ create or replace function public.tools_releve_plan_metre_calcul(p_plan_id uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
   v_plan public.tools_releves_plans; v_etage_h numeric; v_seuil numeric;
-  v_murs jsonb := '{}'::jsonb; v_ouv jsonb := '{}'::jsonb; v_ouv_list jsonb := '[]'::jsonb;
+  v_murs jsonb; v_ouv jsonb; v_ouv_list jsonb; v_pieces jsonb; v_hp_map jsonb; v_aj_map jsonb; v_aj_rev jsonb;
+  -- Tableaux PL/pgSQL (ajout en temps amorti constant) : jamais de concaténation jsonb dans une boucle.
+  v_rooms_arr jsonb[] := '{}'; v_rev_arr jsonb[] := '{}';
   r record; v_c jsonb; v_pts jsonb; v_n int; i int; v_p jsonb; v_q jsonb;
   v_px numeric; v_py numeric; v_qx numeric; v_qy numeric; v_dx numeric; v_dy numeric; v_l numeric;
   v_m text; v_w jsonb; v_wl numeric; v_ux numeric; v_uy numeric; v_d numeric; v_t0 numeric; v_t1 numeric; v_ta numeric; v_tb numeric;
   v_best text; v_best_score numeric; v_best_t0 numeric; v_best_t1 numeric; v_score numeric; v_e numeric;
   v_o jsonb; v_ol numeric; v_heff numeric; v_allege numeric; v_osurf numeric; v_deduite boolean; v_franchi boolean;
-  v_piece record; v_h numeric; v_hsrc text; v_surface numeric; v_perim numeric; v_perim_ded numeric;
-  v_brute numeric; v_ded numeric; v_face_ded numeric; v_faces jsonb; v_room_ouv jsonb; v_rooms jsonb := '[]'::jsonb; v_room_map jsonb := '{}'::jsonb;
+  v_h numeric; v_hsrc text; v_surface numeric; v_perim numeric; v_perim_ded numeric;
+  v_brute numeric; v_ded numeric; v_face_ded numeric; v_faces jsonb[]; v_room_ouv jsonb; v_rooms jsonb; v_room_map jsonb;
   v_room jsonb; v_aj jsonb; v_aj_list jsonb; v_ret jsonb; v_hp jsonb;
-  v_rev jsonb := '[]'::jsonb; v_app jsonb; v_q_base numeric; v_calculable boolean; v_raison text; v_face jsonb;
+  v_rev jsonb; v_app jsonb; v_q_base numeric; v_calculable boolean; v_raison text; v_face jsonb;
   v_zd numeric; v_zf numeric; v_zb numeric; v_zh numeric; v_ox numeric; v_oy numeric; v_perte numeric; v_ids jsonb;
   v_travaux jsonb;
 begin
@@ -319,35 +321,44 @@ begin
   v_seuil := case when jsonb_typeof(v_plan.reglages->'metre'->'seuilDeductionMm2') = 'number'
                   then (v_plan.reglages->'metre'->>'seuilDeductionMm2')::numeric end;
 
-  -- Murs et ouvertures actifs du plan.
-  for r in select x.id, x.donnees from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'mur' and x.deleted_at is null loop
-    v_murs := v_murs || jsonb_build_object(r.id::text, jsonb_build_object(
-      'ax', (r.donnees->'a'->>'x')::numeric, 'ay', (r.donnees->'a'->>'y')::numeric,
-      'bx', (r.donnees->'b'->>'x')::numeric, 'by', (r.donnees->'b'->>'y')::numeric,
-      'e', (r.donnees->>'epaisseurMm')::numeric));
-  end loop;
-  for r in select x.id, x.parent_element_id, x.donnees from public.tools_releves_elements x
-           where x.plan_id = p_plan_id and x.type = 'ouverture' and x.deleted_at is null order by x.id loop
-    v_o := jsonb_build_object('id', r.id, 'murId', r.parent_element_id, 'type', r.donnees->>'typeOuverture',
-      'd', (r.donnees->>'decalageMm')::numeric, 'l', (r.donnees->>'largeurMm')::numeric, 'h', (r.donnees->>'hauteurMm')::numeric,
-      'allege', case when jsonb_typeof(r.donnees->'allegeMm') = 'number' then (r.donnees->>'allegeMm')::numeric end,
-      'etat', coalesce(r.donnees->>'etatProjet', 'existant'));
-    v_ouv := jsonb_set(v_ouv, array[r.parent_element_id::text], coalesce(v_ouv->(r.parent_element_id::text), '[]'::jsonb) || jsonb_build_array(v_o));
-    v_ouv_list := v_ouv_list || jsonb_build_array(jsonb_build_object('id', r.id, 'murId', r.parent_element_id, 'typeOuverture', r.donnees->>'typeOuverture',
-      'largeurMm', (r.donnees->>'largeurMm')::numeric, 'hauteurMm', (r.donnees->>'hauteurMm')::numeric,
-      'allegeMm', v_o->'allege', 'surfaceMm2', round((r.donnees->>'largeurMm')::numeric * (r.donnees->>'hauteurMm')::numeric),
-      'etatProjet', v_o->'etat'));
-  end loop;
+  -- Murs, ouvertures, pièces, hauteurs ponctuelles, ajustements : une lecture agrégée chacun (O(n)).
+  select coalesce(jsonb_object_agg(x.id::text, jsonb_build_object(
+      'ax', (x.donnees->'a'->>'x')::numeric, 'ay', (x.donnees->'a'->>'y')::numeric,
+      'bx', (x.donnees->'b'->>'x')::numeric, 'by', (x.donnees->'b'->>'y')::numeric, 'e', (x.donnees->>'epaisseurMm')::numeric)), '{}'::jsonb)
+    into v_murs from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'mur' and x.deleted_at is null;
+  select coalesce(jsonb_object_agg(t.mur_id, t.liste), '{}'::jsonb) into v_ouv from (
+    select x.parent_element_id::text as mur_id, jsonb_agg(jsonb_build_object('id', x.id, 'murId', x.parent_element_id, 'type', x.donnees->>'typeOuverture',
+      'd', (x.donnees->>'decalageMm')::numeric, 'l', (x.donnees->>'largeurMm')::numeric, 'h', (x.donnees->>'hauteurMm')::numeric,
+      'allege', case when jsonb_typeof(x.donnees->'allegeMm') = 'number' then (x.donnees->>'allegeMm')::numeric end,
+      'etat', coalesce(x.donnees->>'etatProjet', 'existant')) order by x.id) as liste
+    from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'ouverture' and x.deleted_at is null group by x.parent_element_id) t;
+  select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'murId', x.parent_element_id, 'typeOuverture', x.donnees->>'typeOuverture',
+      'largeurMm', (x.donnees->>'largeurMm')::numeric, 'hauteurMm', (x.donnees->>'hauteurMm')::numeric,
+      'allegeMm', case when jsonb_typeof(x.donnees->'allegeMm') = 'number' then (x.donnees->>'allegeMm')::numeric end,
+      'surfaceMm2', round((x.donnees->>'largeurMm')::numeric * (x.donnees->>'hauteurMm')::numeric),
+      'etatProjet', coalesce(x.donnees->>'etatProjet', 'existant')) order by x.id), '[]'::jsonb)
+    into v_ouv_list from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'ouverture' and x.deleted_at is null;
+  select coalesce(jsonb_object_agg(p.id::text, jsonb_build_object('h', p.hauteur_sous_plafond_mm, 'supprime', p.deleted_at is not null)), '{}'::jsonb)
+    into v_pieces from public.tools_releves_pieces p where p.etage_id = v_plan.etage_id;
+  select coalesce(jsonb_object_agg(t.pid, t.liste), '{}'::jsonb) into v_hp_map from (
+    select x.piece_id::text as pid, jsonb_agg(jsonb_build_object('id', x.id, 'valeurMm', (x.donnees->>'valeur')::numeric, 'point', x.donnees->'a') order by x.id) as liste
+    from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'mesure' and x.deleted_at is null
+      and x.piece_id is not null and x.donnees->>'typeCote' = 'hauteur' group by x.piece_id) t;
+  select coalesce(jsonb_object_agg(t.pid, t.liste), '{}'::jsonb) into v_aj_map from (
+    select a.piece_id::text as pid, jsonb_agg(to_jsonb(a) order by a.grandeur) as liste from public.tools_releves_metre_ajustements a
+    where a.plan_id = p_plan_id and a.revetement_id is null and a.retire_le is null group by a.piece_id) t;
+  select coalesce(jsonb_object_agg(a.revetement_id::text, to_jsonb(a)), '{}'::jsonb) into v_aj_rev from public.tools_releves_metre_ajustements a
+    where a.plan_id = p_plan_id and a.revetement_id is not null and a.retire_le is null;
 
   -- Pièces (contours du plan).
   for v_c in select value from jsonb_array_elements(v_plan.contours) loop
-    select p.id, p.hauteur_sous_plafond_mm, p.deleted_at into v_piece from public.tools_releves_pieces p where p.id = (v_c->>'pieceId')::uuid;
-    if v_piece.id is null or v_piece.deleted_at is not null then continue; end if;
-    v_h := coalesce(v_piece.hauteur_sous_plafond_mm, v_etage_h);
-    v_hsrc := case when v_piece.hauteur_sous_plafond_mm is not null then 'piece' when v_etage_h is not null then 'etage' end;
+    v_room := v_pieces->(v_c->>'pieceId');
+    if v_room is null or (v_room->>'supprime')::boolean then continue; end if;
+    v_h := coalesce((v_room->>'h')::numeric, v_etage_h);
+    v_hsrc := case when v_room->'h' <> 'null'::jsonb then 'piece' when v_etage_h is not null then 'etage' end;
     v_pts := v_c->'points'; v_n := jsonb_array_length(v_pts);
     v_surface := round(public.tools_releve_plan_surface(v_pts));
-    v_perim := 0; v_perim_ded := 0; v_ded := 0; v_faces := '[]'::jsonb; v_room_ouv := '{}'::jsonb;
+    v_perim := 0; v_perim_ded := 0; v_ded := 0; v_faces := '{}'; v_room_ouv := '{}'::jsonb;
     for i in 0 .. v_n - 1 loop
       v_p := v_pts->i; v_q := v_pts->((i + 1) % v_n);
       v_px := (v_p->>'x')::numeric; v_py := (v_p->>'y')::numeric; v_qx := (v_q->>'x')::numeric; v_qy := (v_q->>'y')::numeric;
@@ -394,40 +405,38 @@ begin
         end loop;
       end if;
       v_ded := v_ded + v_face_ded;
-      v_faces := v_faces || jsonb_build_array(jsonb_build_object('index', i, 'murId', v_best, 'longueurMm', round(v_l, 1),
+      v_faces := array_append(v_faces, jsonb_build_object('index', i, 'murId', v_best, 'longueurMm', round(v_l, 1),
         'debutMm', case when v_best is not null then round(v_best_t0, 1) end, 'finMm', case when v_best is not null then round(v_best_t1, 1) end,
         'surfaceBruteMm2', case when v_h is not null then round(v_l * v_h) end, 'deductionsMm2', round(v_face_ded),
         'surfaceNetteMm2', case when v_h is not null then round(v_l * v_h) - round(v_face_ded) end));
     end loop;
     v_brute := case when v_h is not null then round(v_perim * v_h) end;
-    select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'valeurMm', (x.donnees->>'valeur')::numeric, 'point', x.donnees->'a') order by x.id), '[]'::jsonb) into v_hp
-    from public.tools_releves_elements x where x.plan_id = p_plan_id and x.type = 'mesure' and x.deleted_at is null
-      and x.piece_id = v_piece.id and x.donnees->>'typeCote' = 'hauteur';
+    v_hp := coalesce(v_hp_map->(v_c->>'pieceId'), '[]'::jsonb);
     v_room := jsonb_build_object(
-      'pieceId', v_piece.id, 'hauteurMm', v_h, 'hauteurSource', v_hsrc,
+      'pieceId', (v_c->>'pieceId')::uuid, 'hauteurMm', v_h, 'hauteurSource', v_hsrc,
       'surfaceSolBruteMm2', v_surface, 'surfaceSolNetteMm2', v_surface, 'surfacePlafondMm2', v_surface,
       'perimetreBrutMm', round(v_perim, 1), 'perimetreUtileMm', round(greatest(0, v_perim - v_perim_ded), 1),
       'surfaceMursBruteMm2', v_brute, 'deductionsMm2', round(v_ded),
       'surfaceMursNetteMm2', case when v_brute is not null then v_brute - round(v_ded) end,
       'volumeMm3', case when v_h is not null then round(v_surface * v_h) end,
-      'faces', v_faces,
+      'faces', to_jsonb(v_faces),
       'ouvertures', coalesce((select jsonb_agg(value order by value->>'id') from jsonb_each(v_room_ouv)), '[]'::jsonb),
       'hauteursPonctuelles', v_hp);
     -- Ajustements actifs de la pièce : valeur retenue, calculée à la saisie, périmée si le calcul a changé.
     v_aj_list := '[]'::jsonb; v_ret := jsonb_build_object(
       'surface_sol', v_room->'surfaceSolNetteMm2', 'surface_plafond', v_room->'surfacePlafondMm2', 'perimetre_brut', v_room->'perimetreBrutMm',
       'perimetre_utile', v_room->'perimetreUtileMm', 'surface_murs', v_room->'surfaceMursNetteMm2', 'volume', v_room->'volumeMm3');
-    for r in select a.* from public.tools_releves_metre_ajustements a
-             where a.plan_id = p_plan_id and a.piece_id = v_piece.id and a.revetement_id is null and a.retire_le is null order by a.grandeur loop
-      v_aj_list := v_aj_list || jsonb_build_array(jsonb_build_object('id', r.id, 'grandeur', r.grandeur, 'unite', r.unite,
-        'valeurCalculee', r.valeur_calculee, 'valeurRetenue', r.valeur_retenue, 'raison', r.raison, 'auteurId', r.created_by, 'date', r.created_at,
-        'perime', r.valeur_calculee is distinct from (case when jsonb_typeof(v_ret->r.grandeur) = 'number' then (v_ret->>r.grandeur)::numeric end)));
-      v_ret := v_ret || jsonb_build_object(r.grandeur, r.valeur_retenue);
+    for v_aj in select value from jsonb_array_elements(coalesce(v_aj_map->(v_c->>'pieceId'), '[]'::jsonb)) loop
+      v_aj_list := v_aj_list || jsonb_build_array(jsonb_build_object('id', v_aj->'id', 'grandeur', v_aj->'grandeur', 'unite', v_aj->'unite',
+        'valeurCalculee', v_aj->'valeur_calculee', 'valeurRetenue', v_aj->'valeur_retenue', 'raison', v_aj->'raison', 'auteurId', v_aj->'created_by', 'date', v_aj->'created_at',
+        'perime', (v_aj->>'valeur_calculee')::numeric is distinct from (case when jsonb_typeof(v_ret->(v_aj->>'grandeur')) = 'number' then (v_ret->>(v_aj->>'grandeur'))::numeric end)));
+      v_ret := v_ret || jsonb_build_object(v_aj->>'grandeur', v_aj->'valeur_retenue');
     end loop;
-    v_room := v_room || jsonb_build_object('ajustements', v_aj_list, 'retenu', v_ret);
-    v_rooms := v_rooms || jsonb_build_array(v_room);
-    v_room_map := v_room_map || jsonb_build_object(v_piece.id::text, v_room);
+    v_aj := null;
+    v_rooms_arr := array_append(v_rooms_arr, v_room || jsonb_build_object('ajustements', v_aj_list, 'retenu', v_ret));
   end loop;
+  v_rooms := to_jsonb(v_rooms_arr);
+  select coalesce(jsonb_object_agg(value->>'pieceId', value), '{}'::jsonb) into v_room_map from jsonb_array_elements(v_rooms);
 
   -- Revêtements.
   for r in select x.id, x.piece_id, x.donnees from public.tools_releves_elements x
@@ -470,10 +479,9 @@ begin
       v_q_base := round(greatest(0, v_q_base));
     end if;
     -- Ajustement de la quantité du revêtement.
-    select to_jsonb(a) into v_aj from public.tools_releves_metre_ajustements a
-    where a.plan_id = p_plan_id and a.revetement_id = r.id and a.retire_le is null limit 1;
+    v_aj := v_aj_rev->(r.id::text);
     v_perte := (r.donnees->>'pertePourcent')::numeric;
-    v_rev := v_rev || jsonb_build_array(jsonb_build_object(
+    v_rev_arr := array_append(v_rev_arr, jsonb_build_object(
       'id', r.id, 'pieceId', r.piece_id, 'categorie', r.donnees->>'categorie', 'revetement', r.donnees->>'revetement', 'libelle', r.donnees->>'libelle',
       'unite', r.donnees->>'unite', 'application', v_app, 'pertePourcent', v_perte, 'etatProjet', coalesce(r.donnees->>'etatProjet', 'existant'),
       'calculable', v_calculable or v_aj is not null, 'raison', case when v_aj is null then v_raison end,
@@ -486,6 +494,7 @@ begin
         then round(coalesce((v_aj->>'valeur_retenue')::numeric, v_q_base) * (100 + v_perte) / 100) end));
     v_aj := null;
   end loop;
+  v_rev := to_jsonb(v_rev_arr);
 
   -- Travaux (plan projeté) : existant / à déposer / nouveau / déplacé.
   select jsonb_build_object(

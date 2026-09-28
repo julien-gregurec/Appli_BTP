@@ -1129,7 +1129,7 @@ function CotePanel({ cote, editable, projete, pieceLabel, onPatch, onDelete, onC
   return <section className={styles.section} aria-label="Cote sélectionnée" data-testid="plan-cote-panel">
     <h2>{hauteur ? "Hauteur ponctuelle" : COTE_TYPE_LABELS[cote.typeCote]} · {formatLongueurM(cote.valeurMm)}</h2>
     {!hauteur && <p className={releveStyles.feedback} data-testid="plan-cote-ecart">
-      {cote.source === "calcule" ? "Valeur calculée sur le plan (suit les points)." : `Valeur relevée (${COTE_SOURCE_LABELS[cote.source].toLowerCase()}) ; plan : ${formatLongueurM(coteLongueurMm(cote))}${ecart !== null ? ` — écart ${ecart > 0 ? "+" : ""}${String(Math.round(ecart) / 10).replace(".", ",")} cm` : ""}.`}
+      {cote.source === "calcule" ? "Valeur calculée sur le plan (suit les points)." : `Valeur relevée au ${cote.source === "laser" ? "laser" : "mètre"} ; plan : ${formatLongueurM(coteLongueurMm(cote))}${ecart !== null ? ` — écart ${ecart > 0 ? "+" : ""}${String(Math.round(ecart) / 10).replace(".", ",")} cm` : ""}.`}
     </p>}
     {pieceLabel && <p className={releveStyles.feedback}>Pièce : {pieceLabel}</p>}
     <div className={styles.grid}>
