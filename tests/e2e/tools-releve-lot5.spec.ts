@@ -310,10 +310,16 @@ test("Ouvertures foundation : porte, fenêtre, baie, ouverture libre (wall_id, p
   await page.goto(planUrl());
   const ids = await rectangleWalls(page);
   await tool(page, "Sélection");
-  const w = await wallScreen(page, ids[2]);
-  await page.mouse.click(w.mid.x, w.mid.y);
+  // Lot 6 : les ouvertures ne se chevauchent plus et évitent les jonctions — 83 + 120 + 240 + 90 cm
+  // ne tiennent pas sur un mur de 4,20 m (4,00 m libres entre les angles) : elles sont réparties
+  // sur les quatre murs du rectangle.
   const panel = page.getByTestId("plan-wall-panel");
-  for (const label of ["+ Porte", "+ Fenêtre", "+ Baie", "+ Ouverture libre"]) await panel.getByRole("button", { name: label }).click();
+  for (const [wall, labels] of [[ids[0], ["+ Baie"]], [ids[1], ["+ Ouverture libre"]], [ids[3], ["+ Fenêtre"]], [ids[2], ["+ Porte"]]] as const) {
+    const w = await wallScreen(page, wall);
+    await page.mouse.click(w.quarter.x, w.quarter.y);
+    await expect(panel).toBeVisible();
+    for (const label of labels) await panel.getByRole("button", { name: label }).click();
+  }
   await expect(page.locator('[data-testid="plan-ouverture"]')).toHaveCount(4);
   // Porte : position 30 cm depuis A, largeur 90 cm.
   await panel.getByRole("button", { name: /^Porte/ }).click();
@@ -322,7 +328,7 @@ test("Ouvertures foundation : porte, fenêtre, baie, ouverture libre (wall_id, p
   await saved(page);
   const openings = (await planWalls()).filter((x) => x.type === "ouverture");
   expect(openings).toHaveLength(4);
-  expect(new Set(openings.map((o) => o.parent_element_id))).toEqual(new Set([ids[2]]));
+  expect(new Set(openings.map((o) => o.parent_element_id))).toEqual(new Set(ids));
   expect(openings.map((o) => o.donnees.typeOuverture).sort()).toEqual(["baie", "fenetre", "passage", "porte"]);
   const porte = openings.find((o) => o.donnees.typeOuverture === "porte")!.donnees as unknown as { decalageMm: number; largeurMm: number; hauteurMm: number };
   expect(porte).toMatchObject({ decalageMm: 300, largeurMm: 900, hauteurMm: 2040 });
