@@ -8,6 +8,7 @@ import {
   verifierAccesApplication,
 } from "@/lib/applications-elsatia";
 import {
+  diagnostiquerRefusApplication,
   estRoleReserves,
   ROLE_ADMIN_PLATEFORME,
   type RoleApplicationReserves,
@@ -50,17 +51,15 @@ export async function determinerAccesReserves(
   const supabase = await createClient();
   const { data } = await supabase
     .from("acces_applications_entreprises")
-    .select("autorise, valide_du, valide_jusqu_au")
+    .select("autorise, valide_du, valide_jusqu_au, statut_commercial, essai_fin")
     .eq("entreprise_id", contexte.entrepriseId)
     .eq("application_code", CODE_APPLICATION_RESERVES)
     .maybeSingle();
 
-  const maintenant = Date.now();
-  const organisationAutorisee = data?.autorise === true
-    && (!data.valide_du || new Date(data.valide_du).getTime() <= maintenant)
-    && (!data.valide_jusqu_au || new Date(data.valide_jusqu_au).getTime() > maintenant);
-
-  return organisationAutorisee ? "habilitation_requise" : "abonnement_requis";
+  // Per-App Commercial Suspension V1 : l'état commercial PROPRE à l'application
+  // (jamais celui de Gestion Pro) distingue « abonnement requis » d'« habilitation
+  // requise ».
+  return diagnostiquerRefusApplication(data);
 }
 
 export async function exigerShellReserves(): Promise<ContexteReserves> {

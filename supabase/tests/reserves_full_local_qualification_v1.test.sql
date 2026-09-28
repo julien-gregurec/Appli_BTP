@@ -17,7 +17,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(181);
+select plan(183);  -- 181 + 8.12b, 8.19b (Per-App Commercial Suspension V1)
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -530,20 +530,31 @@ select is((select count(*)::int from public.reserves), 0, '8.11 entitlement éch
 select pg_temp.en_service();
 update public.acces_applications_entreprises set valide_jusqu_au = null
 where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
--- Suspension du tenant (abonnement suspendu, puis suspension programmée échue).
+-- Per-App Commercial Suspension V1 : un incident de facturation GP seul ne coupe plus
+-- Réserves (8.12b) ; la suspension du tenant est son état commercial RÉSERVES (8.12-8.15)
+-- ou une suspension GLOBALE explicite (8.16).
 update public.entreprises set abonnement_statut = 'suspendu' where id = 'a0000000-0000-0000-0000-000000000001';
+select pg_temp.en_tant_que('10000000-0000-0000-0000-000000000001');
+select ok((select count(*) from public.reserves) > 0, '8.12b GP suspendu seul (Réserves payé) : réserves visibles');
+select pg_temp.en_service();
+update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'suspended'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 select pg_temp.en_tant_que('10000000-0000-0000-0000-000000000001');
 select is((select count(*)::int from public.reserves), 0, '8.12 tenant suspendu : 0 réserve');
 select is((select count(*)::int from storage.objects where bucket_id = 'reserves-photos'), 0, '8.13 tenant suspendu : 0 photo');
 select throws_like($$select public.reserves_commenter(pg_temp.r('r3'), 'pendant suspension')$$, '%non autorisé%', '8.14 tenant suspendu : écriture refusée');
-select throws_ok($$update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001'$$,
+select throws_ok($$update public.acces_applications_entreprises set statut_commercial = 'active'
+  where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves'$$,
   '42501', null, '8.15 le tenant suspendu ne lève pas sa propre suspension');
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut = 'actif', suspension_prevue_at = now() - interval '1 minute' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'active'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
+update public.entreprises set suspension_globale_at = now() - interval '1 minute', suspension_globale_motif = 'test' where id = 'a0000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('10000000-0000-0000-0000-000000000001');
-select is((select count(*)::int from public.reserves), 0, '8.16 suspension programmée échue : 0 réserve');
+select is((select count(*)::int from public.reserves), 0, '8.16 suspension globale échue : 0 réserve');
 select pg_temp.en_service();
-update public.entreprises set suspension_prevue_at = null where id = 'a0000000-0000-0000-0000-000000000001';
+update public.entreprises set suspension_globale_at = null, suspension_globale_motif = null where id = 'a0000000-0000-0000-0000-000000000001';
 -- Session révoquée (déconnexion forcée d'un appareil) : le jeton encore valide ne sert plus.
 insert into public.sessions_revoquees (session_id, utilisateur_id, entreprise_id)
 values ('5e550000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001');
@@ -555,9 +566,13 @@ select ok((select count(*) from public.reserves) > 0, '8.18 une autre session du
 select pg_temp.en_service();
 update public.entreprises set abonnement_statut = 'suspendu' where id = 'c0000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('c0000000-0000-0000-0000-0000000000a1');
+select ok((select count(*) from public.reserves) > 0, '8.19b intervenant dont le GP seul est suspendu : réserves visibles');
+select pg_temp.en_service();
+update public.entreprises set abonnement_statut = 'actif', suspension_globale_at = now(), suspension_globale_motif = 'test' where id = 'c0000000-0000-0000-0000-000000000001';
+select pg_temp.en_tant_que('c0000000-0000-0000-0000-0000000000a1');
 select is((select count(*)::int from public.reserves), 0, '8.19 intervenant dont le tenant est suspendu : 0 réserve');
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut = 'actif' where id = 'c0000000-0000-0000-0000-000000000001';
+update public.entreprises set suspension_globale_at = null, suspension_globale_motif = null where id = 'c0000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('10000000-0000-0000-0000-000000000001');
 select lives_ok($$select * from public.reserves_revoquer_intervenant('e7200000-0000-0000-0000-00000000000c', 'fin de mission')$$, '8.20 l''hôte révoque C');
 select pg_temp.en_tant_que('c0000000-0000-0000-0000-0000000000a1');

@@ -19,7 +19,8 @@
 -- Contrôles 24-26 (train canonique V5) : réabonnement Stripe (…0928 201,
 -- ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1), Réserves hôte suspendu en lecture seule (…0928 301, D-01),
 -- Relevé & Métré plan 2D (…0928 101, Lot 5).
--- Contrôles 27-29 (train canonique V6). Contrôle 30 : cycle commercial (…0928 701-703,
+-- Contrôles 27-29 (train canonique V6). Contrôle 31 : suspension commerciale par application (…0929 801).
+-- Contrôle 30 : cycle commercial (…0928 701-703,
 -- ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
@@ -27,7 +28,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (361, '20260928000703')),
+attendu_train(nb, derniere) as (values (362, '20260929000801')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -393,6 +394,30 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
                   on g.code = p.code and p.actif and p.prix_mensuel_ht = g.mensuel and p.prix_annuel_ht = 10 * g.mensuel) = 4
            and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif(uuid)')), '')) > 0
            and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif_reel(uuid)')), '')) > 0, true
+  union all
+  -- 31 : suspension commerciale PAR APPLICATION (ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1, …0929 801) :
+  -- a_acces_application ne dépend plus de l'état commercial GP (est_membre_actif) mais de
+  -- l'appartenance plateforme + l'état commercial de l'application ; suspension globale sur
+  -- colonnes dédiées, jamais posée sans motif ; webhook d'application réservé au service ;
+  -- prédicats internes non exposés ; aucune perte de droit à la migration.
+  select 31, 'Suspension commerciale par application (20260929000801)',
+         'a_acces_application sans est_membre_actif, statut_commercial présent, suspensions globales motivées, webhook service seul, 0 perte',
+         concat_ws(', ',
+           case when position('est_membre_actif(' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.a_acces_application(uuid,text)')), '')) = 0
+                 and position('application_commercialement_ouverte' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.a_acces_application(uuid,text)')), '')) > 0
+                then 'décision par application' else 'décision GP GLOBALE' end,
+           'suspensions globales : ' || coalesce((case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.entreprises where suspension_globale_at is not null', false, true, '')))[1]::text end), '?'),
+           'pertes migration : ' || coalesce((case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.rapport_migration_suspension_par_app_v1 where changement = ''perte_acces''', false, true, '')))[1]::text end), 'rapport ABSENT'),
+           'gains migration : ' || coalesce((case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.rapport_migration_suspension_par_app_v1 where changement = ''gain_acces''', false, true, '')))[1]::text end), '?')),
+         position('est_membre_actif(' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.a_acces_application(uuid,text)')), '')) = 0
+           and position('application_commercialement_ouverte' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.a_acces_application(uuid,text)')), '')) > 0
+           and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'acces_applications_entreprises' and column_name = 'statut_commercial')
+           and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.entreprises where suspension_globale_at is not null and nullif(btrim(suspension_globale_motif), '''') is null', false, true, '')))[1]::text end) = '0'
+           and coalesce(has_function_privilege('service_role', to_regprocedure('public.synchroniser_statut_commercial_application_service(uuid,text,text,text,text,timestamptz,timestamptz)'), 'execute'), false)
+           and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.synchroniser_statut_commercial_application_service(uuid,text,text,text,text,timestamptz,timestamptz)'), 'execute'), true)
+           and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.compte_suspendu_globalement(uuid)'), 'execute'), true)
+           and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from information_schema.column_privileges where table_schema = ''public'' and table_name = ''entreprises'' and column_name = ''suspension_globale_at'' and grantee = ''authenticated'' and privilege_type = ''UPDATE''', false, true, '')))[1]::text end) = '0'
+           and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.rapport_migration_suspension_par_app_v1 where changement = ''perte_acces''', false, true, '')))[1]::text end) = '0', true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

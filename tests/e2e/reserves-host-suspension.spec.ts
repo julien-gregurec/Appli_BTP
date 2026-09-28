@@ -47,12 +47,26 @@ function enTetesService() {
   return { apikey: cle, Authorization: `Bearer ${cle}`, "Content-Type": "application/json" };
 }
 
-/** Change l'état commercial de l'hôte comme le fait la facturation : clé serveur. */
+/**
+ * Change l'état commercial RÉSERVES de l'hôte comme le fait la facturation : webhook
+ * commercial par application, clé serveur (Per-App Commercial Suspension V1 : « l'hôte perd
+ * Réserves » = son droit Réserves se ferme ; un incident Gestion Pro seul ne suffit plus).
+ */
+let sequenceEvenement = 0;
 async function etatHote(api: APIRequestContext, statut: "actif" | "suspendu") {
-  const reponse = await api.patch(
-    `${process.env.E2E_SUPABASE_URL}/rest/v1/entreprises?id=eq.${HOTE}`,
-    { headers: { ...enTetesService(), Prefer: "return=representation" },
-      data: { abonnement_statut: statut, suspension_prevue_at: null }, timeout: 60_000 },
+  sequenceEvenement += 1;
+  const reponse = await api.post(
+    `${process.env.E2E_SUPABASE_URL}/rest/v1/rpc/synchroniser_statut_commercial_application_service`,
+    { headers: enTetesService(),
+      data: {
+        p_entreprise_id: HOTE,
+        p_application_code: "reserves",
+        p_statut_stripe: statut === "actif" ? "active" : "past_due",
+        p_subscription_ref: "sub_e2e_reserves_hote",
+        p_evenement_id: `evt_e2e_reserves_hote_${Date.now()}_${sequenceEvenement}`,
+        p_evenement_at: new Date(Date.now() + sequenceEvenement).toISOString(),
+      },
+      timeout: 60_000 },
   );
   expect(reponse.status(), await reponse.text()).toBe(200);
 }

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { cheminAccessibleEssaiExpire } from "@/lib/acces-socle-essai";
+import { MOTIF_SUSPENSION_PLATEFORME } from "@/lib/etat-commercial-applications";
 
 // Chemins qui restent accessibles quand l'essai est expiré sans offre — souscrire,
 // demander de l'aide, récupérer ses données (ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1).
@@ -66,6 +67,9 @@ type ContexteAbonnementCourant = {
   suspension_prevue_at: string | null;
   impaye_message: string | null;
   acces_support: boolean;
+  // Per-App Commercial Suspension V1 : suspension plateforme / sécurité EXPLICITE du
+  // compte (toutes applications). Jamais déduite d'un impayé ; motif non exposé.
+  suspension_globale?: boolean | null;
 };
 
 async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise> {
@@ -178,7 +182,15 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     && essaiFin !== null
     && essaiFin < Date.now();
 
-  if (suspenduPourImpaye) {
+  // Suspension plateforme / sécurité : prioritaire, même sortie minimale (aide, export,
+  // état de facturation) ; la base refuse déjà tout accès métier dans TOUTES les
+  // applications (est_membre_actif, a_acces_application).
+  if (!accesSupport && abonnement.suspension_globale === true) {
+    const cheminActuel = (await headers()).get("x-elsatia-pathname");
+    if (!cheminAccessibleEssaiExpire(cheminActuel)) {
+      redirect(`/abonnement-suspendu?motif=${MOTIF_SUSPENSION_PLATEFORME}`);
+    }
+  } else if (suspenduPourImpaye) {
     // GP-EXTERNAL-PILOT-CLOSURE-V1 — même sortie que l'essai expiré (aide,
     // export RGPD, souscription) : un compte suspendu (impayé ou fermeture
     // administrative, hors moteur billing) ne doit jamais retenir les données

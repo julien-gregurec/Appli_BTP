@@ -28,8 +28,9 @@ function service(sql: string) {
 const RETABLIR = `
   insert into public.acces_applications_entreprises(entreprise_id,application_code,autorise,source)
   values ('${ORGANISATION_A}','colors',true,'recette')
-  on conflict (entreprise_id,application_code) do update set autorise=true, valide_du=null, valide_jusqu_au=null;
-  update public.entreprises set abonnement_statut='actif', suspension_prevue_at=null where id='${ORGANISATION_A}';
+  on conflict (entreprise_id,application_code) do update set autorise=true, valide_du=null, valide_jusqu_au=null, statut_commercial='entitled';
+  update public.entreprises set abonnement_statut='actif', suspension_prevue_at=null,
+    suspension_globale_at=null, suspension_globale_motif=null where id='${ORGANISATION_A}';
   update public.habilitations_applications_utilisateurs set autorise=true, valide_du=null, valide_jusqu_au=null,
     role_code='colors_gestionnaire_stock'
    where entreprise_id='${ORGANISATION_A}' and utilisateur_id='${GESTIONNAIRE_A}';
@@ -83,11 +84,30 @@ test.describe.serial("@colors-suspension suspension sans reconnexion", () => {
     await page.waitForURL(/\/abonnement-requis/);
   });
 
-  test("tenant suspendu : l'accès se ferme sans reconnexion, et aucune écriture ne passe", async ({ page }) => {
+  // Per-App Commercial Suspension V1 : un impayé Gestion Pro seul ne coupe plus Colors.
+  test("Gestion Pro suspendu seul : Colors reste ouvert, sans reconnexion", async ({ page }) => {
+    await seConnecter(page, COMPTES.gestionnaire);
+    await exigerAccesOuvert(page);
+    service(`update public.entreprises set abonnement_statut='suspendu' where id='${ORGANISATION_A}'`);
+    await exigerAccesOuvert(page);
+    const exportOuvert = await page.request.get("/api/export/inventaire", { maxRedirects: 0 });
+    expect(exportOuvert.status(), "l'export Colors reste ouvert pendant un impayé GP").toBe(200);
+  });
+
+  test("suspension globale explicite du compte : Colors se ferme sans reconnexion", async ({ page }) => {
+    await seConnecter(page, COMPTES.gestionnaire);
+    await exigerAccesOuvert(page);
+    service(`update public.entreprises set suspension_globale_at=now(), suspension_globale_motif='recette' where id='${ORGANISATION_A}'`);
+    await page.goto("/inventaire");
+    await page.waitForURL(/\/(abonnement-requis|acces-refuse|login)/);
+    await expect(page.getByText("Blanc atelier")).toHaveCount(0);
+  });
+
+  test("tenant suspendu (droit Colors) : l'accès se ferme sans reconnexion, et aucune écriture ne passe", async ({ page }) => {
     await seConnecter(page, COMPTES.gestionnaire);
     await page.goto(`/inventaire/${SEAUX.aStockFaible}`);
     await expect(page.getByLabel("Nouvelle quantité")).toBeVisible();
-    service(`update public.entreprises set abonnement_statut='suspendu' where id='${ORGANISATION_A}'`);
+    service(`update public.acces_applications_entreprises set statut_commercial='suspended' where entreprise_id='${ORGANISATION_A}' and application_code='colors'`);
 
     // Le formulaire était déjà affiché : l'envoi après suspension ne doit rien écrire.
     await page.getByLabel("Nouvelle quantité").fill("0.2");

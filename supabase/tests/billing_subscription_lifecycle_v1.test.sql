@@ -113,8 +113,8 @@ insert into matrice values
   (6,  'active + cancel_at_period_end',            'actif',    current_date - 60, current_date - 30, null, now() + interval '20 days', true, true),
   (7,  'past_due / unpaid / payment_failed',       'suspendu', current_date - 60, current_date - 30, null, null, false, true),
   (8,  'canceled (subscription terminée)',         'annule',   current_date - 60, current_date - 30, null, null, false, true),
-  (9,  'suspension plateforme échue',              'actif',    current_date - 60, current_date - 30, now() - interval '1 minute', null, false, true),
-  (10, 'suspension plateforme programmée (future)', 'actif',   current_date - 60, current_date - 30, now() + interval '3 days', null, true, true);
+  (9,  'impayé GP : suspension programmée échue',  'actif',    current_date - 60, current_date - 30, now() - interval '1 minute', null, false, true),
+  (10, 'impayé GP : suspension programmée (future)', 'actif',   current_date - 60, current_date - 30, now() + interval '3 days', null, true, true);
 
 create function pg_temp.ent(k int) returns uuid language sql immutable as $$ select ('c0000000-0000-4000-8000-' || lpad(k::text, 12, '0'))::uuid $$;
 create function pg_temp.adm(k int) returns uuid language sql immutable as $$ select ('c1000000-0000-4000-8000-' || lpad(k::text, 12, '0'))::uuid $$;
@@ -193,10 +193,13 @@ select is(r.metier_admin, m.metier, 'M' || m.k || ' ' || m.libelle || ' : accès
 select is(r.metier_membre, m.metier, 'M' || m.k || ' ' || m.libelle || ' : accès métier GP (membre)') from matrice m join resultats_matrice r using (k) order by k;
 select is(r.chantiers_rls, m.metier, 'M' || m.k || ' ' || m.libelle || ' : permission métier (a_permission)') from matrice m join resultats_matrice r using (k) order by k;
 select is(r.entreprise_visible, m.metier, 'M' || m.k || ' ' || m.libelle || ' : fiche entreprise visible par RLS') from matrice m join resultats_matrice r using (k) order by k;
-select is(r.tools, m.metier, 'M' || m.k || ' ' || m.libelle || ' : Tools (a_acces_application)') from matrice m join resultats_matrice r using (k) order by k;
-select is(r.colors, m.metier, 'M' || m.k || ' ' || m.libelle || ' : Colors') from matrice m join resultats_matrice r using (k) order by k;
-select is(r.reserves, m.metier, 'M' || m.k || ' ' || m.libelle || ' : Réserves') from matrice m join resultats_matrice r using (k) order by k;
-select is(r.tools_tier, case when m.metier then 'pro' else 'free' end, 'M' || m.k || ' ' || m.libelle || ' : palier Tools effectif de l''admin Tools Pro') from matrice m join resultats_matrice r using (k) order by k;
+-- Per-App Commercial Suspension V1 (20260929000801) : l'état commercial GP ne décide plus
+-- que Gestion Pro. Tools, Colors et Réserves (droits autorisés, non suspendus pour leur
+-- propre compte, aucune suspension globale) restent ouverts dans les 10 états GP.
+select is(r.tools, true, 'M' || m.k || ' ' || m.libelle || ' : Tools (a_acces_application) indépendant de GP') from matrice m join resultats_matrice r using (k) order by k;
+select is(r.colors, true, 'M' || m.k || ' ' || m.libelle || ' : Colors indépendant de GP') from matrice m join resultats_matrice r using (k) order by k;
+select is(r.reserves, true, 'M' || m.k || ' ' || m.libelle || ' : Réserves indépendant de GP') from matrice m join resultats_matrice r using (k) order by k;
+select is(r.tools_tier, 'pro', 'M' || m.k || ' ' || m.libelle || ' : palier Tools effectif de l''admin Tools Pro (indépendant de GP)') from matrice m join resultats_matrice r using (k) order by k;
 select is(r.facturation_admin, m.facturation_admin, 'M' || m.k || ' ' || m.libelle || ' : chemin facturation ouvert à l''admin (voir / payer / réactiver)') from matrice m join resultats_matrice r using (k) order by k;
 select ok(r.facturation_membre_vue and not r.facturation_membre_gere, 'M' || r.k || ' ' || r.libelle || ' : membre simple voit l''état, ne gère pas la facturation') from resultats_matrice r order by k;
 

@@ -16,10 +16,17 @@
 --
 -- Décor : A = hôte (fixture multitenant) ; C, D = entreprises intervenantes (comptes
 -- gratuits) ; B = tenant témoin sans lien.
+--
+-- Per-App Commercial Suspension V1 (20260929000801) : « l'hôte perd Réserves » est
+-- désormais l'état commercial RÉSERVES de l'hôte (acces_applications_entreprises.
+-- statut_commercial) ou une suspension GLOBALE explicite du compte — plus un incident de
+-- facturation Gestion Pro. La règle D-01 et toutes les assertions sont conservées ; seuls
+-- les déclencheurs changent, et 7.11 / 7.12 prouvent qu'un incident GP seul ne gèle plus
+-- l'intervenant.
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(97);  -- 96 (branche d'origine) + 8.06b (train V5 : reserves_contacts)
+select plan(99);  -- 96 (branche d'origine) + 8.06b (train V5 : reserves_contacts) + 7.11, 7.12 (per-app)
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -179,8 +186,9 @@ select pg_temp.en_service();
 select set_config('q.empreinte_avant', pg_temp.empreinte(), true);
 select set_config('q.nb_historique_r1', (select count(*) from public.reserves_historique where reserve_id = pg_temp.r('r1'))::text, true);
 
--- ── Suspension commerciale de l'hôte (hors de la session de C) ────────────────
-update public.entreprises set abonnement_statut = 'suspendu' where id = 'a0000000-0000-0000-0000-000000000001';
+-- ── Suspension commerciale RÉSERVES de l'hôte (hors de la session de C) ───────
+update public.acces_applications_entreprises set statut_commercial = 'suspended'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- §2 LECTURE CONSERVÉE — même session, aucune reconnexion
@@ -301,10 +309,12 @@ select is((select count(*)::int from public.reserves), 0, '6.01 admin de l''hôt
 select throws_like($$select public.reserves_commenter(pg_temp.r('r1'), 'hôte suspendu')$$, '%non autorisé%',
   '6.02 admin de l''hôte suspendu : écriture refusée par la règle existante (pas par la nouvelle)');
 select is(public.reserves_lecture_seule_hote(pg_temp.r('r1')), null::boolean, '6.03 admin de l''hôte suspendu : pas d''information (il ne lit pas)');
-select throws_ok($$update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001'$$,
+select throws_ok($$update public.acces_applications_entreprises set statut_commercial = 'active'
+  where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves'$$,
   '42501', null, '6.04 l''hôte suspendu ne lève pas sa propre suspension');
 select pg_temp.en_service();
-select is((select abonnement_statut from public.entreprises where id = 'a0000000-0000-0000-0000-000000000001'), 'suspendu',
+select is((select statut_commercial from public.acces_applications_entreprises
+  where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves'), 'suspended',
   '6.05 état commercial inchangé par le lot (Billing non modifié)');
 
 -- ═════════════════════════════════════════════════════════════════════════════
@@ -346,7 +356,8 @@ select set_config('q.intervenant_c_avant', (select row(id, statut, entreprise_in
 select set_config('q.historique_r2', (select string_agg(action, ',' order by created_at, ctid)
   from public.reserves_historique where reserve_id = pg_temp.r('r2')), true);
 select set_config('q.nb_invitations', (select count(*) from public.reserves_invitations)::text, true);
-update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'active'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 
 select pg_temp.session_c();  -- même session qu'avant la suspension
 select is(public.reserves_lecture_seule_hote(pg_temp.r('r1')), false, '9.01 lecture seule levée');
@@ -383,16 +394,17 @@ select ok((select count(*) from public.reserves) = 3, '9.15 l''hôte retrouve se
 -- ═════════════════════════════════════════════════════════════════════════════
 -- §7 AUTRES FORMES DE FERMETURE DE L'HÔTE
 -- ═════════════════════════════════════════════════════════════════════════════
--- Suspension programmée échue.
+-- Suspension GLOBALE explicite (plateforme / sécurité) de l'hôte.
 select pg_temp.en_service();
+update public.entreprises set suspension_globale_at = now() - interval '1 minute', suspension_globale_motif = 'test D-01' where id = 'a0000000-0000-0000-0000-000000000001';
+select pg_temp.session_c();
+select is((select count(*)::int from public.reserves), 2, '7.01 suspension globale de l''hôte : lecture conservée');
+select throws_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'x')$$, '42501', null, '7.02 suspension globale de l''hôte : écriture refusée');
+select pg_temp.en_service();
+update public.entreprises set suspension_globale_at = null, suspension_globale_motif = null where id = 'a0000000-0000-0000-0000-000000000001';
 update public.entreprises set suspension_prevue_at = now() - interval '1 minute' where id = 'a0000000-0000-0000-0000-000000000001';
 select pg_temp.session_c();
-select is((select count(*)::int from public.reserves), 2, '7.01 suspension programmée échue : lecture conservée');
-select throws_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'x')$$, '42501', null, '7.02 suspension programmée échue : écriture refusée');
-select pg_temp.en_service();
-update public.entreprises set suspension_prevue_at = now() + interval '7 days' where id = 'a0000000-0000-0000-0000-000000000001';
-select pg_temp.session_c();
-select lives_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'suspension à venir')$$, '7.03 suspension programmée à venir : écriture possible');
+select lives_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'impayé GP seul')$$, '7.03 impayé GP échu seul (Réserves payé) : écriture possible');
 -- Entitlement Réserves retiré, organisation par ailleurs active.
 select pg_temp.en_service();
 update public.entreprises set suspension_prevue_at = null where id = 'a0000000-0000-0000-0000-000000000001';
@@ -408,25 +420,34 @@ where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_cod
 select pg_temp.session_c();
 select throws_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'x')$$, '42501', null, '7.06 entitlement échu : écriture refusée');
 select is(public.reserves_lecture_seule_hote(pg_temp.r('r1')), true, '7.07 entitlement échu : écran en lecture seule');
--- Abonnement annulé.
+-- Abonnement Réserves annulé.
 select pg_temp.en_service();
-update public.acces_applications_entreprises set valide_jusqu_au = null
+update public.acces_applications_entreprises set valide_jusqu_au = null, statut_commercial = 'cancelled'
 where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
-update public.entreprises set abonnement_statut = 'annule' where id = 'a0000000-0000-0000-0000-000000000001';
 select pg_temp.session_c();
 select is((select count(*)::int from public.reserves), 2, '7.08 abonnement annulé : lecture conservée');
 select throws_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'x')$$, '42501', null, '7.09 abonnement annulé : écriture refusée');
 -- Retour à l'état normal.
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'active'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 select pg_temp.session_c();
 select lives_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'rétabli')$$, '7.10 hôte rétabli : écriture possible');
+-- Per-app : un incident de facturation GESTION PRO seul ne gèle plus l'intervenant.
+select pg_temp.en_service();
+update public.entreprises set abonnement_statut = 'annule', suspension_prevue_at = null where id = 'a0000000-0000-0000-0000-000000000001';
+select pg_temp.session_c();
+select is(public.reserves_lecture_seule_hote(pg_temp.r('r1')), false, '7.11 GP annulé, Réserves actif : pas de lecture seule');
+select lives_ok($$select public.reserves_commenter(pg_temp.r('r1'), 'GP annulé')$$, '7.12 GP annulé, Réserves actif : écriture possible');
+select pg_temp.en_service();
+update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001';
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- §10 NON-ORACLE ET PRÉSERVATION DE R-04
 -- ═════════════════════════════════════════════════════════════════════════════
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut = 'suspendu' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'suspended'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 select pg_temp.en_tant_que('20000000-0000-0000-0000-000000000001');
 select is(public.reserves_lecture_seule_hote(pg_temp.r('r1')), null::boolean, '10.01 B : aucune information sur la réserve de A');
 select is(public.reserves_chantier_lecture_seule_hote('e8000000-0000-0000-0000-000000000001'), null::boolean,
@@ -441,7 +462,8 @@ select lives_ok($$select public.reserves_preferences_definir('c0000000-0000-0000
 -- R-04 : un membre de l'hôte qui n'a plus le module Réserves supprime un chantier GP lié ;
 -- le détachement côté Réserves n'est pas bloqué (la garde ne vise que les tiers).
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut = 'actif' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial = 'active'
+where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and application_code = 'reserves';
 insert into public.chantiers (id, entreprise_id, client_id, nom, statut) values
   ('a4000000-0000-0000-0000-0000000000f8', 'a0000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', 'SUSP_GP', 'en_cours');
 select pg_temp.en_tant_que('10000000-0000-0000-0000-000000000001');
