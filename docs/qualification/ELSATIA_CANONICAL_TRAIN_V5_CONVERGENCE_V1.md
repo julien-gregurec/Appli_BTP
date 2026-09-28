@@ -11,9 +11,25 @@
 
 ## 0. Verdict
 
-**`__VERDICT__`**
+**`CANONICAL TRAIN V5 LOCALLY QUALIFIED`**
 
-__RESUME__
+Les 4 lots post-V4 sont intégrés sans toucher à V4 (branche, migrations et rapports historiques
+inchangés). Les 3 migrations post-V4 sont renumérotées après la dernière migration réelle de V4 :
+`…0928 101` (Relevé plan 2D), `…0928 201` (réabonnement Stripe), `…0928 301` (Réserves D-01). Base
+neuve **355/355**, 0 erreur. **Upgrade V4 → V5 avec données réalistes** (base V4 construite depuis
+V3) : 0 écart de lignes sur 267 tables, **76/76 empreintes métier identiques**, 0 policy supprimée
+ou modifiée, sonde RLS **0 écart / 1 326 cellules**, grants et EXECUTE existants inchangés, schéma
+et ACL identiques au fresh, **35/35 contrôles métier** (plan 2D sur un relevé V4, D-01 sur un hôte
+suspendu avant l'upgrade avec rejeu hors-ligne, réabonnement sur une entreprise annulée).
+pgTAP **140/149 propres, 0 régression** (les 146 fichiers communs donnent des résultats identiques à
+V4, les 3 suites nouvelles sont propres). Les 5 applications passent typecheck, lint, Vitest et
+build. **Playwright** : Relevé 2/3/4/5 + Atelier **52/52**, Réserves **59/59**, D-01 **7/7**,
+GP ↔ Réserves **5/5 ×2**, Stripe réabonnement **6/6 ×2**, Colors **73/73**. Seeds :
+**ALL ACTIVE SEEDS QUALIFIED, 16/16** sur 355 migrations. Attendus du train, DB verify (26
+contrôles, GO local), CI et runbooks sont régénérés.
+
+Comme en V4, ce qui reste relève de l'exécution distante (Stripe Test, Portail, Storage, GoTrue,
+e-mail réels : NOT PROVEN localement). V5 n'est pas déployé.
 
 ---
 
@@ -185,7 +201,7 @@ Intégré **après** Ordering et Trial Sync (V4) : la migration `…0928 201` ne
 |---|---|
 | Same customer | pgTAP `stripe_resubscription_flow_v1` **99/99** ; upgrade **S02** (autre client → 42501), **S04** |
 | Aucun nouvel essai | pgTAP ; upgrade **S07** (fenêtre close, jamais prolongée) ; concurrence R5 |
-| Portal first | Vitest `stripe-reabonnement` (parcours par statut : réactivable → Portail, jamais Checkout) ; Playwright **__PW_STRIPE__** |
+| Portal first | Vitest `stripe-reabonnement` (parcours par statut : réactivable → Portail, jamais Checkout) ; Playwright **6/6 ×2** (annulé, résiliation programmée → Portail, échec, paiement requis, droits, retours Checkout) |
 | Anti-double subscription | upgrade **S01** (courante active → refus) ; concurrence **R2** : 20 subscriptions différentes → **1** gagne, 19 × 42501 ; Vitest `stripe-checkout-exclusivite` |
 | Old invoice isolation | upgrade **S08** (facture tardive de l'ancienne : `sans_effet`), **S09** (inconnue : `differe`), **S11** (anciennes factures V4 inchangées) ; concurrence R3 |
 | Entitlements conditionnels | upgrade **S06**, **S10** (rattacher n'écrit aucun droit) ; concurrence R4 (droits rendus par `invoice.paid` seul) |
@@ -295,9 +311,18 @@ modification de spec ni de harnais de recette. Les piles sont lancées **l'une a
 | Réserves V6 sécurité (cross tenant) | idem | 23 | ✅ 23/23 |
 | Réserves V6 performance | idem | 5 | ✅ 5/5 |
 | **Réserves total** | | 59 (+7 D-01) | ✅ **59/59** + D-01 **7/7** |
-| GP ↔ Réserves `gp-reserves-integration.spec.ts` | `gp-reserves-pile-locale/preparer-base.sh`, passerelle, GP :3100, Réserves :3020 | 5/5 ×2 | __PW_GPRES__ |
-| **Stripe réabonnement** `stripe-reabonnement.spec.ts` | pile GP ↔ Réserves, GP :3100, état Stripe projeté en base, clé factice | 6 | __PW_STRIPE_ROW__ |
-| Colors (`colors` + `colors-mobile`) | `colors-pile-locale/preparer-base.sh`, nuancier de recette | 73/73 | __PW_COLORS__ |
+| GP ↔ Réserves `gp-reserves-integration.spec.ts` | `gp-reserves-pile-locale/preparer-base.sh`, passerelle, GP :3100, Réserves :3020 | 5/5 ×2 | ✅ **5/5 ×2** (20,6 s ; 18,8 s après remise à zéro de la base, comme en V4) |
+| **Stripe réabonnement** `stripe-reabonnement.spec.ts` | pile GP ↔ Réserves, GP :3100, état Stripe projeté en base, clé factice | 6 | ✅ **6/6 ×2** |
+| Colors (`colors` + `colors-mobile`) | `colors-pile-locale/preparer-base.sh`, nuancier de recette | 73/73 | ✅ **73/73** |
+
+Variables de recette locales (jamais des secrets réels, aucune écrite dans le dépôt) : Gestion Pro
+compilé exige `RATE_LIMIT_HMAC_KEY` en `next start` (sinon 503 fail-closed du limiteur, voulu) ; le
+parcours de réabonnement exige un Stripe « configuré » (clé `sk_test_` factice, secret de webhook
+factice, 8 `STRIPE_PRICE_*` factices, `ABONNEMENTS_PUBLICS_OUVERTS=true`) — la spec projette l'état
+Stripe en base, aucun appel ne réussit ; Colors exige `COLORS_NUANCIER_FICHIER` =
+`tests/e2e/fixtures/colors-nuancier-recette.json` et `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Des passages
+lancés sans ces variables ont échoué sur ces seules causes (écran d'erreur / 503 au login, offres
+masquées, nuancier absent) et ne sont pas comptés.
 
 Premier passage Relevé Lots 2-4 **invalide, non compté** : lancé pendant `verify:seeds`, dont le
 drill DR change le mot de passe du rôle global `authenticator` → PostgREST de la pile Relevé coupé
