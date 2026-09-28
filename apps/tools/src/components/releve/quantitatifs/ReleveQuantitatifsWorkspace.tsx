@@ -260,7 +260,7 @@ function OuvrageCard({ ouvrage, lignes, source, ctx, editable, pieces, run, busy
     onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}>
     <summary>
       <strong data-testid="qt-ouvrage-nom">{ouvrage.nom}</strong>
-      <span className={styles.value} data-testid="qt-ouvrage-total">{formatQuantiteOuvrage(totalMilli, ouvrage.unite)}{nonCalc ? ` (+ ${nonCalc} non calculable)` : ""}</span>
+      <span className={styles.value} data-testid="qt-ouvrage-total">{lignes.length === 0 ? "aucune donnée" : `${formatQuantiteOuvrage(totalMilli, ouvrage.unite)}${nonCalc ? ` (+ ${nonCalc} non calculable)` : ""}`}</span>
       <span className={styles.badge}>{OUVRAGE_CATEGORIE_LABELS[ouvrage.categorie]}</span>
       {ouvrageOrigine(ouvrage) === "manuelle" && <span className={styles.badge}>manuel</span>}
       {anomalies.length > 0 && <span className={styles.badge} data-tone={anomalies.some((a) => a.gravite === "erreur") ? "alerte" : undefined} data-testid="qt-ouvrage-anomalies">{anomalies.length} anomalie(s)</span>}
@@ -268,7 +268,7 @@ function OuvrageCard({ ouvrage, lignes, source, ctx, editable, pieces, run, busy
     {open && <div className={styles.pieceBody}>
       <p className={styles.muted} data-testid="qt-formule">{formuleTexte(ouvrage)}</p>
       <p className={styles.muted}>Lot : {ouvrageLot(ouvrage)} · {OUVRAGE_SOURCES_A_ETAT.includes(ouvrage.regle.source)
-        ? `états retenus : ${ouvrage.etats.map((e) => ETAT_PROJET_LABELS[e]).join(", ")}` : `quantités ${ETAT_PROJET_LABELS[ouvrage.etatTravaux].toLowerCase()}`}
+        ? `états retenus : ${ouvrage.etats.map((e) => ETAT_PROJET_LABELS[e]).join(", ")}` : `état des travaux : ${ETAT_PROJET_LABELS[ouvrage.etatTravaux]}`}
         {ouvrage.pieceIds?.length ? ` · ${ouvrage.pieceIds.length} pièce(s) visée(s)` : " · toutes les pièces"}{ouvrage.commentaire ? ` · ${ouvrage.commentaire}` : ""}</p>
       <ul className={styles.rows} data-testid="qt-lignes">{lignes.map((ligne) => <LigneRow key={`${ligne.pieceId}:${ligne.etatProjet}`} ligne={ligne} ouvrage={ouvrage} source={source} ctx={ctx} editable={editable} run={run} />)}</ul>
       {lignes.length === 0 && <p className={styles.muted}>Aucune ligne : aucune donnée du plan ne correspond à la règle.</p>}
