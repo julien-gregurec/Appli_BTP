@@ -190,7 +190,8 @@ select ok((select count(*) from public.commandes_fournisseurs where entreprise_i
   'commandes supprimées après instantané (…506 inchangé)');
 
 -- ─── 7. RD-1 : purge complète ─────────────────────────────────────────
-select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'QUALIF-RD-V1-DUREE-DE-TEST', interval '10 years', false);
+-- Paramètres de TEST uniquement (V2 : durée, point de départ et choix des photos explicites).
+select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'QUALIF-RD-V1-DUREE-DE-TEST', interval '10 years', false, array['date_contrat']);
 select set_config('rgpd.run_id', 'd9950000-0000-0000-0000-000000000003', true);
 \ir fixtures/rgpd_purge_driver.inc
 select is(current_setting('rgpd.resultat'), 'complete', 'politique activée (durée de TEST) : purge complète');

@@ -99,11 +99,18 @@ async function afficherContratsAcceptes() {
   console.log(`\nContrats acceptés : ${r.devis_acceptes} devis, ${r.avenants_acceptes} avenant(s) actifs ; ${r.preuves} preuve(s) figée(s).`);
   const etat = r.etat ?? r.politique;
   console.log(`  Politique : ${r.politique}${r.decision_ref ? ` (décision ${r.decision_ref})` : ""} — état effectif : ${etat}${r.duree_conservation ? `, durée ${r.duree_conservation}` : ""}`);
+  // V2 (20260928000100) : point de départ et choix des photos font partie des paramètres à valider.
+  if (r.regles_depart) {
+    console.log(`  Point de départ : ${r.regles_depart.join(" + ")}${r.regle_depart_repli ? ` (repli : ${r.regle_depart_repli})` : " (sans repli)"} ; photos : ${r.choix_photos_explicite ? (r.inclure_photos ? "conservées" : "non conservées") : "choix non exprimé"}`);
+  }
+  const manquants = (r.parametres_manquants ?? []).join(", ");
   if (r.devis_acceptes + r.avenants_acceptes > 0) {
     if (etat === "non_decidee") {
       console.log("  → DECISION_REQUIRED:RGPD-PURGE-VS-CONTRAT-ACCEPTE : la purge s'arrêtera sur ces contrats (échec sûr).");
     } else if (etat === "duree_requise") {
-      console.log("  → DECISION_REQUIRED:RGPD-DUREE-CONSERVATION-CONTRAT : conserver_contrat_minimise retenue, durée non validée ; la purge s'arrêtera sur ces contrats (échec sûr).");
+      console.log(`  → DECISION_REQUIRED:RGPD-DUREE-CONSERVATION-CONTRAT : conserver_contrat_minimise retenue, durée non validée${manquants ? ` (paramètres manquants : ${manquants})` : ""} ; la purge s'arrêtera sur ces contrats (échec sûr).`);
+    } else if (etat === "parametres_requis") {
+      console.log(`  → DECISION_REQUIRED:RGPD-PARAMETRES-CONSERVATION-CONTRAT : paramètres non validés (${manquants}) ; la purge s'arrêtera sur ces contrats (échec sûr).`);
     }
   }
 }

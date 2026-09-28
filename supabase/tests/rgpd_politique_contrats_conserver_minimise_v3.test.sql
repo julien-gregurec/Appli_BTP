@@ -17,7 +17,7 @@
 --      instantanés `contrat_minimise` ; retour à « sans durée » = de nouveau fail-closed.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(30);
 
 \ir fixtures/isolation_multitenant.inc
 \ir fixtures/rgpd_tenant_facture_emise.inc
@@ -119,9 +119,15 @@ reset role;
 select set_config('request.jwt.claims', '', true);
 
 -- ─── 6. Activation simulée (durée de TEST), puis retour fail-closed ────
+-- V2 (20260928000100) : l'appel à 4 arguments de 504 ne suffit plus (point de départ et
+-- choix des photos non exprimés) : il reste non actif.
 select lives_ok(
   $$select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DUREE-VALIDEE', interval '3 years', false)$$,
-  'activation simulée avec une durée de test (aucune migration ne l''écrit)');
+  'appel à 4 arguments (durée de test seule) accepté');
+select is(platform.etat_politique_contrats(), 'parametres_requis', 'durée seule : toujours non active (fail-closed V2)');
+select lives_ok(
+  $$select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DUREE-VALIDEE', interval '3 years', false, array['date_contrat'])$$,
+  'activation simulée avec des paramètres de TEST (aucune migration ne l''écrit)');
 select is(platform.etat_politique_contrats(), 'conserver_contrat_minimise', 'état effectif : active');
 select set_config('rgpd.run_id', 'c9000000-0000-0000-0000-0000000003a2', true);
 \ir fixtures/rgpd_purge_driver.inc
