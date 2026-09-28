@@ -71,13 +71,17 @@ select ok(not has_column_privilege('anon', 'public.incident_controles', 'motif',
 select ok(not has_column_privilege('anon', 'public.incident_controles', 'incident_ref', 'SELECT'), 'anon ne lit jamais la référence');
 select ok(not has_column_privilege('authenticated', 'public.incident_controles', 'maj_par_libelle', 'SELECT'), 'authenticated ne lit jamais l''auteur');
 select ok(not has_function_privilege('anon', 'public.incident_upload_ouvert(text)', 'EXECUTE'), 'garde upload non exposée à anon');
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname like 'incident\_%'
+              and has_function_privilege('anon', p.oid, 'EXECUTE')), 1,
+  'une seule fonction incident_* exécutable par anon : incident_etat_public (SECURITY INVOKER)');
 select is((select count(*)::int from public.incident_statuts_services), 12, '12 services suivis');
 select is((select count(*)::int from public.incident_statuts_services where statut <> 'OPERATIONAL'), 0, 'tous OPERATIONAL au départ');
 
 -- ═════════════ 2. Couverture des gardes ═════════════
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind in ('r','p') and not c.relispartition
+    where n.nspname = 'public' and c.relkind in ('r','p')
       and not public.incident_table_exemptee(c.relname)
       and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = 'incident_garde_ecriture')),
   0,
@@ -217,6 +221,12 @@ select is((public.plateforme_incident_basculer('gestion_pro','lecture_seule',fal
   'false', 'double levée sans effet');
 reset role;
 select is((select count(*)::int from public.incident_journal), 2, 'double levée non journalisée');
+set local role authenticated;
+select pg_temp.jwt('30000000-0000-0000-0000-000000000001', 'authenticated');
+select is((public.plateforme_incident_basculer('colors','exports',false,'levée d''un contrôle jamais posé') ->> 'change'),
+  'false', 'lever un contrôle jamais posé : sans effet');
+reset role;
+select is((select count(*)::int from public.incident_controles where portee = 'colors'), 0, 'aucune ligne parasite créée');
 
 -- ═════════════ 7. Lecture seule GLOBALE ═════════════
 set local role authenticated;

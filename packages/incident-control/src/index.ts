@@ -118,7 +118,7 @@ const exact = (chemin: string) => new RegExp(`^${chemin.replace(/[.*+?^${}()|[\]
 
 export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, ReglesApplication>> = {
   gestion_pro: {
-    toujoursOuverts: [exact("/api/health"), exact("/api/status")],
+    toujoursOuverts: [exact("/api/health"), exact("/api/status"), exact("/_next")],
     pilotage: [
       exact("/plateforme"),
       exact("/login"),
@@ -169,7 +169,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     liensPublics: [exact("/document"), exact("/imprimer/partage"), exact("/api/documents/partage")],
   },
   reserves: {
-    toujoursOuverts: [exact("/api/health"), exact("/api/status")],
+    toujoursOuverts: [exact("/api/health"), exact("/api/status"), exact("/_next")],
     pilotage: [exact("/login"), exact("/auth"), exact("/hors-ligne"), exact("/acces-refuse"), exact("/abonnement-requis")],
     serveurAServeur: [exact("/api/cron")],
     crons: [exact("/api/cron")],
@@ -181,7 +181,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     liensPublics: [],
   },
   colors: {
-    toujoursOuverts: [exact("/api/health"), exact("/api/status")],
+    toujoursOuverts: [exact("/api/health"), exact("/api/status"), exact("/_next")],
     pilotage: [exact("/login"), exact("/auth"), exact("/acces-refuse"), exact("/abonnement-requis")],
     serveurAServeur: [],
     crons: [],
@@ -193,7 +193,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     liensPublics: [],
   },
   studio: {
-    toujoursOuverts: [exact("/api/health"), exact("/api/status")],
+    toujoursOuverts: [exact("/api/health"), exact("/api/status"), exact("/_next")],
     pilotage: [exact("/login"), exact("/auth")],
     serveurAServeur: [exact("/api/elsatia")],
     crons: [exact("/api/elsatia/erasure"), exact("/api/elsatia/reconcile")],

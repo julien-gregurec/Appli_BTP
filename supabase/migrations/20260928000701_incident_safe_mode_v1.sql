@@ -240,7 +240,8 @@ begin
   select * into v_ancien from public.incident_controles
    where portee = p_portee and controle = p_controle for update;
 
-  if found and v_ancien.actif = p_actif and not p_actif then
+  -- Lever un contrôle déjà inactif (ou jamais posé) : aucun effet, aucune trace parasite.
+  if not p_actif and (not found or not v_ancien.actif) then
     return jsonb_build_object('change', false, 'portee', p_portee, 'controle', p_controle, 'actif', p_actif);
   end if;
 
@@ -479,6 +480,10 @@ returns boolean language sql immutable set search_path = public as $$
                      'elsatia_identity_subjects','elsatia_identity_outbox');
 $$;
 
+-- Utilitaires internes (appelés par les gardes, sous le propriétaire) : aucun rôle d'API.
+revoke all on function public.incident_application_table(text) from public, anon, authenticated, service_role;
+revoke all on function public.incident_table_exemptee(text) from public, anon, authenticated, service_role;
+
 create or replace function public.incident_garde_ecriture()
 returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -538,7 +543,9 @@ declare
 begin
   for v_table in
     select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind in ('r','p') and not c.relispartition
+    -- Partitions comprises : un trigger d'instruction du parent ne se déclenche pas pour une
+    -- instruction qui vise directement une partition.
+    where n.nspname = 'public' and c.relkind in ('r','p')
     order by c.relname
   loop
     execute format('drop trigger if exists incident_garde_ecriture on public.%I', v_table);
@@ -578,7 +585,7 @@ returns text language sql immutable set search_path = public as $$
     else 'gestion_pro'
   end;
 $$;
-grant execute on function public.incident_application_bucket(text) to authenticated, service_role;
+revoke all on function public.incident_application_bucket(text) from public, anon, authenticated, service_role;
 
 create or replace function public.incident_upload_ouvert(p_bucket text)
 returns boolean language sql stable security definer set search_path = public as $$

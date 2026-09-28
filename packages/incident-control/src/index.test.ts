@@ -94,6 +94,13 @@ describe("decisionIncident — coupure d'application (isolation)", () => {
     expect(decide("reserves", "GET", "/login", coupeReserves)).toEqual({ action: "continuer" });
   });
 
+  it("coupure globale : ressources Next toujours servies (pages de pilotage rendables)", () => {
+    const tout = etat(["global", "app_coupee"]);
+    expect(decide("gestion_pro", "GET", "/_next/static/chunks/app.js", tout)).toEqual({ action: "continuer" });
+    expect(decide("studio", "GET", "/_next/image", tout)).toEqual({ action: "continuer" });
+    expect(decide("gestion_pro", "GET", "/_nextx", tout)).toMatchObject({ code: "SAFE_MODE_APP_OFF" });
+  });
+
   it("coupure globale : la console plateforme reste accessible pour rouvrir", () => {
     const tout = etat(["global", "app_coupee"]);
     expect(decide("gestion_pro", "GET", "/plateforme/incident", tout)).toEqual({ action: "continuer" });
