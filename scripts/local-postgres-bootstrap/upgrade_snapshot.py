@@ -48,12 +48,23 @@ TABLES_METIER = [
     # Train V4 (ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE §11) : Stripe (journal d'abonnement),
     # historique des affectations (RGPD dette résiduelle), documents GP (plans Réserves).
     "abonnement_evenements", "affectations_historique",
+    # Train V5 (ELSATIA_CANONICAL_TRAIN_V5_CONVERGENCE_V1 §10) : Relevé & Métré Lots 2-4 (étendus par
+    # le plan 2D), GP ↔ Réserves (contacts, échanges), Stripe (factures d'abonnement, journaux d'ordre
+    # et d'essai, étendus par le réabonnement).
+    "tools_releves", "tools_releves_chantiers", "tools_releves_batiments", "tools_releves_etages",
+    "tools_releves_zones", "tools_releves_pieces", "tools_releves_elements", "tools_releves_medias",
+    "tools_releves_versions", "tools_releves_journal",
+    "reserves_contacts", "reserves_conversations", "reserves_mutations_appliquees",
+    "factures_abonnement", "stripe_evenements_ordre", "stripe_objets_ordre", "stripe_essai_ecarts",
 ]
 TABLES_SONDE_RLS = [
     "entreprises", "employes", "clients", "chantiers", "devis", "factures",
     "affectations", "pointages", "notes_frais", "boutique_commandes", "colors_seaux",
     "acces_applications_entreprises", "avenants", "reserves", "reserves_photos", "tools_projects",
     "commandes_fournisseurs", "lignes_commande", "depenses_fournisseurs", "reglements_fournisseurs",
+    # Train V5.
+    "tools_releves", "tools_releves_elements", "tools_releves_medias", "reserves_contacts",
+    "reserves_messages", "factures_abonnement",
 ]
 
 

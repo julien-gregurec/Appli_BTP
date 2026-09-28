@@ -23,7 +23,9 @@ import { CLASSES, SEEDS, seedById } from "./registry.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ACTIVE_CLASSES = new Set(["ACTIVE", "CI_ONLY", "PREVIEW", "PRODUCTION_TOOL"]);
 // Couvertures déclarées hors de ce harnais (suites pgTAP, CI Studio, recette avec passerelle).
-const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle"]);
+// "upgrade-harness" : exécuté par scripts/qualification/upgrade-v4-v5.sh sur une base V4 construite
+// depuis V3 (le complément suppose un état antérieur au train courant, jamais une base fraîche).
+const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness"]);
 
 // Où vivent les scripts de données, et à quoi ils ressemblent.
 const DISCOVERY = [

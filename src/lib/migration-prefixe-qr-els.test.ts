@@ -223,13 +223,16 @@ describe("migration ELS-REC-004 : conversion des préfixes QR LGP-* vers ELS-* (
   // Empreintes mises à jour par le train canonique V4 : devis et commandes du seed insérés en
   // brouillon puis finalisés après leurs lignes (verrous 20260926000506 / 20260927000508) ;
   // aucune ligne liée aux préfixes QR n'a changé.
+  // Puis par le train canonique V5 : seed réécrit par le durcissement des seeds (script SQL
+  // déterministe, docs/qualification/ELSATIA_SEED_COMPATIBILITY_HARDENING_V1.md) ; ni l'ancienne
+  // ni la nouvelle version ne contient de préfixe QR (LGP-* / ELS-*).
   it("les scripts de seed ELSATIA Preview restent strictement inchangés (empreintes déjà vérifiées)", () => {
     const empreinte = (chemin: string) => createHash("sha256").update(readFileSync(resolve(racine, chemin))).digest("hex");
     expect(empreinte("scripts/seed-elsatia-preview-year.mjs")).toBe(
-      "784e30d52548cbc2b0788b883cb6189bec09623c29a70834c6bc6009f1ad2620",
+      "987f217719abe15e74d2d1d1b516a4f9bf5515d0f23e8192a021d79e3d119808",
     );
     expect(empreinte("scripts/seed-elsatia-preview-year.test.mjs")).toBe(
-      "603e614b54100949949a437011905c4fbb6318e8e3bf3c7384ffbd478bba1037",
+      "e4d55e68dbb52b8826985d3a5f5ac002912372d1d7165876bf280735a2c002f9",
     );
   });
 });

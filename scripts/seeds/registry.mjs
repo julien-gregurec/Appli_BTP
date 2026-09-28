@@ -341,6 +341,13 @@ export const SEEDS = [
     },
   },
   {
+    id: "upgrade-complement-v5",
+    path: "scripts/local-postgres-bootstrap/upgrade_v4_v5_seed_complement.sql",
+    classification: "CI_ONLY",
+    target: "qualification d'upgrade V4 → V5 (base V4 avec historique V3, jamais une base fraîche V5)",
+    coveredBy: "upgrade-harness",
+  },
+  {
     id: "upgrade-complement-v4",
     path: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql",
     classification: "CI_ONLY",
