@@ -13,7 +13,24 @@
 
 **`ELSATIA INCIDENT RESPONSE LOCALLY QUALIFIED`**
 
-⟨VERDICT⟩
+ELSATIA peut réagir à un incident Production **sans improviser et sans redéployer** :
+
+- **Mode sûr piloté en base.** Il couvre la lecture seule globale ou par application, la coupure d'application, les uploads, exports, paiements, invitations et liens publics. Propagation mesurée en ≤ 10 s.
+- **La base est l'autorité.** Une écriture PostgREST directe avec un JWT client valide est refusée en 503, service_role compris en lecture seule, et **rien n'est supprimé**.
+- **RBAC.** Seul le rôle plateforme `total` en AAL2 peut basculer. Un admin client est refusé, prouvé en HTTP réel.
+- **Audit.** Le journal des bascules est append-only.
+- **Verrou Stripe post-restauration.** La base refuse de rouvrir le trafic avant la réconciliation.
+- **Sondes de santé** GP, Réserves et Studio (worker), sans secret.
+- **Runbooks.** 12 incidents, plus la procédure sécurité et l'ordre post-restauration.
+- **Drill local réel.** `npm run incident:drill` monte GoTrue, PostgREST, Storage, Redis, des mocks Stripe/Brevo et Gestion Pro, puis exécute **15 scénarios : 91/91 vérifications**.
+
+Un **défaut réel de perte silencieuse** d'événements Stripe en cas de panne DB a été trouvé et corrigé : la reprise des réservations orphelines (migration `…702`).
+
+Non-régression :
+- **pgTAP : 0 régression.** Les 152 suites communes sont identiques à V6 ; les 2 nouvelles sont propres (131 + 30).
+- **Studio dédié** : 15 migrations, 572 pgTAP.
+- **Upgrade V6 → V6 + safe mode avec données** : 0 écart sur 270 tables, 91/91 empreintes métier identiques, sonde RLS 0 écart sur 1 160 cellules.
+- **Les 5 applications** passent tests, typecheck, lint et build.
 
 ---
 
@@ -58,7 +75,7 @@ comptages identiques avant/après chaque gel, pgTAP et drill S2/S6).
 | Désactivation invitations | `invitations` | **base** (création `reserves_invitations`, consultation/acceptation par jeton) + proxy (GP accès, Réserves, Colors, Studio) |
 | Désactivation liens publics | `liens_publics` | **base** : les 3 fonctions de résolution de jeton sont enveloppées (`…__brut` retirées de tout rôle) + proxy |
 
-Expiration automatique optionnelle (1 min à 7 j). Propagation mesurée : ⟨PROPAGATION⟩.
+Expiration automatique optionnelle (1 min à 7 j). Propagation mesurée : activation 9,2 s, levée 8,9 s, réouverture 9,7 s (drill final, cache de 10 s des proxys) ; la base applique la garde **immédiatement**.
 
 ## 3. Kill-switch — audit de l'existant
 
@@ -177,7 +194,7 @@ même en SQL direct). Console : 50 dernières entrées. Drill S14 : 18/18 bascul
 `npm run incident:drill` (`scripts/incident/drill.sh` + `scenarios.mjs`) : base jetable avec
 **Auth réel (GoTrue)**, **PostgREST réel**, mock Storage à RLS réelle, proxy « Kong », **Redis**,
 faux Stripe, faux Brevo, **Gestion Pro en `next dev`**, base Studio dédiée. Garde « local
-uniquement » (`exigerCibleLocale`, testée). Résultat : ⟨DRILL⟩
+uniquement » (`exigerCibleLocale`, testée). Résultat : **`DRILL RÉUSSI : 91/91 vérifications`** (base neuve de 360 migrations + Studio dédié 15, run final à froid ; runs précédents : 90/90, puis 91/91 après ajout du contrôle cron)
 
 | Scénario | Vérifié côté utilisateur / exploitation |
 |---|---|
@@ -223,12 +240,71 @@ Voir §1 — 12 runbooks + 2 procédures, format commun, commandes SQL vérifié
 
 ## 17. Tests
 
-⟨TESTS⟩
+| Porte | Résultat |
+|---|---|
+| pgTAP complet (une base neuve par fichier, `pgtap-run-v3.sh`) | **154 fichiers, 145 propres, 4 618 ok, 14 not ok hérités** ; comparaison fichier par fichier avec la base V6 (même méthode) : **0 régression** (152 communs identiques : 143 propres / 4 457 ok / 14 not ok, comme le rapport V6) ; nouveaux : `incident_safe_mode_v1` **131/131**, `stripe_webhook_reservations_orphelines_v1` **30/30** |
+| Chaîne Studio dédiée (`dedicated-db-check.sh`) | 15 migrations, 0 table GP, **572 pgTAP, 0 échec** (V6 : 543 ; + `studio_incident_control` 29) |
+| Upgrade V6 → +701/702 (données pilote + fixture multi-tenant + 70 événements Stripe historiques) | 0 écart de lignes / 270 tables, 91/91 empreintes, 0 policy modifiée (4 ajoutées), RLS 0 écart / 1 160 cellules, 0 droit retiré, 0 orpheline créée, 248 gardes |
+| Idempotence | `…701` et `…702` rejouées deux fois sans erreur |
+| Vitest Gestion Pro (+ paquets) | **2 371 passés**, 36 ignorés (V6 : 2 300) |
+| Vitest Tools / Colors / Réserves / Studio | **2 118** / **431** / **186** / **295** (V6 : 291) |
+| Worker Studio | `healthcheck` + `redis-readiness` verts (rendus vidéo : ffmpeg absent, voir §18) |
+| typecheck · lint | 5 applications ✅ ; lint racine 0 erreur, 15 avertissements (comme V6) |
+| Build | Gestion Pro, Réserves, Colors, Studio, Tools ✅ (`/api/health`, `/plateforme/incident` compilés) |
+| Portes du dépôt | `verify:migrations` (360 · dédié 15), `verify:train-expectations`, `test:preview-pack` 29/29, `test:seeds` 48/48, `test:migration-targets` 7/7, `test:preflight-preview` 5/5, scripts Stripe 5/5 · 10/10 · 6/6, `verify:env-manifest`, `test:env-manifest` 67/67, `verify:secrets`, `test:incident-drill` 6/6 ✅ |
+| Drill | **91/91** |
+
+Tests unitaires des gardes : décision proxy (paquet, 40 cas), `updateSession` réel (9 cas),
+santé sans secret, console (validation, messages sans SQL brut), webhooks (finalisation),
+worker (sonde), pgTAP RBAC/journal/gardes/wrappers/verrou/expiration/opérateur.
 
 ## 18. Écarts, limites et décisions
 
-⟨LIMITES⟩
+Aucun écart bloquant. Limites assumées, toutes documentées dans les runbooks :
+
+1. **HOSTED NOT PROVEN.** Rien n'a été exécuté sur Preview/Production. À confirmer à la première
+   Preview : (a) `GET /storage/v1/status` sur le Storage hébergé (le mock local l'implémente) ;
+   (b) application de `…701` sous faible trafic avec `lock_timeout` — elle pose un trigger sur
+   248 tables (verrou bref par table) ; (c) `preview:db-verify` + sonde santé ; (d) PostgREST
+   hébergé renvoie 503 sur `PT503` (prouvé ici avec PostgREST 12.2.3 réel).
+2. **Server Actions en lecture seule** : le proxy ne peut pas les distinguer (la déconnexion en est
+   une) et les laisse passer ; la **base** refuse leurs écritures. Un effet de bord externe
+   **antérieur** à toute écriture (rare : un envoi d'e-mail sans écriture préalable) n'est pas
+   empêché — poser `app_coupee` si cela compte.
+3. **`exports` et `paiements`** ne sont appliqués qu'au proxy (ce sont des lectures ou des appels
+   sortants) ; la base ne les distingue pas. `exports` bloque aussi l'export RGPD (droit d'accès) :
+   à lever dès que possible — **décision propriétaire** si le gel doit durer.
+4. **Tools** (application cliente) : gardée en base seulement ; ses écrans affichent l'erreur
+   générique pendant un gel. Amélioration possible : bandeau lisant `incident_etat_public`.
+5. Schémas `platform` et `stripe_attestation` non gardés (écrits uniquement par des fonctions
+   internes, elles-mêmes appelées dans des transactions qui touchent des tables gardées).
+6. **E-mails** : pas de file d'envoi rejouable commune ; un envoi échoué est une erreur explicite
+   (journalisée), à renvoyer manuellement (runbook). **Google Play RTDN** non rejouable (Tools) :
+   réconciliation par l'API de vérification.
+7. Reprise des webhooks orphelins : fenêtre de **5 min** (règle Tools existante) ; un webhook
+   légitime de plus de 5 min pourrait être traité deux fois — les traitements sont idempotents.
+8. Propagation : cache d'état **10 s** (mesuré 8,8–9,8 s), cache santé 5 s ; base injoignable :
+   dernier état gardé 5 min puis proxy passant (la base, absente ou revenue, reste l'autorité).
+9. Studio dédié : pilotage **SQL uniquement** (pas de rôle plateforme dans ce projet) ;
+   `STUDIO_ENABLED` reste la coupure de dernier recours (redéploiement).
+10. Colors : pas de route santé propre (test de sécurité non affaibli) ; couverte par la sonde GP.
+11. Non rejoués ici : Playwright (garde inerte sans contrôle actif ; `updateSession` réel testé ;
+    drill sur pile réelle avec GP en `next dev`) ; tests de rendu vidéo du worker (ffmpeg absent :
+    5 échecs **identiques avec et sans cette mission**) ; GoTrue v2.192.0 (release) au lieu de
+    v2.196.0 compilé en V6.
+12. Inchangé depuis DR V2 : procédure de rotation de `BANK_DATA_ENCRYPTION_KEY` inexistante ;
+    RPO/RTO hébergés non prouvés ; remédiation du doublon d'endpoint Stripe Test non exécutée.
 
 ## 19. Fichiers
 
-⟨FICHIERS⟩
+| Domaine | Fichiers |
+|---|---|
+| Base (partagée) | `supabase/migrations/20260928000701_incident_safe_mode_v1.sql`, `20260928000702_stripe_webhook_reservations_orphelines_v1.sql` ; pgTAP `supabase/tests/incident_safe_mode_v1.test.sql`, `stripe_webhook_reservations_orphelines_v1.test.sql` |
+| Base Studio dédiée | `apps/studio/supabase/migrations/20260928130000_studio_incident_control.sql`, `apps/studio/supabase/tests/studio_incident_control.test.sql`, `migration-targets.json` |
+| Paquet commun | `packages/incident-control/` (décision, cache d'état, santé, garde de proxy) + tests |
+| Gestion Pro | `src/lib/incident/{etat,proxy,sante,console}.ts` (+ tests), `src/lib/supabase/proxy.ts`, `src/app/api/health/route.ts`, `src/app/(app)/plateforme/incident/page.tsx`, `src/app/actions/plateforme-incident.ts`, webhooks Stripe Connect/boutique (finalisation) + tests, `src/lib/supabase/proxy-mode-sur.test.ts` |
+| Réserves / Colors / Studio | `apps/*/src/lib/incident.ts`, `apps/*/src/proxy.ts`, `apps/{reserves,studio}/src/app/api/health/route.ts`, `apps/studio/tests/incident.test.ts`, configs (tsconfig, next, vitest) ; `apps/colors/src/lib/supabase/cles.ts` |
+| Worker | `workers/studio-video/src/healthcheck.ts` (+ test) |
+| Drill | `scripts/incident/{drill.sh,scenarios.mjs,lib.mjs,lib.test.mjs,mock-externe.mjs}`, `scripts/local-postgres-bootstrap/local_storage_mock.mjs` (`/status`), `package.json` |
+| Runbooks | `docs/runbooks/incident/*.md` (15), `docs/runbooks/ELSATIA_DISASTER_RECOVERY_RUNBOOK_V2.md` (renvois) |
+| Divers | `config/env-manifest.json` (exclusion du banc `scripts/incident/`), attendus du train synchronisés (360) |
