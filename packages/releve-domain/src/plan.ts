@@ -28,6 +28,7 @@ import {
   type Ancre, type IsoDateTime, type MurType, type OuvertureModele, type OuverturePoussee, type OuvertureSens, type OuvertureType,
   type OuvertureVantaux, type Point2D, type ReleveElement, type VersionType,
 } from "./model";
+import { coteAnomalie, coteDonnees, COTE_ISSUE_MESSAGES, isEtatProjet, type CoteIssueCode, type EtatProjet, type PlanCote } from "./metre";
 import {
   CALQUE_DES_CATEGORIES, equipementDonnees, validatePlanEquipements,
   type EquipmentIssueCode, type PlanCalque, type PlanCalqueEtat, type PlanEquipement,
@@ -69,6 +70,11 @@ export type PlanReglages = {
   readonly grilleMm?: number | null;
   /** Lot 7 : état des calques (absent = visible, non verrouillé). */
   readonly calques?: Partial<Record<PlanCalque, Partial<PlanCalqueEtat>>>;
+  /**
+   * Lot 8 : réglages du métré. `seuilDeductionMm2` = option « petites ouvertures » : une ouverture de
+   * surface inférieure n'est pas déduite des murs. Absent / null = tout déduire (aucun seuil par défaut).
+   */
+  readonly metre?: { readonly seuilDeductionMm2?: number | null };
 };
 
 /** Géométrie d'une pièce métier (Lot 3) sur le plan. */
@@ -94,6 +100,8 @@ export type PlanMur = {
   readonly typeMur: MurType;
   /** Mur dont celui-ci est la copie (plan dérivé) : suit les photos rattachées au mur d'origine. */
   readonly origineId?: string | null;
+  /** Lot 8 : plan projeté — existant, à déposer, nouveau, déplacé (absent = existant). */
+  readonly etatProjet?: EtatProjet;
 };
 
 export type PlanOuverture = {
@@ -118,6 +126,8 @@ export type PlanOuverture = {
   readonly poussee?: OuverturePoussee;
   /** Lot 6 : modèle de menuiserie. Absent = battant (porte, fenêtre), coulissant (baie). */
   readonly modele?: OuvertureModele;
+  /** Lot 8 : plan projeté — existant, à déposer, nouveau, déplacé (absent = existant). */
+  readonly etatProjet?: EtatProjet;
 };
 
 /** Lot 6 — libellés des attributs de menuiserie. */
@@ -140,12 +150,14 @@ export type PlanDocument = {
   readonly ouvertures: readonly PlanOuverture[];
   /** Lot 7 : objets du plan (mobilier, sanitaire, cuisine, équipements techniques). */
   readonly equipements: readonly PlanEquipement[];
+  /** Lot 8 : cotes manuelles et hauteurs ponctuelles (absent = aucune, documents antérieurs). */
+  readonly cotes?: readonly PlanCote[];
   readonly contours: readonly PlanContour[];
   readonly cadre: PlanCadre;
   readonly reglages: PlanReglages;
 };
 
-export const EMPTY_PLAN_DOCUMENT: PlanDocument = { murs: [], ouvertures: [], equipements: [], contours: [], cadre: DEFAULT_PLAN_CADRE, reglages: {} };
+export const EMPTY_PLAN_DOCUMENT: PlanDocument = { murs: [], ouvertures: [], equipements: [], cotes: [], contours: [], cadre: DEFAULT_PLAN_CADRE, reglages: {} };
 
 /** Ligne `tools_releves_plans`. */
 export type Plan = {
@@ -247,6 +259,8 @@ export type PlanIssue = {
   readonly path: string; readonly message: string; readonly code?: OpeningIssueCode;
   /** Lot 7 : anomalie d'un objet (`equipements.<id>.<code>`). */
   readonly equipmentCode?: EquipmentIssueCode;
+  /** Lot 8 : anomalie d'une cote (`cotes.<id>.<code>`). */
+  readonly coteCode?: CoteIssueCode;
 };
 
 function finiteCoordinate(value: number): boolean {
@@ -268,6 +282,7 @@ export function validatePlanMur(mur: PlanMur): PlanIssue[] {
     issues.push({ path: "hauteurMm", message: `Hauteur entre ${PLAN_LIMITS.hauteurMinMm / 10} et ${PLAN_LIMITS.hauteurMaxMm / 10} cm.` });
   }
   if (!(MUR_TYPES as readonly string[]).includes(mur.typeMur)) issues.push({ path: "typeMur", message: "Type de mur inconnu." });
+  if (mur.etatProjet !== undefined && !isEtatProjet(mur.etatProjet)) issues.push({ path: "etatProjet", message: "État projeté inconnu." });
   return issues;
 }
 
@@ -305,6 +320,7 @@ export function validatePlanOuverture(ouverture: PlanOuverture, mur: Pick<PlanMu
   if (ouverture.vantaux !== undefined && !(OUVERTURE_VANTAUX as readonly number[]).includes(ouverture.vantaux)) issues.push({ path: "vantaux", message: "Un ou deux vantaux.", code: "invalide" });
   if (ouverture.poussee !== undefined && !(OUVERTURE_POUSSEES as readonly string[]).includes(ouverture.poussee)) issues.push({ path: "poussee", message: "Poussant ou tirant.", code: "invalide" });
   if (ouverture.modele !== undefined && !(OUVERTURE_MODELES as readonly string[]).includes(ouverture.modele)) issues.push({ path: "modele", message: "Modèle de menuiserie inconnu.", code: "invalide" });
+  if (ouverture.etatProjet !== undefined && !isEtatProjet(ouverture.etatProjet)) issues.push({ path: "etatProjet", message: "État projeté inconnu.", code: "invalide" });
   return issues;
 }
 
@@ -354,6 +370,10 @@ export function validatePlanDocument(document: PlanDocument): PlanIssue[] {
   for (const issue of validatePlanEquipements(document.equipements ?? [], new Set(murs.keys()))) {
     issues.push({ path: `equipements.${issue.equipementId}.${issue.code}`, message: issue.message, equipmentCode: issue.code });
   }
+  for (const cote of document.cotes ?? []) {
+    const code = coteAnomalie(cote);
+    if (code) issues.push({ path: `cotes.${cote.id}.${code}`, message: COTE_ISSUE_MESSAGES[code], coteCode: code });
+  }
   return issues;
 }
 
@@ -369,6 +389,8 @@ export function murFromElement(element: Pick<ReleveElement<"mur">, "id" | "piece
   return {
     id: element.id, pieceId: element.pieceId, a: readPoint(d.a), b: readPoint(d.b),
     epaisseurMm: Number(d.epaisseurMm), hauteurMm: d.hauteurMm ?? null, typeMur: d.typeMur, origineId: d.origineId ?? null,
+    // Lot 8 : présent seulement s'il a été enregistré (clés stables).
+    ...(isEtatProjet(d.etatProjet) ? { etatProjet: d.etatProjet } : {}),
   };
 }
 
@@ -384,6 +406,7 @@ export function ouvertureFromElement(element: Pick<ReleveElement<"ouverture">, "
     ...(d.vantaux !== undefined ? { vantaux: d.vantaux } : {}),
     ...(d.poussee !== undefined ? { poussee: d.poussee } : {}),
     ...(d.modele !== undefined ? { modele: d.modele } : {}),
+    ...(isEtatProjet(d.etatProjet) ? { etatProjet: d.etatProjet } : {}),
   };
 }
 
@@ -394,6 +417,7 @@ export function murDonnees(mur: PlanMur): Record<string, unknown> {
     epaisseurMm: mur.epaisseurMm, hauteurMm: mur.hauteurMm, typeMur: mur.typeMur,
   };
   if (mur.origineId) donnees.origineId = mur.origineId;
+  if (mur.etatProjet !== undefined) donnees.etatProjet = mur.etatProjet;
   return donnees;
 }
 
@@ -406,6 +430,7 @@ export function ouvertureDonnees(ouverture: PlanOuverture): Record<string, unkno
   if (ouverture.vantaux !== undefined) donnees.vantaux = ouverture.vantaux;
   if (ouverture.poussee !== undefined) donnees.poussee = ouverture.poussee;
   if (ouverture.modele !== undefined) donnees.modele = ouverture.modele;
+  if (ouverture.etatProjet !== undefined) donnees.etatProjet = ouverture.etatProjet;
   return donnees;
 }
 
@@ -417,6 +442,8 @@ export type PlanOperations = {
   ouvertures: { id: string; murId: string; donnees: Record<string, unknown> }[];
   /** Lot 7 : objets créés, modifiés ou restaurés (absent : aucun — charges des Lots 5 / 6). */
   equipements?: { id: string; pieceId: string | null; donnees: Record<string, unknown> }[];
+  /** Lot 8 : cotes créées, modifiées ou restaurées (absent : aucune). */
+  cotes?: { id: string; pieceId: string | null; donnees: Record<string, unknown> }[];
   supprimes: string[];
   contours?: PlanContour[];
   cadre?: PlanCadre;
@@ -432,6 +459,7 @@ function same(a: unknown, b: unknown): boolean {
 const murKey = (mur: PlanMur | undefined) => (mur ? JSON.stringify([mur.pieceId, murDonnees(mur)]) : "");
 const ouvertureKey = (ouverture: PlanOuverture | undefined) => (ouverture ? JSON.stringify([ouverture.murId, ouvertureDonnees(ouverture)]) : "");
 const equipementKey = (objet: PlanEquipement | undefined) => (objet ? JSON.stringify([objet.pieceId, equipementDonnees(objet)]) : "");
+const coteKey = (cote: PlanCote | undefined) => (cote ? JSON.stringify([cote.pieceId, coteDonnees(cote, "")]) : "");
 
 function stripSurface(contours: readonly PlanContour[]): PlanContour[] {
   return contours.map((contour) => ({
@@ -448,13 +476,15 @@ function stripSurface(contours: readonly PlanContour[]): PlanContour[] {
  * « annuler » qui les fait réapparaître les ré-envoie et le serveur les restaure). Les contours
  * partent en bloc s'ils ont changé (la surface calculée par le serveur n'est pas comparée).
  */
-export function diffPlan(before: PlanDocument, after: PlanDocument): PlanOperations {
+export function diffPlan(before: PlanDocument, after: PlanDocument, context: { readonly etageId?: string } = {}): PlanOperations {
   const beforeMurs = new Map(before.murs.map((mur) => [mur.id, mur]));
   const beforeOuvertures = new Map(before.ouvertures.map((ouverture) => [ouverture.id, ouverture]));
   const afterMurIds = new Set(after.murs.map((mur) => mur.id));
   const afterOuvertureIds = new Set(after.ouvertures.map((ouverture) => ouverture.id));
   const beforeEquipements = new Map((before.equipements ?? []).map((objet) => [objet.id, objet]));
   const afterEquipementIds = new Set((after.equipements ?? []).map((objet) => objet.id));
+  const beforeCotes = new Map((before.cotes ?? []).map((cote) => [cote.id, cote]));
+  const afterCoteIds = new Set((after.cotes ?? []).map((cote) => cote.id));
   const operations: PlanOperations = {
     murs: after.murs.filter((mur) => murKey(beforeMurs.get(mur.id)) !== murKey(mur)).map((mur) => ({ id: mur.id, pieceId: mur.pieceId, donnees: murDonnees(mur) })),
     ouvertures: after.ouvertures.filter((ouverture) => ouvertureKey(beforeOuvertures.get(ouverture.id)) !== ouvertureKey(ouverture))
@@ -466,8 +496,12 @@ export function diffPlan(before: PlanDocument, after: PlanDocument): PlanOperati
       ...before.murs.filter((mur) => !afterMurIds.has(mur.id)).map((mur) => mur.id),
       ...before.ouvertures.filter((ouverture) => !afterOuvertureIds.has(ouverture.id) && afterMurIds.has(ouverture.murId)).map((ouverture) => ouverture.id),
       ...(before.equipements ?? []).filter((objet) => !afterEquipementIds.has(objet.id)).map((objet) => objet.id),
+      ...(before.cotes ?? []).filter((cote) => !afterCoteIds.has(cote.id)).map((cote) => cote.id),
     ],
   };
+  const cotes = (after.cotes ?? []).filter((cote) => coteKey(beforeCotes.get(cote.id)) !== coteKey(cote))
+    .map((cote) => ({ id: cote.id, pieceId: cote.pieceId, donnees: coteDonnees(cote, context.etageId ?? "") }));
+  if (cotes.length) operations.cotes = cotes;
   if (!same(stripSurface(before.contours), stripSurface(after.contours))) operations.contours = stripSurface(after.contours);
   if (!same(before.cadre, after.cadre)) operations.cadre = after.cadre;
   if (!same(before.reglages, after.reglages)) operations.reglages = after.reglages;
@@ -489,7 +523,10 @@ export function validatePlanSave(document: PlanDocument, operations: PlanOperati
   const sentObjets = new Set((operations.equipements ?? []).map((objet) => objet.id));
   const deleted = new Set(operations.supprimes);
   const linkOf = new Map((document.equipements ?? []).map((objet) => [objet.id, objet.murId]));
+  const sentCotes = new Set((operations.cotes ?? []).map((cote) => cote.id));
   return validatePlanDocument(document).filter((issue) => {
+    const cote = /^cotes\.([^.]+)\./.exec(issue.path);
+    if (cote) return sentCotes.has(cote[1]);
     const objet = /^equipements\.([^.]+)\./.exec(issue.path);
     if (objet) return sentObjets.has(objet[1]) || deleted.has(linkOf.get(objet[1]) ?? "");
     const match = /^ouvertures\.([^.]+)\./.exec(issue.path);
@@ -499,7 +536,7 @@ export function validatePlanSave(document: PlanDocument, operations: PlanOperati
 }
 
 export function isPlanOperationsEmpty(operations: PlanOperations): boolean {
-  return operations.murs.length === 0 && operations.ouvertures.length === 0 && (operations.equipements ?? []).length === 0 && operations.supprimes.length === 0
+  return operations.murs.length === 0 && operations.ouvertures.length === 0 && (operations.equipements ?? []).length === 0 && (operations.cotes ?? []).length === 0 && operations.supprimes.length === 0
     && operations.contours === undefined && operations.cadre === undefined && operations.reglages === undefined;
 }
 
@@ -651,6 +688,19 @@ export function planExportEntities(document: PlanDocument, labels: { readonly pi
     const layer = EXPORT_LAYER_OF_CALQUE[CALQUE_DES_CATEGORIES[objet.categorie]];
     entities.push({ layer, kind: "polygon", points: equipementFootprint(objet), ref: objet.id });
     entities.push({ layer, kind: "text", at: objet.position, text: objet.libelle, ref: objet.id });
+  }
+  // Lot 8 : cotes manuelles (ligne de cote décalée + valeur), hauteurs ponctuelles (texte).
+  for (const cote of document.cotes ?? []) {
+    if (cote.b) {
+      const l = Math.hypot(cote.b.x - cote.a.x, cote.b.y - cote.a.y) || 1;
+      const off = cote.decalageMm ?? 0;
+      const nx = (-(cote.b.y - cote.a.y) / l) * off; const ny = ((cote.b.x - cote.a.x) / l) * off;
+      const a = { x: cote.a.x + nx, y: cote.a.y + ny }; const b = { x: cote.b.x + nx, y: cote.b.y + ny };
+      entities.push({ layer: "COTES", kind: "line", a, b, widthMm: 0, ref: cote.id });
+      entities.push({ layer: "COTES", kind: "text", at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: `${Math.round(cote.valeurMm)} mm`, ref: cote.id });
+    } else {
+      entities.push({ layer: "COTES", kind: "text", at: cote.a, text: `h ${Math.round(cote.valeurMm)} mm`, ref: cote.id });
+    }
   }
   for (const contour of document.contours) {
     entities.push({ layer: "PIECES", kind: "polygon", points: contour.points, ref: contour.pieceId });

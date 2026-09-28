@@ -264,6 +264,8 @@ export type MurDonnees = {
   readonly materiauId?: ElementId | null;
   /** Lot 5 (facultatif) : mur du plan de base dont celui-ci est la copie (plan dérivé). */
   readonly origineId?: string | null;
+  /** Lot 8 (facultatif) : plan projeté — existant, à déposer, nouveau, déplacé. */
+  readonly etatProjet?: EquipementEtatProjet;
 };
 
 export const OUVERTURE_TYPES = ["porte", "fenetre", "porte_fenetre", "baie", "tremie", "passage"] as const;
@@ -288,6 +290,8 @@ export type OuvertureDonnees = {
   readonly poussee?: OuverturePoussee;
   /** Lot 6 (facultatif) : modèle de menuiserie (battant, oscillo-battant, coulissant, galandage, fixe). */
   readonly modele?: OuvertureModele;
+  /** Lot 8 (facultatif) : plan projeté — existant, à déposer, nouveau, déplacé. */
+  readonly etatProjet?: EquipementEtatProjet;
 };
 /** Lot 6 : attributs de menuiserie (facultatifs, absents des ouvertures antérieures). */
 export const OUVERTURE_VANTAUX = [1, 2] as const;
@@ -417,7 +421,11 @@ export const REVETEMENT_TYPES = [
   "peinture", "carrelage", "faience", "parquet", "stratifie", "moquette", "pvc", "panneau_decoratif",
   "papier_peint", "enduit", "beton", "autre",
 ] as const;
-export type RevetementType = (typeof REVETEMENT_TYPES)[number];
+/** Lot 8 : familles ajoutées (sols, plafonds, linéaires) — sur-ensemble ORDONNÉ (migration 1201). */
+export const REVETEMENT_TYPES_LOT8 = [
+  ...REVETEMENT_TYPES, "resine", "dalle", "ba13", "acoustique", "panneau", "plinthe", "corniche", "profile", "barriere", "bande_peripherique",
+] as const;
+export type RevetementType = (typeof REVETEMENT_TYPES_LOT8)[number];
 /** Unités de quantité : sous-ensemble des unités Gestion Pro (`lignes_metres.unite`). */
 export const QUANTITE_UNITES = ["m2", "ml", "m3", "u"] as const;
 export type QuantiteUnite = (typeof QUANTITE_UNITES)[number];
