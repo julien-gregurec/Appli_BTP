@@ -397,7 +397,7 @@ volume de Production ni de l'hébergé.
 | Storage : backup base / fichiers / manifeste | 0,15 / 0,19 / 0,49 s | RUN_B_ST_BK |
 | Storage : restauration base / fichiers / redémarrage API / vérification | 0,34 / 0,04 / 2,19 / 0,34 s | RUN_B_ST_RS |
 | Auth : backup / restauration | 0,13 / 0,42 s | RUN_B_AU |
-| `npm run dr:verify` complet | 263 s | RUN_B_TOTAL |
+| `npm run dr:verify` complet | 263 s (jeu réutilisé) | RUN_B_TOTAL |
 
 Lecture :
 
