@@ -27,3 +27,12 @@ it("only renders notices from the fixed list", () => {
   expect(knownNotice(undefined)).toBe(undefined);
   expect(knownNotice(["x"])).toBe(undefined);
 });
+it("renders identity and read-only notices (ELSATIA refusal, closed session, read-only refusal)", async () => {
+  const { READ_ONLY_MESSAGE, identityMessage } = await import("../src/lib/identity-policy");
+  // Régression du portage post-H, trouvée par la suite E2E dédiée : ces messages étaient filtrés.
+  expect(knownNotice(READ_ONLY_MESSAGE)).toBe(READ_ONLY_MESSAGE);
+  for (const code of ["ACCOUNT_DISABLED", "NOT_ENTITLED", "REPLAY", "EXPIRED", "NONCE_MISMATCH", "REVOKED", "PLATFORM_UNAVAILABLE", "UNKNOWN_CODE"]) {
+    const text = identityMessage(code)!;
+    expect(knownNotice(text), code).toBe(text);
+  }
+});

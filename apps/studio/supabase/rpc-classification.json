@@ -1,0 +1,135 @@
+{
+  "description": "Classification BLOQUANTE de toute fonction du schéma public du projet Supabase DÉDIÉ Studio exécutable par anon/authenticated/service_role. Contrôlée sur base réelle par apps/studio/e2e-dedicated/verify-dedicated-chain.mjs (C5) : une fonction non classée, classée mais absente, ou exécutable par un rôle hors de sa classe fait échouer la CI. Cohérente avec apps/studio/tests/read-only-policy.test.ts.",
+  "anon_allowed": [],
+  "classes": {
+    "user_write": {
+      "caller": "authenticated",
+      "description": "Écriture utilisateur : garde d'écriture applicative (canWrite / requireWritableStudioUser) ET garde base studio_guard.assert_write ; refusée en lecture seule.",
+      "functions": [
+        "studio_accept_invitation",
+        "studio_activate_timeline",
+        "studio_archive_workspace",
+        "studio_attach_brand_logo",
+        "studio_cancel_analysis",
+        "studio_cancel_render",
+        "studio_create_project",
+        "studio_create_render_share",
+        "studio_create_workspace",
+        "studio_delete_media",
+        "studio_delete_timeline",
+        "studio_duplicate_project",
+        "studio_invite_member",
+        "studio_order_project_media",
+        "studio_project_lifecycle",
+        "studio_remove_project_media",
+        "studio_rename_workspace",
+        "studio_request_analysis",
+        "studio_request_editor_render",
+        "studio_request_render",
+        "studio_reserve_media",
+        "studio_save_brand_kit",
+        "studio_save_editor",
+        "studio_save_project",
+        "studio_save_timeline",
+        "studio_set_member",
+        "studio_set_project_cover"
+      ]
+    },
+    "user_revocation": {
+      "caller": "authenticated",
+      "description": "Révocation d'exposition (chemin user_callable exposure_revocation) : admise en lecture seule, refusée pour un compte bloqué.",
+      "functions": [
+        "studio_revoke_invitation",
+        "studio_revoke_render_share"
+      ]
+    },
+    "user_read": {
+      "caller": "authenticated",
+      "description": "Lecture (STABLE) : admise en lecture seule.",
+      "functions": [
+        "studio_dashboard_stats",
+        "studio_get_brand_kit",
+        "studio_get_timeline",
+        "studio_identity_session_status",
+        "studio_list_analysis",
+        "studio_list_brand_logo_candidates",
+        "studio_list_invitations",
+        "studio_list_project_media",
+        "studio_list_render_shares",
+        "studio_my_role",
+        "studio_project_media_stats",
+        "studio_project_summaries",
+        "studio_workspace_usage"
+      ]
+    },
+    "public_resolve": {
+      "caller": "service_role",
+      "description": "Résolution publique d'un secret haché (page /s/[token], page d'invitation) : clé service, STABLE.",
+      "functions": [
+        "studio_resolve_invitation",
+        "studio_resolve_render_share"
+      ]
+    },
+    "identity_bridge": {
+      "caller": "service_role",
+      "description": "Pont d'identité ELSATIA (passage signé, cycle de vie, réconciliation) : clé service, serveur Studio uniquement.",
+      "functions": [
+        "studio_identity_accept_handoff",
+        "studio_identity_apply_lifecycle",
+        "studio_identity_ban_drift",
+        "studio_identity_confirm_ban",
+        "studio_identity_consume_handoff",
+        "studio_identity_link",
+        "studio_identity_purge",
+        "studio_identity_record_handoff",
+        "studio_identity_register_session",
+        "studio_identity_revoke_sessions",
+        "studio_identity_user_by_email"
+      ]
+    },
+    "worker_render": {
+      "caller": "service_role",
+      "description": "Worker de rendu (chemin système render_worker).",
+      "functions": [
+        "studio_claim_render",
+        "studio_complete_render",
+        "studio_render_dispatch",
+        "studio_render_progress"
+      ]
+    },
+    "worker_analysis": {
+      "caller": "service_role",
+      "description": "Worker d'analyse (chemin système analysis_worker).",
+      "functions": [
+        "studio_analysis_dispatch",
+        "studio_analysis_touch",
+        "studio_claim_analysis",
+        "studio_finish_analysis"
+      ]
+    },
+    "media_system": {
+      "caller": "service_role",
+      "description": "Cycle de vie Storage des médias (finalisation, expiration, réconciliation).",
+      "functions": [
+        "studio_expire_media",
+        "studio_fail_media",
+        "studio_finish_media",
+        "studio_mark_media_missing",
+        "studio_mark_media_purged"
+      ]
+    },
+    "rgpd_erasure": {
+      "caller": "service_role",
+      "description": "Effacement RGPD (chemin système rgpd_erasure) : décision écrite, DECISION_REQUIRED bloquant.",
+      "functions": [
+        "studio_erasure_confirm_auth_deleted",
+        "studio_erasure_due",
+        "studio_erasure_execute",
+        "studio_erasure_finalize",
+        "studio_erasure_prepare",
+        "studio_erasure_storage_batch",
+        "studio_erasure_storage_done"
+      ]
+    }
+  }
+}

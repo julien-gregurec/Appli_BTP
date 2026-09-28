@@ -1,0 +1,102 @@
+name: Studio Dedicated E2E (projet Supabase dédié, sans train GP)
+# Chaîne Studio DÉDIÉE seule (apps/studio/supabase/migrations) sur des services réels locaux :
+# PostgreSQL 16, GoTrue, PostgREST, storage-api, Redis, worker de rendu, Studio next start,
+# identité centrale sans table GP. Aucun Supabase distant, aucun Vercel, aucun secret de dépôt.
+# Échoue si : une migration GP apparaît, une migration Studio est oubliée, une RPC non classée
+# apparaît, une table GP apparaît, un scénario Playwright critique échoue, pgTAP ou identité échoue.
+on:
+  pull_request:
+    paths:
+      - 'apps/studio/**'
+      - 'workers/studio-video/**'
+      - 'packages/studio-domain/**'
+      - 'packages/elsatia-identity/**'
+      - 'supabase/migrations/**'
+      - 'supabase/tests/studio_*'
+      - 'scripts/verify-migration-targets*.mjs'
+      - 'scripts/local-postgres-bootstrap/pg_bootstrap.sql'
+      - '.github/workflows/studio-dedicated-e2e.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-dedicated-e2e-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  E2E_BIN: ${{ github.workspace }}/../e2e-infra
+  E2E_DIR: ${{ github.workspace }}/../e2e-run
+  PGBIN: /usr/lib/postgresql/16/bin
+  STUDIO_FFMPEG_PATH: /usr/bin/ffmpeg
+  STUDIO_FFPROBE_PATH: /usr/bin/ffprobe
+jobs:
+  studio-dedicated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/studio/package-lock.json
+            workers/studio-video/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: false
+      - name: Paquets système (PostgreSQL 16 + pgTAP, Redis, FFmpeg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-16-pgtap redis-server ffmpeg
+          sudo systemctl stop redis-server || true
+          ffmpeg -hide_banner -filters | grep -q drawtext
+      - name: Cache infra (GoTrue, PostgREST, storage-api)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.E2E_BIN }}
+          key: studio-e2e-infra-gotrue-v2.192.0-postgrest-v12.2.3-storage-v1.79.22-node24
+      - name: Infra du banc
+        run: apps/studio/e2e-dedicated/install-infra.sh
+      - run: npm ci --ignore-scripts
+      - run: npm ci --prefix apps/studio
+      - run: npm ci --prefix workers/studio-video
+
+      # --- 1. dedicated-db-check : ciblage statique + chaîne dédiée seule + pgTAP Studio ---
+      - name: Ciblage des migrations (statique)
+        run: node scripts/verify-migrations.mjs && node scripts/verify-migration-targets.mjs && node --test scripts/verify-migration-targets.test.mjs
+      - name: dedicated-db-check (chaîne dédiée seule + pgTAP Studio)
+        run: |
+          mkdir -p "$RUNNER_TEMP/pgtap"
+          $PGBIN/initdb -D "$RUNNER_TEMP/pgtap/data" -A trust -U postgres >/dev/null
+          $PGBIN/pg_ctl -D "$RUNNER_TEMP/pgtap/data" -o "-p 56440 -k $RUNNER_TEMP/pgtap" -l "$RUNNER_TEMP/pgtap/log" -w start
+          DEDICATED_PSQL_ARGS="-h 127.0.0.1 -p 56440 -U postgres" apps/studio/scripts/dedicated-db-check.sh
+          $PGBIN/pg_ctl -D "$RUNNER_TEMP/pgtap/data" stop -m fast
+
+      # --- 2. Studio : RPC classées (read-only-policy), typage, lint, Vitest ---
+      - run: npm run typecheck --prefix apps/studio && npm run typecheck:e2e-dedicated --prefix apps/studio && npm run lint --prefix apps/studio
+      - run: npm test --prefix apps/studio
+
+      # --- 3. identity : B + I1 sur GoTrue + PostgREST réels (deux projets locaux) ---
+      - name: identity B+I1 (GoTrue/PostgREST réels)
+        run: |
+          STACK_BIN="$E2E_BIN" STACK_DIR="$RUNNER_TEMP/identity-stack" packages/elsatia-identity/scripts/local-stack.sh start
+          source "$RUNNER_TEMP/identity-stack/env.sh"
+          npx vitest run packages/elsatia-identity
+          node packages/elsatia-identity/scripts/studio-post-h-smoke.mjs
+      - if: always()
+        run: STACK_DIR="$RUNNER_TEMP/identity-stack" packages/elsatia-identity/scripts/local-stack.sh stop || true
+
+      # --- 4. Playwright Studio dédié : pile réelle, garde de chaîne + canaris, 21 scénarios ---
+      - run: apps/studio/node_modules/.bin/playwright install --with-deps chromium
+      - name: Playwright Studio dédié
+        run: E2E_RESULT="$RUNNER_TEMP/studio-dedicated-e2e.json" apps/studio/e2e-dedicated/run.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: studio-dedicated-e2e
+          path: |
+            apps/studio/e2e-dedicated/test-results
+            ${{ env.E2E_DIR }}/*.log
+          if-no-files-found: ignore

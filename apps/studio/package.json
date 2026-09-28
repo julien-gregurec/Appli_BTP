@@ -9,9 +9,11 @@
     "build": "next build --webpack",
     "start": "next start -p 3030",
     "typecheck": "tsc --noEmit --incremental false",
-    "lint": "eslint src tests next.config.ts",
+    "lint": "eslint src tests e2e-dedicated next.config.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck:e2e-dedicated": "tsc --noEmit -p e2e-dedicated/tsconfig.json",
+    "test:e2e:dedicated": "e2e-dedicated/run.sh"
   },
   "dependencies": {
     "@elsatia/identity": "file:../../packages/elsatia-identity",
