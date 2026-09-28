@@ -1,4 +1,4 @@
--- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 5 — PLAN 2D (migration 20260927000901)
+-- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 5 — PLAN 2D (migration 20260928000101)
 --
 -- Qualifie sous RLS réelle :
 --   S1–S6   schéma : table, colonne plan_id, RLS, lecture seule pour `authenticated`, RPC SECURITY DEFINER ;

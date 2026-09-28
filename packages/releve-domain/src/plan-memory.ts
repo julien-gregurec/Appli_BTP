@@ -1,5 +1,5 @@
 /**
- * Dépôt de plans en mémoire : mêmes règles que les RPC de la migration 20260927000901
+ * Dépôt de plans en mémoire : mêmes règles que les RPC de la migration 20260928000101
  * (création, enregistrement par lot avec révision attendue, gel immuable, dérivation). Sert aux
  * tests du domaine et de l'éditeur, sans base.
  */

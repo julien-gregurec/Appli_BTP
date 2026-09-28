@@ -1,7 +1,7 @@
 -- ELSATIA-RESERVES-HOST-SUSPENSION-POLICY-V1
 --
 -- Décision D-01 : quand l'organisation HÔTE est suspendue, l'entreprise intervenante
--- invitée passe en LECTURE SEULE. Migration : 20260927000506_reserves_hote_suspendu_
+-- invitée passe en LECTURE SEULE. Migration : 20260928000301_reserves_hote_suspendu_
 -- lecture_seule_v1.sql. Rapport : docs/qualification/ELSATIA_RESERVES_HOST_SUSPENSION_
 -- POLICY_V1.md.
 --
@@ -19,7 +19,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(96);
+select plan(97);  -- 96 (branche d'origine) + 8.06b (train V5 : reserves_contacts)
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -327,8 +327,10 @@ select lives_ok($$update public.reserves_plans set nb_pages = 2 where id = 'e810
 update public.reserves_plans set nb_pages = null where id = 'e8100000-0000-0000-0000-000000000001';
 select ok(exists (select 1 from pg_trigger where tgname = 'reserves_garde_hote_suspendu'
   and tgrelid = 'public.reserves_historique'::regclass), '8.05 garde posée sur le journal');
-select is((select count(distinct tgrelid)::int from pg_trigger where tgname = 'reserves_garde_hote_suspendu'), 10,
-  '8.06 garde posée sur les 10 tables de l''hôte');
+select is((select count(distinct tgrelid)::int from pg_trigger where tgname = 'reserves_garde_hote_suspendu'), 11,
+  '8.06 garde posée sur les 11 tables de l''hôte (10 + reserves_contacts, train V5)');
+select ok(exists (select 1 from pg_trigger where tgname = 'reserves_garde_hote_suspendu'
+  and tgrelid = 'public.reserves_contacts'::regclass), '8.06b garde posée sur reserves_contacts (GP ↔ Réserves)');
 select ok(not has_function_privilege('authenticated', 'public.reserves_hote_ecriture_ouverte(uuid)', 'execute')
   and not has_function_privilege('anon', 'public.reserves_hote_ecriture_ouverte(uuid)', 'execute'),
   '8.07 le prédicat commercial n''est pas exposé aux clients');

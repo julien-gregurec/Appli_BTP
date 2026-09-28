@@ -1,5 +1,5 @@
 /**
- * Lot 5 — Plan 2D d'un étage (miroir de la migration 20260927000901).
+ * Lot 5 — Plan 2D d'un étage (miroir de la migration 20260928000101).
  *
  * Un **plan** documente la géométrie d'un ÉTAGE dans un état : `initial` (existant relevé),
  * `corrige`, `projete`, `as_built` — les mêmes valeurs que les versions du relevé. Il porte :

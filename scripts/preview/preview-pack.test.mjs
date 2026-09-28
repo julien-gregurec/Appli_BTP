@@ -317,6 +317,19 @@ test("train : attendus générés = fichiers du dépôt (DB verify SQL, runbooks
   assert.ok(attendus.controles >= 17, "contrôles V3 (14-17) présents");
 });
 
+test("train : chiffres historiques V3 et V4 jamais réécrits (train V5)", async () => {
+  const te = await import("./train-expectations.mjs");
+  const racine = resolve(import.meta.dirname, "../..");
+  assert.ok(te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE.md"));
+  assert.ok(!te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_PREVIEW_FINAL_EXECUTION_PACK_V1.md"));
+  const v4 = readFileSync(resolve(racine, "docs/qualification/ELSATIA_CANONICAL_TRAIN_V4_PREVIEW_CANDIDATE.md"), "utf8");
+  assert.match(v4, /Base neuve \*\*352\/352\*\*/);
+  assert.match(v4, /\*\*352\*\*, dernière \*\*`20260927100000`\*\*/);
+  const v3 = readFileSync(resolve(racine, "docs/qualification/ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE.md"), "utf8");
+  assert.doesNotMatch(v3, /<!--train:(nb|derniere|controles)-->/);
+  assert.doesNotMatch(v4, /<!--train:(nb|derniere|controles)-->/);
+});
+
 test("train : réécriture des marqueurs SQL et Markdown", async () => {
   const te = await import("./train-expectations.mjs");
   const a = { nb: 999, derniere: "20991231000000", controles: 42 };

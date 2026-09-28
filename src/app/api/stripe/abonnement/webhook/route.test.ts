@@ -287,7 +287,7 @@ describe("coordination webhook et saga", () => {
   it("B3 : la subscription est liée à l'entreprise avant la chaîne remise", async () => {
     const admin = adminFake();
     await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_lien"));
-    // Rattachement unique (première liaison ou réabonnement, migration …508).
+    // Rattachement unique (première liaison ou réabonnement, migration 20260928000201).
     const lien = admin.appels.find((a) => a.table === "relier_subscription_reabonnement_service");
     expect(lien).toBeTruthy();
     expect((lien?.donnees as Record<string, unknown>).p_nouvelle_subscription_id).toBe("sub_test");
@@ -381,7 +381,7 @@ describe("email de paiement échoué", () => {
 describe("statut d'accès sur les événements facture (Billing Security V3 + contrat d'ordre)", () => {
   // Les transitions sont désormais décidées et écrites en base, atomiquement,
   // par `appliquer_evenement_facture_abonnement_v2_service` (garde de
-  // subscription …508, puis contrat 506 : verrou ligne +
+  // subscription 20260928000201, puis contrat 506 : verrou ligne +
   // filigrane event.created). Leur sémantique (3DS sans effet, paid régularise,
   // payment_failed suspend immédiatement, périmé sans effet) est prouvée par
   // supabase/tests/stripe_event_ordering_v1.test.sql ; ici on vérifie le

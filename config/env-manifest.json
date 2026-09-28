@@ -5956,6 +5956,50 @@
       "example_required": false
     },
     {
+      "name": "SEEDS_DR_PGPASSWORD",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe TCP local et jetable du rôle postgres pour le drill DR du harnais des seeds (scripts/seeds/verify-seeds.mjs ; généré par job en CI, masqué). Prioritaire sur DR_PGPASSWORD. Sans lui, le scénario DR du harnais échoue explicitement.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR_PGPASSWORD",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe de la base DR locale lu par les scripts scripts/dr/* et, à défaut de SEEDS_DR_PGPASSWORD, par le harnais des seeds (scripts/seeds/verify-seeds.mjs). Base jetable uniquement.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "STRIPE_PORTAL_CONFIGURATION_ID",
       "applications": [
         "gestion_pro"

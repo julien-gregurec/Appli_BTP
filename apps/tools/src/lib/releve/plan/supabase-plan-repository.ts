@@ -2,7 +2,7 @@
  * Adaptateur Supabase du port `RelevePlanRepository` (Lot 5).
  *
  * Lecture : PostgREST sous RLS (`tools_releves_plans` et `tools_releves_elements`, lecture seule
- * pour les plans). Écriture : UNIQUEMENT les RPC de la migration 901 (création, enregistrement
+ * pour les plans). Écriture : UNIQUEMENT les RPC de la migration 20260928000101 (création, enregistrement
  * par lot avec révision attendue, gel) — la table des plans n'accorde aucun droit d'écriture
  * direct aux utilisateurs.
  */

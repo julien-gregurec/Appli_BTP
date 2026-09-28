@@ -185,7 +185,7 @@ describe("parité domaine ↔ migration tools_releve_metre_capture_media_v1 (Lot
 });
 
 const plan2d = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/20260927000901_tools_releve_metre_plan_2d_v1.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/20260928000101_tools_releve_metre_plan_2d_v1.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ");
 

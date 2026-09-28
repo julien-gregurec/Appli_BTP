@@ -1,6 +1,6 @@
 /**
  * Décision D-01 — organisation HÔTE suspendue : l'entreprise intervenante passe en
- * LECTURE SEULE (migration `20260927000506_reserves_hote_suspendu_lecture_seule_v1`).
+ * LECTURE SEULE (migration `20260928000301_reserves_hote_suspendu_lecture_seule_v1`).
  *
  * L'AUTORITÉ EST LA BASE : `reserves_acteur_courant` et le trigger
  * `reserves_garde_hote_suspendu` refusent toute écriture, par n'importe quel chemin. Ce

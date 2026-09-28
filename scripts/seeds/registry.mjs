@@ -235,9 +235,54 @@ export const SEEDS = [
         { sql: "scripts/e2e/reset-reserves-recipe.sql" },
         { sql: "scripts/e2e/prepare-reserves-v4-listes.sql" },
         { sql: "scripts/e2e/prepare-reserves-v6-securite.sql" },
+        // Train V5 : décor isolé D-01 (hôte suspendu → intervenant en lecture seule).
+        { sql: "scripts/e2e/prepare-reserves-suspension-hote.sql" },
         { sql: "scripts/e2e/prepare-reserves-v6-charge.sql" },
       ],
       runs: 3,
+    },
+  },
+  { id: "e2e-reserves-suspension-hote", path: "scripts/e2e/prepare-reserves-suspension-hote.sql", classification: "CI_ONLY", target: "recette e2e Réserves D-01 (hôte suspendu)", coveredBy: "e2e-reserves" },
+  // Train V4 → V5 : décor GP ↔ Réserves (tests/e2e/gp-reserves-pile-locale/preparer-base.sh).
+  {
+    id: "e2e-gp-reserves",
+    path: "scripts/e2e/prepare-gp-reserves-integration.sql",
+    classification: "CI_ONLY",
+    target: "recette e2e GP ↔ Réserves (tests/e2e/gp-reserves-pile-locale/preparer-base.sh)",
+    idempotent: true,
+    harness: {
+      setup: [PARITE_GOTRUE, ISOLATION_MULTITENANT],
+      run: [
+        { sql: "scripts/e2e/prepare-gp-reserves-integration.sql" },
+        { sql: "scripts/e2e/prepare-local-recipe.sql" },
+      ],
+      runs: 3,
+    },
+    bypass: {
+      capacite_personnes_bypass: "Décor e2e : `set local` dans la transaction du script, base jetable uniquement.",
+    },
+  },
+  // Train V4 → V5 : jeu de la recette Playwright Relevé & Métré (releve_e2e_stack.sh, comptes GoTrue
+  // remplacés ici par deux lignes auth.users ; mêmes variables psql ua / ub / ea).
+  {
+    id: "e2e-releve",
+    path: "scripts/local-postgres-bootstrap/releve_e2e_seed.sql",
+    classification: "CI_ONLY",
+    target: "recette e2e Relevé & Métré (scripts/local-postgres-bootstrap/releve_e2e_stack.sh)",
+    idempotent: true,
+    harness: {
+      setup: [
+        PARITE_GOTRUE,
+        { seed: "pilote-btp" },
+        { inline: "insert into auth.users (id, email) values ('e2e0a000-0000-4000-8000-00000000000a', 'releve-a@example.test'), ('e2e0b000-0000-4000-8000-00000000000b', 'releve-b@example.test') on conflict do nothing;" },
+      ],
+      run: [
+        { inline: "\\set ua 'e2e0a000-0000-4000-8000-00000000000a'\n\\set ub 'e2e0b000-0000-4000-8000-00000000000b'\nselect id as ea from public.entreprises where reference_interne = 'PILOTE-BTP-V1' \\gset\n\\ir scripts/local-postgres-bootstrap/releve_e2e_seed.sql" },
+      ],
+      runs: 3,
+    },
+    bypass: {
+      capacite_personnes_bypass: "Recette e2e : `set` de session sur la base jetable de la pile Relevé, superutilisateur uniquement.",
     },
   },
   { id: "e2e-local-recipe", path: "scripts/e2e/prepare-local-recipe.sql", classification: "CI_ONLY", target: "recette e2e locale", coveredBy: "e2e-reserves" },
@@ -289,9 +334,18 @@ export const SEEDS = [
       run: [
         { sql: "scripts/local-postgres-bootstrap/upgrade_v1_v2_seed_complement.sql" },
         { sql: "scripts/local-postgres-bootstrap/upgrade_v2_v3_seed_complement.sql" },
+        // Train V4 : complément de l'upgrade V3 → V4 (repris par l'upgrade V4 → V5).
+        { sql: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql" },
       ],
       runs: 1,
     },
+  },
+  {
+    id: "upgrade-complement-v4",
+    path: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql",
+    classification: "CI_ONLY",
+    target: "qualification d'upgrade V3 → V4 (et V4 → V5)",
+    coveredBy: "upgrade-complements",
   },
   {
     id: "upgrade-complement-v3",

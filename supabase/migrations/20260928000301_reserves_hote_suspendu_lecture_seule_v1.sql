@@ -1,5 +1,8 @@
 -- ELSATIA-RESERVES-HOST-SUSPENSION-POLICY-V1 — HÔTE SUSPENDU : INTERVENANT EN LECTURE SEULE
 --
+-- Train canonique V5 : renumérotée 20260927000506 → 20260928000301 (le numéro …0927 506 est
+-- celui de l'ordre des webhooks Stripe dans le train V4). Seul ajout : `reserves_contacts` (§3).
+--
 -- Décision propriétaire D-01 (ouverte par ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1 §3.8,
 -- tranchée : MODE LECTURE SEULE). Rapport :
 -- docs/qualification/ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md.
@@ -172,7 +175,11 @@ begin
   foreach v_table in array array[
     'reserves', 'reserves_historique', 'reserves_messages', 'reserves_conversations',
     'reserves_photos', 'reserves_mutations_appliquees', 'reserves_plans',
-    'reserves_chantiers', 'reserves_intervenants', 'reserves_invitations'
+    'reserves_chantiers', 'reserves_intervenants', 'reserves_invitations',
+    -- Train canonique V5 : `reserves_contacts` (GP ↔ Réserves, 20260927000402) est aussi une
+    -- table de l'hôte, absente de la branche d'origine (bâtie sur V3). Ses policies la réservent
+    -- déjà aux membres de l'hôte ; la garde s'y applique par cohérence de défense en profondeur.
+    'reserves_contacts'
   ] loop
     execute format('drop trigger if exists reserves_garde_hote_suspendu on public.%I', v_table);
     execute format(

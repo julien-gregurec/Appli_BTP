@@ -25,7 +25,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (352, '20260927100000')),
+attendu_train(nb, derniere) as (values (355, '20260928000301')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -238,11 +238,11 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
                 then 'garde' else 'garde ABSENTE' end,
            (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
-             and c.relname like 'tools\_releves%' and c.relrowsecurity)::text || ' tables RLS'),
+             and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity)::text || ' tables RLS'),
          coalesce((select etat = 'releve_pro:reference:inclut tools_pro' from releve_pro), false)
            and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
            and (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
-                 and c.relname like 'tools\_releves%' and c.relrowsecurity) = 11, true
+                 and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity) = 11, true
   union all
   select 23, 'Identité Studio (20260927100000) : fermée, inerte (Studio OFF)', 'tables RLS sans droit d''API ; 0 sujet émis',
          concat_ws(', ',
@@ -283,6 +283,28 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and coalesce((select not has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p
                          join pg_namespace n on n.oid = p.pronamespace
                          where n.nspname = 'public' and p.proname = 'reserves_hote_ecriture_ouverte'), false), true
+  union all
+  -- Contrôle 26 (train V5) : Relevé & Métré Lot 5, plan 2D par étage. Table en lecture seule pour
+  -- les utilisateurs (écriture par RPC uniquement), RPC fermées à anon, journal « plan ».
+  select 26, 'Tools Relevé & Métré : plan 2D (20260928000101)', 'tools_releves_plans RLS, écriture RPC seule, RPC fermées à anon',
+         concat_ws(', ',
+           case when to_regclass('public.tools_releves_plans') is null then 'tools_releves_plans ABSENTE'
+                when (select c.relrowsecurity from pg_class c where c.oid = to_regclass('public.tools_releves_plans'))
+                  then 'RLS' else 'RLS DÉSACTIVÉE' end,
+           (select count(*) from information_schema.role_table_grants where table_schema = 'public'
+             and table_name = 'tools_releves_plans' and grantee in ('anon', 'authenticated')
+             and privilege_type <> 'SELECT')::text || ' droit(s) d''écriture API',
+           (select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
+             and p.proname in ('tools_releve_plan_creer', 'tools_releve_plan_enregistrer', 'tools_releve_plan_figer')
+             and not has_function_privilege('anon', p.oid, 'execute'))::text || '/3 RPC fermées à anon'),
+         to_regclass('public.tools_releves_plans') is not null
+           and coalesce((select c.relrowsecurity from pg_class c where c.oid = to_regclass('public.tools_releves_plans')), false)
+           and (select count(*) from information_schema.role_table_grants where table_schema = 'public'
+                 and table_name = 'tools_releves_plans' and grantee in ('anon', 'authenticated')
+                 and privilege_type <> 'SELECT') = 0
+           and (select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
+                 and p.proname in ('tools_releve_plan_creer', 'tools_releve_plan_enregistrer', 'tools_releve_plan_figer')
+                 and not has_function_privilege('anon', p.oid, 'execute')) = 3, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

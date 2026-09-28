@@ -142,7 +142,7 @@ async function appliquerEvenementFacture(admin: SupabaseAdmin, entrepriseId: str
   const taxes = (objet.total_tax_amounts ?? []).reduce((total, taxe) => total + Number(taxe.amount ?? 0), 0);
   const totalCentimes = Number(objet.total ?? 0);
   const htCentimes = objet.subtotal_excluding_tax == null ? Math.max(0, totalCentimes - taxes) : Number(objet.subtotal_excluding_tax);
-  // Garde de subscription (migration 20260927000508) puis contrat d'ordre 506.
+  // Garde de subscription (migration 20260928000201) puis contrat d'ordre 506.
   const { data, error } = await admin.rpc("appliquer_evenement_facture_abonnement_v2_service", {
     p_entreprise_id: entrepriseId,
     p_stripe_event_id: evenement.id,

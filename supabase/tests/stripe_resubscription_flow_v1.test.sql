@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 
--- ELSATIA — Stripe Resubscription Flow V1 (migration 20260927000508).
+-- ELSATIA — Stripe Resubscription Flow V1 (migration 20260928000201 ; …0927 508 sur sa branche d'origine).
 -- Réabonnement d'une entreprise dont la subscription Stripe a été annulée :
 -- cas Stripe (cancel_at_period_end, canceled, unpaid, past_due, subscription
 -- deleted, customer existant sans abonnement), réactivation préférée, aucun

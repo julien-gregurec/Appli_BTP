@@ -46,6 +46,12 @@ export function appliquerMarkdown(md, a) {
     .replace(/<!--train:controles-->[^<]*<!--\/train:controles-->/g, `<!--train:controles-->${a.controles}<!--/train:controles-->`);
 }
 
+/**
+ * Rapports de train canonique (V3, V4, V5…) : chiffres HISTORIQUES de leur train, jamais
+ * réécrits par ce générateur, même s'ils portaient un jour un marqueur (train V5).
+ */
+export const RAPPORTS_HISTORIQUES = /(^|\/)ELSATIA_CANONICAL_TRAIN_[^/]*\.md$/;
+
 function fichiersMarkdown(dir) {
   const out = [];
   for (const nom of readdirSync(dir)) {
@@ -68,7 +74,7 @@ export function synchroniser({ ecrire = false } = {}) {
   }
   for (const f of fichiersMarkdown(DOCS)) {
     const md = readFileSync(f, "utf8");
-    if (!md.includes("<!--train:")) continue;
+    if (!md.includes("<!--train:") || RAPPORTS_HISTORIQUES.test(relative(ROOT, f))) continue;
     const neuf = appliquerMarkdown(md, a);
     if (neuf !== md) {
       changes.push(relative(ROOT, f));

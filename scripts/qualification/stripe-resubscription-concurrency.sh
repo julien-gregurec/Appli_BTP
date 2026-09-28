@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ELSATIA — Stripe Resubscription Flow V1 : concurrence RÉELLE du réabonnement.
 #
-# N sessions PostgreSQL parallèles, sur la vraie base (migrations 506 + 507 + 508) :
+# N sessions PostgreSQL parallèles, sur la vraie base (migrations …0927 506 + …0927 507 + …0928 201, train V5) :
 #   R1  N livraisons simultanées du rattachement de la MÊME nouvelle subscription
 #       → exactement un « relie », le reste « deja_lie », un seul historique ;
 #   R2  N nouvelles subscriptions DIFFÉRENTES rattachées en même temps (double

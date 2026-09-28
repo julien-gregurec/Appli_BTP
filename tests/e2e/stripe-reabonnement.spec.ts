@@ -4,7 +4,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 /*
  * ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1 — écrans de réabonnement dans un vrai navigateur.
  *
- * Pile : PostgreSQL 16 portant le train complet (…508), passerelle locale Supabase
+ * Pile : PostgreSQL 16 portant le train complet (…0928 201, train V5), passerelle locale Supabase
  * (tests/e2e/colors-pile-locale/passerelle.mjs : RLS réelle sous le rôle du JWT),
  * Gestion Pro en `next dev`. Aucun appel Stripe réussi n'est possible (clé factice) :
  * l'état Stripe est projeté en base comme le ferait le webhook, et le chemin d'action
