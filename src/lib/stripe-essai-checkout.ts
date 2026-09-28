@@ -14,6 +14,7 @@
 // rend acceptable par la contrainte au retour du webhook. Le fuseau du serveur
 // Node (TZ, heure d'été) n'intervient à aucun moment.
 import { DUREE_ESSAI_JOURS } from "@/lib/acces-socle-essai";
+import { MESSAGES_REABONNEMENT } from "@/lib/stripe-reabonnement";
 
 const SECONDES_PAR_JOUR = 86_400;
 
@@ -124,4 +125,48 @@ export function suffixeIdempotenceEssai(essai: EssaiCheckout) {
 /** Essai d'un réabonnement : toujours aucun, l'essai ELSATIA est consommé. */
 export function essaiReabonnement(): EssaiCheckout {
   return { mode: "aucun", raison: "essai_consomme", finLocale: null, restantSecondes: 0 };
+}
+
+/**
+ * Libellés de souscription affichés sur /abonnement
+ * (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, finding B-5).
+ *
+ * L'écran annonçait « Essai gratuit de 30 jours » et « Démarrer l’essai » à
+ * toute entreprise sans subscription, y compris un essai expiré ou à moins de
+ * 48 h de sa fin — cas où Checkout ne porte AUCUN essai et facture dès la
+ * souscription. Le libellé suit désormais exactement ce que Checkout fera
+ * (même calcul `calculerEssaiCheckout`, même horloge).
+ */
+export type LibellesSouscription = { titre: string; description: string; bouton: string; paiementImmediat: boolean };
+
+export function libellesSouscription(essai: EssaiCheckout, reabonnement: boolean): LibellesSouscription {
+  if (reabonnement || (essai.mode === "aucun" && essai.raison === "essai_consomme")) {
+    return {
+      titre: MESSAGES_REABONNEMENT.reactiver.libelle,
+      description: MESSAGES_REABONNEMENT.reactiver.description,
+      bouton: "Réactiver avec cette offre",
+      paiementImmediat: true,
+    };
+  }
+  if (essai.mode === "trial_end") {
+    return {
+      titre: "Choisir une offre",
+      description: `Votre essai gratuit continue jusqu’au ${formaterDateFr(essai.finLocale)} inclus : aucun paiement avant cette date.`,
+      bouton: "Choisir cette offre",
+      paiementImmediat: false,
+    };
+  }
+  return {
+    titre: "Choisir une offre",
+    description: essai.raison === "restant_inferieur_minimum_stripe"
+      ? "Votre essai se termine dans moins de 48 heures : le paiement de la première échéance est demandé dès la souscription."
+      : "Votre période d’essai est terminée : le paiement de la première échéance est demandé dès la souscription.",
+    bouton: "Souscrire (paiement immédiat)",
+    paiementImmediat: true,
+  };
+}
+
+function formaterDateFr(dateIso: string) {
+  const [a, m, j] = dateIso.split("-");
+  return `${j}/${m}/${a}`;
 }

@@ -20,6 +20,8 @@ vi.mock("@/lib/abonnement-notifications", () => ({ notifierPaiementAbonnementEch
 vi.mock("@/lib/stripe-capacite-reconcile", () => ({ reconcilierCapacitePersonnesStripe: deps.reconcilierCapacitePersonnesStripe }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   recupererAbonnementStripe: deps.recupererAbonnementStripe,
+  // Offre facturée : la vraie fonction est pure ; ici, sans Price configuré, repli metadata.
+  offreFactureeDepuisSubscription: (a: { metadata?: Record<string, string> }) => ({ offre: a.metadata?.offre ?? null, periodicite: a.metadata?.periodicite ?? null, source: "metadata", divergence: false }),
   statutAbonnementDepuisStripe: (s: string) => (s === "trialing" ? "essai" : s === "active" ? "actif" : ["past_due", "unpaid", "incomplete", "paused"].includes(s) ? "suspendu" : "annule"),
   reconcilierAbonnementStripe: deps.reconcilierAbonnementStripe,
   ajouterDepassementAppareilsFacture: deps.ajouterDepassementAppareilsFacture,

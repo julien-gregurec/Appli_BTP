@@ -37,6 +37,8 @@ const deps = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: deps.createAdminClient }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   recupererAbonnementStripe: deps.recupererAbonnementStripe,
+  // Offre facturée : la vraie fonction est pure ; ici, sans Price configuré, repli metadata.
+  offreFactureeDepuisSubscription: (a: { metadata?: Record<string, string> }) => ({ offre: a.metadata?.offre ?? null, periodicite: a.metadata?.periodicite ?? null, source: "metadata", divergence: false }),
   statutAbonnementDepuisStripe: deps.statutAbonnementDepuisStripe,
   reconcilierAbonnementStripe: deps.reconcilierAbonnementStripe,
   ajouterDepassementAppareilsFacture: deps.ajouterDepassementAppareilsFacture,
