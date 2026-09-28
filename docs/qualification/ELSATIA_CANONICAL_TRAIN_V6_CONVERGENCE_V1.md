@@ -11,9 +11,26 @@
 
 ## 0. Verdict
 
-**`__VERDICT__`**
+**`CANONICAL TRAIN V6 LOCALLY QUALIFIED`**
 
-__RESUME__
+Les 3 lots post-V5 sont intégrés sans toucher à V5 (branche, migrations et rapports historiques
+inchangés). Migrations renumérotées après la dernière migration réelle de V5 : `…0928 401` (Relevé
+Lot 6), `…0928 501` (RGPD contrats V2), plus `…0928 601` propre à V6 (**surface de la pièce
+synchronisée par le serveur**, décision produit implémentée sans affaiblir le Lot 3). Base neuve
+**358/358**, 0 erreur. **Upgrade V5 → V6 avec données réalistes** (base V5 construite depuis V3) :
+0 écart de lignes sur 269 tables, **91/91 empreintes métier identiques**, 0 policy supprimée,
+modifiée ou ajoutée, sonde RLS **0 écart / 1 479 cellules**, grants inchangés, schéma et ACL
+identiques au fresh, **28/28 contrôles métier**. pgTAP **143/152 propres, 0 régression** (fichiers
+communs identiques à V5, 3 suites nouvelles propres). Les 5 applications passent typecheck, lint,
+Vitest et build. **Playwright** : Relevé 2/3/4/5/6 + Atelier **68/68**, Réserves **59/59**, D-01
+**7/7**, GP ↔ Réserves **5/5 ×3**, Stripe réabonnement **6/6 ×2**, Colors **73/73**. Chaîne Studio
+dédiée : 14 migrations, **543 pgTAP**, 0 table GP, identité B + I1 **73/73 ×3** (GoTrue, PostgREST,
+app Studio réelle). Seeds : **ALL ACTIVE SEEDS QUALIFIED, 16/16** sur 358 migrations. DB verify
+**29 contrôles, GO local**. RGPD contrats : **aucune durée, aucun point de départ, aucun sort des
+photos activés — fail-closed**. Studio reste **OFF** pour la première Preview.
+
+Comme en V5, ce qui reste relève de l'exécution distante (Stripe Test, Portail, Storage, GoTrue,
+e-mail réels : NOT PROVEN localement). V6 n'est pas déployé.
 
 ---
 
@@ -248,7 +265,25 @@ Playwright 1.62.1, Chromium 1194 (`executablePath` explicite). Chaque pile tourn
 PostgreSQL 16 **neuve aux 358 migrations V6**, piles lancées **l'une après l'autre**. Aucune
 modification de spec ni de harnais de recette.
 
-__PLAYWRIGHT__
+| Recette | Pile | Référence V5 | **V6** |
+|---|---|---|---|
+| Relevé Lot 2 / 3 / 4 | `releve_e2e_stack.sh` : GoTrue v2.196.0 (compilé), PostgREST v12.2.3, mock Storage, seed pilote ; Tools `next dev --webpack` :3020 | 4 / 6 / 19 | ✅ 4/4, 6/6, 19/19 |
+| Relevé Lot 5 | idem | 17 | ✅ **17/17** |
+| **Relevé Lot 6** (géométrie L/T/X, ouvertures au clic, validations UI + serveur, glisser / redimensionner, menuiserie, undo/redo, nettoyage des jonctions, pièces + surface serveur, versioning, cible photo dédoublonnée, SVG, autre tenant, tablette, perf 100-500 murs + 50-300 ouvertures) | idem | — (16 sur sa branche) | ✅ **16/16** |
+| Atelier non-régression | idem | 6 | ✅ **6/6** |
+| **Relevé + Atelier total** (une passe, base neuve) | | 52 | ✅ **68/68** (9,2 min) |
+| Réserves V3 / V4 listes-PDF / V4 mobile / V5 hors ligne (`--grep-invert "rechargement hors ligne"`) / V6 sécurité / V6 performance | `reserves-pile-locale/preparer-base.sh` + V6 charge + passerelle + `amorcer-recette-v4.mjs`, Réserves compilé :3020 | 59 | ✅ **59/59** (1 + 11 + 6 + 13 + 23 + 5) |
+| **Réserves D-01** | idem, base neuve distincte | 7 | ✅ **7/7** |
+| GP ↔ Réserves | `gp-reserves-pile-locale/preparer-base.sh`, passerelle, GP :3100, Réserves :3020 | 5/5 ×2 | ✅ **5/5 ×3** (22,0 s ; 20,4 s ; 22,0 s après remise à zéro complète) |
+| Stripe réabonnement | pile GP ↔ Réserves, état Stripe projeté en base, clé factice | 6/6 ×2 | ✅ **6/6 ×2** (8,1 s ; 8,5 s après remise à zéro) |
+| Colors (`colors` + `colors-mobile`) | `colors-pile-locale/preparer-base.sh`, nuancier de recette | 73 | ✅ **73/73** (1,1 min) |
+
+Variables de recette locales (valeurs factices, aucune écrite dans le dépôt) : celles de V5, plus
+**`STRIPE_WEBHOOK_ABONNEMENT_SECRET`** pour le parcours de réabonnement — `stripeBillingEstConfigure()`
+l'exige en plus de `STRIPE_WEBHOOK_SECRET` (le « secret de webhook factice » du rapport V5 désigne
+cette variable). Un premier passage Stripe lancé sans elle (« souscription en ligne temporairement
+fermée ») est **invalide, non compté**. Les builds de recette Réserves, GP et Colors ont été
+refaits avec les variables publiques de la pile (URL et clé de la passerelle).
 
 ## 14. Chaîne dédiée Studio
 
