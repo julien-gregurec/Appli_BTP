@@ -260,7 +260,8 @@ select is((select p.contenu -> 'fournisseur' ->> 'reference' from platform.comma
   'FRN-0001', 'fournisseur référencé par sa référence interne seulement');
 
 -- ─── 9. Politique contrats activée (durée de TEST), purge complète ──────
-select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DUREE-VALIDEE', interval '3 years', false);
+-- Paramètres de TEST uniquement (V2 : durée, point de départ et choix des photos explicites).
+select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DUREE-VALIDEE', interval '3 years', false, array['date_contrat']);
 select set_config('rgpd.run_id', 'd9900000-0000-0000-0000-000000000002', true);
 \ir fixtures/rgpd_purge_driver.inc
 select is(current_setting('rgpd.resultat'), 'complete', 'purge complète');

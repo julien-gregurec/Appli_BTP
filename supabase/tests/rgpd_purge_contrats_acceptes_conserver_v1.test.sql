@@ -20,12 +20,12 @@ select set_config('t.b', 'b0000000-0000-0000-0000-000000000001', true);
 update public.entreprises set suppression_prevue_at = now() - interval '1 second' where id = current_setting('t.a')::uuid;
 
 create temporary table _contrats_avant on commit drop as
-select 'devis'::text as type_contrat, d.id, d.entreprise_id, d.numero, d.montant_ttc, d.date_emission::timestamptz as depart,
+select 'devis'::text as type_contrat, d.id, d.entreprise_id, d.numero, d.montant_ttc, d.date_emission as depart,
        (select count(*) from public.lignes_devis l where l.devis_id = d.id)::integer as nb_lignes,
        public._empreinte_jsonb(public._document_contrat_accepte('devis', d.id)) as empreinte
   from public.devis d where d.statut = 'accepte'
 union all
-select 'avenant', a.id, a.entreprise_id, null, a.montant_ttc, date_trunc('day', a.date_acceptation),
+select 'avenant', a.id, a.entreprise_id, null, a.montant_ttc, (a.date_acceptation at time zone 'Europe/Paris')::date,
        (select count(*) from public.lignes_avenants l where l.avenant_id = a.id)::integer,
        public._empreinte_jsonb(public._document_contrat_accepte('avenant', a.id))
   from public.avenants a where a.statut = 'accepte';
@@ -35,8 +35,8 @@ create temporary table _b_avant on commit drop as
 select md5(string_agg(to_jsonb(d)::text, '|' order by d.id)) as e from public.devis d where d.entreprise_id = current_setting('t.b')::uuid;
 
 select lives_ok(
-  $$select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DECISION-C', interval '10 years', true)$$,
-  'décision simulée : conserver les contrats minimisés 10 ans, photos comprises');
+  $$select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DECISION-C', interval '10 years', true, array['date_contrat'])$$,
+  'décision simulée (paramètres de TEST) : conserver 10 ans à partir de la date du contrat, photos comprises');
 
 select set_config('rgpd.entreprise_cible', current_setting('t.a'), true);
 select set_config('rgpd.run_id', 'c9000000-0000-0000-0000-0000000000c1', true);
@@ -67,8 +67,9 @@ select is(
 select is(
   (select count(*)::integer from platform.contrats_acceptes_purges p
      join _contrats_avant c on c.id = p.source_id
-    where p.conserver_jusqu_au = c.depart + interval '10 years'),
-  4, 'échéance = date du contrat + durée décidée (déterministe, indépendante de la date de purge)');
+    where p.date_depart_conservation = c.depart and p.dernier_jour_conserve = (c.depart + interval '10 years')::date
+      and p.conserver_jusqu_au = ((c.depart + interval '10 years')::date + 1)::timestamp at time zone 'Europe/Paris'),
+  4, 'échéance = date du contrat + durée (dernier jour inclus, suppression le lendemain 00:00 Europe/Paris), indépendante de la date de purge');
 select is(
   (select count(*)::integer from platform.contrats_acceptes_purges p
      join _contrats_avant c on c.id = p.source_id
@@ -150,10 +151,14 @@ select throws_ok('update platform.contrats_acceptes_purges set contenu = contenu
 
 -- Échéance atteinte (ligne insérée par le propriétaire avec une échéance passée).
 insert into platform.contrats_acceptes_purges (entreprise_id, type_contrat, source_id, reference, politique, decision_ref,
-  niveau, contenu, empreinte_document, empreinte_contenu, conserver_jusqu_au)
+  niveau, contenu, empreinte_document, empreinte_contenu, conserver_jusqu_au,
+  date_depart_conservation, regles_depart_appliquees, duree_conservation, dernier_jour_conserve, inclure_photos)
 values (current_setting('t.a')::uuid, 'devis', gen_random_uuid(), 'ANCIEN', 'conserver_contrat_minimise', 'TEST-DECISION-C',
   'contrat_minimise', '{"photos":[{"storage_path":"a0000000-0000-0000-0000-000000000001/ancien/photo.jpg"}]}',
-  repeat('c', 64), repeat('d', 64), now() - interval '1 day');
+  repeat('c', 64), repeat('d', 64),
+  platform.echeance_conservation_contrat((current_date - interval '10 years' - interval '2 days')::date, interval '10 years'),
+  (current_date - interval '10 years' - interval '2 days')::date, array['date_contrat'], interval '10 years',
+  platform.dernier_jour_conservation_contrat((current_date - interval '10 years' - interval '2 days')::date, interval '10 years'), true);
 set local role service_role;
 select is((select string_agg(reference_chemins, ',') from (select array_to_string(chemins_storage, ',') as reference_chemins
                                                            from public.purger_contrats_conserves_echus()) t),
