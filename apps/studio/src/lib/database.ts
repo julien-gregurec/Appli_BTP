@@ -1,4 +1,6 @@
 import type {
+  BrandKitInput,
+  StudioBrandKit,
   StudioMediaAnalysis,
   ProjectAsset,
   StudioRenderJob,
@@ -215,6 +217,80 @@ export type Database = {
           p_role: string | null;
         };
         Returns: undefined;
+      };
+      studio_get_brand_kit: {
+        Args: { p_workspace: string };
+        Returns: StudioBrandKit | null;
+      };
+      studio_save_brand_kit: {
+        Args: {
+          p_workspace: string;
+          p_data: BrandKitInput;
+          p_revision: number | null;
+        };
+        Returns: StudioBrandKit;
+      };
+      studio_list_brand_logo_candidates: {
+        Args: { p_workspace: string };
+        Returns: {
+          id: string;
+          original_filename: string;
+          project_id: string;
+          project_name: string;
+        }[];
+      };
+      studio_attach_brand_logo: {
+        Args: { p_project: string };
+        Returns: string;
+      };
+      studio_create_render_share: {
+        Args: { p_output: string; p_token_hash: string; p_days: number };
+        Returns: string;
+      };
+      studio_revoke_render_share: {
+        Args: { p_share: string };
+        Returns: undefined;
+      };
+      studio_list_render_shares: {
+        Args: { p_project: string };
+        Returns: unknown;
+      };
+      studio_resolve_render_share: {
+        Args: { p_token_hash: string };
+        Returns: unknown;
+      };
+      studio_invite_member: {
+        Args: {
+          p_workspace: string;
+          p_email: string;
+          p_role: string;
+          p_token_hash: string;
+          p_days: number;
+        };
+        Returns: string;
+      };
+      studio_revoke_invitation: { Args: { p_invitation: string }; Returns: undefined };
+      studio_list_invitations: { Args: { p_workspace: string }; Returns: unknown };
+      studio_resolve_invitation: { Args: { p_token_hash: string }; Returns: unknown };
+      studio_accept_invitation: { Args: { p_token_hash: string }; Returns: string };
+      studio_pending_invitation_for: { Args: { p_email: string }; Returns: boolean };
+      studio_my_deletion_plan: { Args: Record<string, never>; Returns: unknown };
+      studio_deletion_prepare: { Args: { p_user: string }; Returns: unknown };
+      studio_deletion_finish: { Args: { p_user: string }; Returns: unknown };
+      studio_deletion_pending_keys: { Args: { p_limit: number }; Returns: unknown };
+      studio_deletion_mark_purged: {
+        Args: { p_bucket: string; p_keys: string[] };
+        Returns: number;
+      };
+      studio_workspace_usage: {
+        Args: { p_workspace: string; p_since?: string };
+        Returns: {
+          since: string;
+          exports: number;
+          render_seconds: number;
+          media_bytes: number;
+          render_bytes: number;
+        };
       };
     };
   };

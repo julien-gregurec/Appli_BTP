@@ -93,7 +93,7 @@ async function handle(
       } else if (action === "remove") {
         if (typeof body.asset !== "string")
           throw new MediaError("Média invalide.");
-        await removeProjectMedia(id, body.asset);
+        await removeProjectMedia(id, body.asset, body.force === true);
       } else if (action === "order") {
         if (
           !Array.isArray(body.ids) ||

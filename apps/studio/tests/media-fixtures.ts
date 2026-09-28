@@ -2,7 +2,7 @@ import { mkdtemp, writeFile, open } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import sharp from "sharp";
-import type { Browser } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 export async function fixtures(browser: Browser) {
   const directory = await mkdtemp(join(tmpdir(), "studio-media-fixtures-"));
   for (let n = 0; n < 5; n++) {
@@ -56,4 +56,20 @@ export async function largeFixture(
   await file.truncate(size);
   await file.close();
   return path;
+}
+/**
+ * A change event fired before React hydrates the upload zone is lost, and under load hydration
+ * can take seconds: wait until the file input actually carries its React handlers.
+ */
+export async function fileInputReady(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const input = document.querySelector('input[type="file"]');
+      return (
+        !!input && Object.keys(input).some((k) => k.startsWith("__reactProps"))
+      );
+    },
+    undefined,
+    { timeout: 120000 },
+  );
 }

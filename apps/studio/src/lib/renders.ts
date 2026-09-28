@@ -1,6 +1,14 @@
 import "server-only";
 import { isStudioId } from "@elsatia/studio-domain";
 import { authorizeProject, MediaError } from "./media-service";
+import { renderRefusal } from "./render-refusal";
+import { downloadFileName } from "./render-labels";
+import { listRenderShares } from "./shares";
+
+const assetMissingMessage = renderRefusal({
+  code: "22023",
+  message: "ASSET_MISSING",
+}).message;
 import { storageAdmin } from "./storage-admin";
 import { getActiveStudioTimeline } from "./timelines";
 export async function getStudioRenders(projectId: string) {
@@ -9,7 +17,7 @@ export async function getStudioRenders(projectId: string) {
     client
       .from("studio_render_jobs")
       .select(
-        "id,project_id,status,progress_percent,width,height,retry_count,error_code,error_message,created_at,timeline_id,timeline_revision:snapshot->timeline->revision",
+        "id,project_id,status,profile,progress_percent,width,height,retry_count,error_code,error_message,created_at,timeline_id,timeline_revision:snapshot->timeline->revision",
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
@@ -30,7 +38,9 @@ export async function getStudioRenders(projectId: string) {
       })
     : null;
   if (active?.error) throw new MediaError("Montage indisponible.", 503);
+  const shares = await listRenderShares(projectId);
   return {
+    shares,
     active: active?.data
       ? {
           timeline: active.data.id,
@@ -56,6 +66,7 @@ export async function requestStudioRender(
   retry: string | null,
   preview = false,
   expected?: { timeline: string; revision: number },
+  quality: "standard" | "hd720" = "standard",
 ) {
   const { client } = await authorizeProject(projectId, true);
   if (!isStudioId(requestId) || (retry !== null && !isStudioId(retry)))
@@ -76,19 +87,19 @@ export async function requestStudioRender(
     .select("*")
     .in("id", ids);
   if (assets.error) throw new MediaError("Médias indisponibles.", 503);
-  if (assets.data.length !== ids.length) throw new MediaError("ASSET_MISSING");
+  if (assets.data.length !== ids.length) throw new MediaError(assetMissingMessage);
   const admin = storageAdmin();
   for (const a of assets.data) {
     const info = await admin.storage
       .from("studio-originals")
       .info(a.storage_key);
     if (info.error || a.upload_status !== "ready")
-      throw new MediaError("ASSET_MISSING");
+      throw new MediaError(assetMissingMessage);
   }
   const profile =
     preview || process.env.STUDIO_RENDER_INTERNAL_PREVIEW === "1"
       ? "preview"
-      : "standard";
+      : quality;
   if (
     expected &&
     (!isStudioId(expected.timeline) || !Number.isSafeInteger(expected.revision))
@@ -107,15 +118,10 @@ export async function requestStudioRender(
         p_revision: expected.revision,
       })
     : await client.rpc("studio_request_render", args);
-  if (r.error)
-    throw new MediaError(
-      r.error.code === "22023"
-        ? r.error.message
-        : r.error.code === "40001"
-          ? "Cette version a changé. Rechargez avant de lancer le rendu."
-          : "Création du rendu refusée.",
-      r.error.code === "42501" ? 403 : r.error.code === "40001" ? 409 : 400,
-    );
+  if (r.error) {
+    const refusal = renderRefusal(r.error);
+    throw new MediaError(refusal.message, refusal.status);
+  }
   return { id: r.data };
 }
 export async function cancelStudioRender(projectId: string, jobId: string) {
@@ -137,7 +143,7 @@ export async function getRenderDownloadUrl(
   outputId: string,
   download = false,
 ) {
-  const { client } = await authorizeProject(projectId);
+  const { client, project } = await authorizeProject(projectId);
   if (!isStudioId(outputId)) throw new MediaError("Export inaccessible.", 404);
   const r = await client
     .from("studio_render_outputs")
@@ -150,7 +156,9 @@ export async function getRenderDownloadUrl(
   const signed = await storageAdmin()
     .storage.from("studio-renders")
     .createSignedUrl(r.data.storage_key, 60, {
-      download: download ? "elsatia-studio.mp4" : false,
+      download: download
+        ? downloadFileName(project.name, r.data.width, r.data.height)
+        : false,
     });
   if (signed.error) throw new MediaError("Export indisponible.", 503);
   return { url: signed.data.signedUrl };

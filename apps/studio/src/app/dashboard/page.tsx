@@ -25,7 +25,7 @@ export default async function Dashboard({
         {context.workspace.name}.
       </h1>
       <p className="intro">
-        Votre espace est prêt. La création vidéo arrive dans les prochains lots.
+        Votre espace est prêt : importez vos médias dans un projet, choisissez un modèle, puis créez votre vidéo.
       </p>
       <Notice message={params.error} />
       <section className="card" aria-label="Statistiques Studio">
@@ -77,8 +77,8 @@ export default async function Dashboard({
           <span className="eyebrow">VOS MÉDIAS</span>
           <h2>De l’image à l’histoire.</h2>
           <p>
-            Importez vos photos et vidéos dans un projet privé. Le montage et
-            l’export arriveront plus tard.
+            Importez vos photos et vidéos dans un projet privé, composez votre
+            montage, puis exportez une vidéo prête à partager.
           </p>
           <Link href={`/projects?workspace=${context.workspace.id}`}>
             Nouveau projet →

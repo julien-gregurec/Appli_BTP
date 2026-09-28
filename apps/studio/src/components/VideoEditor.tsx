@@ -11,6 +11,7 @@ import {
   editorStep,
   editorUndo,
   editorRedo,
+  editorCoalesce,
   editorFingerprint,
   type EditorCommand,
   type EditorHistory,
@@ -27,13 +28,31 @@ import {
 } from "../lib/editor-autosave";
 import EditorPreview, { editorTime } from "./EditorPreview";
 import RenderPanel from "./RenderPanel";
+import MusicPanel from "./MusicPanel";
 
+/** Lets a user keep unsaved work after a conflict; a plain JSON file, no upload. */
+function downloadDraft(doc: TimelineDocument) {
+  const url = URL.createObjectURL(
+    new Blob(
+      [JSON.stringify({ clips: doc.clips, presentation: doc.presentation })],
+      { type: "application/json" },
+    ),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "elsatia-studio-montage-local.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 async function request(project: string, body?: unknown) {
+  const payload = body ? JSON.stringify(body) : undefined;
   const r = await fetch(`/api/timelines/${project}`, {
     method: body ? "POST" : "GET",
     headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    body: payload,
     cache: "no-store",
+    // Lets the last save outlive a closing page; browsers cap keepalive bodies at 64 KiB.
+    keepalive: payload !== undefined && payload.length < 60000,
   });
   const d = await r.json();
   if (!r.ok)
@@ -54,7 +73,7 @@ export default function VideoEditor({
   const [history, setHistory] = useState<EditorHistory>(() =>
     editorHistory(initial),
   );
-  const [selected, setSelected] = useState(initial.clips[0]?.id ?? ""),
+  const [chosen, setSelected] = useState(initial.clips[0]?.id ?? ""),
     [time, setTime] = useState(0),
     [playing, setPlaying] = useState(false);
   const [saveStatus, setStatus] = useState<SaveStatus>("saved"),
@@ -68,10 +87,12 @@ export default function VideoEditor({
   const [scroll, setScroll] = useState(0),
     [drag, setDrag] = useState(""),
     [media, setMedia] = useState(
-      assets.find((a) => a.upload_status === "ready")?.id ?? "",
+      assets.find((a) => a.upload_status === "ready" && a.media_type !== "audio")
+        ?.id ?? "",
     ),
     [insertion, setInsertion] = useState("after");
   const save = useRef<EditorAutosave | null>(null),
+    lastChange = useRef({ key: "", at: 0 }),
     latest = useRef(history.present),
     strip = useRef<HTMLDivElement>(null);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -84,8 +105,12 @@ export default function VideoEditor({
       ),
     [],
   );
-  const doc = history.present,
-    clip = doc.clips.find((c) => c.id === selected),
+  const doc = history.present;
+  // A selection that no longer exists (removal, undo, restore) falls back to the first clip.
+  const selected = doc.clips.some((c) => c.id === chosen)
+    ? chosen
+    : (doc.clips[0]?.id ?? "");
+  const clip = doc.clips.find((c) => c.id === selected),
     clipIndex = doc.clips.findIndex((c) => c.id === selected);
   const fingerprint = useMemo(() => editorFingerprint(doc), [doc]);
   const status: SaveStatus =
@@ -133,12 +158,26 @@ export default function VideoEditor({
     };
   }, [initial, canWrite]);
   useEffect(() => {
+    if (!canWrite) return;
+    const flush = () => void save.current?.flush();
+    const hidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [canWrite]);
+  useEffect(() => {
     if (status === "saved") return;
     const leave = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     const navigate = (e: MouseEvent) => {
+      if (status === "conflict") return; // The user must be able to leave; the draft can be downloaded.
       if (e.target instanceof Element && e.target.closest("a[href]")) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -158,8 +197,33 @@ export default function VideoEditor({
     if (!canWrite) return;
     try {
       const next = applyEditorCommand(doc, command, assets);
-      setHistory(editorStep(history, next));
-      if (status !== "error" && status !== "conflict") setError("");
+      // Typing and slider ticks on the same target merge into one undo step.
+      const key =
+        command.type === "overlay"
+          ? `overlay:${command.overlay.id}`
+          : command.type === "edit"
+            ? `edit:${command.id}`
+            : "";
+      const now = Date.now(),
+        merge =
+          key !== "" &&
+          key === lastChange.current.key &&
+          now - lastChange.current.at < 800 &&
+          history.past.length > 0;
+      lastChange.current = { key, at: now };
+      if (command.type === "remove" && command.id === selected) {
+        const i = doc.clips.findIndex((c) => c.id === command.id);
+        setSelected(doc.clips[i + 1]?.id ?? doc.clips[i - 1]?.id ?? "");
+      }
+      setHistory(merge ? editorCoalesce(history, next) : editorStep(history, next));
+      const dropped =
+        (doc.presentation?.overlays.length ?? 0) -
+        (next.presentation?.overlays.length ?? 0);
+      if (dropped > 0)
+        setError(
+          `${dropped} texte${dropped > 1 ? "s ont" : " a"} été retiré${dropped > 1 ? "s" : ""} car ${dropped > 1 ? "ils dépassent" : "il dépasse"} la durée du clip. Utilisez Annuler pour les rétablir.`,
+        );
+      else if (status !== "error" && status !== "conflict") setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Modification refusée.");
     }
@@ -198,32 +262,40 @@ export default function VideoEditor({
         window.confirm("Retirer ce clip du montage ? Le média sera conservé.")
       ) {
         e.preventDefault();
-        setHistory((s) =>
-          editorStep(
-            s,
-            applyEditorCommand(
-              s.present,
-              { type: "remove", id: selected },
-              assets,
-            ),
-          ),
-        );
+        // Never throw inside a state updater: a stale selection would crash the page.
+        setHistory((s) => {
+          try {
+            return editorStep(
+              s,
+              applyEditorCommand(
+                s.present,
+                { type: "remove", id: selected },
+                assets,
+              ),
+            );
+          } catch {
+            return s;
+          }
+        });
       }
       if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && e.altKey) {
         e.preventDefault();
         setHistory((s) => {
           const i = s.present.clips.findIndex((c) => c.id === selected),
             next = i + (e.key === "ArrowLeft" ? -1 : 1);
-          return i >= 0 && next >= 0 && next < s.present.clips.length
-            ? editorStep(
-                s,
-                applyEditorCommand(
-                  s.present,
-                  { type: "move", id: selected, index: next },
-                  assets,
-                ),
-              )
-            : s;
+          if (i < 0 || next < 0 || next >= s.present.clips.length) return s;
+          try {
+            return editorStep(
+              s,
+              applyEditorCommand(
+                s.present,
+                { type: "move", id: selected, index: next },
+                assets,
+              ),
+            );
+          } catch {
+            return s;
+          }
         });
       }
     }
@@ -270,6 +342,11 @@ export default function VideoEditor({
         enabled={analysisEnabled}
         asset={clip?.asset_id ?? null}
       />
+      <p className="desktop-hint" role="note">
+        L’édition du montage est conçue pour ordinateur. Sur téléphone, vous
+        pouvez consulter le projet, lancer l’export, télécharger et partager la
+        vidéo.
+      </p>
       <div className="editor-toolbar">
         <p>
           <strong>Durée : {editorTime(doc.total_duration_ms)}</strong> · Cible :{" "}
@@ -318,10 +395,19 @@ export default function VideoEditor({
             </button>
           )}
           {status === "conflict" && (
-            <p>
-              Cette version a été modifiée ailleurs. Vos changements restent
-              visibles ici. Rechargez uniquement après les avoir examinés.
-            </p>
+            <>
+              <p>
+                Cette version a été modifiée ailleurs. Vos changements restent
+                visibles ici : téléchargez-les avant de recharger, sinon ils
+                seront perdus.
+              </p>
+              <button onClick={() => downloadDraft(doc)}>
+                Télécharger mes modifications
+              </button>
+              <button onClick={() => window.location.reload()}>
+                Recharger la dernière version
+              </button>
+            </>
           )}
         </div>
       )}
@@ -785,7 +871,12 @@ export default function VideoEditor({
                 onChange={(e) => setMedia(e.target.value)}
               >
                 {assets
-                  .filter((a) => a.upload_status === "ready" && !a.deleted_at)
+                  .filter(
+                    (a) =>
+                      a.upload_status === "ready" &&
+                      !a.deleted_at &&
+                      a.media_type !== "audio",
+                  )
                   .map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.original_filename}
@@ -832,6 +923,12 @@ export default function VideoEditor({
           </div>
         )}
       </section>
+      <MusicPanel
+        music={doc.presentation?.music ?? null}
+        assets={assets}
+        canWrite={canWrite}
+        change={change}
+      />
       <RenderPanel
         project={initial.project_id}
         canWrite={canWrite}

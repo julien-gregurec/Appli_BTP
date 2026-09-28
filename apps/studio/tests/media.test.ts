@@ -3,6 +3,16 @@ import sharp from "sharp";
 import { validateFile, writable } from "../src/lib/media-contract";
 import { inspectMedia } from "../src/lib/media-inspection";
 const limits = { image_bytes: 52428800, video_bytes: 1073741824 };
+describe("HEIC", () => {
+  it("est refusé avec un conseil actionnable, quel que soit le type déclaré", () => {
+    for (const [name, mime] of [
+      ["IMG_0001.HEIC", "image/heic"],
+      ["IMG_0002.heic", "application/octet-stream"],
+      ["photo.jpg", "image/heif"],
+    ])
+      expect(() => validateFile(name, mime, 1000, limits)).toThrow(/HEIC.*Le plus compatible/);
+  });
+});
 describe("admission fichiers", () => {
   for (const [name, mime] of [
     ["photo.jpg", "image/jpeg"],

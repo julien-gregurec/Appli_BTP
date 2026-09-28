@@ -34,6 +34,14 @@ export interface TextOverlay {
   color: string;
   max_lines: number;
 }
+/** One imported audio track per montage, mixed under the clips' own audio at export. */
+export interface TimelineMusic {
+  asset_id: string;
+  /** 0..1 gain applied to the track (the clips' audio keeps its own volume). */
+  volume: number;
+  fade_in_ms: number;
+  fade_out_ms: number;
+}
 export interface TimelinePresentation {
   version: 1;
   template: { id: string; version: number; snapshot: object };
@@ -45,6 +53,46 @@ export interface TimelinePresentation {
     position: "top" | "bottom";
     width: number;
   } | null;
+  music?: TimelineMusic | null;
+}
+const uuidFormat =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Strict shape check: unknown keys, out-of-range gains or fades are refused, never clamped silently. */
+export function parseMusic(value: unknown): TimelineMusic | null {
+  if (value === null || value === undefined) return null;
+  const fail = () => {
+    throw new TimelineValidationError("Musique invalide.");
+  };
+  if (typeof value !== "object" || Array.isArray(value)) return fail();
+  const v = value as Record<string, unknown>;
+  const keys = Object.keys(v);
+  if (
+    keys.length !== 4 ||
+    !["asset_id", "volume", "fade_in_ms", "fade_out_ms"].every((k) =>
+      keys.includes(k),
+    )
+  )
+    return fail();
+  const { asset_id, volume, fade_in_ms, fade_out_ms } = v;
+  if (
+    typeof asset_id !== "string" ||
+    !uuidFormat.test(asset_id) ||
+    typeof volume !== "number" ||
+    !(volume >= 0 && volume <= 1) ||
+    !Number.isInteger(fade_in_ms) ||
+    !Number.isInteger(fade_out_ms) ||
+    (fade_in_ms as number) < 0 ||
+    (fade_out_ms as number) < 0 ||
+    (fade_in_ms as number) > 10000 ||
+    (fade_out_ms as number) > 10000
+  )
+    return fail();
+  return {
+    asset_id,
+    volume,
+    fade_in_ms: fade_in_ms as number,
+    fade_out_ms: fade_out_ms as number,
+  };
 }
 export const safeAreas: Record<
   AspectRatio,
@@ -55,6 +103,19 @@ export const safeAreas: Record<
   "1:1": { x: 0.1, top: 0.1, bottom: 0.14 },
   "4:5": { x: 0.1, top: 0.1, bottom: 0.18 },
 };
+// Latin, Cyrillic, Vietnamese/Latin extended, general punctuation, euro and trademark:
+// the ranges every bundled Noto face is verified to cover. Emoji and rare symbols have no glyph.
+const renderableCharacters =
+  /^[\s\u0020-\u007e\u00a0-\u024f\u0400-\u04ff\u1e00-\u1eff\u2010-\u2027\u2030-\u205e\u20ac\u2122]*$/u;
+/** Write-path validation: bounded AND drawable with the bundled fonts, so a render cannot fail on glyphs. */
+export function renderableText(value: string): string {
+  const clean = boundedText(value);
+  if (!renderableCharacters.test(clean))
+    throw new TimelineValidationError(
+      "Ce texte contient des caractères non pris en charge (emoji, symboles rares). Utilisez des lettres, chiffres et ponctuation.",
+    );
+  return clean;
+}
 export function boundedText(value: string): string {
   if (
     typeof value !== "string" ||
@@ -102,6 +163,7 @@ export function validatePresentation(
     typeof p.template.snapshot !== "object"
   )
     fail();
+  parseMusic(p.music);
   for (const role of fontRoles) {
     const f = p.typography?.[role];
     if (

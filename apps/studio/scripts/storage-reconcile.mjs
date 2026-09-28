@@ -1,8 +1,19 @@
-/** Manual, dry-run by default. No scheduler and no production credentials loaded implicitly. */
+/**
+ * Dry-run by default. No scheduler and no production credentials loaded implicitly.
+ * A non-loopback project is refused unless the operator names its exact host in
+ * STUDIO_RECONCILE_ALLOW_REMOTE_HOST; --apply is still required to change anything.
+ */
 import { createClient } from "@supabase/supabase-js";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-if (!url || new URL(url).hostname !== "127.0.0.1")
-  throw new Error("This validated reconciliation command is local-only.");
+const host = url ? new URL(url).hostname : "";
+if (
+  !host ||
+  (host !== "127.0.0.1" &&
+    process.env.STUDIO_RECONCILE_ALLOW_REMOTE_HOST !== host)
+)
+  throw new Error(
+    "Refused: set STUDIO_RECONCILE_ALLOW_REMOTE_HOST to the exact target host to run against a remote project.",
+  );
 const key = process.env.STUDIO_STORAGE_SERVICE_KEY;
 if (!key) throw new Error("Server storage credential required.");
 const apply = process.argv.includes("--apply");

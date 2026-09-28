@@ -16,7 +16,14 @@ for (const value of [baseURL, process.env.NEXT_PUBLIC_SUPABASE_URL]) {
 export default defineConfig({
   testDir: "tests",
   globalSetup: "./scripts/e2e-setup.mjs",
-  testMatch: "**/*.spec.ts",
+  // The full-size acceptance scenarios are opt-in: they need a server without
+  // STUDIO_RENDER_INTERNAL_PREVIEW and would appear as skipped in the gate.
+  testMatch:
+    process.env.STUDIO_ACCEPTANCE === "1"
+      ? "**/acceptance*.spec.ts"
+      : "**/*.spec.ts",
+  testIgnore:
+    process.env.STUDIO_ACCEPTANCE === "1" ? [] : ["**/acceptance*.spec.ts"],
   workers: 1,
   retries: 0,
   timeout: 120000,
@@ -33,7 +40,9 @@ export default defineConfig({
   webServer: {
     command: "npm run start",
     url: `${baseURL}/login`,
-    reuseExistingServer: false,
-    timeout: 120000,
+    // Fresh server by default. Slow shared machines may extend the start-up wait, and an
+    // iterating developer may reuse an already started server (never used by the gate).
+    reuseExistingServer: process.env.STUDIO_E2E_REUSE_SERVER === "1",
+    timeout: Number(process.env.STUDIO_E2E_SERVER_TIMEOUT_MS || 120000),
   },
 });

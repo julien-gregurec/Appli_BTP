@@ -196,7 +196,7 @@ select lives_ok($$select studio_guard.assert_write('public.studio_projects', 'UP
 -- ------------------------------------------------------------------ Inventaire verrouillé
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname = 'public' and p.provolatile = 'v' and has_function_privilege('authenticated', p.oid, 'execute')),
-          22, 'Inventaire : exactement 22 RPC d''écriture exécutables par authenticated (nouvelle RPC = revue)');
+          29, 'Inventaire : exactement 29 RPC d''écriture exécutables par authenticated (22 fondation + 7 lot post-H revues : ELSATIA_STUDIO_POST_H_PORT_V1.md §7) (nouvelle RPC = revue)');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname in ('public', 'studio_identity', 'studio_guard') and has_function_privilege('anon', p.oid, 'execute')
               and p.proname like 'studio%'), 0, 'Inventaire : aucune fonction Studio exécutable par anon');

@@ -1,4 +1,4 @@
-# ELSATIA Studio — Lots A, B et C
+# ELSATIA Studio
 
 Application autonome dans `apps/studio`, port 3030. Contrats purs dans `packages/studio-domain`. Le Lot A couvre compte ELSATIA/Supabase, workspaces personnels/professionnels, membres, rôles, onboarding et RLS. Le Lot B ajoute import direct TUS signé, bibliothèque privée et réconciliation ; le Lot C complète la gestion des projets et de leurs références média. Aucun moteur vidéo ni dépendance métier Gestion Pro.
 
@@ -54,6 +54,7 @@ Ce stop ne concerne que l’instance enregistrée dans `.local-test.json`. Il co
 ## Parcours et sécurité
 
 - `/login`, `/signup` : compte Supabase commun ; aucun profil/mot de passe dupliqué.
+- Lot post-H porté sur le projet Supabase dédié (B + I1) : `docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md`. Aucune inscription Studio publique, aucun mot de passe en Preview/Production : le compte Studio naît du passage signé ELSATIA ; le hook Auth et la suppression de compte côté Studio du lot post-H ne sont **pas** portés (remplacés par la fondation d'identité et la fondation RGPD).
 - `/auth/callback` : échange PKCE ; `/auth/confirm` : confirmation token_hash de type email.
 - `/onboarding` : bouton d’ouverture/création du workspace personnel, RPC idempotente et verrouillée.
 - `/dashboard?workspace=UUID` : workspace actif explicite. Sans paramètre, premier workspace autorisé ; sans aucun workspace, onboarding. Un UUID fourni mais inaccessible donne une page 404, jamais un autre workspace par défaut.
@@ -117,3 +118,15 @@ Qualification finale : [rapport D-bis](../../ELSATIA-STUDIO-V1-LOT-D-FINAL-QUALI
 La section Vidéo exportée du projet lance maintenant un vrai rendu via le worker séparé `../../workers/studio-video`. Après installation de ses dépendances, le gate complet exécute **18 scénarios A–E, deux fois sur deux bases fraîches**, avec son Redis local dédié. Le mode individuel exécute aussi les 18 scénarios. `render-migration-check.mjs` valide fresh 257, rollback 256, données D, upgrade/réapplication 257.
 
 Le Web reste en profil standard 1080p. `STUDIO_RENDER_INTERNAL_PREVIEW=1`, uniquement côté serveur, sélectionne la demi-résolution pour les recettes. La queue/FFmpeg ne tournent jamais dans Next. Voir le [README worker](../../workers/studio-video/README.md), le [contrat](../../ELSATIA-STUDIO-RENDER-CONTRACT.md) et le [rapport E](../../ELSATIA-STUDIO-V1-LOT-E-REPORT.md). La CI rapide conserve les 14 scénarios A–D et ajoute les vrais rendus unitaires courts ; la qualification complète E est un workflow manuel distinct.
+
+## Lot post-H (porté le 2026-09-28)
+
+Rapport, inventaire et preuves : `docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md`. Exploitation :
+
+- Migrations **projet dédié uniquement** `apps/studio/supabase/migrations/20260929*` ; preuve locale : `apps/studio/scripts/dedicated-db-check.sh`.
+- Table `studio_render_limits` : `admission_open`, plafonds de rendus actifs/horaires/journaliers, modifiables par l'exploitant en SQL seulement (garde centrale).
+- Colonne `studio_workspaces.render_watermark` : filigrane serveur, positionné par l'exploitant seulement.
+- Invitations par e-mail : `STUDIO_MAIL_PROVIDER` (`mailpit` local | `resend`), `STUDIO_MAIL_FROM`, `STUDIO_RESEND_API_KEY` ; sans fournisseur, le lien est affiché une fois à l'administrateur. L'invitation est liée à l'adresse du compte ELSATIA.
+- Liens de partage publics `/s/<jeton>` : coupés dès que le compte ELSATIA du propriétaire de l'espace n'est plus actif ; révocables même en lecture seule.
+- Réconciliation Storage à distance : `STUDIO_RECONCILE_ALLOW_REMOTE_HOST=<hôte exact>` (dry-run par défaut, `--apply` explicite).
+- Recette pleine taille opt-in : `STUDIO_ACCEPTANCE=1 npx playwright test` contre un serveur démarré sans `STUDIO_RENDER_INTERNAL_PREVIEW`.

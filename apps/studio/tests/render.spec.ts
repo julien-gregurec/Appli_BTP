@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { readFile, rm, mkdir, utimes, access } from "node:fs/promises";
 import { join } from "node:path";
-import { fixtures } from "./media-fixtures";
+import { fixtures, fileInputReady } from "./media-fixtures";
 const password = "Studio-Montage-Local-398!";
 async function user(page: Page) {
   const api = createClient(
@@ -91,6 +91,7 @@ async function upload(page: Page, photos: number, videos: number) {
       mimeType: "video/mp4",
       buffer: sample.mp4,
     });
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     photos + videos,
@@ -118,7 +119,7 @@ async function render(page: Page, id: string) {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(panel.locator("[data-render-job]")).toHaveCount(1);
   const job = panel.locator("[data-render-job]").first();
-  await expect(job.getByRole("status")).toContainText("completed", {
+  await expect(job.getByRole("status")).toContainText("Terminé", {
     timeout: 600000,
   });
   await job.getByRole("button", { name: "Voir la vidéo", exact: true }).click();
@@ -291,10 +292,10 @@ test("Lot E failure : asset manquant après admission, cleanup et retry", async 
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(
     panel.locator("[data-render-job]").getByRole("status"),
-  ).toContainText("failed", {
+  ).toContainText("Échec", {
     timeout: 30000,
   });
-  await expect(panel).toContainText("ASSET_MISSING");
+  await expect(panel).toContainText("Un média du montage est introuvable");
   const failed = await request(page, `/api/renders/${id}`);
   const { readdir } = await import("node:fs/promises");
   await expect
@@ -319,7 +320,7 @@ test("Lot E failure : asset manquant après admission, cleanup et retry", async 
   await panel.getByRole("button", { name: "Réessayer le rendu" }).click();
   await expect(
     panel.locator("[data-render-job]").first().getByRole("status"),
-  ).toContainText("completed", { timeout: 600000 });
+  ).toContainText("Terminé", { timeout: 600000 });
   // Reconciliation exercises real private Storage and scratch, while retaining
   // the completed retry output and objects still inside the one-hour grace.
   const root = process.env.STUDIO_RENDER_TMP!;
@@ -422,13 +423,13 @@ test("Lot E cancellation : worker arrêté, aucun output", async ({ page }) => {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(
     panel.locator("[data-render-job]").getByRole("status"),
-  ).toContainText("rendering", {
+  ).toContainText("Rendu en cours", {
     timeout: 60000,
   });
   await panel.getByRole("button", { name: "Annuler le rendu" }).click();
   await expect(
     panel.locator("[data-render-job]").getByRole("status"),
-  ).toContainText("cancelled", {
+  ).toContainText("Annulé", {
     timeout: 15000,
   });
   const jobs = await request(page, `/api/renders/${id}`);

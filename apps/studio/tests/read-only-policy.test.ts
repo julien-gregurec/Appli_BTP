@@ -13,10 +13,22 @@ const WRITE_RPCS = new Set([
   "studio_save_timeline", "studio_activate_timeline", "studio_delete_timeline", "studio_save_editor",
   "studio_request_render", "studio_request_editor_render", "studio_cancel_render",
   "studio_request_analysis", "studio_cancel_analysis",
+  // Lot post-H (ELSATIA_STUDIO_POST_H_PORT_V1.md §7).
+  "studio_save_brand_kit", "studio_attach_brand_logo", "studio_create_render_share",
+  "studio_invite_member", "studio_accept_invitation",
 ]);
+// Révocations (lot post-H) : réduisent l'exposition (lien public, invitation). Admises en lecture
+// seule, donc SANS garde d'écriture applicative ; la base les borne au chemin user_callable
+// exposure_revocation (UPDATE des seules tables de partage/invitation, compte bloqué refusé).
+const REVOCATION_RPCS = new Set(["studio_revoke_render_share", "studio_revoke_invitation"]);
+// Résolution publique (page /s/[token], page d'invitation avant connexion) : clé service, fonctions
+// STABLE (lecture seule), hachage du secret comme seule donnée d'entrée.
+const PUBLIC_RESOLVE_RPCS = new Set(["studio_resolve_render_share", "studio_resolve_invitation"]);
 const READ_RPCS = new Set([
   "studio_dashboard_stats", "studio_project_summaries", "studio_list_project_media", "studio_project_media_stats",
   "studio_get_timeline", "studio_list_analysis", "studio_my_role", "studio_identity_session_status",
+  "studio_workspace_usage", "studio_get_brand_kit", "studio_list_brand_logo_candidates",
+  "studio_list_render_shares", "studio_list_invitations",
 ]);
 // Clé service, bornées EN BASE à un chemin système déclaré (studio_guard.system_paths) : jamais
 // appelées pour le compte d'un utilisateur, pas de garde applicative requise (la base les borne).
@@ -41,7 +53,10 @@ function units(code: string): string[] {
 it("toute RPC appelée par Studio est classée lecture ou écriture", () => {
   for (const file of sources(resolve("src"))) {
     for (const m of readFileSync(file, "utf8").matchAll(/\.rpc\(\s*"([a-z_]+)"/g))
-      expect(WRITE_RPCS.has(m[1]) || READ_RPCS.has(m[1]) || SYSTEM_RPCS.has(m[1]), `${file} : RPC non classée ${m[1]}`).toBe(true);
+      expect(
+        WRITE_RPCS.has(m[1]) || READ_RPCS.has(m[1]) || SYSTEM_RPCS.has(m[1]) || REVOCATION_RPCS.has(m[1]) || PUBLIC_RESOLVE_RPCS.has(m[1]),
+        `${file} : RPC non classée ${m[1]}`,
+      ).toBe(true);
   }
 });
 
@@ -70,5 +85,14 @@ it("les RPC système ne sont appelées que par les modules serveur à clé servi
     for (const m of readFileSync(file, "utf8").matchAll(/\.rpc\(\s*"([a-z_]+)"/g))
       if (SYSTEM_RPCS.has(m[1]))
         expect(/media-service\.ts$|erasure-runner\.ts$/.test(file), `${file} : RPC système ${m[1]} hors module serveur`).toBe(true);
+  }
+});
+
+it("les résolutions publiques et révocations post-H restent dans leurs modules serveur", () => {
+  for (const file of sources(resolve("src"))) {
+    for (const m of readFileSync(file, "utf8").matchAll(/\.rpc\(\s*"([a-z_]+)"/g)) {
+      if (PUBLIC_RESOLVE_RPCS.has(m[1]) || REVOCATION_RPCS.has(m[1]))
+        expect(/lib\/(?:shares|invitations)\.ts$/.test(file), `${file} : ${m[1]} hors module serveur`).toBe(true);
+    }
   }
 });
