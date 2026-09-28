@@ -40,6 +40,14 @@ Le plan 2D du Lot 5 devient une géométrie bâtiment : les murs sont des **soli
 - `git fetch` de `claude/vibrant-darwin-b4gc9n` (Lot 5 qualifié, `d8539d4`).
 - **D1** : la session impose de pousser `claude/happy-euler-7vzpgz`. Cette branche pointait sur un ancêtre du Lot 5 sans commit propre : elle a été avancée **en avance rapide** sur `d8539d4`. Aucune réécriture d'historique, aucune PR, aucun merge.
 
+| Commit | Objet |
+|---|---|
+| `f57dfc7` | migration 1001 (additive) + pgTAP Lot 6 |
+| `23cf948` | domaine (ouvertures, cibles photo) + Engine B `thick-strips` |
+| `9eac8e9` | éditeur : géométrie bâtiment, ouvertures graphiques, jonctions, export |
+| `fa3bfe4` | recette Playwright Lot 6 + adaptation du test Lot 5 (D8) |
+| *(ce rapport)* | rapport Lot 6 |
+
 ## 2. Architecture — aucun second moteur
 
 | Couche | Fichier | Rôle |
