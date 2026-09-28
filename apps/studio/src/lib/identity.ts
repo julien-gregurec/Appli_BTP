@@ -63,6 +63,13 @@ export function studioBroker(): StudioIdentityBroker {
   });
 }
 
+/** Vérificateur des demandes d'export RGPD de la plateforme (même émetteur, même JWKS public). */
+export function studioExportVerifier() {
+  const issuer = process.env.ELSATIA_IDENTITY_ISSUER;
+  if (!issuer) throw new IdentityError("CONFIG_INVALID", { detail: "ELSATIA_IDENTITY_ISSUER absente" });
+  return createIdentityVerifier({ issuer, audience: STUDIO_AUDIENCE, jwks: jwksSource() });
+}
+
 export function handoffUrl(nonce: string): URL {
   const value = process.env.ELSATIA_IDENTITY_HANDOFF_URL;
   if (!value) throw new IdentityError("CONFIG_INVALID", { detail: "ELSATIA_IDENTITY_HANDOFF_URL absente" });

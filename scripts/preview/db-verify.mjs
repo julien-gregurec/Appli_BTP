@@ -115,6 +115,11 @@ export const RPC_SERVICE_SEULEMENT = [
   // Train canonique V6 : paramétrage RGPD des contrats V2 (…0928 501) — purge des échus et rapport,
   // exploitation seule (la purge reste refusée tant que la politique n'est pas active).
   "purger_contrats_conserves_echus", "rapport_echeances_contrats_conserves",
+  // RGPD export V1 (…0929 101) : worker d'export asynchrone — le périmètre vient du job, jamais d'un
+  // paramètre ; aucune demande ni téléchargement par la clé service.
+  "rgpd_export_reclamer", "rgpd_export_prolonger", "rgpd_export_materialiser", "rgpd_export_sections",
+  "rgpd_export_page", "rgpd_export_fichiers_page", "rgpd_export_terminer", "rgpd_export_echouer",
+  "rgpd_export_expirer", "rgpd_export_constater_suppression", "rgpd_export_classification",
 ];
 
 export function sqlServiceSeulement() {

@@ -50,19 +50,19 @@ export function studioExportClient(o: OptionsStudioClient): StudioPort {
           signal: AbortSignal.timeout(o.delaiMs ?? 30_000),
         });
       } catch (cause) {
-        throw new ErreurTransitoire("STUDIO_INDISPONIBLE", { cause });
+        throw new ErreurTransitoire("EXPORT_STUDIO_INDISPONIBLE", { cause });
       }
-      if (reponse.status >= 500 || reponse.status === 429) throw new ErreurTransitoire("STUDIO_INDISPONIBLE");
-      if (!reponse.ok) throw new ErreurTransitoire("STUDIO_CONTRAT_REFUSE");
+      if (reponse.status >= 500 || reponse.status === 429) throw new ErreurTransitoire("EXPORT_STUDIO_INDISPONIBLE");
+      if (!reponse.ok) throw new ErreurTransitoire("EXPORT_STUDIO_CONTRAT_REFUSE");
       const taille = Number(reponse.headers.get("content-length") ?? "0");
-      if (taille > REPONSE_MAX_OCTETS) throw new ErreurTransitoire("STUDIO_REPONSE_TROP_GRANDE");
+      if (taille > REPONSE_MAX_OCTETS) throw new ErreurTransitoire("EXPORT_STUDIO_REPONSE_TROP_GRANDE");
       let corps: unknown;
       try {
         corps = await reponse.json();
       } catch {
-        throw new ErreurTransitoire("STUDIO_REPONSE_INVALIDE");
+        throw new ErreurTransitoire("EXPORT_STUDIO_REPONSE_INVALIDE");
       }
-      if (!reponseValide(corps)) throw new ErreurTransitoire("STUDIO_REPONSE_INVALIDE");
+      if (!reponseValide(corps)) throw new ErreurTransitoire("EXPORT_STUDIO_REPONSE_INVALIDE");
       return corps;
     },
     async lireUrl(url) {

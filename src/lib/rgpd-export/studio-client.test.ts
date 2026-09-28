@@ -30,11 +30,11 @@ describe("client d'export Studio (contrat inter-projets)", () => {
   });
 
   it.each([
-    ["réseau coupé", () => { throw new TypeError("fetch failed"); }, "STUDIO_INDISPONIBLE"],
-    ["503", () => new Response("", { status: 503 }), "STUDIO_INDISPONIBLE"],
-    ["401 (contrat refusé)", () => new Response("", { status: 401 }), "STUDIO_CONTRAT_REFUSE"],
-    ["réponse non conforme", () => Response.json({ statut: "ok", format: "autre/1" }), "STUDIO_REPONSE_INVALIDE"],
-    ["corps illisible", () => new Response("<html>", { status: 200 }), "STUDIO_REPONSE_INVALIDE"],
+    ["réseau coupé", () => { throw new TypeError("fetch failed"); }, "EXPORT_STUDIO_INDISPONIBLE"],
+    ["503", () => new Response("", { status: 503 }), "EXPORT_STUDIO_INDISPONIBLE"],
+    ["401 (contrat refusé)", () => new Response("", { status: 401 }), "EXPORT_STUDIO_CONTRAT_REFUSE"],
+    ["réponse non conforme", () => Response.json({ statut: "ok", format: "autre/1" }), "EXPORT_STUDIO_REPONSE_INVALIDE"],
+    ["corps illisible", () => new Response("<html>", { status: 200 }), "EXPORT_STUDIO_REPONSE_INVALIDE"],
   ])("%s → erreur transitoire %s (le job est réessayé, jamais déclaré complet)", async (_n, rep, code) => {
     const client = studioExportClient({ issuer, url: "https://studio.test/x", originesFichiers: [], fetcher: fetcher(rep as () => Response) });
     await expect(client.exporter(randomUUID(), randomUUID())).rejects.toMatchObject({ code });

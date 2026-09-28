@@ -250,7 +250,7 @@ describe("worker d'export RGPD", () => {
   describe("Studio (export individuel, projet dédié)", () => {
     const studioOk = (reponse: StudioExport | "PANNE", fichiers: Record<string, string> = {}): StudioPort => ({
       async exporter() {
-        if (reponse === "PANNE") throw new ErreurTransitoire("STUDIO_INDISPONIBLE");
+        if (reponse === "PANNE") throw new ErreurTransitoire("EXPORT_STUDIO_INDISPONIBLE");
         return reponse;
       },
       async lireUrl(url) {
@@ -263,7 +263,7 @@ describe("worker d'export RGPD", () => {
     it("Studio indisponible : réessai, jamais d'archive déclarée complète", async () => {
       const e = usager();
       const r = await executerUnExport({ db: db(e), stockage: stockage({}), studio: studioOk("PANNE") });
-      expect(r).toMatchObject({ etat: "retry", code: "STUDIO_INDISPONIBLE" });
+      expect(r).toMatchObject({ etat: "retry", code: "EXPORT_STUDIO_INDISPONIBLE" });
       expect(e.termine).toBeUndefined();
     });
 

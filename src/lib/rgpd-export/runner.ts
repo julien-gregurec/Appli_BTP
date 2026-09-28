@@ -143,6 +143,8 @@ export interface ResultatRunner {
   lignes?: number;
   fichiers?: Record<string, number>;
   duree_ms?: number;
+  /** Ventilation du temps (ms) : matérialisation, données, fichiers, Studio, dépôt + fin. */
+  phases?: Record<string, number>;
 }
 
 // ── Exécution ──────────────────────────────────────────────────────────────────────────────────
@@ -159,8 +161,15 @@ export async function executerUnExport(o: OptionsRunner): Promise<ResultatRunner
   log("rgpd_export.claimed", { job, tentative: r.tentative, type: r.type_export, reprise: r.reprise });
 
   const dossier = mkdtempSync(join(o.dossierTemporaire ?? tmpdir(), "elsatia-export-"));
+  const phases: Record<string, number> = {};
+  let top = Date.now();
+  const phase = (nom: string) => {
+    phases[nom] = Date.now() - top;
+    top = Date.now();
+  };
   try {
     const mat = await o.db.materialiser(job, bail);
+    phase("materialisation_ms");
     if (mat.statut === "FAILED") {
       log("rgpd_export.failed", { job, code: mat.code });
       return { etat: "failed", job_id: job, code: mat.code };
@@ -237,6 +246,7 @@ export async function executerUnExport(o: OptionsRunner): Promise<ResultatRunner
         entreprise_id: s.entreprise_id, lignes: n, json: nomJson, csv: n > 0 ? nomCsv : null });
     }
 
+    phase("donnees_ms");
     // 2. Fichiers (manifeste de la base → copie en flux, empreinte recalculée).
     const manifeste: FichierIndex[] = [];
     const dejaInclus = new Map<string, FichierIndex>();
@@ -287,12 +297,14 @@ export async function executerUnExport(o: OptionsRunner): Promise<ResultatRunner
       if (page.length < 500) break;
     }
 
+    phase("fichiers_ms");
     // 3. Studio (projet dédié, B + I1) : export individuel seulement.
     let studio: MetaExport["studio"] = { statut: "NON_APPLICABLE", format: null, sections: 0, fichiers: 0 };
     if (r.type_export === "UTILISATEUR" && r.studio_sujet_connu) {
       studio = await exporterStudio(o, r, mat.demandeur_studio ?? null, zip, manifeste, motifs, noter);
     }
 
+    phase("studio_ms");
     // 4. Méta-données, manifeste, classification, empreintes.
     const compteFichiers = manifeste.reduce((acc, f) => ({ ...acc, [f.statut]: (acc[f.statut] ?? 0) + 1 }),
       {} as Record<StatutFichier, number>);
@@ -330,9 +342,10 @@ export async function executerUnExport(o: OptionsRunner): Promise<ResultatRunner
       lignes, sections: index.length, entrees: fin.entrees, fichiers: compteFichiers, studio: studio.statut, motifs: motifsUniques,
     });
     if (t.objets_obsoletes?.length) await o.stockage.supprimerArchives(t.objets_obsoletes).catch(() => {});
+    phase("depot_ms");
     const res: ResultatRunner = { etat: "ready", job_id: job, complet: t.complet, octets: fin.octets, entrees: fin.entrees,
-      lignes, fichiers: compteFichiers, duree_ms: Date.now() - debut };
-    log("rgpd_export.ready", { job, complet: t.complet, octets: fin.octets, entrees: fin.entrees, lignes, duree_ms: res.duree_ms });
+      lignes, fichiers: compteFichiers, duree_ms: Date.now() - debut, phases };
+    log("rgpd_export.ready", { job, complet: t.complet, octets: fin.octets, entrees: fin.entrees, lignes, duree_ms: res.duree_ms, ...phases });
     return res;
   } catch (erreur) {
     if (erreur instanceof ErreurBailPerdu) {
@@ -370,7 +383,7 @@ async function exporterStudio(
   const vide = (statut: StatutStudio): MetaExport["studio"] => ({ statut, format: null, sections: 0, fichiers: 0 });
   if (!o.studio || !demandeur) {
     // Un sujet Studio existe mais le contrat n'est pas configuré : jamais « complet ».
-    motifs.push("STUDIO_NON_CONFIGURE");
+    motifs.push("EXPORT_STUDIO_NON_CONFIGURE");
     return vide("NON_CONFIGURE");
   }
   const e = await o.studio.exporter(demandeur, r.job_id); // ErreurTransitoire → réessai du job
@@ -389,7 +402,7 @@ async function exporterStudio(
     const flux = await o.studio.lireUrl(f.url);
     if (!flux) {
       manifeste.push({ ...base, statut: "ILLISIBLE" });
-      motifs.push("STUDIO_FICHIER_ILLISIBLE");
+      motifs.push("EXPORT_STUDIO_FICHIER_ILLISIBLE");
       continue;
     }
     const x = await zip.ajouter(nom, flux, { compresser: false });

@@ -6455,6 +6455,56 @@
       "url_class": "api_endpoint"
     },
     {
+      "name": "ELSATIA_STUDIO_EXPORT_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Point d'export RGPD du projet Studio dédié (https://<studio>/api/elsatia/export), appelé par le worker d'export RGPD de Gestion Pro avec une demande signée elsatia-export-request+jwt (RGPD DATA EXPORT V1, docs/qualification/ELSATIA_RGPD_DATA_EXPORT_PORTABILITY_V1.md). Absent : Studio non configuré — l'export individuel d'une personne déjà venue sur Studio est produit mais marqué INCOMPLET (fail-closed). Studio reste EXCLU de la première Preview.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "url_class": "api_endpoint"
+    },
+    {
+      "name": "ELSATIA_STUDIO_STORAGE_ORIGIN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine du Storage du projet Studio dédié (https://<ref>.supabase.co) : seules les URL signées de cette origine sont suivies par le worker d'export RGPD (défense SSRF). Absente : aucun fichier Studio n'est copié et l'export est marqué INCOMPLET (fail-closed). RGPD DATA EXPORT V1.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Studio est déployé",
+      "url_class": "cross_app_link"
+    },
+    {
       "name": "STUDIO_ACCESS_MODE",
       "applications": [
         "gestion_pro"

@@ -7,7 +7,7 @@
 -- base, bail / reprise après interruption / rejeu, téléchargement borné, expiration, journal.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(88);
+select plan(89);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -105,6 +105,8 @@ set local role authenticated;
 select ok(public.est_acces_support_actif('a0000000-0000-0000-0000-000000000001'), 'témoin : la session d''assistance plateforme est active sur A');
 select is(public.rgpd_export_demander('ENTREPRISE', 'a0000000-0000-0000-0000-000000000001', 'support-a-0001') ->> 'code',
   'SESSION_ASSISTANCE_INTERDITE', 'assistance : une session support ne peut pas exporter les données du client');
+select throws_ok($$select public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null,
+  'assistance : l''export synchrone historique est aussi refusé à une session support (correctif)');
 select set_config('request.jwt.claims',
   '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","session_id":"c0000000-0000-0000-0000-000000000001"}', true);
 reset role;
@@ -283,13 +285,13 @@ reset role;
 select is((select count(*) from platform.rgpd_export_lignes where job_id = (select job_id from _r)), (select n from _n1),
   'rejeu de la matérialisation : aucune ligne dupliquée');
 set local role service_role;
-select is(public.rgpd_export_echouer(job_id, bail, 'STUDIO_INDISPONIBLE', true) ->> 'statut', 'PENDING',
+select is(public.rgpd_export_echouer(job_id, bail, 'EXPORT_STUDIO_INDISPONIBLE', true) ->> 'statut', 'PENDING',
   'échec transitoire (Studio indisponible) : replanifié, jamais READY') from _r;
 reset role;
 update platform.rgpd_export_jobs set prochaine_tentative_at = now() where id = (select job_id from _r);
 set local role service_role;
 create temporary table _r3 on commit drop as select * from public.rgpd_export_reclamer();
-select is(public.rgpd_export_echouer(job_id, bail, 'STUDIO_INDISPONIBLE', true) ->> 'statut', 'FAILED',
+select is(public.rgpd_export_echouer(job_id, bail, 'EXPORT_STUDIO_INDISPONIBLE', true) ->> 'statut', 'FAILED',
   'tentatives épuisées : FAILED') from _r3;
 reset role;
 select is((select count(*)::integer from platform.rgpd_export_lignes where job_id = (select job_id from _r3))
