@@ -1,0 +1,117 @@
+### R1 /pointage/gestion : pointages du mois (toute l'entreprise)
+                                                                                                                        QUERY PLAN                                                                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=511.154..685.051 rows=1000 loops=1)
+   Buffers: shared hit=55480 read=319
+   ->  Result (actual time=511.146..684.905 rows=1000 loops=1)
+         Buffers: shared hit=55480 read=319
+         ->  Sort (actual time=508.293..508.561 rows=1000 loops=1)
+               Sort Key: p.date DESC
+               Sort Method: top-N heapsort  Memory: 272kB
+               Buffers: shared hit=39135 read=273
+               ->  Bitmap Heap Scan on pointages p (actual time=8.297..506.436 rows=4225 loops=1)
+                     Recheck Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= (to_char(date_trunc('month'::text, (CURRENT_DATE)::timestamp with time zone), 'YYYY-MM-DD'::text))::date) AND (date <= CURRENT_DATE))
+                     Filter: (peut_consulter_pointage_employe(entreprise_id, employe_id) AND est_membre_actif(entreprise_id))
+                     Heap Blocks: exact=204
+                     Buffers: shared hit=39132 read=273
+                     ->  Bitmap Index Scan on pointages_entreprise_date_idx (actual time=0.214..0.214 rows=4225 loops=1)
+                           Index Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= (to_char(date_trunc('month'::text, (CURRENT_DATE)::timestamp with time zone), 'YYYY-MM-DD'::text))::date) AND (date <= CURRENT_DATE))
+                           Buffers: shared read=7
+         SubPlan 1
+           ->  Index Scan using employes_id_entreprise_unique on employes e (actual time=0.045..0.045 rows=1 loops=1000)
+                 Index Cond: (id = p.employe_id)
+                 Filter: est_membre_actif(entreprise_id)
+                 Buffers: shared hit=3994 read=6
+         SubPlan 2
+           ->  Index Scan using chantiers_id_entreprise_unique on chantiers c (actual time=0.130..0.130 rows=1 loops=1000)
+                 Index Cond: (id = p.chantier_id)
+                 Filter: peut_consulter_chantier(entreprise_id, id)
+                 Buffers: shared hit=12351 read=40
+ Planning:
+   Buffers: shared hit=545 read=57
+ Planning Time: 3.270 ms
+ Execution Time: 685.247 ms
+(30 rows)
+
+### R2 /devis/:id : lignes d'un devis de 1 000 lignes
+                                                                                 QUERY PLAN                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=153.582..153.715 rows=1000 loops=1)
+   Buffers: shared hit=15265 read=1780
+   ->  Sort (actual time=150.287..150.339 rows=1000 loops=1)
+         Sort Key: ordre
+         Sort Method: quicksort  Memory: 282kB
+         Buffers: shared hit=15265 read=1780
+         ->  Seq Scan on lignes_devis (actual time=40.013..150.035 rows=1000 loops=1)
+               Filter: ((devis_id = 'c349612b-9af8-45a0-bf45-f36f18eab189'::uuid) AND a_permission(entreprise_id, 'acces_devis'::text) AND est_membre_actif(entreprise_id))
+               Rows Removed by Filter: 288590
+               Buffers: shared hit=15262 read=1780
+ Planning:
+   Buffers: shared hit=39 read=6
+ Planning Time: 0.245 ms
+ Execution Time: 154.294 ms
+(14 rows)
+
+### R3 /chantiers : chantiers_liste_paginee (peut_consulter_chantier avant LIMIT)
+                     QUERY PLAN                     
+----------------------------------------------------
+ Result (actual time=83.218..83.219 rows=1 loops=1)
+   Buffers: shared hit=7671 read=67
+ Planning Time: 0.030 ms
+ Execution Time: 83.234 ms
+(4 rows)
+
+### R4 /planning et /pointage/gestion : liste des chantiers ouverts (RLS peut_consulter_chantier par ligne)
+                                                                                       QUERY PLAN                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=75.627..75.699 rows=600 loops=1)
+   Buffers: shared hit=5420
+   ->  Sort (actual time=75.625..75.654 rows=600 loops=1)
+         Sort Key: nom
+         Sort Method: quicksort  Memory: 67kB
+         Buffers: shared hit=5420
+         ->  Seq Scan on chantiers c (actual time=0.453..75.313 rows=600 loops=1)
+               Filter: ((statut <> ALL ('{archive,annule}'::text[])) AND (entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND peut_consulter_chantier(entreprise_id, id))
+               Rows Removed by Filter: 15
+               Buffers: shared hit=5417
+ Planning:
+   Buffers: shared hit=7
+ Planning Time: 0.187 ms
+ Execution Time: 75.750 ms
+(14 rows)
+
+### R5 /planning : affectations de la semaine
+                                                                                                                                                   QUERY PLAN                                                                                                                                                    
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=69.223..170.883 rows=575 loops=1)
+   Buffers: shared hit=14375 read=128
+   ->  Result (actual time=69.220..170.793 rows=575 loops=1)
+         Buffers: shared hit=14375 read=128
+         ->  Sort (actual time=68.972..69.127 rows=575 loops=1)
+               Sort Key: a.date
+               Sort Method: quicksort  Memory: 101kB
+               Buffers: shared hit=5175 read=128
+               ->  Bitmap Heap Scan on affectations a (actual time=0.589..68.829 rows=575 loops=1)
+                     Recheck Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= (date_trunc('week'::text, (CURRENT_DATE)::timestamp with time zone))::date) AND (date <= ((date_trunc('week'::text, (CURRENT_DATE)::timestamp with time zone) + '6 days'::interval))::date))
+                     Filter: (peut_consulter_affectation_employe(entreprise_id, employe_id) AND est_membre_actif(entreprise_id))
+                     Heap Blocks: exact=125
+                     Buffers: shared hit=5175 read=128
+                     ->  Bitmap Index Scan on affectations_entreprise_date_idx (actual time=0.052..0.053 rows=575 loops=1)
+                           Index Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= (date_trunc('week'::text, (CURRENT_DATE)::timestamp with time zone))::date) AND (date <= ((date_trunc('week'::text, (CURRENT_DATE)::timestamp with time zone) + '6 days'::interval))::date))
+                           Buffers: shared read=3
+         SubPlan 1
+           ->  Index Scan using chantiers_id_entreprise_unique on chantiers c (actual time=0.130..0.130 rows=1 loops=575)
+                 Index Cond: (id = a.chantier_id)
+                 Filter: peut_consulter_chantier(entreprise_id, id)
+                 Buffers: shared hit=6900
+         SubPlan 2
+           ->  Index Scan using employes_id_entreprise_unique on employes e (actual time=0.046..0.046 rows=1 loops=575)
+                 Index Cond: (id = a.employe_id)
+                 Filter: est_membre_actif(entreprise_id)
+                 Buffers: shared hit=2300
+ Planning:
+   Buffers: shared hit=9 read=3
+ Planning Time: 0.406 ms
+ Execution Time: 170.976 ms
+(30 rows)
+

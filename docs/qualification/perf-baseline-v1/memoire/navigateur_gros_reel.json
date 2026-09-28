@@ -1,0 +1,58 @@
+{
+  "/dashboard": {
+    "statut": 200,
+    "chargementMs": 3155,
+    "documentOctets": 0,
+    "tasJsMo": 50,
+    "noeudsDom": 81079,
+    "url": "/dashboard"
+  },
+  "/planning": {
+    "statut": 200,
+    "chargementMs": 2142,
+    "documentOctets": 3971450,
+    "tasJsMo": 26,
+    "noeudsDom": 15006,
+    "url": "/planning"
+  },
+  "/pointage/gestion": {
+    "statut": 200,
+    "chargementMs": 3899,
+    "documentOctets": 3719298,
+    "tasJsMo": 21,
+    "noeudsDom": 22269,
+    "url": "/pointage/gestion"
+  },
+  "/devis/c349612b-9af8-45a0-bf45-f36f18eab189": {
+    "statut": 200,
+    "chargementMs": 1319,
+    "documentOctets": 1512357,
+    "tasJsMo": 17,
+    "noeudsDom": 8233,
+    "url": "/devis/c349612b-9af8-45a0-bf45-f36f18eab189"
+  },
+  "/chantiers/ff3f83f6-b714-4c2d-8d5e-4f739013ee77": {
+    "statut": 200,
+    "chargementMs": 687,
+    "documentOctets": 237171,
+    "tasJsMo": 8,
+    "noeudsDom": 1305,
+    "url": "/chantiers/ff3f83f6-b714-4c2d-8d5e-4f739013ee77"
+  },
+  "/chantiers": {
+    "statut": 200,
+    "chargementMs": 638,
+    "documentOctets": 176462,
+    "tasJsMo": 6,
+    "noeudsDom": 896,
+    "url": "/chantiers"
+  },
+  "/factures": {
+    "statut": 200,
+    "chargementMs": 350,
+    "documentOctets": 139979,
+    "tasJsMo": 6,
+    "noeudsDom": 905,
+    "url": "/factures"
+  }
+}

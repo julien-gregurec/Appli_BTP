@@ -1,0 +1,116 @@
+{
+  "app": "http://127.0.0.1:3020",
+  "users": 1,
+  "iterations": 1,
+  "duree_s": 0.16151117499999998,
+  "requetes": 8,
+  "erreurs": 7,
+  "debit_rps": 49.532176333928604,
+  "echecsConnexion": [],
+  "chemins": {
+    "POST /auth/v1/token (connexion)": {
+      "n": 1,
+      "ok": 1,
+      "statuts": {
+        "200": 1
+      },
+      "p50": 72.64027300000001,
+      "p95": 72.64027300000001,
+      "p99": 72.64027300000001,
+      "max": 72.64027300000001,
+      "octets_moyens": 0,
+      "redirections": []
+    },
+    "/chantiers/e0000000-0000-0000-0000-000000000101": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/reserves?chantier=e0000000-0000-0000-0000-000000000101": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/reserves?chantier=e0000000-0000-0000-0000-000000000101&statut=levee_demandee": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/reserves?chantier=e0000000-0000-0000-0000-000000000101&priorite=bloquante&statut=emise": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/reserves/727edc28-71b0-469c-ad7e-257630ae55a3": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/imprimer/chantier/e0000000-0000-0000-0000-000000000101": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    },
+    "/api/documents/chantier/e0000000-0000-0000-0000-000000000101/pdf": {
+      "n": 1,
+      "ok": 0,
+      "statuts": {
+        "500": 1
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "octets_moyens": null,
+      "redirections": []
+    }
+  }
+}
