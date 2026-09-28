@@ -34,6 +34,10 @@ delete from public.reserves_messages;
 delete from public.reserves_conversations;
 delete from public.reserves;
 delete from public.reserves_invitations;
+-- Numérotation des réserves remise à zéro avec elles : sinon chaque passe renumérotait le décor
+-- à la suite de la précédente (R-9, R-10… au lieu de R-1), et la recette ne repartait pas
+-- « du même décor » (seed compatibility hardening V1).
+update public.reserves_chantiers set compteur_reserves = 0 where compteur_reserves <> 0;
 
 -- L'entreprise extérieure redevient une entreprise INVITÉE sans aucun accès : c'est
 -- précisément l'état que le parcours doit faire changer, et rien d'autre ne le rétablit.

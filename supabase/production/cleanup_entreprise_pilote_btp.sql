@@ -33,11 +33,25 @@
 --      supprimés en DERNIER (après les tables qui les référencent en RESTRICT, notamment
 --      demandes_conges.created_by) : la suppression de auth.users cascade automatiquement
 --      vers public.utilisateurs et public.utilisateurs_entreprises.
+--   6. Depuis 20260926000506, une commande fournisseur envoyée n'est supprimable que dans une
+--      purge RGPD (CM-06, trigger trg_commande_fournisseur_suppression_statut) et ses lignes
+--      sont verrouillées (PO-1). Le seed pilote crée des commandes envoyées : ce trigger est
+--      désactivé NOMMÉMENT, comme les 4 ci-dessus, et les commandes sont supprimées
+--      directement — leurs lignes partent par la cascade de la clé étrangère, que le verrou
+--      des lignes laisse passer (commande absente). Les verrous PO-1 restent actifs.
+--   7. TOUT le script tient dans UNE transaction (seed compatibility hardening V1) : un
+--      ALTER TABLE … DISABLE TRIGGER est transactionnel. Auparavant, chaque ALTER était
+--      validé seul : un DELETE en échec laissait les triggers d'immuabilité DÉSACTIVÉS pour
+--      toutes les entreprises du projet. Désormais, la moindre erreur annule tout, triggers
+--      compris, et le verrou exclusif pris par ALTER TABLE empêche toute autre session
+--      d'écrire dans ces tables pendant la fenêtre de désactivation.
 --
 -- Testé de bout en bout (seed → cleanup → re-seed propre) sur PostgreSQL 16 local avec les
 -- 313 migrations réelles rejouées (environnement de revue indépendante, pas Preview).
 
 set statement_timeout='5min';
+
+begin;
 
 do $cleanup_garde$
 declare
@@ -75,6 +89,7 @@ alter table public.devis disable trigger verrou_devis_accepte;
 alter table public.factures disable trigger verrou_facture_emise;
 alter table public.lignes_factures disable trigger lignes_factures_brouillon_only;
 alter table public.lignes_devis disable trigger verrou_lignes_devis_accepte;
+alter table public.commandes_fournisseurs disable trigger trg_commande_fournisseur_suppression_statut;
 
 do $cleanup$
 declare
@@ -95,7 +110,7 @@ begin
 
   delete from public.reglements_fournisseurs where depense_id in (select id from public.depenses_fournisseurs where entreprise_id=v_entreprise and numero_piece like 'ACH-PILOTE-%');
   delete from public.depenses_fournisseurs where entreprise_id=v_entreprise and numero_piece like 'ACH-PILOTE-%';
-  delete from public.lignes_commande where commande_id in (select id from public.commandes_fournisseurs where entreprise_id=v_entreprise and numero like 'CMD-PILOTE-%');
+  -- Lignes supprimées par la cascade de la clé étrangère (voir 6. en tête).
   delete from public.commandes_fournisseurs where entreprise_id=v_entreprise and numero like 'CMD-PILOTE-%';
 
   delete from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[PILOTE]%';
@@ -122,6 +137,9 @@ begin
   delete from public.permissions_poste where entreprise_id=v_entreprise;
   delete from public.postes where entreprise_id=v_entreprise;
   delete from public.historique_capacite_personnes where entreprise_id=v_entreprise;
+  -- Compteurs de numérotation (identifiants salariés, notes de frais…) : sans clé étrangère vers
+  -- entreprises, ils survivaient au nettoyage (résidu détecté par le harnais verify:seeds).
+  delete from public.compteurs_reference where entreprise_id=v_entreprise;
 
   delete from public.entreprises where id=v_entreprise;
 
@@ -136,6 +154,7 @@ alter table public.devis enable trigger verrou_devis_accepte;
 alter table public.factures enable trigger verrou_facture_emise;
 alter table public.lignes_factures enable trigger lignes_factures_brouillon_only;
 alter table public.lignes_devis enable trigger verrou_lignes_devis_accepte;
+alter table public.commandes_fournisseurs enable trigger trg_commande_fournisseur_suppression_statut;
 
 -- Vérification finale : aucune trace ne doit subsister.
 do $verif$
@@ -151,5 +170,7 @@ begin
   end if;
 end;
 $verif$;
+
+commit;
 
 select 'PILOTE-BTP-V1 nettoyée' as resultat;

@@ -180,37 +180,50 @@ begin
       values (ent, 'DR-'||suffixe||'-FRS-002', 'Toitures Alsace', 'Karim Belkacem', 'contact.toitures.dr'||lower(suffixe)||'@dr-drill.invalid', '0388000002', 'Strasbourg', 'sous_traitant')
       returning id into fourn2;
 
+    -- Stock porté par ses mouvements (trigger appliquer_mouvement_avant_insertion) : articles créés
+    -- à 0, stock initial saisi comme une entrée, puis consommations. La réception de CMD-0001 par
+    -- le moteur canonique crédite elle-même le réassort (plus d'entrée manuelle en doublon, plus de
+    -- chevrons reçus sans mouvement) — seed compatibility hardening V1.
     insert into public.articles_stock (entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, prix_achat_ht, prix_vente_ht) values
-      (ent, 'DR-'||suffixe||'-ART-001', 'Tuile terre cuite', 'u', 1200, 200, 6.5, 8.0) returning id into art1;
+      (ent, 'DR-'||suffixe||'-ART-001', 'Tuile terre cuite', 'u', 0, 200, 6.5, 8.0) returning id into art1;
     insert into public.articles_stock (entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, prix_achat_ht, prix_vente_ht) values
-      (ent, 'DR-'||suffixe||'-ART-002', 'Chevron sapin 63x175', 'ml', 300, 50, 3.2, 4.5) returning id into art2;
+      (ent, 'DR-'||suffixe||'-ART-002', 'Chevron sapin 63x175', 'ml', 0, 50, 3.2, 4.5) returning id into art2;
     insert into public.articles_stock (entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, prix_achat_ht, prix_vente_ht) values
-      (ent, 'DR-'||suffixe||'-ART-003', 'Isolant laine de bois 100mm', 'm2', 80, 20, 12.0, 16.0) returning id into art3;
+      (ent, 'DR-'||suffixe||'-ART-003', 'Isolant laine de bois 100mm', 'm2', 0, 20, 12.0, 16.0) returning id into art3;
     insert into public.articles_stock (entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, prix_achat_ht, prix_vente_ht) values
-      (ent, 'DR-'||suffixe||'-ART-004', 'Vis charpente 8x200', 'boite', 40, 10, 22.0, 28.0) returning id into art4;
+      (ent, 'DR-'||suffixe||'-ART-004', 'Vis charpente 8x200', 'boite', 0, 10, 22.0, 28.0) returning id into art4;
 
     insert into public.mouvements_stock (entreprise_id, article_id, chantier_id, type, quantite, date, motif, employe_id) values
+      (ent, art1, null, 'entree', 1200, '2026-07-01', 'Stock initial', null),
+      (ent, art2, null, 'entree', 300, '2026-07-01', 'Stock initial', null),
+      (ent, art3, null, 'entree', 80, '2026-07-01', 'Stock initial', null),
+      (ent, art4, null, 'entree', 40, '2026-07-01', 'Stock initial', null),
       (ent, art1, cha1, 'sortie', 500, '2026-08-03', 'Pose toiture Durand', emp1),
-      (ent, art2, cha1, 'sortie', 60, '2026-08-02', 'Charpente toiture Durand', emp1),
-      (ent, art1, null, 'entree', 1000, '2026-07-28', 'Réassort fournisseur', null);
+      (ent, art2, cha1, 'sortie', 60, '2026-08-02', 'Charpente toiture Durand', emp1);
 
-    -- Commandes créées en brouillon puis passées à leur statut après leurs lignes : une
-    -- commande engagée est verrouillée (20260926000506), son identité imprimée figée à la
-    -- sortie du brouillon (20260927000508).
-    insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, montant_ht, montant_tva, montant_ttc, cree_par_utilisateur_id)
-      values (ent, 'DR-'||suffixe||'-CMD-0001', fourn1, cha1, 'brouillon', '2026-07-25', '2026-07-30', 3900, 780, 4680, user1)
+    -- Commandes : brouillon, lignes, puis transitions métier — une commande engagée est
+    -- verrouillée (20260926000506) et son identité imprimée figée à l'envoi (20260927000508).
+    -- Envoi/confirmation par changer_statut_commande_interne, réception par le moteur canonique
+    -- enregistrer_reception_commande_interne (20260922000322), qui crée les entrées de stock des
+    -- lignes reliées à un article et recalcule le statut.
+    insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, cree_par_utilisateur_id)
+      values (ent, 'DR-'||suffixe||'-CMD-0001', fourn1, cha1, 'brouillon', '2026-07-25', '2026-07-30', user1)
       returning id into cmd1;
     insert into public.lignes_commande (entreprise_id, commande_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, quantite_recue, article_id) values
-      (ent, cmd1, 'Tuile terre cuite', 1000, 'u', 6.5, 20, 1000, art1),
-      (ent, cmd1, 'Chevron sapin 63x175', 300, 'ml', 3.2, 20, 300, art2);
-    update public.commandes_fournisseurs set statut = 'recue' where id = cmd1;
+      (ent, cmd1, 'Tuile terre cuite', 1000, 'u', 6.5, 20, 0, art1),
+      (ent, cmd1, 'Chevron sapin 63x175', 300, 'ml', 3.2, 20, 0, art2);
+    perform public.changer_statut_commande_interne(ent, cmd1, 'envoyee');
+    perform public.changer_statut_commande_interne(ent, cmd1, 'confirmee');
+    perform public.enregistrer_reception_commande_interne(ent, cmd1,
+      (select jsonb_agg(jsonb_build_object('ligne_id', l.id, 'quantite_recue', l.quantite)) from public.lignes_commande l where l.commande_id = cmd1),
+      null);
 
-    insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, montant_ht, montant_tva, montant_ttc, cree_par_utilisateur_id)
-      values (ent, 'DR-'||suffixe||'-CMD-0002', fourn2, cha2, 'brouillon', '2026-09-15', '2026-09-30', 8000, 1600, 9600, user1)
+    insert into public.commandes_fournisseurs (entreprise_id, numero, fournisseur_id, chantier_id, statut, date_commande, date_livraison_prevue, cree_par_utilisateur_id)
+      values (ent, 'DR-'||suffixe||'-CMD-0002', fourn2, cha2, 'brouillon', '2026-09-15', '2026-09-30', user1)
       returning id into cmd2;
     insert into public.lignes_commande (entreprise_id, commande_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, article_id) values
       (ent, cmd2, 'Isolant laine de bois 100mm', 250, 'm2', 12.0, 20, art3);
-    update public.commandes_fournisseurs set statut = 'envoyee' where id = cmd2;
+    perform public.changer_statut_commande_interne(ent, cmd2, 'envoyee');
 
     -- Réserves : module séparé avec ses propres chantiers/intervenants
     -- (public.reserves_chantiers / reserves_intervenants), reliés au vrai

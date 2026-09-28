@@ -22,12 +22,20 @@ export const REGISTRE_SCRIPTS = Object.freeze({
   "seed_entreprise_test_5_ans.sql": { destructif: false },
   "seed_entreprise_test_suivi_terrain.sql": { destructif: false },
   "seed_entreprise_test_tous_onglets.sql": { destructif: false },
-  "seed_juju_6_mois.sql": { destructif: false },
-  "corriger_encodage_juju.sql": { destructif: false },
   "seed_entreprise_pilote_btp.sql": { destructif: false },
   "assertions_entreprise_pilote_btp.sql": { destructif: false },
   "cleanup_entreprise_pilote_btp.sql": { destructif: true, cleConfirmation: "CONFIRM_DELETE_TEST_DATA", valeurAttendue: "YES" },
-  "supprimer_entreprises_test.sql": { destructif: true, cleConfirmation: "CONFIRM_DELETE_TEST_DATA", valeurAttendue: "YES" },
+});
+
+/**
+ * Scripts LEGACY retirés du registre (seed compatibility hardening V1, classement de
+ * scripts/seeds/registry.mjs) : leur cible n'existe plus ou ils sont cassés. Ils restent
+ * dans le dépôt comme archive et sont refusés avec un motif explicite.
+ */
+export const SCRIPTS_LEGACY = Object.freeze({
+  "seed_juju_6_mois.sql": "entreprise « juju » supprimée le 14-07-2026 ; le script ne compile plus",
+  "corriger_encodage_juju.sql": "correctif ponctuel d'une entreprise supprimée",
+  "supprimer_entreprises_test.sql": "nettoyage ponctuel du 14-07-2026, identifiants en dur obsolètes",
 });
 
 function extraireRefDepuisUrl(url) {
@@ -88,7 +96,10 @@ export function verifierRefLieeCli(refLiee) {
 
 /** Vérifie qu'un nom de script demandé fait bien partie du registre autorisé. */
 export function verifierScriptConnu(nomFichier) {
-  const entree = REGISTRE_SCRIPTS[nomFichier];
+  if (Object.hasOwn(SCRIPTS_LEGACY, nomFichier)) {
+    return { autorise: false, motif: `Script LEGACY retiré du registre : ${nomFichier} (${SCRIPTS_LEGACY[nomFichier]}). Voir scripts/seeds/registry.mjs.` };
+  }
+  const entree = Object.hasOwn(REGISTRE_SCRIPTS, nomFichier) ? REGISTRE_SCRIPTS[nomFichier] : undefined;
   if (!entree) {
     return { autorise: false, motif: `Script inconnu du registre : ${nomFichier}. Aucun script hors de cette liste explicite n'est exécutable via ce garde-fou.` };
   }

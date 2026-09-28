@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   REF_PREVIEW_AUTORISEE,
   REGISTRE_SCRIPTS,
+  SCRIPTS_LEGACY,
   verifierAutorisationComplete,
   verifierCiblePreview,
   verifierConfirmationDestructive,
@@ -72,19 +73,19 @@ test("verifierRefLieeCli — ref liée CLI absente ou différente → refus", ()
 });
 
 test("verifierScriptConnu — script du registre → autorisé, script hors registre → refus", () => {
-  assert.equal(verifierScriptConnu("seed_juju_6_mois.sql").autorise, true);
+  assert.equal(verifierScriptConnu("seed_entreprise_test_5_ans.sql").autorise, true);
   const inconnu = verifierScriptConnu("../../etc/passwd");
   assert.equal(inconnu.autorise, false);
   assert.match(inconnu.motif, /inconnu/);
 });
 
 test("verifierConfirmationDestructive — script non destructif ne requiert rien", () => {
-  const resultat = verifierConfirmationDestructive({}, REGISTRE_SCRIPTS["seed_juju_6_mois.sql"]);
+  const resultat = verifierConfirmationDestructive({}, REGISTRE_SCRIPTS["seed_entreprise_test_5_ans.sql"]);
   assert.equal(resultat.autorise, true);
 });
 
 test("verifierConfirmationDestructive — script destructif sans confirmation → refus", () => {
-  const resultat = verifierConfirmationDestructive({}, REGISTRE_SCRIPTS["supprimer_entreprises_test.sql"]);
+  const resultat = verifierConfirmationDestructive({}, REGISTRE_SCRIPTS["cleanup_entreprise_pilote_btp.sql"]);
   assert.equal(resultat.autorise, false);
   assert.match(resultat.motif, /absente/);
 });
@@ -92,7 +93,7 @@ test("verifierConfirmationDestructive — script destructif sans confirmation �
 test("verifierConfirmationDestructive — script destructif avec mauvaise valeur → refus", () => {
   const resultat = verifierConfirmationDestructive(
     { CONFIRM_DELETE_TEST_DATA: "oui" },
-    REGISTRE_SCRIPTS["supprimer_entreprises_test.sql"],
+    REGISTRE_SCRIPTS["cleanup_entreprise_pilote_btp.sql"],
   );
   assert.equal(resultat.autorise, false);
 });
@@ -100,26 +101,26 @@ test("verifierConfirmationDestructive — script destructif avec mauvaise valeur
 test("verifierConfirmationDestructive — script destructif avec la bonne confirmation → autorisé", () => {
   const resultat = verifierConfirmationDestructive(
     { CONFIRM_DELETE_TEST_DATA: "YES" },
-    REGISTRE_SCRIPTS["supprimer_entreprises_test.sql"],
+    REGISTRE_SCRIPTS["cleanup_entreprise_pilote_btp.sql"],
   );
   assert.equal(resultat.autorise, true);
 });
 
 test("verifierAutorisationComplete — parcours nominal script non destructif sur Preview → autorisé", () => {
-  const resultat = verifierAutorisationComplete("seed_juju_6_mois.sql", ENV_PREVIEW_VALIDE, REF_PREVIEW_AUTORISEE);
+  const resultat = verifierAutorisationComplete("seed_entreprise_test_5_ans.sql", ENV_PREVIEW_VALIDE, REF_PREVIEW_AUTORISEE);
   assert.equal(resultat.autorise, true);
   assert.equal(resultat.destructif, false);
 });
 
 test("verifierAutorisationComplete — script destructif sur Preview SANS confirmation → refus, jusqu'au point précédant l'écriture réelle", () => {
-  const resultat = verifierAutorisationComplete("supprimer_entreprises_test.sql", ENV_PREVIEW_VALIDE, REF_PREVIEW_AUTORISEE);
+  const resultat = verifierAutorisationComplete("cleanup_entreprise_pilote_btp.sql", ENV_PREVIEW_VALIDE, REF_PREVIEW_AUTORISEE);
   assert.equal(resultat.autorise, false);
   assert.match(resultat.motif, /confirmation explicite requise/);
 });
 
 test("verifierAutorisationComplete — script destructif sur Preview AVEC confirmation → autorisé", () => {
   const resultat = verifierAutorisationComplete(
-    "supprimer_entreprises_test.sql",
+    "cleanup_entreprise_pilote_btp.sql",
     { ...ENV_PREVIEW_VALIDE, CONFIRM_DELETE_TEST_DATA: "YES" },
     REF_PREVIEW_AUTORISEE,
   );
@@ -129,7 +130,7 @@ test("verifierAutorisationComplete — script destructif sur Preview AVEC confir
 
 test("verifierAutorisationComplete — même avec confirmation, une cible Production fictive reste refusée", () => {
   const resultat = verifierAutorisationComplete(
-    "supprimer_entreprises_test.sql",
+    "cleanup_entreprise_pilote_btp.sql",
     {
       SUPABASE_PROJECT_REF: "future-production-ref",
       NEXT_PUBLIC_SUPABASE_URL: "https://future-production-ref.supabase.co",
@@ -141,7 +142,7 @@ test("verifierAutorisationComplete — même avec confirmation, une cible Produc
 });
 
 test("verifierAutorisationComplete — ref CLI liée différente des variables d'env → refus (défense en profondeur)", () => {
-  const resultat = verifierAutorisationComplete("seed_juju_6_mois.sql", ENV_PREVIEW_VALIDE, "un-autre-projet-lie");
+  const resultat = verifierAutorisationComplete("seed_entreprise_test_5_ans.sql", ENV_PREVIEW_VALIDE, "un-autre-projet-lie");
   assert.equal(resultat.autorise, false);
 });
 
@@ -149,4 +150,19 @@ test("verifierAutorisationComplete — script archivé (sortie_mode_prototype.sq
   assert.equal("sortie_mode_prototype.sql" in REGISTRE_SCRIPTS, false);
   const resultat = verifierAutorisationComplete("sortie_mode_prototype.sql", ENV_PREVIEW_VALIDE, REF_PREVIEW_AUTORISEE);
   assert.equal(resultat.autorise, false);
+});
+
+test("verifierScriptConnu — les scripts LEGACY sont refusés avec leur motif, même avec confirmation", () => {
+  for (const nom of ["seed_juju_6_mois.sql", "corriger_encodage_juju.sql", "supprimer_entreprises_test.sql"]) {
+    assert.ok(nom in SCRIPTS_LEGACY);
+    assert.equal(nom in REGISTRE_SCRIPTS, false);
+    const resultat = verifierAutorisationComplete(nom, { ...ENV_PREVIEW_VALIDE, CONFIRM_DELETE_TEST_DATA: "YES" }, REF_PREVIEW_AUTORISEE);
+    assert.equal(resultat.autorise, false);
+    assert.match(resultat.motif, /LEGACY/);
+  }
+});
+
+test("verifierScriptConnu — une clé héritée d'Object.prototype n'est jamais un script connu", () => {
+  assert.equal(verifierScriptConnu("constructor").autorise, false);
+  assert.equal(verifierScriptConnu("__proto__").autorise, false);
 });

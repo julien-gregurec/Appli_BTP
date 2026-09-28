@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LEGACY — NE PLUS EXÉCUTER (seed compatibility hardening V1, 2026-09-27)
+// Script du mode prototype sans connexion : il lit la clé publique et appelle
+// public.dev_contexte_entreprise(), supprimée par 20260714000078 (fermeture de l'accès anonyme),
+// puis écrit en anonyme — refusé depuis. Il insère aussi employes.taux_horaire / cout_horaire,
+// déplacés depuis dans des tables dédiées. Conservé comme archive ; classement :
+// scripts/seeds/registry.mjs. Arrêt immédiat, avant toute lecture de .env.local.
+// ═══════════════════════════════════════════════════════════════════════
+console.error("ARRÊT SÛR: seed-demo-history.mjs est LEGACY (mode prototype supprimé) — voir scripts/seeds/registry.mjs.");
+process.exit(1);
+
 import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 

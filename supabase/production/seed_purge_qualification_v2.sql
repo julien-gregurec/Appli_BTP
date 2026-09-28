@@ -43,6 +43,24 @@ begin;
 
 set statement_timeout = '5min';
 
+-- Fixture de qualification (base jetable) : 5 salariés actifs par tenant dépassent la capacité
+-- d'une entreprise sans offre (3, trg_capacite_personnes_actives depuis 20260903000256).
+-- Contournement EXPLICITE et borné : `set local` (cette transaction seulement), effectif
+-- uniquement pour une session superutilisateur — le trigger l'ignore pour les rôles d'API.
+set local elsatia.capacite_personnes_bypass = 'on';
+
+-- Rejeu (seed compatibility hardening V1) : tout le jeu est créé dans CETTE transaction ; s'il
+-- est déjà présent, rien n'est rejoué. Un simple ON CONFLICT (id) DO NOTHING ne suffisait pas :
+-- les triggers BEFORE INSERT de numérotation (clients, chantiers, devis, factures, salariés,
+-- notes de frais…) consomment un numéro même quand la ligne est ensuite écartée par le conflit,
+-- et chaque rejeu décalait tous les compteurs. Script exécuté par psql (base locale jetable).
+select exists (select 1 from public.entreprises where id = 'aaaaaaaa-0000-0000-0000-000000000001') as jeu_deja_present \gset
+\if :jeu_deja_present
+  \echo 'Jeu de qualification purge V2 déjà présent : rejeu sans effet.'
+  rollback;
+  \quit
+\endif
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- 1. Entreprises
 -- ═══════════════════════════════════════════════════════════════════════
@@ -186,12 +204,14 @@ on conflict (id) do nothing;
 -- 6. Tenant A — devis + lignes de devis
 -- ═══════════════════════════════════════════════════════════════════════
 
+-- Devis créés en BROUILLON, lignes posées, puis transitions métier (bloc ci-dessous) : un devis
+-- accepté verrouille ses lignes (verrouiller_lignes_devis_accepte) et ses montants.
 insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, date_emission)
 values
-  ('aaaaaaaa-a000-0007-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000001', 'aaaaaaaa-a000-0006-0000-000000000001', 'accepte', '2026-06-15'),
-  ('aaaaaaaa-a000-0007-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000002', 'aaaaaaaa-a000-0006-0000-000000000002', 'envoye', '2026-01-20'),
+  ('aaaaaaaa-a000-0007-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000001', 'aaaaaaaa-a000-0006-0000-000000000001', 'brouillon', '2026-06-15'),
+  ('aaaaaaaa-a000-0007-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000002', 'aaaaaaaa-a000-0006-0000-000000000002', 'brouillon', '2026-01-20'),
   ('aaaaaaaa-a000-0007-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000003', 'aaaaaaaa-a000-0006-0000-000000000003', 'brouillon', '2026-08-20'),
-  ('aaaaaaaa-a000-0007-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000004', null, 'refuse', '2026-05-05')
+  ('aaaaaaaa-a000-0007-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-a000-0003-0000-000000000004', null, 'brouillon', '2026-05-05')
 on conflict (id) do nothing;
 
 insert into public.lignes_devis (id, devis_id, designation, type, quantite, unite, prix_unitaire_ht, taux_tva, ordre)
@@ -204,6 +224,13 @@ values
   ('aaaaaaaa-a000-0008-0000-000000000006', 'aaaaaaaa-a000-0007-0000-000000000003', 'Ravalement facade', 'main_oeuvre', 220, 'm2', 45.00, 10, 1),
   ('aaaaaaaa-a000-0008-0000-000000000007', 'aaaaaaaa-a000-0007-0000-000000000004', 'Etude de faisabilite', 'forfait', 1, 'forfait', 3500.00, 20, 1)
 on conflict (id) do nothing;
+
+-- Transitions : brouillon → envoyé → accepté / refusé. Rejouable (seuls les brouillons avancent).
+update public.devis set statut = 'envoye'
+ where id in ('aaaaaaaa-a000-0007-0000-000000000001', 'aaaaaaaa-a000-0007-0000-000000000002', 'aaaaaaaa-a000-0007-0000-000000000004')
+   and statut = 'brouillon';
+update public.devis set statut = 'accepte' where id = 'aaaaaaaa-a000-0007-0000-000000000001' and statut = 'envoye';
+update public.devis set statut = 'refuse' where id = 'aaaaaaaa-a000-0007-0000-000000000004' and statut = 'envoye';
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- 7. Tenant A — factures (créées en 'brouillon', lignes ajoutées puis
@@ -466,7 +493,7 @@ values
 on conflict (id) do nothing;
 
 insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, date_emission)
-values ('bbbbbbbb-b000-0007-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 'bbbbbbbb-b000-0003-0000-000000000001', 'bbbbbbbb-b000-0006-0000-000000000001', 'accepte', '2026-05-01')
+values ('bbbbbbbb-b000-0007-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 'bbbbbbbb-b000-0003-0000-000000000001', 'bbbbbbbb-b000-0006-0000-000000000001', 'brouillon', '2026-05-01')
 on conflict (id) do nothing;
 
 insert into public.lignes_devis (id, devis_id, designation, type, quantite, unite, prix_unitaire_ht, taux_tva, ordre)
@@ -474,6 +501,10 @@ values
   ('bbbbbbbb-b000-0008-0000-000000000001', 'bbbbbbbb-b000-0007-0000-000000000001', 'Depose ancienne cuisine', 'main_oeuvre', 1, 'forfait', 450.00, 10, 1),
   ('bbbbbbbb-b000-0008-0000-000000000002', 'bbbbbbbb-b000-0007-0000-000000000001', 'Fourniture cuisine equipee', 'fourniture', 1, 'forfait', 6200.00, 10, 2)
 on conflict (id) do nothing;
+
+-- Brouillon → envoyé → accepté, après les lignes (même patron que le tenant A).
+update public.devis set statut = 'envoye' where id = 'bbbbbbbb-b000-0007-0000-000000000001' and statut = 'brouillon';
+update public.devis set statut = 'accepte' where id = 'bbbbbbbb-b000-0007-0000-000000000001' and statut = 'envoye';
 
 insert into public.factures (id, entreprise_id, client_id, chantier_id, devis_origine_id, type, statut, date_emission, date_echeance)
 values ('bbbbbbbb-b000-0009-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 'bbbbbbbb-b000-0003-0000-000000000001', 'bbbbbbbb-b000-0006-0000-000000000001', 'bbbbbbbb-b000-0007-0000-000000000001', 'finale', 'brouillon', '2026-05-20', '2026-06-19')

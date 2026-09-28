@@ -73,6 +73,12 @@ jobs:
       - name: Tests du script Stripe Test réabonnement (sans réseau, sk_live refusée)
         run: npm run test:stripe-resubscription-script
 
+      # Registre des seeds (tout script de données classé, contournements déclarés, LEGACY refusés,
+      # patron « document engagé → lignes » interdit), plan et script SQL du seed Preview, garde du
+      # wrapper Preview. Sans base ni dépendance.
+      - name: Seeds — registre, seed Preview, garde du wrapper (sans base)
+        run: npm run test:seeds
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 
@@ -103,3 +109,43 @@ jobs:
           # publiques du compte et de l'abonnement, que la CI n'a pas et n'a pas à avoir.
           NEXT_PUBLIC_TOOLS_ENV: local
         run: npm run verify
+
+  # Compatibilité RÉELLE des seeds avec le train de migrations : base PostgreSQL 16 fraîche,
+  # TOUTES les migrations rejouées, puis chaque seed exécuté séparément (stderr affiché), rejoué
+  # quand il se dit rejouable (même état final exigé), contrôles de clés étrangères et
+  # d'invariants métier, reprise après interruption du seed Preview, cycle nettoyage/reseed du
+  # pilote, reset de la démo, sauvegarde/restauration/rejeu du drill DR. Une migration qui rend un
+  # seed incompatible fait échouer ce job. Voir docs/qualification/ELSATIA_SEED_COMPATIBILITY_HARDENING_V1.md.
+  seeds:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: PostgreSQL 16 local (+ PL/Python et PyNaCl pour le stub pgsodium du drill DR)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-plpython3-16 python3-nacl
+          sudo systemctl start postgresql
+          # Mot de passe jetable, généré pour ce job : les scripts DR se connectent en TCP local.
+          SEEDS_DR_PGPASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$SEEDS_DR_PGPASSWORD"
+          echo "SEEDS_DR_PGPASSWORD=$SEEDS_DR_PGPASSWORD" >> "$GITHUB_ENV"
+          sudo -u postgres psql -X -q -c "alter role postgres password '$SEEDS_DR_PGPASSWORD'"
+
+      - name: Harnais de compatibilité des seeds (base fraîche)
+        run: sudo -E env "PATH=$PATH" node scripts/seeds/verify-seeds.mjs --report=seeds-report.json
+
+      - name: Rapport du harnais
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seeds-report
+          path: seeds-report.json
+          if-no-files-found: ignore
