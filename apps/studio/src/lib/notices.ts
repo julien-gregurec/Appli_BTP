@@ -1,3 +1,4 @@
+import { IDENTITY_NOTICES } from "./identity-policy";
 /**
  * Every message a server action may pass through `?error=`. The Notice component
  * only renders exact members of this list, so a crafted link cannot show arbitrary text.
@@ -48,7 +49,9 @@ export const notices = {
     "Mise à jour impossible. Redemandez un lien de réinitialisation.",
 } as const;
 export type NoticeKey = keyof typeof notices;
-const allowed = new Set<string>(Object.values(notices));
+// Messages d'identité (connexion ELSATIA refusée, session fermée, lecture seule) : même liste
+// fermée, définie une seule fois dans identity-policy.ts.
+const allowed = new Set<string>([...Object.values(notices), ...IDENTITY_NOTICES]);
 /** Returns the text to display, or nothing when the value is not a known notice. */
 export function knownNotice(value: unknown): string | undefined {
   return typeof value === "string" && allowed.has(value) ? value : undefined;

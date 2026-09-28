@@ -170,3 +170,29 @@ export async function uploadMedia(page: Page, projectId: string, files: string[]
       return { id, name, key };
     });
 }
+
+/** Jeton d'accès GoTrue Studio de la session navigateur (cookie @supabase/ssr, éventuellement découpé). */
+export async function studioAccessToken(context: BrowserContext): Promise<string> {
+  const cookies = (await context.cookies()).filter((c) => c.name.startsWith("elsatia-studio-auth"));
+  const whole = cookies.find((c) => c.name === "elsatia-studio-auth");
+  const raw = whole
+    ? whole.value
+    : cookies
+        .filter((c) => /\.\d+$/.test(c.name))
+        .sort((a, b) => Number(a.name.split(".").pop()) - Number(b.name.split(".").pop()))
+        .map((c) => c.value)
+        .join("");
+  const json = raw.startsWith("base64-") ? Buffer.from(raw.slice(7), "base64url").toString("utf8") : decodeURIComponent(raw);
+  return (JSON.parse(json) as { access_token: string }).access_token;
+}
+
+/** RPC PostgREST RÉELLE avec le jeton de l'utilisateur (contourne l'application : preuve base). */
+export async function rpcAsUser(token: string, fn: string, args: Record<string, unknown>) {
+  const res = await fetch(`${env("NEXT_PUBLIC_SUPABASE_URL")}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, apikey: env("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"), "content-type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const body = (await res.json().catch(() => null)) as { code?: string; hint?: string; message?: string } | null;
+  return { status: res.status, body };
+}

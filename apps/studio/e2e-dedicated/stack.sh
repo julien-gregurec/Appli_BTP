@@ -40,6 +40,11 @@ wait_http() { # url [tentatives]
   for _ in $(seq 1 "${2:-120}"); do curl -s -o /dev/null "$1" && return 0; sleep 0.5; done
   log "ÉCHEC : $1 injoignable"; return 1
 }
+kill_port() { # port : arrête le processus qui écoute (npx/tsx lancent des sous-processus)
+  fuser -k -TERM "$1/tcp" >/dev/null 2>&1 || true
+  for _ in $(seq 1 40); do fuser "$1/tcp" >/dev/null 2>&1 || return 0; sleep 0.25; done
+  fuser -k -KILL "$1/tcp" >/dev/null 2>&1 || true
+}
 spawn() { # nom commande… (journal + pid dans $E2E_DIR)
   local name=$1; shift
   nohup "$@" >"$E2E_DIR/$name.log" 2>&1 &
@@ -255,9 +260,24 @@ stop() {
     [ -f "$f" ] || continue
     pid=$(cat "$f"); pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; rm -f "$f"
   done
+  for port in $P_STUDIO_APP $P_CENTRAL_APP $P_STORAGE $P_GW_STUDIO $P_GW_CENTRAL $P_SMTP; do kill_port "$port"; done
+  pkill -f "$ROOT/workers/studio-video/src/worker.ts" 2>/dev/null || true
+  pkill -f "tsx src/worker.ts" 2>/dev/null || true
   for name in central studio; do
     [ -d "$E2E_DIR/$name" ] && as_pg "$PGBIN/pg_ctl -D $E2E_DIR/$name stop -m fast >/dev/null" || true
   done
+}
+
+# Reconstruit et relance l'application Studio seule (après une modification du code applicatif).
+rebuild_app() {
+  # shellcheck disable=SC1091
+  source "$E2E_DIR/env.sh"
+  [ -f "$E2E_DIR/studio.pid" ] && { pid=$(cat "$E2E_DIR/studio.pid"); pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; }
+  kill_port $P_STUDIO_APP
+  (cd "$APP" && npm run build >"$E2E_DIR/studio-build.log" 2>&1) || { log "ÉCHEC build (voir $E2E_DIR/studio-build.log)"; exit 1; }
+  (cd "$APP" && spawn studio npx next start -p $P_STUDIO_APP -H 127.0.0.1)
+  wait_http "http://127.0.0.1:$P_STUDIO_APP/login" 240
+  log "application Studio reconstruite et relancée"
 }
 
 status() {
@@ -272,5 +292,6 @@ case "${1:-}" in
   stop) stop ;;
   reset) stop; rm -rf "${E2E_DIR:?}"; start ;;
   status) status ;;
-  *) echo "usage: $0 start|stop|reset|status" >&2; exit 2 ;;
+  rebuild-app) rebuild_app ;;
+  *) echo "usage: $0 start|stop|reset|status|rebuild-app" >&2; exit 2 ;;
 esac

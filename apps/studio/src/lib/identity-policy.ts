@@ -94,6 +94,9 @@ const UNAVAILABLE = "Connexion ELSATIA momentanément indisponible. Réessayez d
 const GENERIC = "Connexion impossible. Recommencez.";
 const TRANSIENT = new Set(["JWKS_UNAVAILABLE", "PLATFORM_UNAVAILABLE", "STUDIO_AUTH_UNAVAILABLE", "STUDIO_DB_UNAVAILABLE"]);
 
+/** Tous les messages d'identité affichables (liste blanche de Notice, src/lib/notices.ts). */
+export const IDENTITY_NOTICES: readonly string[] = [...Object.values(MESSAGES), UNAVAILABLE, GENERIC, READ_ONLY_MESSAGE];
+
 /** Message utilisateur stable pour un code d'erreur (jamais de détail technique). */
 export function identityMessage(code: string | undefined): string | undefined {
   if (!code) return undefined;

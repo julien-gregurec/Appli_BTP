@@ -138,6 +138,7 @@ test.describe("auth dédiée", () => {
     // Reconnexion : l'identité centrale refuse d'émettre (compte désactivé).
     await page.getByRole("link", { name: "Continuer avec mon compte ELSATIA" }).click();
     await expect(page).toHaveURL(/error_code=ACCOUNT_DISABLED/);
+    await expect(page.locator("p.notice[role=alert]")).toHaveText("Votre compte ELSATIA est désactivé.");
     // Réactivation : de nouveau admis.
     await central("/__e2e/unban", { email: account.email });
     await page.getByRole("link", { name: "Continuer avec mon compte ELSATIA" }).click();
