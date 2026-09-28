@@ -42,7 +42,10 @@ export async function servirExport(corps: unknown, d: DependancesExport): Promis
     const r = await d.lireSujet(claims.sub, claims.job);
     if (r.statut === "aucun_compte") return { status: 200, body: { statut: "aucun_compte", format: FORMAT_STUDIO_EXPORT } };
     if (r.statut !== "ok") return { status: 409, body: { code: "ACCOUNT_INACTIVE" } };
-    const { fichiers: brut, statut: _statut, ...donnees } = r as { fichiers?: unknown[]; statut: string } & Record<string, unknown>;
+    const donnees: Record<string, unknown> = { ...r };
+    const brut = donnees.fichiers as unknown[] | undefined;
+    delete donnees.fichiers;
+    delete donnees.statut;
     const fichiers = [];
     for (const f of (brut ?? []) as Array<Record<string, unknown>>) {
       const bucket = String(f.bucket ?? "");

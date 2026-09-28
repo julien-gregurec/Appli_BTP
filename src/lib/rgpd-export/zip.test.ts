@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createWriteStream, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { once } from "node:events";
+import { Writable } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -87,6 +88,26 @@ print(len(z.namelist()), hashlib.sha256(z.read("export.json")).hexdigest(), len(
     expect(sortie).toBe("65600 65599 None");
     if (outil("unzip")) expect(execFileSync("unzip", ["-tq", chemin]).toString()).toMatch(/No errors/);
   }, 120_000);
+
+  it("flux : 256 Mio traversent l'écrivain sans que le tas JS ne grossisse d'autant", async () => {
+    const puits = new Writable({ write(_c, _e, cb) { cb(); } });
+    const z = new EcrivainZip(puits);
+    const bloc = Buffer.alloc(1 << 20, 7);
+    global.gc?.();
+    const avant = process.memoryUsage().heapUsed;
+    let max = avant;
+    async function* gros() {
+      for (let i = 0; i < 256; i++) {
+        max = Math.max(max, process.memoryUsage().heapUsed);
+        yield bloc;
+      }
+    }
+    const e = await z.ajouter("gros.bin", gros(), { compresser: false });
+    const fin = await z.fermer();
+    expect(e.octets).toBe(256 << 20);
+    expect(fin.octets).toBeGreaterThan(256 << 20);
+    expect(max - avant).toBeLessThan(64 << 20);
+  }, 60_000);
 
   it("un flux source en erreur fait échouer l'entrée (jamais d'archive silencieusement tronquée)", async () => {
     const sortie = createWriteStream(join(dossier, "erreur.zip"));
