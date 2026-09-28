@@ -1,5 +1,6 @@
 import "server-only";
 import type { Browser } from "puppeteer-core";
+import { cookiesPourUrl } from "./cookies";
 
 // Next.js 16 interdit d'importer react-dom/server dans le code serveur de
 // l'App Router ("render or return the content directly as a Server
@@ -22,7 +23,10 @@ export async function genererPdfDepuisUrl(url: string, cookieHeader?: string | n
   const navigateur = await lancerNavigateur();
   try {
     const page = await navigateur.newPage();
-    if (cookieHeader) await page.setExtraHTTPHeaders({ cookie: cookieHeader });
+    if (cookieHeader) {
+      const cookies = cookiesPourUrl(cookieHeader, url);
+      if (cookies.length > 0) await page.setCookie(...cookies);
+    }
     const reponse = await page.goto(url, { waitUntil: "load" });
     if (!reponse || !reponse.ok()) throw new Error(`Document introuvable (${reponse?.status() ?? "pas de réponse"})`);
     const pdf = await page.pdf({

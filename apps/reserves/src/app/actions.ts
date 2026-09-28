@@ -13,6 +13,7 @@ import {
 import { envoyerInvitation } from "@/lib/emails-reserves";
 import { deposerLienInvitation } from "@/lib/invitation-relais";
 import { estCleIdempotence } from "@/lib/offline/contrat";
+import { cheminInterneSur } from "@/lib/redirection-sure";
 import { deposerObjet } from "@/lib/depot-photo";
 
 const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
@@ -45,7 +46,10 @@ function texteOuNull(formData: FormData, cle: string) {
 }
 
 function cheminSur(valeur: string, defaut: string) {
-  return valeur.startsWith("/") && !valeur.startsWith("//") ? valeur : defaut;
+  // Délègue au validateur durci : l'ancien test `startsWith("/") &&
+  // !startsWith("//")` laissait passer `/\evil.com`, `/%5Cevil.com`,
+  // `/%09/evil.com` et `/.//evil.com` (redirection ouverte, REDTEAM-V2).
+  return cheminInterneSur(valeur, defaut);
 }
 
 export async function connexionAction(formData: FormData) {

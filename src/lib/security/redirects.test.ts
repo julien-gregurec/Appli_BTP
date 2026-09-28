@@ -15,6 +15,10 @@ describe("redirections sûres", () => {
     "/%2f%2fevil.example",
     "/%252f%252fevil.example",
     "/%255cevil.example",
+    "/.//evil.example",
+    "/..//evil.example",
+    "/%2e//evil.example",
+    "/a/..//evil.example",
     "/chemin\nLocation:https://evil.example",
     "https://user:pass@example.com",
   ])("refuse la destination externe ou ambiguë %s", (destination) => {

@@ -12,7 +12,13 @@ export function destinationInterneSure(valeur: string | null | undefined, repli 
     if (!decodee.startsWith("/") || decodee.startsWith("//") || CARACTERES_AMBIGUS.test(decodee)) return repli;
     const url = new URL(decodee, "https://interne.invalid");
     if (url.origin !== "https://interne.invalid" || url.username || url.password) return repli;
-    return `${url.pathname}${url.search}${url.hash}`;
+    // On ne renvoie jamais la valeur d'entrée mais la forme normalisée par
+    // l'analyseur, revérifiée : `/.//evil.com`, `/..//evil.com`, `/%2e//evil.com`
+    // se normalisent en `//evil.com` (protocole-relatif) une fois le pathname
+    // reconstruit (REDTEAM-V2 F3).
+    const destination = `${url.pathname}${url.search}${url.hash}`;
+    if (destination.startsWith("//") || CARACTERES_AMBIGUS.test(destination)) return repli;
+    return destination;
   } catch {
     return repli;
   }
