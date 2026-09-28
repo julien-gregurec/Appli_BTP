@@ -89,6 +89,27 @@ export async function listerChantiers(): Promise<ChantierReserves[]> {
   return (data ?? []) as ChantierReserves[];
 }
 
+/**
+ * D-01 — vrai quand l'appelant consulte cette réserve EN TANT QU'INTERVENANT et que
+ * l'organisation hôte est suspendue. La base refuse alors toute écriture ; l'écran
+ * s'aligne en masquant les commandes. `null` (réserve non lue, erreur) vaut `false` :
+ * masquer une commande n'est jamais la sécurité, la base l'est.
+ */
+export async function lireLectureSeuleHote(reserveId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_lecture_seule_hote", { p_reserve_id: reserveId });
+  return data === true;
+}
+
+/** Même information au niveau d'un chantier auquel l'appelant intervient. */
+export async function lireChantierLectureSeuleHote(chantierId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_chantier_lecture_seule_hote", {
+    p_chantier_id: chantierId,
+  });
+  return data === true;
+}
+
 export async function lireChantier(id: string): Promise<ChantierReserves | null> {
   const supabase = await createClient();
   const { data } = await supabase

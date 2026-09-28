@@ -267,6 +267,22 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          to_regclass('public.stripe_subscriptions_remplacees') is not null
            and to_regprocedure('public.relier_subscription_reabonnement_service(uuid,text,text,text,text,text)') is not null
            and to_regprocedure('public.appliquer_evenement_facture_abonnement_v2_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text,text)') is not null, true
+  union all
+  -- D-01 : hôte suspendu → intervenant en lecture seule (…0928 301). Garde sur les 11 tables de
+  -- l'hôte (10 du lot + reserves_contacts, GP ↔ Réserves V4), prédicat commercial non exposé aux clients.
+  select 25, 'Réserves : hôte suspendu → intervenant en lecture seule (20260928000301)',
+         '11 tables gardées, prédicat non exposé',
+         (select count(distinct t.tgrelid) from pg_trigger t
+          where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname = 'reserves_garde_hote_suspendu')::text
+           || '/11 tables, prédicat exposé : '
+           || coalesce((select has_function_privilege('authenticated', p.oid, 'execute')::text from pg_proc p
+                        join pg_namespace n on n.oid = p.pronamespace
+                        where n.nspname = 'public' and p.proname = 'reserves_hote_ecriture_ouverte'), 'ABSENT'),
+         (select count(distinct t.tgrelid) from pg_trigger t
+          where not t.tgisinternal and t.tgenabled <> 'D' and t.tgname = 'reserves_garde_hote_suspendu') = 11
+           and coalesce((select not has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p
+                         join pg_namespace n on n.oid = p.pronamespace
+                         where n.nspname = 'public' and p.proname = 'reserves_hote_ecriture_ouverte'), false), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

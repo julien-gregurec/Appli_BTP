@@ -9,7 +9,8 @@
 #   1. base reconstruite depuis zéro : amorce Supabase minimale + TOUT le train de migrations ;
 #   2. parité Storage (GRANT aux rôles d'API, les policies jugent), rôles de connexion de la
 #      passerelle (tests/e2e/colors-pile-locale/passerelle.mjs), colonnes GoTrue ;
-#   3. décor Réserves V3/V4 puis V6 (sécurité : organisation B sans lien).
+#   3. décor Réserves V3/V4 puis V6 (sécurité : organisation B sans lien), puis le décor
+#      isolé de la politique de suspension de l'hôte (D-01 : hôte H, intervenant S).
 #
 # Les objets Storage (plan, photos) sont déposés ensuite, passerelle démarrée, par
 # scripts/e2e/amorcer-recette-v4.mjs.
@@ -52,5 +53,6 @@ psql_base < "$DEPOT/scripts/e2e/prepare-local-recipe.sql"
 psql_base < "$DEPOT/scripts/e2e/reset-reserves-recipe.sql"
 psql_base < "$DEPOT/scripts/e2e/prepare-reserves-v4-listes.sql"
 psql_base < "$DEPOT/scripts/e2e/prepare-reserves-v6-securite.sql"
+psql_base < "$DEPOT/scripts/e2e/prepare-reserves-suspension-hote.sql"
 
 echo "== OK : base $BASE prête. Démarrer la passerelle, puis : node scripts/e2e/amorcer-recette-v4.mjs =="
