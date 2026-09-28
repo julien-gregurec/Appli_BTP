@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
-import { calculerEssaiCheckout, parametresEssaiCheckout, suffixeIdempotenceEssai, type EssaiCheckout } from "@/lib/stripe-essai-checkout";
+import { calculerEssaiCheckout, essaiReabonnement, parametresEssaiCheckout, suffixeIdempotenceEssai, type EssaiCheckout } from "@/lib/stripe-essai-checkout";
+import { parcoursDepuisSubscription, subscriptionBloqueCheckout, type ParcoursAbonnement } from "@/lib/stripe-reabonnement";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -26,7 +27,7 @@ export function calculerFacturationStockage(params: {
 }
 
 type StripeErreur = { error?: { message?: string } };
-type StripeCustomer = { id: string };
+type StripeCustomer = { id: string; deleted?: boolean };
 type StripeSession = { id: string; url: string | null; status?: string | null; mode?: string | null; metadata?: Record<string, string> | null };
 export type StripeSubscription = {
   id: string;
@@ -335,23 +336,38 @@ export async function creerOuRecupererClientStripe(params: {
 }
 
 /**
- * Refus d'un second Checkout : l'entreprise est déjà rattachée à une
- * subscription Stripe. Un nouveau Checkout créerait (et facturerait) une
- * seconde subscription que le webhook refuse de rattacher
- * (`rattachement_stripe_incoherent`) ; le changement d'offre passe par le
- * Portail Stripe.
+ * Refus d'un Checkout : une subscription Stripe existe encore (facturable ou
+ * réactivable). Un nouveau Checkout créerait (et facturerait) une seconde
+ * subscription ; `parcours` indique la bonne voie (Portail : reprise d'une
+ * résiliation programmée, paiement requis ; ou abonnement déjà actif).
  */
 export class AbonnementStripeDejaRattache extends Error {
-  constructor() {
+  constructor(public readonly parcours: ParcoursAbonnement = "actif") {
     super("Un abonnement Stripe est déjà rattaché à cette entreprise");
     this.name = "AbonnementStripeDejaRattache";
   }
 }
 
 /**
- * Prépare un Checkout d'abonnement : relit l'essai LOCAL (seule autorité) et
- * calcule l'essai Stripe restant (ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1).
- * Lecture seule, aucun appel Stripe.
+ * Le client Stripe rattaché n'est plus utilisable (supprimé chez Stripe). Le
+ * réabonnement ne crée jamais silencieusement un nouveau client : support.
+ */
+export class ClientStripeInvalide extends Error {
+  constructor() {
+    super("Le client Stripe rattaché à cette entreprise n’est plus utilisable");
+    this.name = "ClientStripeInvalide";
+  }
+}
+
+/**
+ * Prépare un Checkout d'abonnement.
+ *
+ * - Jamais souscrit : essai = reliquat de l'essai LOCAL (seule autorité,
+ *   ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1). Lecture seule, aucun appel Stripe.
+ * - Subscription déjà rattachée (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1) : elle
+ *   est RELUE chez Stripe. Terminée (`canceled`, `incomplete_expired`) →
+ *   réabonnement autorisé, SANS essai. Sinon → refus avec le parcours à suivre
+ *   (réactivation par le Portail, paiement requis, déjà actif).
  */
 export async function preparerCheckoutAbonnement(entrepriseId: string, maintenant: Date = new Date()): Promise<EssaiCheckout> {
   const admin = createAdminClient();
@@ -361,11 +377,25 @@ export async function preparerCheckoutAbonnement(entrepriseId: string, maintenan
     .eq("id", entrepriseId)
     .single();
   if (error || !entreprise) throw new Error("Entreprise introuvable");
-  if (entreprise.stripe_subscription_id) throw new AbonnementStripeDejaRattache();
+  if (entreprise.stripe_subscription_id) {
+    const precedente = await recupererAbonnementStripe(entreprise.stripe_subscription_id as string);
+    const parcours = parcoursDepuisSubscription(precedente);
+    if (parcours !== "nouveau_checkout") throw new AbonnementStripeDejaRattache(parcours);
+    return essaiReabonnement();
+  }
   return calculerEssaiCheckout({
     essaiDebut: entreprise.abonnement_essai_debut as string | null,
     essaiFin: entreprise.abonnement_essai_fin as string | null,
   }, maintenant);
+}
+
+/**
+ * Le client Stripe existant est réutilisé s'il est valide ; supprimé chez
+ * Stripe, il ne l'est plus et aucun autre n'est créé en silence.
+ */
+export async function verifierClientStripeUtilisable(customerId: string) {
+  const client = await requeteStripe<StripeCustomer>(`customers/${encodeURIComponent(customerId)}`, { methode: "GET" });
+  if (client.deleted) throw new ClientStripeInvalide();
 }
 
 export async function creerSessionAbonnementStripe(params: {
@@ -388,12 +418,13 @@ export async function creerSessionAbonnementStripe(params: {
   if (!prix || !baseUrl) throw new Error("Les tarifs Stripe Billing ne sont pas encore configurés");
   // Aucun nouveau contrat ne repart sur une génération fermée.
   verifierPrixVendable(prix, params.environnement);
+  const reabonnement = params.essai.mode === "aucun" && params.essai.raison === "essai_consomme";
   const corps = new URLSearchParams({
     mode: "subscription",
     customer: params.customerId,
     payment_method_collection: "always",
-    success_url: `${baseUrl}/paiement/abonnement/succes?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/paiement/abonnement/annule`,
+    success_url: `${baseUrl}/paiement/abonnement/succes?session_id={CHECKOUT_SESSION_ID}${reabonnement ? "&reabonnement=1" : ""}`,
+    cancel_url: `${baseUrl}/paiement/abonnement/annule${reabonnement ? "?reabonnement=1" : ""}`,
     client_reference_id: params.entrepriseId,
     allow_promotion_codes: "true",
     "line_items[0][price]": prix,
@@ -425,22 +456,24 @@ export async function creerSessionAbonnementStripe(params: {
  * réactivable) : un second Checkout créerait une seconde subscription facturée
  * que le webhook refuse de rattacher.
  */
-const STATUTS_SUBSCRIPTION_VIVANTS = new Set(["trialing", "active", "past_due", "unpaid", "incomplete", "paused"]);
-
 type ListeStripe<T> = { data: T[] };
 
 /**
  * Vérité Stripe (et non seulement locale) : le webhook de la subscription
- * précédente peut ne pas encore être arrivé. Lecture seule.
+ * précédente peut ne pas encore être arrivé. Lecture seule. Toute subscription
+ * non terminée (`trialing/active/past_due/unpaid/incomplete/paused` ou statut
+ * inconnu) interdit un nouveau Checkout. Renvoie la liste complète : une
+ * subscription passée, même terminée, signe un essai déjà consommé.
  */
 export async function verifierAucuneSubscriptionStripeVivante(customerId: string) {
-  const liste = await requeteStripe<ListeStripe<{ id: string; status: string }>>(
+  const liste = await requeteStripe<ListeStripe<{ id: string; status: string; cancel_at_period_end?: boolean; cancel_at?: number | null }>>(
     `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`,
     { methode: "GET" },
   );
-  if ((liste.data ?? []).some((s) => STATUTS_SUBSCRIPTION_VIVANTS.has(s.status))) {
-    throw new AbonnementStripeDejaRattache();
-  }
+  const subscriptions = liste.data ?? [];
+  const vivante = subscriptions.find(subscriptionBloqueCheckout);
+  if (vivante) throw new AbonnementStripeDejaRattache(parcoursDepuisSubscription(vivante));
+  return subscriptions;
 }
 
 /**
@@ -495,9 +528,14 @@ export async function ouvrirCheckoutAbonnement(params: {
   maintenant?: Date;
   environnement?: Record<string, string | undefined>;
 }) {
-  const essai = await preparerCheckoutAbonnement(params.entrepriseId, params.maintenant);
+  let essai = await preparerCheckoutAbonnement(params.entrepriseId, params.maintenant);
   const customerId = await creerOuRecupererClientStripe({ entrepriseId: params.entrepriseId, email: params.email });
-  await verifierAucuneSubscriptionStripeVivante(customerId);
+  // Même client Stripe à chaque (ré)abonnement, jamais un nouveau par souscription.
+  await verifierClientStripeUtilisable(customerId);
+  const passees = await verifierAucuneSubscriptionStripeVivante(customerId);
+  // Une subscription passée chez Stripe (même non rattachée en base) signe un
+  // essai ELSATIA déjà consommé : aucun nouvel essai.
+  if (passees.length > 0) essai = essaiReabonnement();
   const base = { entrepriseId: params.entrepriseId, customerId, offre: params.offre, periodicite: params.periodicite, essai, environnement: params.environnement };
   let session = await creerSessionAbonnementStripe(base);
   // Une clé rejouée renvoie la réponse D'ORIGINE (« open ») même si la session

@@ -16,6 +16,9 @@
 -- Contrôles 19-23 (train canonique V4) : commandes fournisseurs RGPD (…0926 506), dette RGPD
 -- résiduelle (…508), GP ↔ Réserves (…402), Relevé & Métré non commercial (601-801), identité
 -- Studio fermée et inerte (…100000, Studio OFF en première Preview).
+-- Contrôles 24-26 (train canonique V5) : réabonnement Stripe (…0928 201,
+-- ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1), Réserves hôte suspendu en lecture seule (…0928 301, D-01),
+-- Relevé & Métré plan 2D (…0928 101, Lot 5).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -254,6 +257,16 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and c.relname in ('elsatia_identity_subjects', 'elsatia_identity_outbox') and c.relrowsecurity) = 2
            and (select count(*) from information_schema.role_table_grants where table_schema = 'public'
                  and table_name like 'elsatia\_identity\_%' and grantee in ('anon', 'authenticated', 'service_role')) = 0, true
+  union all
+  select 24, 'Stripe : réabonnement (20260928000201)', 'historique des subscriptions remplacées, rattachement et facture v2 présents',
+         coalesce(nullif(concat_ws(', ',
+           case when to_regclass('public.stripe_subscriptions_remplacees') is null then 'historique ABSENT' end,
+           case when to_regprocedure('public.relier_subscription_reabonnement_service(uuid,text,text,text,text,text)') is null then 'rattachement ABSENT' end,
+           case when to_regprocedure('public.appliquer_evenement_facture_abonnement_v2_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text,text)') is null
+                then 'facture v2 ABSENTE' end), ''), 'contrôlé'),
+         to_regclass('public.stripe_subscriptions_remplacees') is not null
+           and to_regprocedure('public.relier_subscription_reabonnement_service(uuid,text,text,text,text,text)') is not null
+           and to_regprocedure('public.appliquer_evenement_facture_abonnement_v2_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text,text)') is not null, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

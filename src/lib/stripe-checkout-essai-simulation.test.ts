@@ -196,10 +196,25 @@ describe("client / subscription Stripe existants", () => {
     expect(params["subscription_data[trial_end]"]).toBe(String(Date.parse("2026-10-31T23:59:59Z") / 1000));
   });
 
-  it("subscription existante : refus AVANT tout appel Stripe (pas de seconde subscription facturée)", async () => {
+  // ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1 : la subscription rattachée est
+  // RELUE chez Stripe (lecture seule) ; vivante, elle interdit tout Checkout.
+  // Seule une subscription terminée ouvre un réabonnement, sans essai.
+  it("subscription existante vivante : refus sans aucune création Stripe (pas de seconde subscription facturée)", async () => {
+    const lectures: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: { method?: string } = {}) => {
+      lectures.push(`${options.method ?? "GET"} ${url.replace("https://api.stripe.com/v1/", "")}`);
+      return { ok: true, status: 200, json: async () => ({ id: "sub_x", status: "active", customer: "cus_x" }) };
+    }));
     createAdminClient.mockReturnValue(baseFake(ligne({ stripe_customer_id: "cus_x", stripe_subscription_id: "sub_x" })));
     await expect(preparerCheckoutAbonnement(ENTREPRISE, new Date("2026-10-10T08:00:00Z"))).rejects.toBeInstanceOf(AbonnementStripeDejaRattache);
-    expect(stripe.fetchFake).not.toHaveBeenCalled();
+    expect(lectures).toEqual(["GET subscriptions/sub_x?expand%5B%5D=discounts"]);
+  });
+
+  it("subscription rattachée terminée : réabonnement autorisé, SANS essai (essai consommé)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: "sub_x", status: "canceled", customer: "cus_x" }) })));
+    createAdminClient.mockReturnValue(baseFake(ligne({ stripe_customer_id: "cus_x", stripe_subscription_id: "sub_x" })));
+    const essai = await preparerCheckoutAbonnement(ENTREPRISE, new Date("2026-10-03T08:00:00Z"));
+    expect(essai).toMatchObject({ mode: "aucun", raison: "essai_consomme" });
   });
 
   it("checkout échoué puis relancé le même jour : même session (idempotence stable), même trial_end", async () => {

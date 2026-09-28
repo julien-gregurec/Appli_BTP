@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const createAdminClient = vi.fn();
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }));
 
-const { AbonnementStripeDejaRattache, ouvrirCheckoutAbonnement } = await import("./stripe-abonnement");
+const { AbonnementStripeDejaRattache, ClientStripeInvalide, ouvrirCheckoutAbonnement } = await import("./stripe-abonnement");
 
 const ENTREPRISE = "33333333-3333-4333-8333-333333333333";
 const ENV = {
@@ -63,7 +63,7 @@ type Session = {
   id: string; url: string; status: "open" | "complete" | "expired"; mode: "subscription";
   metadata: Record<string, string>; customer: string; creeeA: number; params: Record<string, string>;
 };
-type Subscription = { id: string; customer: string; status: string; trial_end: number | null };
+type Subscription = { id: string; customer: string; status: string; trial_end: number | null; cancel_at_period_end?: boolean };
 
 /** Générateur pseudo-aléatoire déterministe (reproductible). */
 function mulberry32(graine: number) {
@@ -82,6 +82,7 @@ function stripeFake(horloge: { maintenant: number }, alea: () => number = () => 
   const subscriptions: Subscription[] = [];
   const idempotence = new Map<string, { corps: string; reponse: unknown }>();
   const appels: string[] = [];
+  const clientsSupprimes = new Set<string>();
   let compteur = 0;
   const ceder = async () => {
     const tours = Math.floor(alea() * 4);
@@ -109,7 +110,16 @@ function stripeFake(horloge: { maintenant: number }, alea: () => number = () => 
     }
     const q = new URLSearchParams(requete);
     let reponse: unknown;
-    if (methode === "GET" && chemin === "subscriptions") {
+    if (methode === "GET" && /^customers\/[^/]+$/.test(chemin)) {
+      const id = decodeURIComponent(chemin.split("/")[1]);
+      reponse = clientsSupprimes.has(id) ? { id, deleted: true } : { id };
+    } else if (methode === "GET" && /^subscriptions\/[^/]+$/.test(chemin)) {
+      const sub = subscriptions.find((s) => s.id === decodeURIComponent(chemin.split("/")[1]));
+      if (!sub) return repondre(404, { error: { message: "No such subscription" } });
+      reponse = sub;
+    } else if (methode === "POST" && chemin === "customers") {
+      reponse = { id: `cus_cree_${++compteur}` };
+    } else if (methode === "GET" && chemin === "subscriptions") {
       reponse = { data: subscriptions.filter((s) => s.customer === q.get("customer")) };
     } else if (methode === "GET" && chemin === "checkout/sessions") {
       reponse = { data: [...sessions.values()].filter((s) => s.customer === q.get("customer") && (!q.get("status") || s.status === q.get("status"))) };
@@ -158,7 +168,7 @@ function stripeFake(horloge: { maintenant: number }, alea: () => number = () => 
     return sub;
   }
   const vivantes = () => subscriptions.filter((s) => ["trialing", "active", "past_due", "unpaid", "incomplete", "paused"].includes(s.status));
-  return { fetchFake, completer, sessions, subscriptions, vivantes, appels };
+  return { fetchFake, completer, sessions, subscriptions, vivantes, appels, clientsSupprimes };
 }
 
 let horloge: { maintenant: number };
@@ -252,22 +262,27 @@ describe("re-Checkout", () => {
     expect(stripe.vivantes()).toHaveLength(1);
   });
 
-  it("subscription précédente annulée : refus avant tout appel Stripe (jamais de nouvel essai de 30 jours)", async () => {
+  // Évolution ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1 : une subscription annulée
+  // n'est plus un refus définitif. Le réabonnement est autorisé, sans essai.
+  it("subscription précédente annulée (liée en base) : réabonnement autorisé, JAMAIS d'essai", async () => {
     const stripe = stripeFake(horloge);
     vi.stubGlobal("fetch", stripe.fetchFake);
     stripe.subscriptions.push({ id: "sub_ancienne", customer: "cus_course", status: "canceled", trial_end: null });
     createAdminClient.mockReturnValue(baseFake(ligne({ stripe_subscription_id: "sub_ancienne" })));
-    await expect(ouvrir(ligne({ stripe_subscription_id: "sub_ancienne" }))).rejects.toBeInstanceOf(AbonnementStripeDejaRattache);
-    expect(stripe.fetchFake).not.toHaveBeenCalled();
+    const { essai, session, customerId } = await ouvrir(ligne({ stripe_subscription_id: "sub_ancienne" }));
+    expect(essai).toMatchObject({ mode: "aucun", raison: "essai_consomme" });
+    expect(customerId).toBe("cus_course");
+    expect(stripe.sessions.get(session.id)!.params["subscription_data[trial_end]"]).toBeUndefined();
+    sansSecondEssai(stripe);
   });
 
-  it("subscription annulée chez Stripe seulement (base non liée) : Checkout autorisé, essai = reliquat local uniquement", async () => {
+  it("subscription annulée chez Stripe seulement (base non liée) : Checkout autorisé, essai consommé → aucun essai", async () => {
     const stripe = stripeFake(horloge);
     vi.stubGlobal("fetch", stripe.fetchFake);
     stripe.subscriptions.push({ id: "sub_orpheline", customer: "cus_course", status: "canceled", trial_end: null });
     createAdminClient.mockReturnValue(baseFake(ligne()));
     const { essai } = await ouvrir(ligne());
-    expect(essai.mode).toBe("trial_end");
+    expect(essai).toMatchObject({ mode: "aucun", raison: "essai_consomme" });
     sansSecondEssai(stripe);
   });
 
@@ -329,4 +344,138 @@ describe("concurrence : deux Checkout simultanés", () => {
     stripe.completer(b.id);
     expect(stripe.vivantes()).toHaveLength(2);
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1 — parcours de réabonnement (Checkout)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("réabonnement : réactivation préférée, sinon nouveau Checkout sans essai", () => {
+  function avecAncienne(stripe: ReturnType<typeof stripeFake>, sub: Partial<Subscription> & { status: string }) {
+    stripe.subscriptions.push({ id: "sub_ancienne", customer: "cus_course", trial_end: null, ...sub });
+    const entreprise = ligne({ stripe_subscription_id: "sub_ancienne" });
+    createAdminClient.mockReturnValue(baseFake(entreprise));
+    return entreprise;
+  }
+
+  it.each(["canceled", "incomplete_expired"])("%s : nouveau Checkout, même client, aucun essai, retour « réabonnement »", async (status) => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    const entreprise = avecAncienne(stripe, { status });
+    const { session, customerId, essai } = await ouvrir(entreprise);
+    const params = stripe.sessions.get(session.id)!.params;
+    expect(customerId).toBe("cus_course");
+    expect(stripe.appels).not.toContain("POST customers");
+    expect(params.customer).toBe("cus_course");
+    expect(essai).toMatchObject({ mode: "aucun", raison: "essai_consomme" });
+    expect(params["subscription_data[trial_end]"]).toBeUndefined();
+    expect(params["subscription_data[trial_period_days]"]).toBeUndefined();
+    expect(params.success_url).toContain("reabonnement=1");
+    expect(params.cancel_url).toContain("reabonnement=1");
+    // La subscription créée est payante dès la souscription.
+    expect(stripe.completer(session.id)?.status).toBe("active");
+    expect(stripe.vivantes()).toHaveLength(1);
+  });
+
+  it.each([
+    ["cancel_at_period_end (active)", { status: "active", cancel_at_period_end: true }, "reprendre_portail"],
+    ["cancel_at_period_end (trialing)", { status: "trialing", cancel_at_period_end: true }, "reprendre_portail"],
+    ["past_due", { status: "past_due" }, "paiement_requis"],
+    ["unpaid", { status: "unpaid" }, "paiement_requis"],
+    ["incomplete", { status: "incomplete" }, "paiement_requis"],
+    ["active", { status: "active" }, "actif"],
+    ["paused", { status: "paused" }, "support"],
+  ] as const)("%s : réactivable ou vivante → aucun Checkout, parcours %s", async (_l, sub, parcours) => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    const entreprise = avecAncienne(stripe, sub);
+    const refus = await ouvrir(entreprise).catch((e: unknown) => e);
+    expect(refus).toBeInstanceOf(AbonnementStripeDejaRattache);
+    expect((refus as InstanceType<typeof AbonnementStripeDejaRattache>).parcours).toBe(parcours);
+    // Lecture seule : ni client, ni session, ni seconde subscription.
+    expect(stripe.appels.every((a) => a.startsWith("GET "))).toBe(true);
+    expect(stripe.sessions.size).toBe(0);
+  });
+
+  it("ancienne annulée mais une AUTRE subscription vit chez Stripe (webhook pas encore reçu) : refus", async () => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    const entreprise = avecAncienne(stripe, { status: "canceled" });
+    stripe.subscriptions.push({ id: "sub_nouvelle", customer: "cus_course", status: "active", trial_end: null });
+    await expect(ouvrir(entreprise)).rejects.toBeInstanceOf(AbonnementStripeDejaRattache);
+    expect(stripe.sessions.size).toBe(0);
+  });
+
+  it("customer existant sans abonnement (jamais souscrit) : client réutilisé, essai = reliquat local", async () => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    createAdminClient.mockReturnValue(baseFake(ligne()));
+    const { customerId, essai } = await ouvrir(ligne());
+    expect(customerId).toBe("cus_course");
+    expect(stripe.appels).not.toContain("POST customers");
+    expect(essai.mode).toBe("trial_end");
+    sansSecondEssai(stripe);
+  });
+
+  it("customer supprimé chez Stripe : refus explicite, aucun nouveau client créé, aucune session", async () => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    stripe.clientsSupprimes.add("cus_course");
+    const entreprise = avecAncienne(stripe, { status: "canceled" });
+    await expect(ouvrir(entreprise)).rejects.toBeInstanceOf(ClientStripeInvalide);
+    expect(stripe.appels).not.toContain("POST customers");
+    expect(stripe.sessions.size).toBe(0);
+  });
+
+  it("réabonnement relancé après abandon : même session ouverte, toujours sans essai", async () => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    const entreprise = avecAncienne(stripe, { status: "canceled" });
+    const premier = await ouvrir(entreprise);
+    horloge.maintenant += 3600;
+    const relance = await ouvrir(entreprise);
+    expect(relance.session.id).toBe(premier.session.id);
+    expect([...stripe.sessions.values()].filter((s) => s.status === "open")).toHaveLength(1);
+  });
+
+  it("réabonnement terminé puis nouveau réabonnement le même jour : clé rejouée « complete » → nouvelle session, jamais l'URL morte", async () => {
+    const stripe = stripeFake(horloge);
+    vi.stubGlobal("fetch", stripe.fetchFake);
+    const entreprise = avecAncienne(stripe, { status: "canceled" });
+    const premier = await ouvrir(entreprise);
+    const sub = stripe.completer(premier.session.id)!;
+    sub.status = "canceled"; // résiliée immédiatement (ex. remboursement)
+    const second = await ouvrir(ligne({ stripe_subscription_id: sub.id }));
+    expect(second.session.id).not.toBe(premier.session.id);
+    expect(stripe.sessions.get(second.session.id)!.status).toBe("open");
+  });
+
+  it.each([
+    ["offres/périodicités différentes", "mensuel", "annuel"],
+    ["même offre", "mensuel", "mensuel"],
+  ] as const)("concurrence (%s) : 500 entrelacements de réabonnement, jamais deux subscriptions vivantes ni d'essai", async (_l, p1, p2) => {
+    let deuxPayables = 0;
+    for (let graine = 1; graine <= 500; graine++) {
+      horloge.maintenant = Date.parse("2026-12-10T08:00:00Z") / 1000;
+      const alea = mulberry32(graine);
+      const stripe = stripeFake(horloge, alea);
+      vi.stubGlobal("fetch", stripe.fetchFake);
+      const entreprise = avecAncienne(stripe, { status: "canceled" });
+      const onglet = async (periodicite: "mensuel" | "annuel") => {
+        try {
+          const { session } = await ouvrir(entreprise, periodicite);
+          for (let i = Math.floor(alea() * 6); i > 0; i--) await new Promise((r) => setImmediate(r));
+          return stripe.completer(session.id);
+        } catch (e) {
+          if (!(e instanceof AbonnementStripeDejaRattache)) throw e;
+          return null;
+        }
+      };
+      await Promise.all([onglet(p1), onglet(p2)]);
+      expect(stripe.vivantes().length, `graine ${graine}`).toBeLessThanOrEqual(1);
+      if ([...stripe.sessions.values()].filter((s) => s.status === "open").length > 1) deuxPayables++;
+      for (const s of stripe.sessions.values()) expect(s.params["subscription_data[trial_end]"]).toBeUndefined();
+    }
+    expect(deuxPayables).toBe(0);
+  }, 60_000);
 });

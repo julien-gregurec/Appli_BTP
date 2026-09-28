@@ -215,6 +215,11 @@ idempotence qui rejoue la réponse d'origine, `expire` refusé hors `open` —, 
 | subscription vivante chez Stripe, webhook pas encore reçu | refus, aucune session créée |
 | subscription précédente annulée (liée en base) | refus avant tout appel Stripe — jamais de nouvel essai |
 | subscription annulée chez Stripe mais non liée en base | Checkout autorisé, essai = reliquat local uniquement |
+
+> **Évolution (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1, migration 508)** : ces deux lignes sont
+> remplacées par le parcours de réabonnement — subscription annulée (liée ou non) → Checkout
+> **autorisé**, même client Stripe, **sans aucun essai** (essai ELSATIA consommé) ; subscription
+> encore réactivable → Portail. Voir `ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1.md` §4-§5.
 | essai expiré puis re-Checkout | aucune session ne porte d'essai |
 | **2 Checkout simultanés, offres différentes, 500 entrelacements** (graines déterministes, paiement dès réception de l'URL) | **0** cas à 2 subscriptions vivantes, **0** cas à 2 sessions payables |
 | **2 Checkout simultanés, même offre (même clé), 500 entrelacements** | idem |

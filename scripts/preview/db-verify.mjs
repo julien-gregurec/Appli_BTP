@@ -100,6 +100,7 @@ select 'buckets_total', count(*) from storage.buckets;`;
 export const RPC_SERVICE_SEULEMENT = [
   "reserver_evenement_abonnement_service", "finaliser_evenement_abonnement_service", "annuler_evenement_abonnement_service",
   "lier_subscription_entreprise_service", "synchroniser_abonnement_stripe_service", "synchroniser_facture_abonnement_service",
+  "relier_subscription_reabonnement_service", "appliquer_evenement_facture_abonnement_v2_service",
   "appliquer_suspensions_impayes", "boutique_finaliser_commande_payee", "boutique_expirer_commande_service",
   "stripe_connect_encaisser_facture_service", "stripe_connect_expirer_checkout_facture_service", "tools_server_appliquer_abonnement",
   "reserves_produire_echeances", "reserves_notifications_preparer", "reserves_notifications_a_expedier", "reserves_notification_envoi_statuer",

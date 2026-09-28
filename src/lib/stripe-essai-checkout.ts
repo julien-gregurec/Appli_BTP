@@ -33,7 +33,9 @@ export type RaisonSansEssai =
   | "essai_expire"
   | "restant_inferieur_minimum_stripe"
   | "dates_absentes"
-  | "dates_incoherentes";
+  | "dates_incoherentes"
+  /** Réabonnement : l'essai ELSATIA a déjà été consommé (ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1). */
+  | "essai_consomme";
 
 export type EssaiCheckout =
   | {
@@ -115,5 +117,11 @@ export function parametresEssaiCheckout(essai: EssaiCheckout): Record<string, st
 
 /** Suffixe de clé d'idempotence : une clé Stripe ne se réutilise qu'à paramètres identiques. */
 export function suffixeIdempotenceEssai(essai: EssaiCheckout) {
-  return essai.mode === "trial_end" ? `essai-${essai.trialEnd}` : "sans-essai";
+  if (essai.mode === "trial_end") return `essai-${essai.trialEnd}`;
+  return essai.raison === "essai_consomme" ? "sans-essai-reabonnement" : "sans-essai";
+}
+
+/** Essai d'un réabonnement : toujours aucun, l'essai ELSATIA est consommé. */
+export function essaiReabonnement(): EssaiCheckout {
+  return { mode: "aucun", raison: "essai_consomme", finLocale: null, restantSecondes: 0 };
 }

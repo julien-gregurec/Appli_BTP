@@ -99,7 +99,7 @@ function adminFake(options: AdminFakeOptions = {}) {
       if (fn === "synchroniser_abonnement_stripe_ordonne_service") {
         return { data: { decision: "applique", statut_resultant: (args.p_statut as string) ?? "actif" }, error: null };
       }
-      if (fn === "appliquer_evenement_facture_abonnement_service") {
+      if (fn === "appliquer_evenement_facture_abonnement_v2_service") {
         const type = args.p_stripe_event_type as string;
         const cible = type === "invoice.paid" ? "actif" : type === "invoice.payment_failed" ? "suspendu" : "actif";
         return { data: options.decisionFacture ?? {
@@ -108,8 +108,8 @@ function adminFake(options: AdminFakeOptions = {}) {
           notifier_echec: type === "invoice.payment_failed",
         }, error: null };
       }
-      if (fn === "lier_subscription_entreprise_service") {
-        return { data: "lie", error: null };
+      if (fn === "relier_subscription_reabonnement_service") {
+        return { data: "deja_lie", error: null };
       }
       if (fn === "enregistrer_releve_stockage_service") {
         return { data: { deja_traite: false, montant_ht: 0 }, error: null };
@@ -287,11 +287,12 @@ describe("coordination webhook et saga", () => {
   it("B3 : la subscription est liée à l'entreprise avant la chaîne remise", async () => {
     const admin = adminFake();
     await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", ev("evt_lien"));
-    const lien = admin.appels.find((a) => a.table === "lier_subscription_entreprise_service");
+    // Rattachement unique (première liaison ou réabonnement, migration …508).
+    const lien = admin.appels.find((a) => a.table === "relier_subscription_reabonnement_service");
     expect(lien).toBeTruthy();
-    expect((lien?.donnees as Record<string, unknown>).p_stripe_subscription_id).toBe("sub_test");
+    expect((lien?.donnees as Record<string, unknown>).p_nouvelle_subscription_id).toBe("sub_test");
     // l'appel de liaison précède la lecture d'opération remise
-    const idxLien = admin.appels.findIndex((a) => a.table === "lier_subscription_entreprise_service");
+    const idxLien = admin.appels.findIndex((a) => a.table === "relier_subscription_reabonnement_service");
     expect(deps.lireOperationActiveRemiseServeur).toHaveBeenCalled();
     expect(idxLien).toBeGreaterThanOrEqual(0);
   });
@@ -379,13 +380,14 @@ describe("email de paiement échoué", () => {
 // canonique : 3-D Secure non bloquant et régularisation de l'impayé au paiement.
 describe("statut d'accès sur les événements facture (Billing Security V3 + contrat d'ordre)", () => {
   // Les transitions sont désormais décidées et écrites en base, atomiquement,
-  // par `appliquer_evenement_facture_abonnement_service` (verrou ligne +
+  // par `appliquer_evenement_facture_abonnement_v2_service` (garde de
+  // subscription …508, puis contrat 506 : verrou ligne +
   // filigrane event.created). Leur sémantique (3DS sans effet, paid régularise,
   // payment_failed suspend immédiatement, périmé sans effet) est prouvée par
   // supabase/tests/stripe_event_ordering_v1.test.sql ; ici on vérifie le
   // contrat d'appel côté route.
   function appelFacture(admin: ReturnType<typeof adminFake>) {
-    const appel = admin.appels.find((a) => a.table === "appliquer_evenement_facture_abonnement_service");
+    const appel = admin.appels.find((a) => a.table === "appliquer_evenement_facture_abonnement_v2_service");
     return appel?.donnees as Record<string, unknown> | undefined;
   }
 
@@ -438,7 +440,7 @@ describe("statut d'accès sur les événements facture (Billing Security V3 + co
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
     const rpc = admin.rpc.bind(admin);
-    admin.rpc = async (fn: string, args: Record<string, unknown>) => fn === "appliquer_evenement_facture_abonnement_service"
+    admin.rpc = async (fn: string, args: Record<string, unknown>) => fn === "appliquer_evenement_facture_abonnement_v2_service"
       ? { data: null, error: { code: "40P01", message: "deadlock detected" } } as never
       : rpc(fn, args);
     const response = await POST(request(evenementFacture("invoice.paid")));
