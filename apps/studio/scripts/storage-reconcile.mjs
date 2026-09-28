@@ -56,14 +56,10 @@ for (;;) {
     if (asset.upload_status === "ready" && absent) {
       summary.missing++;
       if (apply) {
-        const update = await client
-          .from("studio_media_assets")
-          .update({
-            upload_status: "failed",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", asset.id)
-          .eq("upload_status", "ready");
+        // Écritures de la clé service : uniquement par RPC bornée (garde centrale, media_cleanup).
+        const update = await client.rpc("studio_mark_media_missing", {
+          p_asset: asset.id,
+        });
         if (update.error) summary.errors++;
       }
     }
@@ -92,11 +88,9 @@ for (;;) {
           summary.errors++;
           continue;
         }
-        const update = await client
-          .from("studio_media_assets")
-          .update({ purged_at: new Date().toISOString() })
-          .eq("id", asset.id)
-          .eq("upload_status", "deleted");
+        const update = await client.rpc("studio_mark_media_purged", {
+          p_asset: asset.id,
+        });
         if (update.error) summary.errors++;
       }
     }

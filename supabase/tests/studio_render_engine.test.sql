@@ -30,7 +30,11 @@ update public.studio_media_assets set upload_status='ready',duration_ms=case whe
 set local role authenticated;
 select set_config('test.d.ta',pg_temp.save(pg_temp.id('pa'),null,pg_temp.draft(pg_temp.id('aa')))::text,true);
 reset role;
+-- Fixture : objets posés hors flux réel (médias déjà forcés « ready ») → maintenance explicite
+-- (projet dédié : garde Storage 20260928120000 ; sans effet sur le projet partagé).
+set local studio.write_path='storage_maintenance';
 insert into storage.objects(bucket_id,name,metadata) select storage_bucket,storage_key,'{"size":123}'::jsonb from public.studio_media_assets where workspace_id=pg_temp.id('wa');
+set local studio.write_path='';
 set local role authenticated;
 select set_config('test.d.req',gen_random_uuid()::text,true);
 select set_config('test.d.job',public.studio_request_render(pg_temp.id('pa'),pg_temp.id('req'),'preview')::text,true);

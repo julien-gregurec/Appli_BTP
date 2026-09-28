@@ -276,12 +276,8 @@ export async function confirmMedia(id: string) {
   } catch (error) {
     if (error instanceof MediaError && error.status !== 400) throw error;
     // No release of reservation until physical cleanup; invalid bytes remain inaccessible.
-    await storageAdmin()
-      .from("studio_media_assets")
-      .update({ upload_status: "failed", updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .is("deleted_at", null)
-      .neq("upload_status", "ready");
+    // RPC bornée au chemin système media_cleanup (plus d'écriture de table directe par la clé service).
+    await storageAdmin().rpc("studio_fail_media", { p_asset: id });
     throw new MediaError(
       error instanceof Error ? error.message : "Fichier invalide.",
     );

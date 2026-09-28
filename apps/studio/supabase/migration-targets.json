@@ -20,7 +20,10 @@
     "description": "Migrations EXCLUSIVES du projet dédié Studio : ne doivent jamais apparaître dans supabase/migrations (projet partagé GP).",
     "files": [
       "20260926120000_studio_identity_foundation.sql",
-      "20260927110000_studio_dedicated_admission.sql"
+      "20260927110000_studio_dedicated_admission.sql",
+      "20260928100000_studio_db_write_guard.sql",
+      "20260928110000_studio_rgpd_erasure_foundation.sql",
+      "20260928120000_studio_storage_write_guard.sql"
     ]
   }
 }
