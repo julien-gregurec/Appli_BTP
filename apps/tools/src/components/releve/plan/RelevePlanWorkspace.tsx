@@ -7,7 +7,7 @@ import {
   type LoadedPlan, type Plan, type PhotoLibrary, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure,
 } from "@elsatia/releve-domain";
 import { getElsatiaClient } from "@/lib/auth/client";
-import { ficheHref, metreHref, pieceHref, planHref, readPlanSelection, RELEVES_PATH, structureHref, type PlanSelection } from "@/lib/releve/navigation";
+import { ficheHref, metreHref, pieceHref, planHref, quantitatifsHref, readPlanSelection, RELEVES_PATH, structureHref, type PlanSelection } from "@/lib/releve/navigation";
 import { SupabasePlanRepository } from "@/lib/releve/plan/supabase-plan-repository";
 import { SupabaseReleveMediaRepository } from "@/lib/releve/supabase-media-repository";
 import { SupabaseReleveRepository } from "@/lib/releve/supabase-repository";
@@ -122,6 +122,7 @@ function PlanLoader({ service, actor, selection, onNavigate }: {
         {structure.zones.filter((item) => item.etageId === etage.id && !item.deletedAt).map((item) => <Link key={item.id} href={planHref({ releveId, etageId: etage.id, zoneId: item.id, planId: loaded.current?.plan.id })} aria-current={zone?.id === item.id ? "page" : undefined}>Zone · {item.nom}</Link>)}
         {piece && <Link href={pieceHref(releveId, piece.id)}>Fiche {piece.nom}</Link>}
         <Link href={metreHref({ releveId, etat: loaded.current?.plan.etatDocumente === "projete" ? "projete" : loaded.current?.plan.etatDocumente === "as_built" ? "as_built" : "existant", pieceId: piece?.id ?? null })} data-testid="lien-metre-plan">Métré</Link>
+        <Link href={quantitatifsHref({ releveId, etat: loaded.current?.plan.etatDocumente === "projete" ? "projete" : loaded.current?.plan.etatDocumente === "as_built" ? "as_built" : "existant" })} data-testid="lien-quantitatifs-plan">Quantitatifs</Link>
       </nav>
       <p className={releveStyles.feedback} role="status" aria-live="polite">{feedback}</p>
     </div></section>

@@ -21,7 +21,7 @@ import {
   type RevetementSupport,
 } from "@elsatia/releve-domain";
 import { getElsatiaClient } from "@/lib/auth/client";
-import { ficheHref, metreHref, pieceHref, planHref, readMetreSelection, RELEVES_PATH, type MetreSelection } from "@/lib/releve/navigation";
+import { ficheHref, metreHref, pieceHref, planHref, quantitatifsHref, readMetreSelection, RELEVES_PATH, type MetreSelection } from "@/lib/releve/navigation";
 import { SupabaseMetreRepository } from "@/lib/releve/plan/supabase-metre-repository";
 import { OUVERTURE_TYPE_LABELS } from "../plan/PlanLayers";
 import { Brand } from "../../HomeDashboard";
@@ -124,6 +124,7 @@ function MetreLoader({ service, actor, selection, onEtat }: { service: ReleveSer
           for (const node of document.querySelectorAll<HTMLDetailsElement>("details[data-piece]")) node.open = true;
           window.setTimeout(() => window.print(), 50);
         }}>Imprimer / PDF</button>
+        <Link className={releveStyles.secondary} href={quantitatifsHref({ releveId, etat: selection.etat })} data-testid="metre-lien-quantitatifs">Quantitatifs (ouvrages)</Link>
       </div>
 
       {sources.length === 0 && <section className={styles.section}><h2>Aucun plan</h2>

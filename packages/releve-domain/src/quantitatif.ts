@@ -125,6 +125,11 @@ export type OuvrageDonnees = {
   readonly commentaire?: string | null;
 };
 export type OuvrageOrigine = "auto" | "manuelle";
+/** Contrat d'un ouvrage sans identifiant ni pièces visées (bibliothèque, copie vers un autre plan). */
+export function ouvrageModele(ouvrage: OuvrageDonnees & { readonly id?: string }): Omit<OuvrageDonnees, "pieceIds"> {
+  const { nom, code, categorie, lot, unite, regle, pertePourcent, arrondi, etatTravaux, etats, commentaire } = ouvrage;
+  return { nom, ...(code ? { code } : {}), categorie, ...(lot ? { lot } : {}), unite, regle, pertePourcent, arrondi, etatTravaux, etats, ...(commentaire ? { commentaire } : {}) };
+}
 export function ouvrageOrigine(donnees: Pick<OuvrageDonnees, "regle">): OuvrageOrigine {
   return donnees.regle.source === "forfait" || donnees.regle.source === "saisie" ? "manuelle" : "auto";
 }
