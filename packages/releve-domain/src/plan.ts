@@ -23,9 +23,10 @@
 
 import type { EtageId, ReleveId, TenantId, UserId, VersionId } from "./ids";
 import {
-  MUR_TYPES, OUVERTURE_SENS, OUVERTURE_TYPES, RELEVE_COORDINATE_LIMIT_MM, VERSION_TYPE_LABELS, VERSION_TYPES,
-  type Ancre, type IsoDateTime, type MurType, type OuvertureSens, type OuvertureType, type Point2D, type ReleveElement,
-  type VersionType,
+  MUR_TYPES, OUVERTURE_MODELES, OUVERTURE_POUSSEES, OUVERTURE_SENS, OUVERTURE_TYPES, OUVERTURE_VANTAUX, RELEVE_COORDINATE_LIMIT_MM,
+  VERSION_TYPE_LABELS, VERSION_TYPES,
+  type Ancre, type IsoDateTime, type MurType, type OuvertureModele, type OuverturePoussee, type OuvertureSens, type OuvertureType,
+  type OuvertureVantaux, type Point2D, type ReleveElement, type VersionType,
 } from "./model";
 
 // ── États, bornes ─────────────────────────────────────────────────────────────
@@ -101,7 +102,31 @@ export type PlanOuverture = {
   readonly typeOuverture: OuvertureType;
   readonly sens: OuvertureSens;
   readonly origineId?: string | null;
+  /** Lot 6 : 1 vantail (simple) ou 2 (double). Absent = 1. */
+  readonly vantaux?: OuvertureVantaux;
+  /**
+   * Lot 6 : débattement, vu depuis la FACE DE RÉFÉRENCE du mur (sa face gauche, de A vers B) :
+   * « tirant » = le vantail vient vers l'observateur (côté face de référence), « poussant » = il
+   * part de l'autre côté. Absent = tirant (rendu des ouvertures du Lot 5).
+   */
+  readonly poussee?: OuverturePoussee;
+  /** Lot 6 : modèle de menuiserie. Absent = battant (porte, fenêtre), coulissant (baie). */
+  readonly modele?: OuvertureModele;
 };
+
+/** Lot 6 — libellés des attributs de menuiserie. */
+export const OUVERTURE_MODELE_LABELS: Record<OuvertureModele, string> = {
+  battant: "Battant", oscillo_battant: "Oscillo-battant", coulissant: "Coulissant", galandage: "À galandage", fixe: "Fixe (châssis fixe)",
+};
+export const OUVERTURE_POUSSEE_LABELS: Record<OuverturePoussee, string> = { poussant: "Poussant", tirant: "Tirant" };
+
+/** Modèle effectif d'une ouverture (valeur par défaut selon le type quand il est absent). */
+export function ouvertureModele(ouverture: Pick<PlanOuverture, "modele" | "typeOuverture" | "sens">): OuvertureModele | null {
+  if (ouverture.modele) return ouverture.modele;
+  if (ouverture.typeOuverture === "passage" || ouverture.typeOuverture === "tremie") return null;
+  if (ouverture.sens === "coulissant" || ouverture.typeOuverture === "baie") return "coulissant";
+  return "battant";
+}
 
 /** Ce que l'éditeur manipule et ce que l'on enregistre. */
 export type PlanDocument = {
@@ -203,7 +228,14 @@ export function freezeCreatesVersion(etat: PlanEtat, versions: readonly { readon
 
 // ── Validation (miroir SQL) ───────────────────────────────────────────────────
 
-export type PlanIssue = { readonly path: string; readonly message: string };
+/**
+ * Lot 6 — codes des anomalies d'ouverture. `jonction` (ouverture engagée dans un raccord de murs)
+ * dépend de la géométrie raccordée : elle est détectée par le moteur de Tools, pas ici.
+ */
+export const OPENING_ISSUE_CODES = ["hors_mur", "plus_large_que_mur", "chevauchement", "jonction", "largeur_nulle", "hauteur_incoherente", "invalide"] as const;
+export type OpeningIssueCode = (typeof OPENING_ISSUE_CODES)[number];
+
+export type PlanIssue = { readonly path: string; readonly message: string; readonly code?: OpeningIssueCode };
 
 function finiteCoordinate(value: number): boolean {
   return Number.isFinite(value) && Math.abs(value) <= RELEVE_COORDINATE_LIMIT_MM;
@@ -227,19 +259,57 @@ export function validatePlanMur(mur: PlanMur): PlanIssue[] {
   return issues;
 }
 
-export function validatePlanOuverture(ouverture: PlanOuverture, mur: Pick<PlanMur, "a" | "b"> | null): PlanIssue[] {
+/** Messages des anomalies d'ouverture (identiques côté serveur, voir la migration 1001). */
+export const OPENING_ISSUE_MESSAGES: Record<OpeningIssueCode, string> = {
+  hors_mur: "L'ouverture sort de son mur.",
+  plus_large_que_mur: "L'ouverture est plus large que son mur.",
+  chevauchement: "Deux ouvertures se chevauchent sur ce mur.",
+  jonction: "L'ouverture tombe sur une jonction de murs.",
+  largeur_nulle: "Largeur nulle : une ouverture a une largeur positive.",
+  hauteur_incoherente: "Hauteur incohérente : allège + hauteur dépassent la hauteur du mur.",
+  invalide: "Ouverture invalide.",
+};
+
+export function validatePlanOuverture(ouverture: PlanOuverture, mur: Pick<PlanMur, "a" | "b" | "hauteurMm"> | Pick<PlanMur, "a" | "b"> | null): PlanIssue[] {
   const issues: PlanIssue[] = [];
-  if (!mur) return [{ path: "murId", message: "Une ouverture est hébergée par un mur du plan." }];
-  if (!(ouverture.decalageMm >= 0)) issues.push({ path: "decalageMm", message: "Position positive attendue." });
-  if (!(ouverture.largeurMm > 0)) issues.push({ path: "largeurMm", message: "Largeur positive attendue." });
-  if (!(ouverture.hauteurMm > 0) || ouverture.hauteurMm > PLAN_LIMITS.hauteurMaxMm) issues.push({ path: "hauteurMm", message: "Hauteur positive attendue." });
-  if (ouverture.allegeMm !== null && !(ouverture.allegeMm >= 0)) issues.push({ path: "allegeMm", message: "Allège positive attendue." });
-  if (ouverture.decalageMm + ouverture.largeurMm > murLongueurMm(mur) + PLAN_LIMITS.ouvertureToleranceMm) {
-    issues.push({ path: "largeurMm", message: "L'ouverture dépasse de son mur." });
+  if (!mur) return [{ path: "murId", message: "Une ouverture est hébergée par un mur du plan.", code: "hors_mur" }];
+  const longueur = murLongueurMm(mur);
+  if (!(ouverture.decalageMm >= 0)) issues.push({ path: "decalageMm", message: "Position positive attendue.", code: "hors_mur" });
+  if (!(ouverture.largeurMm > 0)) issues.push({ path: "largeurMm", message: "Largeur positive attendue.", code: "largeur_nulle" });
+  if (!(ouverture.hauteurMm > 0) || ouverture.hauteurMm > PLAN_LIMITS.hauteurMaxMm) issues.push({ path: "hauteurMm", message: "Hauteur positive attendue.", code: "hauteur_incoherente" });
+  if (ouverture.allegeMm !== null && !(ouverture.allegeMm >= 0)) issues.push({ path: "allegeMm", message: "Allège positive attendue.", code: "hauteur_incoherente" });
+  if (ouverture.largeurMm > longueur + PLAN_LIMITS.ouvertureToleranceMm) {
+    issues.push({ path: "largeurMm", message: OPENING_ISSUE_MESSAGES.plus_large_que_mur, code: "plus_large_que_mur" });
+  } else if (ouverture.decalageMm + ouverture.largeurMm > longueur + PLAN_LIMITS.ouvertureToleranceMm) {
+    issues.push({ path: "largeurMm", message: "L'ouverture dépasse de son mur.", code: "hors_mur" });
   }
-  if (!(OUVERTURE_TYPES as readonly string[]).includes(ouverture.typeOuverture)) issues.push({ path: "typeOuverture", message: "Type d'ouverture inconnu." });
-  if (!(OUVERTURE_SENS as readonly string[]).includes(ouverture.sens)) issues.push({ path: "sens", message: "Sens inconnu." });
+  // Allège + hauteur ≤ hauteur du mur (quand elle est connue).
+  const hauteurMur = "hauteurMm" in mur ? mur.hauteurMm : null;
+  if (hauteurMur !== null && (ouverture.allegeMm ?? 0) + ouverture.hauteurMm > hauteurMur + PLAN_LIMITS.ouvertureToleranceMm) {
+    issues.push({ path: "hauteurMm", message: OPENING_ISSUE_MESSAGES.hauteur_incoherente, code: "hauteur_incoherente" });
+  }
+  if (!(OUVERTURE_TYPES as readonly string[]).includes(ouverture.typeOuverture)) issues.push({ path: "typeOuverture", message: "Type d'ouverture inconnu.", code: "invalide" });
+  if (!(OUVERTURE_SENS as readonly string[]).includes(ouverture.sens)) issues.push({ path: "sens", message: "Sens inconnu.", code: "invalide" });
+  if (ouverture.vantaux !== undefined && !(OUVERTURE_VANTAUX as readonly number[]).includes(ouverture.vantaux)) issues.push({ path: "vantaux", message: "Un ou deux vantaux.", code: "invalide" });
+  if (ouverture.poussee !== undefined && !(OUVERTURE_POUSSEES as readonly string[]).includes(ouverture.poussee)) issues.push({ path: "poussee", message: "Poussant ou tirant.", code: "invalide" });
+  if (ouverture.modele !== undefined && !(OUVERTURE_MODELES as readonly string[]).includes(ouverture.modele)) issues.push({ path: "modele", message: "Modèle de menuiserie inconnu.", code: "invalide" });
   return issues;
+}
+
+/** Paires d'ouvertures d'un même mur qui se chevauchent (au-delà de la tolérance d'arrondi). */
+export function overlappingOpenings(ouvertures: readonly Pick<PlanOuverture, "id" | "murId" | "decalageMm" | "largeurMm">[]): [string, string][] {
+  const byMur = new Map<string, Pick<PlanOuverture, "id" | "murId" | "decalageMm" | "largeurMm">[]>();
+  for (const ouverture of ouvertures) byMur.set(ouverture.murId, [...(byMur.get(ouverture.murId) ?? []), ouverture]);
+  const pairs: [string, string][] = [];
+  for (const list of byMur.values()) {
+    const sorted = [...list].sort((x, y) => x.decalageMm - y.decalageMm);
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length && sorted[j].decalageMm < sorted[i].decalageMm + sorted[i].largeurMm - PLAN_LIMITS.ouvertureToleranceMm; j++) {
+        pairs.push([sorted[i].id, sorted[j].id]);
+      }
+    }
+  }
+  return pairs;
 }
 
 export function validatePlanContour(contour: PlanContour): PlanIssue[] {
@@ -258,6 +328,9 @@ export function validatePlanDocument(document: PlanDocument): PlanIssue[] {
   for (const mur of document.murs) issues.push(...validatePlanMur(mur).map((issue) => ({ ...issue, path: `murs.${mur.id}.${issue.path}` })));
   for (const ouverture of document.ouvertures) {
     issues.push(...validatePlanOuverture(ouverture, murs.get(ouverture.murId) ?? null).map((issue) => ({ ...issue, path: `ouvertures.${ouverture.id}.${issue.path}` })));
+  }
+  for (const [, second] of overlappingOpenings(document.ouvertures)) {
+    issues.push({ path: `ouvertures.${second}.decalageMm`, message: OPENING_ISSUE_MESSAGES.chevauchement, code: "chevauchement" });
   }
   const seen = new Set<string>();
   for (const contour of document.contours) {
@@ -286,9 +359,16 @@ export function murFromElement(element: Pick<ReleveElement<"mur">, "id" | "piece
 
 export function ouvertureFromElement(element: Pick<ReleveElement<"ouverture">, "id" | "parentElementId" | "donnees">): PlanOuverture {
   const d = element.donnees;
-  return {
+  const ouverture: PlanOuverture = {
     id: element.id, murId: element.parentElementId ?? "", decalageMm: Number(d.decalageMm), largeurMm: Number(d.largeurMm),
     hauteurMm: Number(d.hauteurMm), allegeMm: d.allegeMm ?? null, typeOuverture: d.typeOuverture, sens: d.sens, origineId: d.origineId ?? null,
+  };
+  // Lot 6 : attributs présents seulement s'ils ont été enregistrés (clés stables, pas de réécriture).
+  return {
+    ...ouverture,
+    ...(d.vantaux !== undefined ? { vantaux: d.vantaux } : {}),
+    ...(d.poussee !== undefined ? { poussee: d.poussee } : {}),
+    ...(d.modele !== undefined ? { modele: d.modele } : {}),
   };
 }
 
@@ -308,6 +388,9 @@ export function ouvertureDonnees(ouverture: PlanOuverture): Record<string, unkno
     allegeMm: ouverture.allegeMm, typeOuverture: ouverture.typeOuverture, sens: ouverture.sens,
   };
   if (ouverture.origineId) donnees.origineId = ouverture.origineId;
+  if (ouverture.vantaux !== undefined) donnees.vantaux = ouverture.vantaux;
+  if (ouverture.poussee !== undefined) donnees.poussee = ouverture.poussee;
+  if (ouverture.modele !== undefined) donnees.modele = ouverture.modele;
   return donnees;
 }
 
@@ -366,6 +449,24 @@ export function diffPlan(before: PlanDocument, after: PlanDocument): PlanOperati
   if (!same(before.cadre, after.cadre)) operations.cadre = after.cadre;
   if (!same(before.reglages, after.reglages)) operations.reglages = after.reglages;
   return operations;
+}
+
+/**
+ * Lot 6 — anomalies qui feraient refuser CE lot par le serveur (miroir de
+ * `tools_releve_plan_enregistrer`) : toutes celles qui ne concernent pas une ouverture, et celles
+ * des ouvertures envoyées ou portées par un mur envoyé. Une anomalie antérieure sur un mur non
+ * touché (ouvertures superposées du Lot 5, par exemple) n'empêche pas d'enregistrer le reste :
+ * elle est signalée dans l'éditeur, pas bloquante ici.
+ */
+export function validatePlanSave(document: PlanDocument, operations: PlanOperations): PlanIssue[] {
+  const touchedMurs = new Set([...operations.murs.map((mur) => mur.id), ...operations.ouvertures.map((ouverture) => ouverture.murId)]);
+  const sent = new Set(operations.ouvertures.map((ouverture) => ouverture.id));
+  const hostOf = new Map(document.ouvertures.map((ouverture) => [ouverture.id, ouverture.murId]));
+  return validatePlanDocument(document).filter((issue) => {
+    const match = /^ouvertures\.([^.]+)\./.exec(issue.path);
+    if (!match) return true;
+    return sent.has(match[1]) || touchedMurs.has(hostOf.get(match[1]) ?? "");
+  });
 }
 
 export function isPlanOperationsEmpty(operations: PlanOperations): boolean {
@@ -473,9 +574,18 @@ export const PLAN_EXPORT_LAYERS = ["MURS", "OUVERTURES", "PIECES", "COTES", "PHO
 export type PlanExportLayer = (typeof PLAN_EXPORT_LAYERS)[number];
 
 export type PlanExportEntity =
-  | { readonly layer: PlanExportLayer; readonly kind: "line"; readonly a: Point2D; readonly b: Point2D; readonly widthMm: number; readonly ref: string }
+  | {
+    readonly layer: PlanExportLayer; readonly kind: "line"; readonly a: Point2D; readonly b: Point2D; readonly widthMm: number; readonly ref: string;
+    /** Lot 6 (facultatif) : trait continu, tirets (débattement, linteau, rail) ou vitrage. */
+    readonly style?: "trait" | "tirets" | "vitrage";
+  }
   | { readonly layer: PlanExportLayer; readonly kind: "polygon"; readonly points: readonly Point2D[]; readonly ref: string }
-  | { readonly layer: PlanExportLayer; readonly kind: "text"; readonly at: Point2D; readonly text: string; readonly ref: string };
+  | { readonly layer: PlanExportLayer; readonly kind: "text"; readonly at: Point2D; readonly text: string; readonly ref: string }
+  /**
+   * Lot 6 : arc de cercle (débattement de porte) — ARC natif en DXF, arc elliptique en SVG / PDF.
+   * Angles en radians, repère Y haut, parcours trigonométrique de `start` à `end`.
+   */
+  | { readonly layer: PlanExportLayer; readonly kind: "arc"; readonly centre: Point2D; readonly radius: number; readonly start: number; readonly end: number; readonly ref: string };
 
 /** Modèle d'export neutre : ce qu'un écrivain PDF, DXF ou SVG n'aura qu'à sérialiser. */
 export function planExportEntities(document: PlanDocument, labels: { readonly piece?: (pieceId: string) => string } = {}): PlanExportEntity[] {

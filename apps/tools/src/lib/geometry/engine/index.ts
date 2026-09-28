@@ -18,6 +18,7 @@ export * from "./simplify";
 export * from "./snap";
 export * from "./guides";
 export * from "./planar-faces";
+export * from "./thick-strips";
 export * from "./constraints";
 export * from "./dimensions";
 export * from "./report";

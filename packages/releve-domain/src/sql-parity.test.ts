@@ -14,7 +14,8 @@ import { PHOTO_ANNOTATION_COULEURS, RELEVE_LIMITS } from "./validation";
 import { FORBIDDEN_LOCATION_KEYS, PHOTO_DATE_SOURCES, PHOTO_METADATA_KEYS, PHOTO_METADATA_REQUIRED_KEYS, PHOTO_ORIENTATIONS, PHOTO_SOURCES } from "./media";
 import { PHOTO_ANNOTATION_FORMES, PHOTO_ANNOTATION_FORMES_PREVUES, PHOTO_TARGET_KINDS } from "./photo";
 import { PHOTO_COMMENT_MAX } from "./media-service";
-import { DEFAULT_PLAN_CADRE, PLAN_CREATION_MESSAGES, PLAN_ETATS, PLAN_LIMITS } from "./plan";
+import { DEFAULT_PLAN_CADRE, OPENING_ISSUE_CODES, OPENING_ISSUE_MESSAGES, PLAN_CREATION_MESSAGES, PLAN_ETATS, PLAN_LIMITS } from "./plan";
+import { OUVERTURE_MODELES, OUVERTURE_POUSSEES, OUVERTURE_SENS, OUVERTURE_VANTAUX } from "./model";
 import { RELEVE_COORDINATE_LIMIT_MM } from "./model";
 
 /**
@@ -218,5 +219,32 @@ describe("parité domaine ↔ migration tools_releve_metre_plan_2d_v1 (Lot 5)", 
     for (const code of ["initial_not_first", "initial_with_base", "initial_missing", "base_not_found", "editable_exists"] as const) {
       expect(plan2d).toContain(sqlText(PLAN_CREATION_MESSAGES[code]));
     }
+  });
+});
+
+const lot6 = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260928001001_tools_releve_metre_geometrie_batiment_v1.sql", import.meta.url)),
+  "utf8",
+).replace(/\s+/g, " ");
+
+describe("parité domaine ↔ migration tools_releve_metre_geometrie_batiment_v1 (Lot 6)", () => {
+  it("attributs de menuiserie : mêmes valeurs admises", () => {
+    expect(lot6).toContain(`not in (${quoted(OUVERTURE_SENS)})`);
+    expect(lot6).toContain(`not in (${quoted(OUVERTURE_POUSSEES)})`);
+    expect(lot6).toContain(`not in (${quoted(OUVERTURE_MODELES)})`);
+    expect(lot6).toContain(`not in (${OUVERTURE_VANTAUX.map((v) => `'${v}'`).join(",")})`);
+  });
+  it("codes et messages d'anomalie identiques (la jonction reste côté client)", () => {
+    const sqlText = (message: string) => message.replaceAll("'", "''");
+    for (const code of OPENING_ISSUE_CODES) {
+      if (code === "invalide") { expect(lot6).toContain(`else '${sqlText(OPENING_ISSUE_MESSAGES.invalide)}'`); continue; }
+      expect(lot6).toContain(`when '${code}' then '${sqlText(OPENING_ISSUE_MESSAGES[code])}'`);
+    }
+  });
+  it("tolérance d'arrondi et hauteur maximale identiques", () => {
+    expect(lot6).toContain(`> p_longueur + ${PLAN_LIMITS.ouvertureToleranceMm}`);
+    expect(lot6).toContain(`> p_hauteur_mur + ${PLAN_LIMITS.ouvertureToleranceMm}`);
+    expect(lot6).toContain(`v_hauteur > ${PLAN_LIMITS.hauteurMaxMm}`);
+    expect(lot6).toContain(`b.fin - ${PLAN_LIMITS.ouvertureToleranceMm}`);
   });
 });
