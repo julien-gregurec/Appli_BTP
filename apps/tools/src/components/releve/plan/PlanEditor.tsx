@@ -11,13 +11,19 @@
  * - historique : `lib/tracing/history` + raccourcis `use-undo-redo-shortcuts` ;
  * - géométrie : Engine B via `lib/releve/plan/{geometry,snap,editor}` ;
  * - sauvegarde automatique : `useAutosave` du Lot 3 (révision, conflit, réessai).
+ *
+ * Lot 6 — géométrie bâtiment : murs raccordés à l'épaisseur réelle (`wall-geometry`, Engine B
+ * `thick-strips`), ouvertures posées au clic / au toucher sur un mur, glissées le long du mur,
+ * redimensionnées par leurs tableaux, attributs de menuiserie ; toute modification qui
+ * introduirait une ouverture invalide est refusée avec son motif ; nettoyage des jonctions.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  diffPlan, isPlanEditable, isPlanOperationsEmpty, MUR_TYPES, newUuid, PLAN_ETAT_LABELS, planCreationRule, photoMarkersOnPlan,
-  validatePlanDocument, type Etage, type LoadedPlan, type MurType, type PhotoLibrary, type Plan, type PlanDocument, type PlanEtat,
-  type ReleveMediaService, type RelevePlanRepository, type ReleveStructure,
+  diffPlan, isPlanEditable, isPlanOperationsEmpty, MUR_TYPES, newUuid, OUVERTURE_MODELE_LABELS, OUVERTURE_MODELES, OUVERTURE_POUSSEE_LABELS,
+  ouvertureModele, PLAN_ETAT_LABELS, planCreationRule, photoMarkersOnPlan, validatePlanSave,
+  type Etage, type LoadedPlan, type MurType, type OuvertureModele, type OuverturePoussee, type PhotoLibrary, type Plan, type PlanDocument,
+  type PlanEtat, type PlanOuverture, type ReleveMediaService, type RelevePlanRepository, type ReleveStructure,
 } from "@elsatia/releve-domain";
 import { usePlanViewport } from "@/components/atelier/viewport/use-plan-viewport";
 import { PlanViewport } from "@/components/atelier/viewport/PlanViewport";
@@ -25,12 +31,17 @@ import { distance } from "@/lib/geometry/engine/measure";
 import type { Point2D } from "@/lib/geometry/engine/types";
 import { photosHref } from "@/lib/releve/navigation";
 import {
-  addOpening, addWall, alignWalls, assignRoom, deleteOpening, deleteWalls, mergeWalls, MIN_WALL_MM, moveVertex, moveWall, OPENING_PRESETS,
-  pointAtLength, setWallAngle, setWallLength, splitWall, straightenWall, unassignRoom, updateOpening, updateWall, withRefreshedContours,
+  addWall, alignWalls, assignRoom, cleanupJunctions, deleteOpening, deleteWalls, mergeWalls, MIN_WALL_MM, moveVertex, moveWall,
+  pointAtLength, setWallAngle, setWallLength, splitWall, splitWallAtJunctions, straightenWall, unassignRoom, updateWall, withRefreshedContours,
   type WallDefaults,
 } from "@/lib/releve/plan/editor";
 import { planToSvg } from "@/lib/releve/plan/export-svg";
-import { contourLabelPoint, detectRooms, hitTestVertex, hitTestWall, planBounds, samePoint, wallAngleDegrees, wallLength } from "@/lib/releve/plan/geometry";
+import { contourLabelPoint, detectRooms, hitTestVertex, hitTestWall, offsetAlongWall, planBounds, pointAlongWall, samePoint, wallAngleDegrees, wallLength } from "@/lib/releve/plan/geometry";
+import {
+  changeOpeningKind, introducedIssue, moveOpening, OPENING_KIND_LABELS, OPENING_KIND_PRESETS, OPENING_KINDS, openingKindOf, patchChecked, placeOpening,
+  resizeOpening, snapOpeningPosition, type OpeningKind, type OpeningPatch, type OpeningResult,
+} from "@/lib/releve/plan/openings";
+import { computeWallNetwork, junctionSummary, openingIssues, wallFeatures, type WallNetwork } from "@/lib/releve/plan/wall-geometry";
 import {
   formatAngleDegres, formatLongueurCm, formatLongueurM, formatSurfaceContour, parseAngleDegres, parseEpaisseurCm, parseLongueurCm,
 } from "@/lib/releve/plan/render";
@@ -41,14 +52,18 @@ import { handleGrabPx, pointerPrecisionOf, selectionTolerancePx, snapTolerancePx
 import { EMPTY_SELECTION, isSelected, selectSingle, toggleSelection, type SelectionSet } from "@/lib/viewport/selection-set";
 import { screenToWorld, worldToScreen, type ScreenPoint } from "@/lib/viewport/viewport-math";
 import { SaveStatus, useAutosave } from "../autosave-ui";
-import { OUVERTURE_TYPE_LABELS, PlanLayers, MUR_TYPE_LABELS } from "./PlanLayers";
+import { PlanLayers, MUR_TYPE_LABELS } from "./PlanLayers";
 import releveStyles from "../releve.module.css";
 import styles from "./plan.module.css";
 
-type Tool = "select" | "mur" | "piece";
+type Tool = "select" | "mur" | "ouverture" | "piece";
 type Drag =
   | { kind: "vertex"; from: Point2D; base: PlanDocument; origin: Point2D | null; exclude: Set<string> }
-  | { kind: "wall"; murId: string; grab: Point2D; base: PlanDocument; a: Point2D };
+  | { kind: "wall"; murId: string; grab: Point2D; base: PlanDocument; a: Point2D }
+  | { kind: "opening"; id: string; mode: "corps" | "start" | "end"; grabOffset: number; base: PlanDocument; network: WallNetwork; precision: PointerPrecision };
+
+/** Anomalies qui interdisent une modification de mur (la jonction n'est que signalée). */
+const WALL_BLOCKING = new Set(["hors_mur", "plus_large_que_mur", "chevauchement", "largeur_nulle", "hauteur_incoherente"]);
 
 const HISTORY_LIMIT = 100;
 const DERIVE_LABELS: Record<Exclude<PlanEtat, "initial">, string> = {
@@ -91,6 +106,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   const [pieceToAssign, setPieceToAssign] = useState("");
   const [ouverts, setOuverts] = useState<string[]>([]);
   const [showRooms, setShowRooms] = useState(false);
+  const [openingKind, setOpeningKind] = useState<OpeningKind>("porte");
+  const [ghost, setGhost] = useState<{ murId: string; decalageMm: number; largeurMm: number; valid: boolean } | null>(null);
   const [surfaces, setSurfaces] = useState<Record<string, number>>(() => Object.fromEntries(loaded.document.contours.filter((c) => c.surfaceMm2 != null).map((c) => [c.pieceId, c.surfaceMm2!])));
   const drag = useRef<Drag | null>(null);
   const savedRef = useRef<PlanDocument>(loaded.document);
@@ -113,7 +130,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       const target = patch.document as PlanDocument;
       const operations = diffPlan(savedRef.current, target);
       if (isPlanOperationsEmpty(operations)) return { revision };
-      const issues = validatePlanDocument(target);
+      const issues = validatePlanSave(target, operations);
       if (issues.length) throw new Error(`Plan non enregistré : ${issues[0].message}`);
       const result = await repository.savePlan(plan.id, revision, operations);
       savedRef.current = target;
@@ -133,8 +150,23 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     },
   });
 
-  const commit = useCallback((next: PlanDocument, label: string, options: { refresh?: boolean } = {}) => {
+  // Géométrie raccordée (Lot 6) : du document affiché (aperçu compris) et du document validé.
+  const committedNetwork = useMemo(() => computeWallNetwork(committed.murs), [committed.murs]);
+  const network = useMemo(() => (doc.murs === committed.murs ? committedNetwork : computeWallNetwork(doc.murs)), [doc.murs, committed.murs, committedNetwork]);
+  const issues = useMemo(() => openingIssues(doc, network), [doc, network]);
+  const invalidOpenings = useMemo(() => new Set(issues.map((issue) => issue.ouvertureId)), [issues]);
+  const features = useMemo(() => wallFeatures(doc, network), [doc, network]);
+  const junctions = useMemo(() => junctionSummary(committedNetwork), [committedNetwork]);
+
+  const commit = useCallback((next: PlanDocument, label: string, options: { refresh?: boolean; guardWalls?: boolean } = {}) => {
     if (!editable || next === committed) return;
+    // Modification de murs : refusée si elle rend une ouverture invalide (hors mur, trop large,
+    // chevauchement, hauteur) ; une ouverture qui tombe sur une jonction est signalée.
+    if (options.guardWalls !== false && next.murs !== committed.murs && committed.ouvertures.length > 0) {
+      const issue = introducedIssue(committed, next, committedNetwork, computeWallNetwork(next.murs));
+      if (issue && WALL_BLOCKING.has(issue.code)) { setMessage(`Modification refusée : ${issue.message}`); return; }
+      if (issue) setMessage(`Attention : ${issue.message}`);
+    }
     let finalDoc = next;
     if (options.refresh) {
       const refreshed = withRefreshedContours(next);
@@ -143,7 +175,20 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     }
     setHistory((current) => pushHistory(current, finalDoc, label));
     autosave.queue({ document: finalDoc });
-  }, [autosave, committed, editable]);
+  }, [autosave, committed, committedNetwork, editable]);
+
+  /** Opération d'ouverture (Lot 6) : validée par `openings.ts`, refus motivé sinon. */
+  const commitOpening = useCallback((result: OpeningResult, label: string) => {
+    if (result.error) { setMessage(result.error); return false; }
+    commit(result.document, label, { guardWalls: false });
+    return true;
+  }, [commit]);
+
+  /** Modification de mur demandée au panneau : un refus (document inchangé) est expliqué. */
+  const commitWallEdit = useCallback((next: PlanDocument, label: string) => {
+    if (next === committed) { setMessage("Modification refusée : les ouvertures du mur n'y tiendraient plus (ou mur de longueur nulle)."); return; }
+    commit(next, label, { refresh: true });
+  }, [commit, committed]);
 
   const stepHistory = useCallback((direction: "undo" | "redo") => {
     if (!editable) return;
@@ -175,8 +220,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   const { view, size } = viewport;
   const toWorld = useCallback((local: ScreenPoint) => screenToWorld(local, view, size), [view, size]);
   const snapAt = useCallback((world: Point2D, precision: PointerPrecision, origin: Point2D | null, exclude?: Set<string>) =>
-    resolvePlanSnap(world, doc.murs, { toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view), origin, excludeMurIds: exclude, enabled: snapOn }),
-  [doc.murs, view, snapOn]);
+    resolvePlanSnap(world, doc.murs, { toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view), origin, excludeMurIds: exclude, enabled: snapOn, features }),
+  [doc.murs, view, snapOn, features]);
 
   // ── Photos ──────────────────────────────────────────────────────────────────
   const markers = useMemo(() => library ? photoMarkersOnPlan(library.photos.flatMap((photo) => photo.anchors), committed, etage.id, { piecePoint: contourLabelPoint }) : [],
@@ -227,8 +272,32 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     setSelection((current) => (additive ? toggleSelection(current, hit.murId) : selectSingle(current, hit.murId)));
   }, [doc, markers, size, toWorld, view]);
 
+  /** Outil Ouverture : mur visé et position (centre) accrochée — aperçu et pose. */
+  const openingTarget = useCallback((local: ScreenPoint, precision: PointerPrecision) => {
+    const world = toWorld(local);
+    const hit = hitTestWall(committed.murs, world, toleranceWorldFor(selectionTolerancePx(precision), view));
+    if (!hit) return null;
+    const mur = committed.murs.find((item) => item.id === hit.murId)!;
+    const draft = OPENING_KIND_PRESETS[openingKind];
+    const centre = offsetAlongWall(mur, hit.point);
+    const snapped = snapOn ? snapOpeningPosition(committed, committedNetwork, mur, null, centre - draft.largeurMm / 2, toleranceWorldFor(snapTolerancePx(precision), view), "centre", draft.largeurMm) : null;
+    return { mur, centre: snapped ? snapped.valueMm + draft.largeurMm / 2 : centre, point: hit.point, draft };
+  }, [committed, committedNetwork, openingKind, snapOn, toWorld, view]);
+
   const onCanvasClick = useCallback((local: ScreenPoint, precision: PointerPrecision, modifiers: { additive: boolean }) => {
     if (tool === "mur" && editable) { placePoint(snapAt(toWorld(local), precision, draftStart).point); return; }
+    if (tool === "ouverture" && editable) {
+      const target = openingTarget(local, precision);
+      if (!target) { setMessage("Touchez un mur pour y poser l'ouverture."); return; }
+      const id = newUuid();
+      const result = placeOpening(committed, committedNetwork, target.mur.id, target.centre, target.draft, id);
+      if (commitOpening(result, `Ajout d'ouverture (${OPENING_KIND_LABELS[openingKind]})`)) {
+        setOpeningId(id); setSelection(selectSingle(EMPTY_SELECTION, target.mur.id));
+        setMessage(`${OPENING_KIND_LABELS[openingKind]} posée sur le mur.`);
+      }
+      setGhost(null);
+      return;
+    }
     if (tool === "piece" && editable) {
       if (!pieceToAssign) { setMessage("Choisissez d'abord la pièce à associer."); return; }
       const result = assignRoom(committed, toWorld(local), pieceToAssign);
@@ -238,12 +307,22 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       return;
     }
     selectAt(local, precision, modifiers.additive);
-  }, [commit, committed, draftStart, editable, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
+  }, [commit, commitOpening, committed, committedNetwork, draftStart, editable, openingKind, openingTarget, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
 
   const onCanvasHover = useCallback((local: ScreenPoint | null, precision: PointerPrecision) => {
+    if (tool === "ouverture") {
+      setHover(null);
+      const target = local ? openingTarget(local, precision) : null;
+      if (!target) { setGhost(null); return; }
+      const result = placeOpening(committed, committedNetwork, target.mur.id, target.centre, target.draft, "apercu");
+      const placed = result.document.ouvertures.find((o) => o.id === "apercu");
+      setGhost(placed ? { murId: target.mur.id, decalageMm: placed.decalageMm, largeurMm: placed.largeurMm, valid: true }
+        : { murId: target.mur.id, decalageMm: Math.max(0, target.centre - target.draft.largeurMm / 2), largeurMm: Math.min(target.draft.largeurMm, wallLength(target.mur)), valid: false });
+      return;
+    }
     if (!local || tool !== "mur") { setHover(null); return; }
     setHover(snapAt(toWorld(local), precision, draftStart));
-  }, [draftStart, snapAt, tool, toWorld]);
+  }, [committed, committedNetwork, draftStart, openingTarget, snapAt, tool, toWorld]);
 
   const deleteSelection = useCallback(() => {
     if (openingId) { commit(deleteOpening(committed, openingId), "Suppression d'ouverture"); setOpeningId(null); return; }
@@ -265,6 +344,23 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     onDown: (local: ScreenPoint, pointerType: string | undefined) => {
       const precision = pointerPrecisionOf(pointerType);
       const world = toWorld(local);
+      // Ouverture sélectionnée : tableaux (redimensionner) puis corps (glisser le long du mur).
+      const opening = openingId ? committed.ouvertures.find((o) => o.id === openingId) : undefined;
+      const host = opening ? committed.murs.find((mur) => mur.id === opening.murId) : undefined;
+      if (opening && host) {
+        const reach = handleGrabPx(precision);
+        const screenOf = (offset: number) => worldToScreen(pointAlongWall(host, offset), view, size);
+        const near = (offset: number) => { const p = screenOf(offset); return Math.hypot(p.x - local.x, p.y - local.y) <= reach; };
+        const along = offsetAlongWall(host, world);
+        const base = { base: committed, network: committedNetwork, precision, id: opening.id };
+        if (near(opening.decalageMm)) { drag.current = { kind: "opening", mode: "start", grabOffset: 0, ...base }; return true; }
+        if (near(opening.decalageMm + opening.largeurMm)) { drag.current = { kind: "opening", mode: "end", grabOffset: 0, ...base }; return true; }
+        const onHost = hitTestWall([host], world, toleranceWorldFor(selectionTolerancePx(precision), view));
+        if (onHost && along >= opening.decalageMm && along <= opening.decalageMm + opening.largeurMm) {
+          drag.current = { kind: "opening", mode: "corps", grabOffset: along - opening.decalageMm, ...base };
+          return true;
+        }
+      }
       const selected = committed.murs.filter((mur) => isSelected(selection, mur.id));
       if (selected.length === 0) return false;
       const vertex = hitTestVertex(selected, world, toleranceWorldFor(handleGrabPx(precision), view));
@@ -286,6 +382,24 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       const current = drag.current;
       if (!current) return;
       const world = toWorld(local);
+      if (current.kind === "opening") {
+        const opening = current.base.ouvertures.find((o) => o.id === current.id);
+        const host = opening ? current.base.murs.find((mur) => mur.id === opening.murId) : undefined;
+        if (!opening || !host) return;
+        const along = offsetAlongWall(host, world);
+        const tolerance = toleranceWorldFor(snapTolerancePx(current.precision), view);
+        let result: OpeningResult;
+        if (current.mode === "corps") {
+          const raw = along - current.grabOffset;
+          const snapped = snapOn ? snapOpeningPosition(current.base, current.network, host, opening.id, raw, tolerance, "centre", opening.largeurMm).valueMm : raw;
+          result = moveOpening(current.base, current.network, opening.id, snapped);
+        } else {
+          const snapped = snapOn ? snapOpeningPosition(current.base, current.network, host, opening.id, along, tolerance).valueMm : along;
+          result = resizeOpening(current.base, current.network, opening.id, current.mode, snapped);
+        }
+        if (!result.error) setPreview(result.document);
+        return;
+      }
       if (current.kind === "vertex") {
         const snap = resolvePlanSnap(world, current.base.murs, { toleranceWorld: toleranceWorldFor(snapTolerancePx("fine"), view), origin: current.origin, excludeMurIds: current.exclude, enabled: snapOn });
         setHover(snap);
@@ -304,16 +418,21 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       setHover(null);
       const pending = previewRef.current;
       setPreview(null);
+      if (current?.kind === "opening") {
+        if (pending && pending !== current.base) commit(pending, current.mode === "corps" ? "Déplacement d'ouverture" : "Redimensionnement d'ouverture", { guardWalls: false });
+        return;
+      }
       if (current && pending && pending !== current.base) commit(pending, current.kind === "vertex" ? "Déplacement de point" : "Déplacement de mur", { refresh: true });
     },
-  } : undefined, [commit, committed, editable, selection, setPreview, snapOn, tool, toWorld, view]);
+  } : undefined, [commit, committed, committedNetwork, editable, openingId, selection, setPreview, size, snapOn, tool, toWorld, view]);
 
   // ── Sélection courante ──────────────────────────────────────────────────────
   const selectedMurs = doc.murs.filter((mur) => isSelected(selection, mur.id));
   const single = selectedMurs.length === 1 ? selectedMurs[0] : null;
   const rooms = useMemo(() => (showRooms ? detectRooms(committed.murs) : []), [showRooms, committed.murs]);
 
-  const changeTool = (next: Tool) => { setTool(next); endChain(); setMessage(""); };
+  const changeTool = (next: Tool) => { setTool(next); endChain(); setGhost(null); setMessage(""); };
+  const selectedOpening = openingId ? doc.ouvertures.find((o) => o.id === openingId) ?? null : null;
 
   // ── Plans (états, gel) ──────────────────────────────────────────────────────
   const [busy, setBusy] = useState(false);
@@ -370,17 +489,32 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     <div className={styles.toolbar} role="toolbar" aria-label="Outils du plan">
       <button type="button" aria-pressed={tool === "select"} onClick={() => changeTool("select")}>Sélection</button>
       {editable && <button type="button" aria-pressed={tool === "mur"} onClick={() => changeTool("mur")}>Mur</button>}
+      {editable && <button type="button" aria-pressed={tool === "ouverture"} onClick={() => changeTool("ouverture")}>Ouverture</button>}
       {editable && <button type="button" aria-pressed={tool === "piece"} onClick={() => changeTool("piece")}>Pièce</button>}
       {editable && <button type="button" disabled={!canUndo(history)} onClick={() => stepHistory("undo")} aria-label="Annuler">↶ Annuler</button>}
       {editable && <button type="button" disabled={!canRedo(history)} onClick={() => stepHistory("redo")} aria-label="Rétablir">↷ Rétablir</button>}
       {editable && <button type="button" disabled={selection.length === 0 && !openingId} onClick={deleteSelection}>Supprimer</button>}
       <button type="button" aria-pressed={showRooms} onClick={() => { setShowRooms((value) => !value); if (!showRooms) setMessage(`${detectRooms(committed.murs).length} pièce(s) fermée(s) détectée(s).`); }}>Détecter les pièces</button>
+      {editable && <button type="button" onClick={() => {
+        const result = cleanupJunctions(committed);
+        const total = result.report.fusionnes + result.report.raccordes + result.report.recoupes;
+        if (total === 0) { setMessage("Jonctions déjà propres : rien à corriger."); return; }
+        commit(result.document, "Nettoyage des jonctions", { refresh: true });
+        setMessage(`Jonctions nettoyées : ${result.report.fusionnes} extrémité(s) fusionnée(s), ${result.report.raccordes} raccord(s) en T, ${result.report.recoupes} dépassement(s) recoupé(s).`);
+      }}>Nettoyer les jonctions</button>}
       {editable && <label className={styles.toggle}><input type="checkbox" checked={snapOn} onChange={(event) => setSnapOn(event.target.checked)} /> Accrochage</label>}
       <button type="button" onClick={viewport.recenter}>Recentrer</button>
     </div>
 
+    {tool === "ouverture" && editable && <div className={styles.toolbar} role="toolbar" aria-label="Menuiseries">
+      {OPENING_KINDS.map((kind) => <button key={kind} type="button" aria-pressed={openingKind === kind} data-testid={`plan-menuiserie-${kind}`}
+        onClick={() => { setOpeningKind(kind); setGhost(null); }}>{OPENING_KIND_LABELS[kind]}</button>)}
+    </div>}
+
     <p className={releveStyles.feedback} role="status" aria-live="polite" data-testid="plan-message">
-      {message || (tool === "mur" ? (draftStart ? "Touchez l'extrémité du mur (Entrée ou même point : terminer)." : "Touchez le point de départ du mur.") : tool === "piece" ? "Choisissez une pièce puis touchez l'intérieur d'une pièce fermée." : "")}
+      {message || (tool === "mur" ? (draftStart ? "Touchez l'extrémité du mur (Entrée ou même point : terminer)." : "Touchez le point de départ du mur.")
+        : tool === "piece" ? "Choisissez une pièce puis touchez l'intérieur d'une pièce fermée."
+          : tool === "ouverture" ? `Touchez un mur pour y poser : ${OPENING_KIND_LABELS[openingKind]}.` : "")}
       {ouverts.length > 0 && ` Contour ouvert : ${ouverts.map(pieceName).join(", ")}.`}
     </p>
 
@@ -391,7 +525,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
           onCanvasKeyDown={onCanvasKeyDown} status={status}>
           {({ view: v, size: s }) => <PlanLayers document={doc} view={v} size={s} selection={selection} openingId={openingId} scopePieceIds={scopePieceIds}
             pieceName={pieceName} surfaces={surfaces} markers={markers} photoAnchorId={photoAnchorId} rooms={rooms}
-            draft={tool === "mur" && draftStart ? { start: draftStart, end: hover?.point ?? null } : null} snap={hover} showHandles={editable && tool === "select"} />}
+            draft={tool === "mur" && draftStart ? { start: draftStart, end: hover?.point ?? null } : null} snap={hover} showHandles={editable && tool === "select" && !openingId}
+            network={network} invalidOpenings={invalidOpenings} openingGhost={tool === "ouverture" ? ghost : null} showOpeningHandles={editable && tool === "select"} />}
         </PlanViewport>
       </div>
 
@@ -420,15 +555,32 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
         </section>}
 
         {tool === "select" && single && <WallPanel key={`${single.id}:${wallLength(single)}:${wallAngleDegrees(single)}`} mur={single} editable={editable} document={committed}
-          openingId={openingId} onSelectOpening={setOpeningId}
-          onLength={(mm) => commit(setWallLength(committed, single.id, mm), "Longueur du mur", { refresh: true })}
-          onAngle={(deg) => commit(setWallAngle(committed, single.id, deg), "Angle du mur", { refresh: true })}
-          onPatch={(patch) => commit(updateWall(committed, single.id, patch), "Propriétés du mur", { refresh: patch.epaisseurMm !== undefined })}
+          openingId={openingId} onSelectOpening={setOpeningId} network={committedNetwork}
+          onLength={(mm) => commitWallEdit(setWallLength(committed, single.id, mm), "Longueur du mur")}
+          onAngle={(deg) => commitWallEdit(setWallAngle(committed, single.id, deg), "Angle du mur")}
+          onPatch={(patch) => {
+            const next = updateWall(committed, single.id, patch);
+            if (patch.hauteurMm !== undefined) {
+              const issue = introducedIssue(committed, next, committedNetwork);
+              if (issue) { setMessage(`Modification refusée : ${issue.message}`); return; }
+            }
+            commit(next, "Propriétés du mur", { refresh: patch.epaisseurMm !== undefined });
+          }}
           onStraighten={() => commit(straightenWall(committed, single.id), "Redresser le mur", { refresh: true })}
           onSplit={() => { const result = splitWall(committed, single.id, wallLength(single) / 2, newUuid()); if (result.error) setMessage(result.error); else { commit(result.document, "Scinder le mur", { refresh: true }); setSelection(EMPTY_SELECTION); } }}
-          onAddOpening={(kind) => { const id = newUuid(); commit(addOpening(committed, single.id, OPENING_PRESETS[kind], id), "Ajout d'ouverture"); setOpeningId(id); }}
-          onOpeningPatch={(id, patch) => commit(updateOpening(committed, id, patch), "Ouverture")}
-          onOpeningDelete={(id) => { commit(deleteOpening(committed, id), "Suppression d'ouverture"); setOpeningId(null); }} />}
+          onSplitAtJunctions={() => { const result = splitWallAtJunctions(committed, committedNetwork, single.id, newUuid); if (result.error) setMessage(result.error); else { commit(result.document, "Scinder aux jonctions", { refresh: true }); setSelection(EMPTY_SELECTION); setMessage("Mur scindé à ses jonctions."); } }}
+          onAddOpening={(kind) => {
+            const id = newUuid();
+            if (commitOpening(placeOpening(committed, committedNetwork, single.id, null, OPENING_KIND_PRESETS[kind], id), `Ajout d'ouverture (${OPENING_KIND_LABELS[kind]})`)) setOpeningId(id);
+          }} />}
+
+        {tool === "select" && selectedOpening && <OpeningPanel key={`${selectedOpening.id}:${JSON.stringify(selectedOpening)}`} ouverture={selectedOpening} editable={editable}
+          mur={doc.murs.find((mur) => mur.id === selectedOpening.murId) ?? null} issues={issues.filter((issue) => issue.ouvertureId === selectedOpening.id).map((issue) => issue.message)}
+          onPatch={(patch, label) => commitOpening(patchChecked(committed, committedNetwork, selectedOpening.id, patch), label)}
+          onKind={(kind) => commitOpening(changeOpeningKind(committed, committedNetwork, selectedOpening.id, kind), `Menuiserie : ${OPENING_KIND_LABELS[kind]}`)}
+          onMove={(start) => commitOpening(moveOpening(committed, committedNetwork, selectedOpening.id, start), "Position de l'ouverture")}
+          onPosition={(start) => commitOpening(patchChecked(committed, committedNetwork, selectedOpening.id, { decalageMm: start }), "Position de l'ouverture")}
+          onDelete={() => { commit(deleteOpening(committed, selectedOpening.id), "Suppression d'ouverture"); setOpeningId(null); }} />}
 
         {tool === "select" && selectedMurs.length >= 2 && editable && <section className={styles.section} aria-label="Corrections">
           <h2>{selectedMurs.length} murs sélectionnés</h2>
@@ -459,6 +611,14 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
               : plan.figeLe ? "Plan figé : créez un plan corrigé, projeté ou tel que construit pour le modifier." : "Lecture seule."}
           </p>
           <p className={releveStyles.feedback}>{markers.length} photo(s) positionnée(s) sur le plan.</p>
+          <p className={releveStyles.feedback} data-testid="plan-jonctions">Jonctions : {junctions.L} L · {junctions.T} T · {junctions.X} X{junctions.multiple ? ` · ${junctions.multiple} multiple(s)` : ""}</p>
+        </section>}
+
+        {issues.length > 0 && <section className={styles.section} aria-label="Ouvertures à corriger" data-testid="plan-ouverture-alertes">
+          <h2>Ouvertures à corriger ({issues.length})</h2>
+          <ul className={styles.list}>{issues.slice(0, 20).map((issue) => <li key={`${issue.ouvertureId}:${issue.code}`}>
+            <button type="button" className={styles.linkButton} onClick={() => { const o = doc.ouvertures.find((item) => item.id === issue.ouvertureId); if (o) { setTool("select"); setOpeningId(o.id); setSelection(selectSingle(EMPTY_SELECTION, o.murId)); } }}>{issue.message}</button>
+          </li>)}</ul>
         </section>}
       </aside>
     </div>
@@ -516,15 +676,20 @@ function NumberField({ label, value, testId, parse, format, onCommit, disabled }
   </label>;
 }
 
-function WallPanel({ mur, editable, document, openingId, onSelectOpening, onLength, onAngle, onPatch, onStraighten, onSplit, onAddOpening, onOpeningPatch, onOpeningDelete }: {
-  mur: PlanDocument["murs"][number]; editable: boolean; document: PlanDocument; openingId: string | null; onSelectOpening(id: string | null): void;
+function WallPanel({ mur, editable, document, openingId, network, onSelectOpening, onLength, onAngle, onPatch, onStraighten, onSplit, onSplitAtJunctions, onAddOpening }: {
+  mur: PlanDocument["murs"][number]; editable: boolean; document: PlanDocument; openingId: string | null; network: WallNetwork; onSelectOpening(id: string | null): void;
   onLength(mm: number): void; onAngle(deg: number): void; onPatch(patch: Parameters<typeof updateWall>[2]): void; onStraighten(): void; onSplit(): void;
-  onAddOpening(kind: keyof typeof OPENING_PRESETS): void; onOpeningPatch(id: string, patch: Parameters<typeof updateOpening>[2]): void; onOpeningDelete(id: string): void;
+  onSplitAtJunctions(): void; onAddOpening(kind: OpeningKind): void;
 }) {
   const openings = document.ouvertures.filter((o) => o.murId === mur.id).sort((a, b) => a.decalageMm - b.decalageMm);
   const cm = (input: string) => { const parsed = parseLongueurCm(input); return parsed; };
+  const solid = network.walls.get(mur.id);
+  const JOIN_LABELS: Record<string, string> = { libre: "libre", onglet: "angle (L)", biseau: "angle aigu (biseau)", prolongement: "prolongement", eventail: "jonction multiple", about: "about (T)" };
   return <section className={styles.section} aria-label="Mur sélectionné" data-testid="plan-wall-panel">
     <h2>Mur · {formatLongueurM(wallLength(mur))}</h2>
+    {solid && <p className={releveStyles.feedback} data-testid="plan-wall-jonctions">
+      Extrémité A : {JOIN_LABELS[solid.startJoin]} · extrémité B : {JOIN_LABELS[solid.endJoin]}{solid.obstructions.length ? ` · ${solid.obstructions.length} mur(s) raccordé(s) en T / X` : ""}
+    </p>}
     <div className={styles.grid}>
       <NumberField label="Longueur (cm)" testId="plan-wall-longueur" value={Math.round(wallLength(mur) * 10) / 10} disabled={!editable}
         parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onLength(v)} />
@@ -544,21 +709,71 @@ function WallPanel({ mur, editable, document, openingId, onSelectOpening, onLeng
     {editable && <div className={releveStyles.toolbar}>
       <button type="button" className={releveStyles.secondary} onClick={onStraighten}>Redresser</button>
       <button type="button" className={releveStyles.secondary} onClick={onSplit}>Scinder au milieu</button>
+      {solid && solid.obstructions.length > 0 && <button type="button" className={releveStyles.secondary} onClick={onSplitAtJunctions}>Scinder aux jonctions</button>}
     </div>}
     <h3>Ouvertures ({openings.length})</h3>
     {editable && <div className={releveStyles.toolbar}>
       {(["porte", "fenetre", "baie", "ouverture_libre"] as const).map((kind) => <button key={kind} type="button" className={releveStyles.secondary} onClick={() => onAddOpening(kind)}>
-        + {kind === "ouverture_libre" ? "Ouverture libre" : kind === "fenetre" ? "Fenêtre" : kind === "baie" ? "Baie" : "Porte"}
+        + {OPENING_KIND_LABELS[kind]}
       </button>)}
     </div>}
     <ul className={styles.list}>{openings.map((o) => <li key={o.id} data-selected={o.id === openingId}>
-      <button type="button" className={styles.linkButton} onClick={() => onSelectOpening(o.id)}>{OUVERTURE_TYPE_LABELS[o.typeOuverture]} · {formatLongueurCm(o.largeurMm)} cm</button>
-      {o.id === openingId && <div className={styles.grid}>
-        <NumberField label="Position (cm depuis A)" testId="plan-ouverture-position" value={o.decalageMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onOpeningPatch(o.id, { decalageMm: v })} />
-        <NumberField label="Largeur (cm)" testId="plan-ouverture-largeur" value={o.largeurMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onOpeningPatch(o.id, { largeurMm: v })} />
-        <NumberField label="Hauteur (cm)" value={o.hauteurMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onOpeningPatch(o.id, { hauteurMm: v })} />
-        {editable && <button type="button" className={releveStyles.danger} onClick={() => onOpeningDelete(o.id)}>Supprimer l&apos;ouverture</button>}
-      </div>}
+      <button type="button" className={styles.linkButton} onClick={() => onSelectOpening(o.id)}>{OPENING_KIND_LABELS[openingKindOf(o)]} · {formatLongueurCm(o.largeurMm)} cm</button>
     </li>)}</ul>
+  </section>;
+}
+
+/** Lot 6 — attributs d'une ouverture : menuiserie, dimensions, allège, sens, poussée, vantaux, modèle. */
+function OpeningPanel({ ouverture, mur, editable, issues, onPatch, onKind, onMove, onPosition, onDelete }: {
+  ouverture: PlanOuverture; mur: PlanDocument["murs"][number] | null; editable: boolean; issues: readonly string[];
+  onPatch(patch: OpeningPatch, label: string): void; onKind(kind: OpeningKind): void;
+  /** Déplacement ramené dans l'emplacement libre (bouton « Centrer ») ; `onPosition` : valeur saisie, refusée si invalide. */
+  onMove(startMm: number): void; onPosition(startMm: number): void; onDelete(): void;
+}) {
+  const cm = (input: string) => parseLongueurCm(input);
+  const cmOrNull = (input: string) => (input.trim() ? parseLongueurCm(input) : { ok: true as const, value: null });
+  const kind = openingKindOf(ouverture);
+  const modele = ouvertureModele(ouverture);
+  const battant = modele === "battant" || modele === "oscillo_battant";
+  const libre = ouverture.typeOuverture === "passage" || ouverture.typeOuverture === "tremie";
+  return <section className={styles.section} aria-label="Ouverture sélectionnée" data-testid="plan-opening-panel">
+    <h2>{OPENING_KIND_LABELS[kind]} · {formatLongueurCm(ouverture.largeurMm)} cm</h2>
+    {issues.map((issue) => <p key={issue} className={releveStyles.feedback} role="alert">{issue}</p>)}
+    <div className={styles.grid}>
+      <label className={releveStyles.field}><span>Menuiserie</span>
+        <select data-testid="plan-ouverture-menuiserie" value={kind} disabled={!editable} onChange={(event) => onKind(event.target.value as OpeningKind)}>
+          {OPENING_KINDS.map((item) => <option key={item} value={item}>{OPENING_KIND_LABELS[item]}</option>)}
+        </select>
+      </label>
+      <NumberField label="Position (cm depuis A)" testId="plan-ouverture-position" value={ouverture.decalageMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onPosition(v)} />
+      <NumberField label="Largeur (cm)" testId="plan-ouverture-largeur" value={ouverture.largeurMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onPatch({ largeurMm: v }, "Largeur de l'ouverture")} />
+      <NumberField label="Hauteur (cm)" testId="plan-ouverture-hauteur" value={ouverture.hauteurMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)} onCommit={(v) => v !== null && onPatch({ hauteurMm: v }, "Hauteur de l'ouverture")} />
+      {!libre && <NumberField label="Allège (cm)" testId="plan-ouverture-allege" value={ouverture.allegeMm} disabled={!editable} parse={cmOrNull} format={(v) => formatLongueurCm(v)} onCommit={(v) => onPatch({ allegeMm: v }, "Allège de l'ouverture")} />}
+      {!libre && <label className={releveStyles.field}><span>Modèle</span>
+        <select data-testid="plan-ouverture-modele" value={modele ?? "battant"} disabled={!editable} onChange={(event) => onPatch({ modele: event.target.value as OuvertureModele }, "Modèle de menuiserie")}>
+          {OUVERTURE_MODELES.map((item) => <option key={item} value={item}>{OUVERTURE_MODELE_LABELS[item]}</option>)}
+        </select>
+      </label>}
+      {!libre && battant && <label className={releveStyles.field}><span>Vantaux</span>
+        <select data-testid="plan-ouverture-vantaux" value={ouverture.vantaux ?? 1} disabled={!editable} onChange={(event) => onPatch({ vantaux: Number(event.target.value) as 1 | 2 }, "Vantaux")}>
+          <option value={1}>Simple (1 vantail)</option><option value={2}>Double (2 vantaux)</option>
+        </select>
+      </label>}
+      {!libre && battant && (ouverture.vantaux ?? 1) === 1 && <label className={releveStyles.field}><span>Sens d&apos;ouverture</span>
+        <select data-testid="plan-ouverture-sens" value={ouverture.sens === "droite" ? "droite" : "gauche"} disabled={!editable} onChange={(event) => onPatch({ sens: event.target.value as "gauche" | "droite" }, "Sens d'ouverture")}>
+          <option value="gauche">Paumelles à gauche (côté A)</option><option value="droite">Paumelles à droite (côté B)</option>
+        </select>
+      </label>}
+      {!libre && modele !== "fixe" && modele !== "galandage" && <label className={releveStyles.field}><span>Poussée</span>
+        <select data-testid="plan-ouverture-poussee" value={ouverture.poussee ?? "tirant"} disabled={!editable} onChange={(event) => onPatch({ poussee: event.target.value as OuverturePoussee }, "Poussée")}>
+          {(["tirant", "poussant"] as const).map((item) => <option key={item} value={item}>{OUVERTURE_POUSSEE_LABELS[item]}</option>)}
+        </select>
+      </label>}
+    </div>
+    <small className={releveStyles.feedback}>Poussée vue depuis la face de référence du mur (à gauche en allant de A vers B). Faites glisser l&apos;ouverture le long du mur ou ses bords pour la redimensionner.</small>
+    {editable && mur && <div className={releveStyles.toolbar}>
+      <button type="button" className={releveStyles.secondary} onClick={() => onMove(Math.round((wallLength(mur) - ouverture.largeurMm) / 2 * 10) / 10)}>Centrer sur le mur</button>
+      <button type="button" className={releveStyles.danger} onClick={onDelete}>Supprimer l&apos;ouverture</button>
+    </div>}
   </section>;
 }

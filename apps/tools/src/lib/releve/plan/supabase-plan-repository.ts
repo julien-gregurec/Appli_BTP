@@ -53,7 +53,9 @@ export class SupabasePlanRepository implements RelevePlanRepository {
   async loadPlan(planId: string): Promise<LoadedPlan> {
     const [plan, elements] = await Promise.all([
       this.client.from("tools_releves_plans").select("*").eq("id", planId).maybeSingle(),
-      this.client.from("tools_releves_elements").select("id,type,piece_id,parent_element_id,donnees").eq("plan_id", planId).is("deleted_at", null),
+      // Lot 6 : RPC de lecture (droit contrôlé une fois) — la RLS ligne à ligne coûtait ≈ 4 ms par
+      // élément (3,3 s pour 800 murs et ouvertures).
+      this.client.rpc("tools_releve_plan_elements", { p_plan_id: planId }),
     ]);
     if (plan.error) fail("Chargement du plan", plan.error);
     if (elements.error) fail("Chargement du plan", elements.error);

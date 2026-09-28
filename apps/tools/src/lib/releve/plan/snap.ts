@@ -3,13 +3,16 @@
  *
  * | priorité | accroche | brique Engine B |
  * |---|---|---|
- * | 1 | extrémité de mur | `findSnapCandidates` (endpoint) |
- * | 2 | intersection d'axes | `findSnapCandidates` (intersection) |
+ * | 1 | extrémité de mur (axe) | `findSnapCandidates` (endpoint) |
+ * | 1b | coin de jonction (Lot 6 : angle extérieur / intérieur d'un solide raccordé, about) | `thick-strips` |
+ * | 2 | intersection d'axes (jonction en X) | `findSnapCandidates` (intersection) |
  * | 3 | milieu de mur | `findSnapCandidates` (midpoint) |
+ * | 3b | tableau d'ouverture (Lot 6 : bord sur l'axe ou sur une face) | `wallFeatures` |
  * | 4 | horizontale / verticale / angle usuel depuis le point de départ | `constrainToAngleStep` |
  * |   | combinée à un alignement (axe X / Y d'une extrémité existante) | `alignmentGuides` |
  * | 5 | alignement seul | `alignmentGuides` |
  * | 6 | perpendiculaire / sur l'axe d'un mur | `findSnapCandidates` (perpendicular), point le plus proche |
+ * | 6b | sur une face de mur (Lot 6) | point le plus proche des faces raccordées |
  * | 7 | grille | pas de grille |
  *
  * La tolérance arrive en millimètres (convertie depuis les pixels par l'appelant, comme dans
@@ -22,13 +25,16 @@ import { distance } from "@/lib/geometry/engine/measure";
 import { findSnapCandidates } from "@/lib/geometry/engine/snap";
 import type { Point2D } from "@/lib/geometry/engine/types";
 import { wallSegment } from "./geometry";
+import type { WallFeatures } from "./wall-geometry";
 
 export type PlanSnapKind =
-  | "extremite" | "intersection" | "milieu" | "horizontal" | "vertical" | "angle" | "alignement" | "perpendiculaire" | "sur_mur" | "grille" | "libre";
+  | "extremite" | "coin" | "intersection" | "milieu" | "ouverture" | "horizontal" | "vertical" | "angle" | "alignement" | "perpendiculaire" | "sur_mur"
+  | "face" | "grille" | "libre";
 
 export const PLAN_SNAP_LABELS: Record<PlanSnapKind, string> = {
-  extremite: "Extrémité", intersection: "Intersection", milieu: "Milieu", horizontal: "Horizontal", vertical: "Vertical",
-  angle: "Angle", alignement: "Alignement", perpendiculaire: "Perpendiculaire", sur_mur: "Sur le mur", grille: "Grille", libre: "",
+  extremite: "Extrémité", coin: "Coin de jonction", intersection: "Intersection", milieu: "Milieu", ouverture: "Tableau d'ouverture",
+  horizontal: "Horizontal", vertical: "Vertical", angle: "Angle", alignement: "Alignement", perpendiculaire: "Perpendiculaire",
+  sur_mur: "Sur l'axe du mur", face: "Sur la face du mur", grille: "Grille", libre: "",
 };
 
 export type PlanSnap = {
@@ -50,7 +56,19 @@ export type PlanSnapOptions = {
   angleStepDegrees?: number;
   gridMm?: number | null;
   enabled?: boolean;
+  /** Lot 6 : coins, faces et tableaux de la géométrie raccordée (accroches supplémentaires). */
+  features?: WallFeatures | null;
 };
+
+function nearestPoint(cursor: Point2D, points: readonly Point2D[], tolerance: number): { point: Point2D; distance: number } | null {
+  let best: { point: Point2D; distance: number } | null = null;
+  for (const point of points) {
+    if (Math.abs(point.x - cursor.x) > tolerance || Math.abs(point.y - cursor.y) > tolerance) continue;
+    const d = distance(point, cursor);
+    if (d <= tolerance && (!best || d < best.distance)) best = { point, distance: d };
+  }
+  return best;
+}
 
 const PRIORITY: Partial<Record<string, number>> = { endpoint: 0, intersection: 1, midpoint: 2 };
 
@@ -67,10 +85,18 @@ export function resolvePlanSnap(cursor: Point2D, murs: readonly PlanMur[], optio
   const found = findSnapCandidates(cursor, { segments: nearby.map(wallSegment) }, tolerance)
     .filter((candidate) => PRIORITY[candidate.kind] !== undefined)
     .sort((a, b) => (PRIORITY[a.kind]! - PRIORITY[b.kind]!) || a.distance - b.distance)[0];
+  const features = options.features ?? null;
+  if (found?.kind === "endpoint") return { point: found.point, kind: "extremite" };
+  // 1b. Coins des solides raccordés (Lot 6).
+  const corner = features ? nearestPoint(cursor, features.corners, tolerance) : null;
+  if (corner) return { point: corner.point, kind: "coin" };
   if (found) {
-    const kind: PlanSnapKind = found.kind === "endpoint" ? "extremite" : found.kind === "intersection" ? "intersection" : "milieu";
+    const kind: PlanSnapKind = found.kind === "intersection" ? "intersection" : "milieu";
     return { point: found.point, kind };
   }
+  // 3b. Tableaux d'ouverture (Lot 6).
+  const jamb = features ? nearestPoint(cursor, features.openingPoints, tolerance) : null;
+  if (jamb) return { point: jamb.point, kind: "ouverture" };
 
   // 4–5. Directions et alignements.
   const endpoints: Point2D[] = [];
@@ -105,6 +131,15 @@ export function resolvePlanSnap(cursor: Point2D, murs: readonly PlanMur[], optio
     const perpendicular = findSnapCandidates(cursor, { segments: nearby.map(wallSegment), referencePoint: origin }, tolerance)
       .find((candidate) => candidate.kind === "perpendicular");
     if (perpendicular && (!best || perpendicular.distance <= best.distance)) best = { point: perpendicular.point, distance: perpendicular.distance, kind: "perpendiculaire" };
+  }
+  // 6b. Faces des murs (Lot 6) : préférées à l'axe quand elles sont plus proches du curseur.
+  if (features) {
+    for (const face of features.faces) {
+      if (cursor.x < Math.min(face.start.x, face.end.x) - tolerance || cursor.x > Math.max(face.start.x, face.end.x) + tolerance
+        || cursor.y < Math.min(face.start.y, face.end.y) - tolerance || cursor.y > Math.max(face.start.y, face.end.y) + tolerance) continue;
+      const hit = closestPointOnSegment(cursor, face.start, face.end);
+      if (hit.distance <= tolerance && (!best || hit.distance < best.distance)) best = { point: hit.point, distance: hit.distance, kind: "face" };
+    }
   }
   if (best) return { point: best.point, kind: best.kind };
 

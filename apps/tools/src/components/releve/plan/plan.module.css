@@ -40,14 +40,25 @@
 .contour { fill: #dce9ff; fill-opacity: .55; stroke: #6b8fd6; stroke-width: 1; }
 .contour[data-scope="false"] { fill: #eef0f2; fill-opacity: .5; stroke: #c9cfd4; }
 .detected { fill: #fff4d6; fill-opacity: .45; stroke: #d99a00; stroke-dasharray: 5 4; }
-.wall { stroke: #23313a; stroke-linecap: square; }
-.wall[data-type="exterieur"] { stroke: #111b21; }
-.wall[data-type="cloison"] { stroke: #5b6b73; }
-.wall[data-type="doublage"] { stroke: #8a979d; }
-.wall[data-selected="true"] { stroke: #d97706; }
+/* Murs (Lot 6) : contours tracés (épaisseur double, la moitié intérieure est recouverte par les
+   remplissages), puis remplissages sans trait par-dessus. */
+.wallOutlines path { fill: #1f2933; stroke: #1f2933; stroke-width: 2.4px; stroke-linejoin: miter; }
+.wallFill { fill: #56656d; stroke: none; }
+.wallFill[data-type="exterieur"] { fill: #2f3d45; }
+.wallFill[data-type="porteur"] { fill: #45545c; }
+.wallFill[data-type="cloison"] { fill: #8f9ca3; }
+.wallFill[data-type="doublage"] { fill: #b8c2c7; }
+.wallFill[data-selected="true"] { fill: #e8a24a; }
+.axis { stroke: #0f172a; stroke-width: 0.6; stroke-dasharray: 6 4; opacity: .35; }
+.axis[data-selected="true"] { stroke: #b45309; opacity: .9; }
 .opening line, .opening path { stroke: #23313a; stroke-width: 1.2; fill: none; }
-.opening .gap { stroke: var(--white, #fff); }
-.opening[data-selected="true"] line:not(.gap), .opening[data-selected="true"] path { stroke: #d97706; stroke-width: 2; }
+.opening [data-style="tirets"] { stroke-dasharray: 5 4; stroke-width: 1; }
+.opening [data-style="vitrage"] { stroke: #2563eb; stroke-width: 1.4; }
+.opening[data-selected="true"] line, .opening[data-selected="true"] path { stroke: #d97706; stroke-width: 2; }
+.opening[data-invalid="true"] line, .opening[data-invalid="true"] path { stroke: #dc2626; stroke-width: 2; }
+.openingHandles circle, .openingHandles rect { fill: #fff; stroke: #d97706; stroke-width: 2.5; }
+.openingGhost { fill: #16a34a; fill-opacity: .35; stroke: #15803d; stroke-width: 1.5; }
+.openingGhost[data-valid="false"] { fill: #dc2626; stroke: #b91c1c; }
 .dimension { fill: #374151; font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
 .overall line { stroke: #6b7780; stroke-width: 1; }
 .overall text { fill: #374151; font-size: 12px; font-weight: 900; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
