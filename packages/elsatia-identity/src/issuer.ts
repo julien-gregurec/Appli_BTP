@@ -2,15 +2,18 @@
 // Ne voit que l'identité et la décision d'accès ; ne détient AUCUNE clé du projet Studio.
 import { randomUUID } from "node:crypto";
 import {
+  DEFAULT_EXPORT_REQUEST_TTL_S,
   DEFAULT_HANDOFF_TTL_S,
   DEFAULT_LIFECYCLE_TTL_S,
   IDENTITY_CONTRACT_VERSION,
   IdentityError,
   MAX_TOKEN_TTL_S,
   TYP_HANDOFF,
+  TYP_EXPORT_REQUEST,
   TYP_LIFECYCLE,
   type AccountState,
   type Entitlement,
+  type ExportRequestClaims,
   type HandoffClaims,
   type LifecycleClaims,
   type LifecycleReason,
@@ -36,6 +39,12 @@ export interface IssueHandoffInput {
   nonce: string;
   ent: Entitlement;
   seq: number;
+}
+
+export interface IssueExportRequestInput {
+  userId: string;
+  audience: string;
+  jobId: string;
 }
 
 export interface IssueLifecycleInput {
@@ -65,6 +74,8 @@ export function createIdentityIssuer(options: IdentityIssuerOptions) {
     return { iat, nbf: iat, exp: iat + lifetime };
   };
 
+  const exportTtl = ttl(undefined, DEFAULT_EXPORT_REQUEST_TTL_S);
+
   return {
     issuer,
     subjectFor: (userId: string, audience: string) => subjectFor(issuer, audience, userId),
@@ -90,6 +101,24 @@ export function createIdentityIssuer(options: IdentityIssuerOptions) {
         seq: input.seq,
       };
       return { token: signCompact(claims, options.keys.privateKey, options.keys.kid, TYP_HANDOFF), claims };
+    },
+
+    /** Demande d'export RGPD serveur à serveur : sujet opaque, usage unique, 60 s. */
+    issueExportRequest(input: IssueExportRequestInput): { token: string; claims: ExportRequestClaims } {
+      if (!AUDIENCE_PATTERN.test(input.audience)) throw new IdentityError("BAD_AUDIENCE");
+      if (!UUID_PATTERN.test(input.jobId)) throw new IdentityError("MALFORMED", { detail: "job" });
+      const claims: ExportRequestClaims = {
+        ver: IDENTITY_CONTRACT_VERSION,
+        iss: issuer,
+        aud: input.audience,
+        sub: subjectFor(issuer, input.audience, input.userId),
+        ...times(exportTtl),
+        jti: randomUUID(),
+        scope: "subject_data",
+        job: input.jobId.toLowerCase(),
+        seq: 0,
+      };
+      return { token: signCompact(claims, options.keys.privateKey, options.keys.kid, TYP_EXPORT_REQUEST), claims };
     },
 
     /** Signé à chaque tentative de livraison ; `eventId` (jti) reste stable entre les tentatives. */

@@ -10,10 +10,18 @@ export const IDENTITY_ALG = "ES256" as const;
 export const IDENTITY_CONTRACT_VERSION = 1 as const;
 export const TYP_HANDOFF = "elsatia-handoff+jwt" as const;
 export const TYP_LIFECYCLE = "elsatia-lifecycle+jwt" as const;
-export type IdentityTokenTyp = typeof TYP_HANDOFF | typeof TYP_LIFECYCLE;
+/**
+ * Demande d'export RGPD (serveur à serveur, usage unique) : la plateforme demande à l'application
+ * dédiée les données du SUJET, pour un job d'export précis. Aucune donnée métier ne va vers
+ * l'application ; seule sa réponse (les données Studio du sujet) revient vers la plateforme.
+ */
+export const TYP_EXPORT_REQUEST = "elsatia-export-request+jwt" as const;
+export type IdentityTokenTyp = typeof TYP_HANDOFF | typeof TYP_LIFECYCLE | typeof TYP_EXPORT_REQUEST;
 
 /** Durée de vie d'un jeton de passage : le navigateur le poste immédiatement. */
 export const DEFAULT_HANDOFF_TTL_S = 60;
+/** Durée de vie d'une demande d'export : émise juste avant l'appel serveur à serveur. */
+export const DEFAULT_EXPORT_REQUEST_TTL_S = 60;
 /** Durée de vie d'un événement signé : re-signé à chaque tentative de livraison. */
 export const DEFAULT_LIFECYCLE_TTL_S = 300;
 /** Plafond refusé côté vérificateur, quelle que soit la configuration de l'émetteur. */
@@ -82,6 +90,15 @@ export interface LifecycleClaims extends CommonClaims {
   reason: LifecycleReason;
   /** Nouvelle décision d'accès ; null = inchangée (l'événement ne porte que l'état du compte). */
   ent: Entitlement | null;
+}
+
+export interface ExportRequestClaims extends CommonClaims {
+  /** Portée fixe : données du sujet dans l'application destinataire. */
+  scope: "subject_data";
+  /** Identifiant du job d'export côté plateforme (traçabilité, sans donnée). */
+  job: string;
+  /** Non utilisé par ce jeton (toujours 0) ; présent pour un contrôle commun des revendications. */
+  seq: 0;
 }
 
 export const IDENTITY_ERROR_CODES = [

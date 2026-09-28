@@ -9,9 +9,11 @@ import {
   IdentityError,
   LIFECYCLE_REASONS,
   MAX_TOKEN_TTL_S,
+  TYP_EXPORT_REQUEST,
   TYP_HANDOFF,
   TYP_LIFECYCLE,
   type Entitlement,
+  type ExportRequestClaims,
   type HandoffClaims,
   type IdentityTokenTyp,
   type LifecycleClaims,
@@ -83,6 +85,15 @@ export function createIdentityVerifier(options: IdentityVerifierOptions) {
       if (typeof p.email !== "string" || !/^[^\s@]+@[^\s@]+$/.test(p.email) || p.email.length > 254)
         throw new IdentityError("MALFORMED", { detail: "email" });
       return { ...(p as unknown as HandoffClaims), ent: entitlement(p.ent, false)! };
+    },
+
+    /** Demande d'export : l'appelant consomme le jti (usage unique) AVANT de lire quoi que ce soit. */
+    async verifyExportRequest(token: unknown): Promise<ExportRequestClaims> {
+      const p = await verifyCommon(token, TYP_EXPORT_REQUEST);
+      if (p.scope !== "subject_data") throw new IdentityError("MALFORMED", { detail: "scope" });
+      if (typeof p.job !== "string" || !UUID_PATTERN.test(p.job)) throw new IdentityError("MALFORMED", { detail: "job" });
+      if (p.seq !== 0) throw new IdentityError("MALFORMED", { detail: "seq" });
+      return p as unknown as ExportRequestClaims;
     },
 
     async verifyLifecycle(token: unknown): Promise<LifecycleClaims> {
