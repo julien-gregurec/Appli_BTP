@@ -28,6 +28,10 @@ import {
   type Ancre, type IsoDateTime, type MurType, type OuvertureModele, type OuverturePoussee, type OuvertureSens, type OuvertureType,
   type OuvertureVantaux, type Point2D, type ReleveElement, type VersionType,
 } from "./model";
+import {
+  CALQUE_DES_CATEGORIES, equipementDonnees, validatePlanEquipements,
+  type EquipmentIssueCode, type PlanCalque, type PlanCalqueEtat, type PlanEquipement,
+} from "./equipement";
 
 // ── États, bornes ─────────────────────────────────────────────────────────────
 
@@ -63,6 +67,8 @@ export type PlanReglages = {
   readonly hauteurMm?: number | null;
   readonly typeMur?: MurType;
   readonly grilleMm?: number | null;
+  /** Lot 7 : état des calques (absent = visible, non verrouillé). */
+  readonly calques?: Partial<Record<PlanCalque, Partial<PlanCalqueEtat>>>;
 };
 
 /** Géométrie d'une pièce métier (Lot 3) sur le plan. */
@@ -132,12 +138,14 @@ export function ouvertureModele(ouverture: Pick<PlanOuverture, "modele" | "typeO
 export type PlanDocument = {
   readonly murs: readonly PlanMur[];
   readonly ouvertures: readonly PlanOuverture[];
+  /** Lot 7 : objets du plan (mobilier, sanitaire, cuisine, équipements techniques). */
+  readonly equipements: readonly PlanEquipement[];
   readonly contours: readonly PlanContour[];
   readonly cadre: PlanCadre;
   readonly reglages: PlanReglages;
 };
 
-export const EMPTY_PLAN_DOCUMENT: PlanDocument = { murs: [], ouvertures: [], contours: [], cadre: DEFAULT_PLAN_CADRE, reglages: {} };
+export const EMPTY_PLAN_DOCUMENT: PlanDocument = { murs: [], ouvertures: [], equipements: [], contours: [], cadre: DEFAULT_PLAN_CADRE, reglages: {} };
 
 /** Ligne `tools_releves_plans`. */
 export type Plan = {
@@ -235,7 +243,11 @@ export function freezeCreatesVersion(etat: PlanEtat, versions: readonly { readon
 export const OPENING_ISSUE_CODES = ["hors_mur", "plus_large_que_mur", "chevauchement", "jonction", "largeur_nulle", "hauteur_incoherente", "invalide"] as const;
 export type OpeningIssueCode = (typeof OPENING_ISSUE_CODES)[number];
 
-export type PlanIssue = { readonly path: string; readonly message: string; readonly code?: OpeningIssueCode };
+export type PlanIssue = {
+  readonly path: string; readonly message: string; readonly code?: OpeningIssueCode;
+  /** Lot 7 : anomalie d'un objet (`equipements.<id>.<code>`). */
+  readonly equipmentCode?: EquipmentIssueCode;
+};
 
 function finiteCoordinate(value: number): boolean {
   return Number.isFinite(value) && Math.abs(value) <= RELEVE_COORDINATE_LIMIT_MM;
@@ -339,6 +351,9 @@ export function validatePlanDocument(document: PlanDocument): PlanIssue[] {
     issues.push(...validatePlanContour(contour).map((issue) => ({ ...issue, path: `contours.${contour.pieceId}.${issue.path}` })));
   }
   if (document.contours.length > PLAN_LIMITS.contoursMax) issues.push({ path: "contours", message: "Trop de contours." });
+  for (const issue of validatePlanEquipements(document.equipements ?? [], new Set(murs.keys()))) {
+    issues.push({ path: `equipements.${issue.equipementId}.${issue.code}`, message: issue.message, equipmentCode: issue.code });
+  }
   return issues;
 }
 
@@ -400,6 +415,8 @@ export function ouvertureDonnees(ouverture: PlanOuverture): Record<string, unkno
 export type PlanOperations = {
   murs: { id: string; pieceId: string | null; donnees: Record<string, unknown> }[];
   ouvertures: { id: string; murId: string; donnees: Record<string, unknown> }[];
+  /** Lot 7 : objets créés, modifiés ou restaurés (absent : aucun — charges des Lots 5 / 6). */
+  equipements?: { id: string; pieceId: string | null; donnees: Record<string, unknown> }[];
   supprimes: string[];
   contours?: PlanContour[];
   cadre?: PlanCadre;
@@ -414,6 +431,7 @@ function same(a: unknown, b: unknown): boolean {
 // l'éditeur se comparent égaux, quel que soit l'ordre de leurs propriétés.
 const murKey = (mur: PlanMur | undefined) => (mur ? JSON.stringify([mur.pieceId, murDonnees(mur)]) : "");
 const ouvertureKey = (ouverture: PlanOuverture | undefined) => (ouverture ? JSON.stringify([ouverture.murId, ouvertureDonnees(ouverture)]) : "");
+const equipementKey = (objet: PlanEquipement | undefined) => (objet ? JSON.stringify([objet.pieceId, equipementDonnees(objet)]) : "");
 
 function stripSurface(contours: readonly PlanContour[]): PlanContour[] {
   return contours.map((contour) => ({
@@ -435,14 +453,19 @@ export function diffPlan(before: PlanDocument, after: PlanDocument): PlanOperati
   const beforeOuvertures = new Map(before.ouvertures.map((ouverture) => [ouverture.id, ouverture]));
   const afterMurIds = new Set(after.murs.map((mur) => mur.id));
   const afterOuvertureIds = new Set(after.ouvertures.map((ouverture) => ouverture.id));
+  const beforeEquipements = new Map((before.equipements ?? []).map((objet) => [objet.id, objet]));
+  const afterEquipementIds = new Set((after.equipements ?? []).map((objet) => objet.id));
   const operations: PlanOperations = {
     murs: after.murs.filter((mur) => murKey(beforeMurs.get(mur.id)) !== murKey(mur)).map((mur) => ({ id: mur.id, pieceId: mur.pieceId, donnees: murDonnees(mur) })),
     ouvertures: after.ouvertures.filter((ouverture) => ouvertureKey(beforeOuvertures.get(ouverture.id)) !== ouvertureKey(ouverture))
       .map((ouverture) => ({ id: ouverture.id, murId: ouverture.murId, donnees: ouvertureDonnees(ouverture) })),
+    equipements: (after.equipements ?? []).filter((objet) => equipementKey(beforeEquipements.get(objet.id)) !== equipementKey(objet))
+      .map((objet) => ({ id: objet.id, pieceId: objet.pieceId, donnees: equipementDonnees(objet) })),
     // Une ouverture dont le mur disparaît part avec lui (cascade serveur) : inutile de la citer.
     supprimes: [
       ...before.murs.filter((mur) => !afterMurIds.has(mur.id)).map((mur) => mur.id),
       ...before.ouvertures.filter((ouverture) => !afterOuvertureIds.has(ouverture.id) && afterMurIds.has(ouverture.murId)).map((ouverture) => ouverture.id),
+      ...(before.equipements ?? []).filter((objet) => !afterEquipementIds.has(objet.id)).map((objet) => objet.id),
     ],
   };
   if (!same(stripSurface(before.contours), stripSurface(after.contours))) operations.contours = stripSurface(after.contours);
@@ -462,7 +485,13 @@ export function validatePlanSave(document: PlanDocument, operations: PlanOperati
   const touchedMurs = new Set([...operations.murs.map((mur) => mur.id), ...operations.ouvertures.map((ouverture) => ouverture.murId)]);
   const sent = new Set(operations.ouvertures.map((ouverture) => ouverture.id));
   const hostOf = new Map(document.ouvertures.map((ouverture) => [ouverture.id, ouverture.murId]));
+  // Lot 7 : objets envoyés, et objets liés à un mur supprimé dans ce lot (miroir du serveur).
+  const sentObjets = new Set((operations.equipements ?? []).map((objet) => objet.id));
+  const deleted = new Set(operations.supprimes);
+  const linkOf = new Map((document.equipements ?? []).map((objet) => [objet.id, objet.murId]));
   return validatePlanDocument(document).filter((issue) => {
+    const objet = /^equipements\.([^.]+)\./.exec(issue.path);
+    if (objet) return sentObjets.has(objet[1]) || deleted.has(linkOf.get(objet[1]) ?? "");
     const match = /^ouvertures\.([^.]+)\./.exec(issue.path);
     if (!match) return true;
     return sent.has(match[1]) || touchedMurs.has(hostOf.get(match[1]) ?? "");
@@ -470,7 +499,7 @@ export function validatePlanSave(document: PlanDocument, operations: PlanOperati
 }
 
 export function isPlanOperationsEmpty(operations: PlanOperations): boolean {
-  return operations.murs.length === 0 && operations.ouvertures.length === 0 && operations.supprimes.length === 0
+  return operations.murs.length === 0 && operations.ouvertures.length === 0 && (operations.equipements ?? []).length === 0 && operations.supprimes.length === 0
     && operations.contours === undefined && operations.cadre === undefined && operations.reglages === undefined;
 }
 
@@ -570,7 +599,7 @@ export function murLineage(murs: readonly Pick<PlanMur, "id" | "origineId">[], i
  */
 export const PLAN_EXPORT_FORMATS = ["pdf", "dxf", "svg"] as const;
 export type PlanExportFormat = (typeof PLAN_EXPORT_FORMATS)[number];
-export const PLAN_EXPORT_LAYERS = ["MURS", "OUVERTURES", "PIECES", "COTES", "PHOTOS"] as const;
+export const PLAN_EXPORT_LAYERS = ["MURS", "OUVERTURES", "PIECES", "COTES", "PHOTOS", "MOBILIER", "SANITAIRE", "CUISINE", "TECHNIQUE"] as const;
 export type PlanExportLayer = (typeof PLAN_EXPORT_LAYERS)[number];
 
 export type PlanExportEntity =
@@ -586,6 +615,19 @@ export type PlanExportEntity =
    * Angles en radians, repère Y haut, parcours trigonométrique de `start` à `end`.
    */
   | { readonly layer: PlanExportLayer; readonly kind: "arc"; readonly centre: Point2D; readonly radius: number; readonly start: number; readonly end: number; readonly ref: string };
+
+/** Lot 7 : calque d'export (DXF / SVG) d'un calque de plan portant des objets. */
+export const EXPORT_LAYER_OF_CALQUE: Record<PlanCalque, PlanExportLayer> = {
+  structure: "MURS", ouvertures: "OUVERTURES", mobilier: "MOBILIER", sanitaire: "SANITAIRE", cuisine: "CUISINE", technique: "TECHNIQUE",
+  photos: "PHOTOS", annotations: "PIECES", cotations: "COTES",
+};
+
+/** Lot 7 : emprise d'un objet (rectangle orienté, sens trigonométrique, mm). */
+export function equipementFootprint(objet: Pick<PlanEquipement, "position" | "rotationRad" | "largeurMm" | "profondeurMm">): Point2D[] {
+  const c = Math.cos(objet.rotationRad); const s = Math.sin(objet.rotationRad);
+  const w = objet.largeurMm / 2; const d = objet.profondeurMm / 2;
+  return [[-w, -d], [w, -d], [w, d], [-w, d]].map(([x, y]) => ({ x: objet.position.x + x * c - y * s, y: objet.position.y + x * s + y * c }));
+}
 
 /** Modèle d'export neutre : ce qu'un écrivain PDF, DXF ou SVG n'aura qu'à sérialiser. */
 export function planExportEntities(document: PlanDocument, labels: { readonly piece?: (pieceId: string) => string } = {}): PlanExportEntity[] {
@@ -603,6 +645,13 @@ export function planExportEntities(document: PlanDocument, labels: { readonly pi
     const at = (distance: number): Point2D => ({ x: mur.a.x + ((mur.b.x - mur.a.x) * distance) / longueur, y: mur.a.y + ((mur.b.y - mur.a.y) * distance) / longueur });
     entities.push({ layer: "OUVERTURES", kind: "line", a: at(ouverture.decalageMm), b: at(ouverture.decalageMm + ouverture.largeurMm), widthMm: mur.epaisseurMm, ref: ouverture.id });
   }
+  // Lot 7 : objets visibles = rectangle orienté (emprise) + libellé, sur le calque de leur catégorie.
+  for (const objet of document.equipements ?? []) {
+    if (!objet.visible) continue;
+    const layer = EXPORT_LAYER_OF_CALQUE[CALQUE_DES_CATEGORIES[objet.categorie]];
+    entities.push({ layer, kind: "polygon", points: equipementFootprint(objet), ref: objet.id });
+    entities.push({ layer, kind: "text", at: objet.position, text: objet.libelle, ref: objet.id });
+  }
   for (const contour of document.contours) {
     entities.push({ layer: "PIECES", kind: "polygon", points: contour.points, ref: contour.pieceId });
     if (contour.graine) entities.push({ layer: "PIECES", kind: "text", at: contour.graine, text: labels.piece?.(contour.pieceId) ?? contour.pieceId, ref: contour.pieceId });
@@ -614,6 +663,9 @@ export function planExportEntities(document: PlanDocument, labels: { readonly pi
 
 export type PlanSaveResult = { readonly revision: number; readonly contours: readonly PlanContour[] };
 
+/** Lot 7 : objet supprimé (corbeille du plan, restaurable). */
+export type DeletedPlanEquipement = { readonly objet: PlanEquipement; readonly deletedAt: IsoDateTime };
+
 export interface RelevePlanRepository {
   /** Plans d'un étage (tous états, figés compris), sans leur géométrie. */
   listPlans(etageId: string): Promise<Plan[]>;
@@ -623,4 +675,6 @@ export interface RelevePlanRepository {
   /** Révision attendue ≠ serveur → `ReleveConflictError` (rien n'est écrit). */
   savePlan(planId: string, expectedRevision: number, operations: PlanOperations): Promise<PlanSaveResult>;
   freezePlan(planId: string, expectedRevision: number, libelle?: string | null): Promise<Plan>;
+  /** Lot 7 : objets supprimés du plan (les plus récents d'abord), pour les restaurer. */
+  listDeletedEquipements(planId: string): Promise<DeletedPlanEquipement[]>;
 }

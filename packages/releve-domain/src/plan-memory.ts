@@ -12,6 +12,8 @@ import {
   type RelevePlanRepository,
 } from "./plan";
 import { ReleveConflictError } from "./repository";
+import { equipementAnomalie, equipementFromElement, EQUIPMENT_ISSUE_MESSAGES, type PlanEquipement } from "./equipement";
+import type { DeletedPlanEquipement } from "./plan";
 import type { VersionType } from "./model";
 
 export class PlanRuleError extends Error {
@@ -20,6 +22,12 @@ export class PlanRuleError extends Error {
 
 type StoredMur = PlanMur & { deleted: boolean };
 type StoredOuverture = PlanOuverture & { deleted: boolean };
+type StoredEquipement = PlanEquipement & { deleted: boolean; deletedAt: string | null };
+function storedToObjet(stored: StoredEquipement & { planId: string }): PlanEquipement {
+  const objet: Partial<StoredEquipement & { planId: string }> = { ...stored };
+  delete objet.deleted; delete objet.deletedAt; delete objet.planId;
+  return objet as PlanEquipement;
+}
 
 /** Aire (mm²) d'un contour — seule arithmétique locale, pour que le double reste autonome. */
 function shoelace(points: readonly { x: number; y: number }[]): number {
@@ -32,6 +40,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
   plans = new Map<string, Plan>();
   murs = new Map<string, StoredMur & { planId: string }>();
   ouvertures = new Map<string, StoredOuverture & { planId: string }>();
+  equipements = new Map<string, StoredEquipement & { planId: string }>();
   versions: { id: string; typeVersion: VersionType }[] = [];
   /** Pièces actives par étage (contrôle des contours). */
   piecesParEtage = new Map<string, Set<string>>();
@@ -60,6 +69,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       document: {
         murs: [...this.murs.values()].filter((mur) => mur.planId === planId && !mur.deleted).map(strip).map((mur) => murFromElement({ id: mur.id as never, pieceId: mur.pieceId as never, donnees: { ...mur } as never })),
         ouvertures: [...this.ouvertures.values()].filter((o) => o.planId === planId && !o.deleted).map(strip).map((o) => ouvertureFromElement({ id: o.id as never, parentElementId: o.murId as never, donnees: { ...o } as never })),
+        equipements: [...this.equipements.values()].filter((e) => e.planId === planId && !e.deleted).map(storedToObjet),
         contours: plan.contours, cadre: plan.cadre, reglages: plan.reglages,
       },
     };
@@ -87,6 +97,11 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       for (const o of [...this.ouvertures.values()].filter((x) => x.planId === base.id && !x.deleted && map.has(x.murId))) {
         const id = this.uuid();
         this.ouvertures.set(id, { ...o, id, murId: map.get(o.murId)!, planId: plan.id, origineId: o.id });
+      }
+      for (const e of [...this.equipements.values()].filter((x) => x.planId === base.id && !x.deleted)) {
+        const id = this.uuid();
+        const murId = e.murId ? map.get(e.murId) ?? null : null;
+        this.equipements.set(id, { ...e, id, planId: plan.id, origineId: e.id, murId, face: murId ? e.face : null, decalageMm: murId ? e.decalageMm : null });
       }
       const contours: PlanContour[] = base.contours.map((contour) => ({ ...contour, murIds: contour.murIds.filter((id) => map.has(id)).map((id) => map.get(id)!) }));
       this.plans.set(plan.id, { ...plan, contours, revision: 2 });
@@ -118,6 +133,29 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       if (validatePlanOuverture(ouverture, host).length) throw new PlanRuleError(`Ouverture invalide : ${item.id}`, "invalid");
       nextOuvertures.set(item.id, { ...ouverture, planId, deleted: false });
     }
+    const nextEquipements = new Map(this.equipements);
+    for (const item of operations.equipements ?? []) {
+      const existing = nextEquipements.get(item.id);
+      if (existing && existing.planId !== planId) throw new PlanRuleError("Élément étranger au plan.", "forbidden");
+      const objet = equipementFromElement({ id: item.id as never, pieceId: item.pieceId as never, donnees: item.donnees as never });
+      const code = equipementAnomalie(objet);
+      if (code) throw new PlanRuleError(EQUIPMENT_ISSUE_MESSAGES[code], "invalid");
+      if (existing && !existing.deleted && existing.verrouille && objet.verrouille) throw new PlanRuleError(EQUIPMENT_ISSUE_MESSAGES.verrouille, "invalid");
+      nextEquipements.set(item.id, { ...objet, planId, deleted: false, deletedAt: null });
+    }
+    for (const id of operations.supprimes) {
+      const objet = nextEquipements.get(id);
+      if (objet && objet.planId === planId && !objet.deleted) {
+        if (objet.verrouille) throw new PlanRuleError(EQUIPMENT_ISSUE_MESSAGES.verrouille, "invalid");
+        nextEquipements.set(id, { ...objet, deleted: true, deletedAt: this.now() });
+      }
+    }
+    for (const objet of nextEquipements.values()) {
+      if (objet.planId !== planId || objet.deleted || !objet.murId) continue;
+      if (!(operations.equipements ?? []).some((item) => item.id === objet.id) && !operations.supprimes.includes(objet.murId)) continue;
+      const mur = nextMurs.get(objet.murId);
+      if (!mur || mur.planId !== planId || mur.deleted || operations.supprimes.includes(objet.murId)) throw new PlanRuleError(EQUIPMENT_ISSUE_MESSAGES.mur_absent, "invalid");
+    }
     for (const id of operations.supprimes) {
       const mur = nextMurs.get(id);
       if (mur && mur.planId === planId) {
@@ -136,13 +174,19 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       }
       contours = operations.contours.map((contour) => ({ ...contour, surfaceMm2: shoelace(contour.points) }));
     }
-    this.murs = nextMurs; this.ouvertures = nextOuvertures;
+    this.murs = nextMurs; this.ouvertures = nextOuvertures; this.equipements = nextEquipements;
     const next: Plan = {
       ...plan, contours, cadre: operations.cadre ?? plan.cadre, reglages: operations.reglages ?? plan.reglages,
       revision: plan.revision + 1, updatedAt: this.now(),
     };
     this.plans.set(planId, next);
     return { revision: next.revision, contours: next.contours };
+  }
+
+  async listDeletedEquipements(planId: string): Promise<DeletedPlanEquipement[]> {
+    return [...this.equipements.values()].filter((e) => e.planId === planId && e.deleted)
+      .sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""))
+      .map((stored) => ({ objet: storedToObjet(stored), deletedAt: stored.deletedAt ?? "" }));
   }
 
   async freezePlan(planId: string, expectedRevision: number, libelle: string | null = null): Promise<Plan> {

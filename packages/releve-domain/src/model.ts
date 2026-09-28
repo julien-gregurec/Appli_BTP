@@ -299,8 +299,20 @@ export type OuvertureModele = (typeof OUVERTURE_MODELES)[number];
 /** Catégories métier d'ouverture demandées par le contrat produit. */
 export const OUVERTURE_FAMILLES = { porte: ["porte", "porte_fenetre"], fenetre: ["fenetre"], baie: ["baie"], ouverture_libre: ["tremie", "passage"] } as const satisfies Record<string, readonly OuvertureType[]>;
 
-export const EQUIPEMENT_CATEGORIES = ["mobilier", "electricite", "plomberie", "cvc", "eclairage", "autre"] as const;
+/** Catégories d'équipement du Lot 2 (contrat 604 / 801). */
+export const EQUIPEMENT_CATEGORIES_LOT2 = ["mobilier", "electricite", "plomberie", "cvc", "eclairage", "autre"] as const;
+/**
+ * Lot 7 : catégories courantes (migration 1101) — sur-ensemble ORDONNÉ du Lot 2 : sanitaire, cuisine,
+ * sécurité, rangement, technique s'ajoutent ; aucune valeur ne disparaît.
+ */
+export const EQUIPEMENT_CATEGORIES = [...EQUIPEMENT_CATEGORIES_LOT2, "sanitaire", "cuisine", "securite", "rangement", "technique"] as const;
 export type EquipementCategorie = (typeof EQUIPEMENT_CATEGORIES)[number];
+/** Lot 7 : état d'un objet dans un plan projeté (EXISTING / TO_REMOVE / NEW / MOVED). */
+export const EQUIPEMENT_ETATS_PROJET = ["existant", "a_deposer", "nouveau", "deplace"] as const;
+export type EquipementEtatProjet = (typeof EQUIPEMENT_ETATS_PROJET)[number];
+/** Lot 7 : face du mur contre laquelle un objet mural est posé (gauche = face de référence, de A vers B). */
+export const EQUIPEMENT_FACES = ["gauche", "droite"] as const;
+export type EquipementFace = (typeof EQUIPEMENT_FACES)[number];
 export type EquipementDonnees = {
   readonly categorie: EquipementCategorie;
   readonly libelle: string;
@@ -309,6 +321,23 @@ export type EquipementDonnees = {
   readonly largeurMm: number | null;
   readonly profondeurMm: number | null;
   readonly hauteurMm: number | null;
+  // Lot 7 (facultatifs, objets de plan) — contrôlés par `tools_releve_plan_equipement_anomalie`.
+  /** Type d'objet du catalogue (`EQUIPEMENT_CATALOGUE`). */
+  readonly objet?: string;
+  /** Cote de pose au-dessus du sol fini (mm) : 0 au sol, 1 400 pour un meuble haut. */
+  readonly niveauMm?: number | null;
+  readonly commentaire?: string | null;
+  readonly visible?: boolean;
+  readonly verrouille?: boolean;
+  /** Pièce déduite de la position (vrai) ou choisie à la main (faux). */
+  readonly pieceAuto?: boolean;
+  /** Liaison au mur : mur du plan, face, position de l'axe de l'objet le long du mur depuis A. */
+  readonly murId?: string | null;
+  readonly face?: EquipementFace | null;
+  readonly decalageMm?: number | null;
+  readonly etatProjet?: EquipementEtatProjet;
+  /** Objet du plan de base dont celui-ci est la copie (plan dérivé). */
+  readonly origineId?: string | null;
 };
 
 /** Recovery V2 : `largeur`, `distance` (distance libre) et `volume` ajoutés, sans retrait. */

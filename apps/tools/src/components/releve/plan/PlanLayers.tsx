@@ -15,7 +15,9 @@
  * n'apparaissent que lorsqu'ils sont lisibles à l'échelle courante.
  */
 import { memo, useMemo } from "react";
-import type { MurType, OuvertureType, PlanDocument, PlanPhotoMarker } from "@elsatia/releve-domain";
+import { CALQUE_DES_CATEGORIES, type MurType, type OuvertureType, type PlanCalques, type PlanDocument, type PlanEquipement, type PlanPhotoMarker } from "@elsatia/releve-domain";
+import { equipmentSymbol, type EquipmentSymbol } from "@/lib/releve/plan/equipment-symbols";
+import { equipmentHandles, footprint } from "@/lib/releve/plan/equipments";
 import type { Point2D } from "@/lib/geometry/engine/types";
 import { contourLabelPoint, pointAlongWall, wallLength, type DetectedRoom } from "@/lib/releve/plan/geometry";
 import { formatLongueurM, formatSurfaceContour, openingSymbol, overallDimensions, visibleWalls, wallDimension } from "@/lib/releve/plan/render";
@@ -56,11 +58,19 @@ export type PlanLayersProps = {
   openingGhost: { murId: string; decalageMm: number; largeurMm: number; valid: boolean } | null;
   /** Lot 6 : poignées de l'ouverture sélectionnée (déplacer, redimensionner). */
   showOpeningHandles: boolean;
+  /** Lot 7 : calques (visible / masqué) — l'éditeur gère le verrouillage. */
+  calques: PlanCalques;
+  /** Lot 7 : objets sélectionnés (identifiants). */
+  objetIds: readonly string[];
+  /** Lot 7 : poignées (rotation, redimensionnement) de l'objet sélectionné seul. */
+  showObjectHandles: boolean;
+  /** Lot 7 : aperçu de l'objet à poser (outil Objet). */
+  objectGhost: Pick<PlanEquipement, "position" | "rotationRad" | "largeurMm" | "profondeurMm"> & { kind: string } | null;
 };
 
 export const PlanLayers = memo(function PlanLayers({
   document, view, size, selection, openingId, scopePieceIds, pieceName, surfaces, markers, photoAnchorId, rooms, draft, snap, showHandles,
-  network, invalidOpenings, openingGhost, showOpeningHandles,
+  network, invalidOpenings, openingGhost, showOpeningHandles, calques, objetIds, showObjectHandles, objectGhost,
 }: PlanLayersProps) {
   const project = (p: Point2D) => worldToScreen(p, view, size);
   const scale = view.scale;
@@ -72,13 +82,17 @@ export const PlanLayers = memo(function PlanLayers({
   const murs = useMemo(() => new Map(document.murs.map((mur) => [mur.id, mur])), [document.murs]);
   // Parties pleines de chaque mur (monde) : recalculées quand les murs ou les ouvertures changent.
   const parts = useMemo(() => new Map(document.murs.map((mur) => [mur.id, wallParts(network, murs, mur, document.ouvertures)])), [document.murs, document.ouvertures, network, murs]);
-  const overall = useMemo(() => overallDimensions(document), [document]);
+  // Emprise : murs et contours seulement (un objet déplacé ne la recalcule pas).
+  const { murs: docMurs, contours: docContours } = document;
+  const overall = useMemo(() => overallDimensions({ ...document, murs: docMurs, contours: docContours }), [docMurs, docContours]); // eslint-disable-line react-hooks/exhaustive-deps
   const selected = new Set(selection);
   const path = (points: readonly Point2D[]) => points.map((p, i) => { const s = project(p); return `${i ? "L" : "M"}${s.x.toFixed(1)},${s.y.toFixed(1)}`; }).join(" ") + " Z";
 
   const origin = project({ x: 0, y: 0 }); const unitX = project({ x: 1, y: 0 }); const unitY = project({ x: 0, y: 1 });
   const worldMatrix = `matrix(${unitX.x - origin.x} ${unitX.y - origin.y} ${unitY.x - origin.x} ${unitY.y - origin.y} ${origin.x} ${origin.y})`;
   const selectionKey = [...selection].sort().join(",");
+  const objetKey = [...objetIds].sort().join(",");
+  const box = visibleWorldBounds(view, size);
 
   const cadreA = project({ x: document.cadre.minX, y: document.cadre.maxY });
   const cadreB = project({ x: document.cadre.maxX, y: document.cadre.minY });
@@ -97,20 +111,46 @@ export const PlanLayers = memo(function PlanLayers({
     {/* Murs : solides raccordés — contours d'abord, remplissages ensuite (coutures invisibles).
         Géométrie en coordonnées MONDE, mémorisée, sous une seule transformation : un pan ou un zoom
         ne change qu'un attribut (pas de reprojection de centaines de polygones à chaque trame). */}
-    <g transform={worldMatrix}>
-      <WallSolids document={document} parts={parts} selected={selectionKey} />
-    </g>
+    {calques.structure.visible && <g transform={worldMatrix}>
+      <WallSolids murs={document.murs} parts={parts} selected={selectionKey} />
+    </g>}
     {/* Axes des murs (trait fin) : repère de cotation et d'accrochage. */}
-    {visible.map((mur) => {
+    {calques.structure.visible && visible.map((mur) => {
       const a = project(mur.a); const b = project(mur.b);
       return <line key={mur.id} data-testid="plan-mur" data-id={mur.id} data-type={mur.typeMur} data-selected={selected.has(mur.id)}
         className={styles.axis} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
     })}
 
     {/* Ouvertures : symboles dans la baie (le mur est interrompu) — monde, mémorisés. */}
-    <g transform={worldMatrix}>
-      <OpeningSymbols document={document} murs={murs} openingId={openingId} invalid={invalidOpenings} />
+    {calques.ouvertures.visible && <g transform={worldMatrix}>
+      <OpeningSymbols ouvertures={document.ouvertures} murs={murs} openingId={openingId} invalid={invalidOpenings} />
+    </g>}
+
+    {/* Lot 7 : objets du plan (monde, mémorisés), par calque. */}
+    <g transform={worldMatrix} data-testid="plan-monde">
+      <EquipmentSymbols equipements={document.equipements} calques={calques} selected={objetKey} />
     </g>
+    {/* Libellés des objets lisibles à l'échelle courante (calque Annotations). */}
+    {calques.annotations.visible && document.equipements.map((objet) => {
+      if (!objet.visible || !calques[CALQUE_DES_CATEGORIES[objet.categorie]].visible || objet.largeurMm * scale < 48) return null;
+      if (objet.position.x < box.minX || objet.position.x > box.maxX || objet.position.y < box.minY || objet.position.y > box.maxY) return null;
+      const at = project(objet.position);
+      return <text key={`lbl-${objet.id}`} className={styles.objectLabel} x={at.x} y={at.y}>{objet.libelle}</text>;
+    })}
+    {/* Poignées de l'objet sélectionné : rotation (devant) et redimensionnement (coin). */}
+    {showObjectHandles && objetIds.length === 1 && (() => {
+      const objet = document.equipements.find((item) => item.id === objetIds[0]);
+      if (!objet || objet.verrouille) return null;
+      const handles = equipmentHandles(objet, scale);
+      const rotate = project(handles.rotate); const resize = project(handles.resize);
+      const front = project(footprint(objet).slice(2).reduce((acc, p) => ({ x: acc.x + p.x / 2, y: acc.y + p.y / 2 }), { x: 0, y: 0 }));
+      return <g className={styles.objectHandles}>
+        <line x1={front.x} y1={front.y} x2={rotate.x} y2={rotate.y} />
+        <circle data-testid="plan-objet-poignee" data-handle="rotation" cx={rotate.x} cy={rotate.y} r={9} />
+        <rect data-testid="plan-objet-poignee" data-handle="taille" x={resize.x - 8} y={resize.y - 8} width={16} height={16} rx={3} />
+      </g>;
+    })()}
+    {objectGhost && <path data-testid="plan-objet-apercu" data-kind={objectGhost.kind} className={styles.objectGhost} d={path(footprint(objectGhost))} />}
 
     {/* Poignées de l'ouverture sélectionnée : tableaux (redimensionner) et centre (déplacer). */}
     {showOpeningHandles && openingId && (() => {
@@ -144,7 +184,7 @@ export const PlanLayers = memo(function PlanLayers({
     })()}
 
     {/* Cotes des murs */}
-    {visible.map((mur) => {
+    {calques.cotations.visible && visible.map((mur) => {
       if (wallLength(mur) * scale < DIMENSION_MIN_PX) return null;
       const label = wallDimension(mur, 14 / scale);
       const at = project(label.at);
@@ -153,7 +193,7 @@ export const PlanLayers = memo(function PlanLayers({
     })}
 
     {/* Dimensions principales */}
-    {overall && (() => {
+    {calques.cotations.visible && overall && (() => {
       const topLeft = project({ x: overall.bounds.minX, y: overall.bounds.maxY });
       const topRight = project({ x: overall.bounds.maxX, y: overall.bounds.maxY });
       const bottomLeft = project({ x: overall.bounds.minX, y: overall.bounds.minY });
@@ -167,7 +207,7 @@ export const PlanLayers = memo(function PlanLayers({
     })()}
 
     {/* Noms et surfaces des pièces */}
-    {document.contours.map((contour) => {
+    {calques.annotations.visible && document.contours.map((contour) => {
       const point = contourLabelPoint(contour);
       if (!point) return null;
       const at = project(point);
@@ -184,7 +224,7 @@ export const PlanLayers = memo(function PlanLayers({
     })}
 
     {/* Repères photo */}
-    {markers.map((marker) => {
+    {calques.photos.visible && markers.map((marker) => {
       const s = project(marker.point);
       return <g key={marker.anchorId} data-testid="plan-photo" data-anchor={marker.anchorId} data-source={marker.source} className={styles.marker} data-selected={marker.anchorId === photoAnchorId}>
         <circle cx={s.x} cy={s.y} r={10} />
@@ -219,14 +259,14 @@ export const PlanLayers = memo(function PlanLayers({
 const worldPath = (points: readonly Point2D[]) => points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ") + " Z";
 
 /** Solides des murs (monde) : ne se redessinent que si les murs, ouvertures ou la sélection changent. */
-const WallSolids = memo(function WallSolids({ document, parts, selected }: { document: PlanDocument; parts: ReadonlyMap<string, Point2D[][]>; selected: string }) {
+const WallSolids = memo(function WallSolids({ murs, parts, selected }: { murs: PlanDocument["murs"]; parts: ReadonlyMap<string, Point2D[][]>; selected: string }) {
   const chosen = new Set(selected ? selected.split(",") : []);
   return <>
     <g className={styles.wallOutlines} data-testid="plan-murs-contours">
-      {document.murs.flatMap((mur) => (parts.get(mur.id) ?? []).map((part, index) => <path key={`${mur.id}:${index}`} d={worldPath(part)} vectorEffect="non-scaling-stroke" />))}
+      {murs.flatMap((mur) => (parts.get(mur.id) ?? []).map((part, index) => <path key={`${mur.id}:${index}`} d={worldPath(part)} vectorEffect="non-scaling-stroke" />))}
     </g>
     <g className={styles.wallFills}>
-      {document.murs.flatMap((mur) => (parts.get(mur.id) ?? []).map((part, index) => <path key={`${mur.id}:${index}`} data-testid="plan-mur-corps" data-id={mur.id}
+      {murs.flatMap((mur) => (parts.get(mur.id) ?? []).map((part, index) => <path key={`${mur.id}:${index}`} data-testid="plan-mur-corps" data-id={mur.id}
         data-type={mur.typeMur} data-selected={chosen.has(mur.id)} className={styles.wallFill} d={worldPath(part)} />))}
     </g>
   </>;
@@ -236,10 +276,10 @@ const WallSolids = memo(function WallSolids({ document, parts, selected }: { doc
  * Symboles des ouvertures (monde). Arc : sous la transformation monde → écran (symétrie Y), le
  * drapeau de parcours reste exprimé dans le repère LOCAL (monde) : sens trigonométrique = 1.
  */
-const OpeningSymbols = memo(function OpeningSymbols({ document, murs, openingId, invalid }: {
-  document: PlanDocument; murs: ReadonlyMap<string, PlanDocument["murs"][number]>; openingId: string | null; invalid: ReadonlySet<string>;
+const OpeningSymbols = memo(function OpeningSymbols({ ouvertures, murs, openingId, invalid }: {
+  ouvertures: PlanDocument["ouvertures"]; murs: ReadonlyMap<string, PlanDocument["murs"][number]>; openingId: string | null; invalid: ReadonlySet<string>;
 }) {
-  return <>{document.ouvertures.map((ouverture) => {
+  return <>{ouvertures.map((ouverture) => {
     const mur = murs.get(ouverture.murId);
     if (!mur) return null;
     const symbol = openingSymbol(mur, ouverture);
@@ -256,4 +296,34 @@ const OpeningSymbols = memo(function OpeningSymbols({ document, murs, openingId,
       })}
     </g>;
   })}</>;
+});
+
+/** Symboles mémorisés par objet (les objets sont immuables : la référence suffit). */
+const symbolCache = new WeakMap<PlanEquipement, EquipmentSymbol>();
+function cachedSymbol(objet: PlanEquipement): EquipmentSymbol {
+  let symbol = symbolCache.get(objet);
+  if (!symbol) { symbol = equipmentSymbol(objet); symbolCache.set(objet, symbol); }
+  return symbol;
+}
+
+/** Objets (monde) : ne se redessinent que si les objets, les calques ou la sélection changent. */
+const EquipmentSymbols = memo(function EquipmentSymbols({ equipements, calques, selected }: { equipements: readonly PlanEquipement[]; calques: PlanCalques; selected: string }) {
+  const chosen = new Set(selected ? selected.split(",") : []);
+  return <>{equipements.map((objet) => {
+    const calque = CALQUE_DES_CATEGORIES[objet.categorie];
+    if (!objet.visible || !calques[calque].visible) return null;
+    return <EquipmentGlyph key={objet.id} objet={objet} selected={chosen.has(objet.id)} />;
+  })}</>;
+});
+
+/** Un objet : mémorisé par référence (un glisser ne redessine que l'objet déplacé). */
+const EquipmentGlyph = memo(function EquipmentGlyph({ objet, selected }: { objet: PlanEquipement; selected: boolean }) {
+  const symbol = cachedSymbol(objet);
+  return <g data-testid="plan-objet" data-id={objet.id} data-objet={objet.objet} data-categorie={objet.categorie} data-calque={CALQUE_DES_CATEGORIES[objet.categorie]}
+    data-selected={selected} data-locked={objet.verrouille} data-etat={objet.etatProjet ?? "existant"} data-lie={Boolean(objet.murId)} className={styles.object}>
+    <path className={styles.objectOutline} d={worldPath(symbol.outline)} vectorEffect="non-scaling-stroke" />
+    {symbol.polygons.map((polygon, index) => <path key={`p${index}`} d={worldPath(polygon)} vectorEffect="non-scaling-stroke" />)}
+    {symbol.lines.map((line, index) => <line key={`l${index}`} data-style={line.style} x1={line.a.x} y1={line.a.y} x2={line.b.x} y2={line.b.y} vectorEffect="non-scaling-stroke" />)}
+    {symbol.circles.map((circle, index) => <circle key={`c${index}`} cx={circle.centre.x} cy={circle.centre.y} r={circle.radius} vectorEffect="non-scaling-stroke" />)}
+  </g>;
 });

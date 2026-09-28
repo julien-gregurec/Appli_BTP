@@ -24,6 +24,7 @@ import type { Point2D } from "@/lib/geometry/engine/types";
 import { contourFromRoom, detectRooms, JOINT_EPSILON_MM, offsetAlongWall, refreshContours, roomAt, samePoint, wallAngleDegrees, wallLength } from "./geometry";
 import { OPENING_KIND_PRESETS, placeOpening, type OpeningDraft } from "./openings";
 import { computeWallNetwork, type WallNetwork } from "./wall-geometry";
+import { followWalls, relinkAfterMerge, relinkAfterSplit } from "./equipments";
 
 export type WallDefaults = { epaisseurMm: number; hauteurMm: number | null; typeMur: MurType };
 export const DEFAULT_WALL: WallDefaults = { epaisseurMm: 200, hauteurMm: 2500, typeMur: "cloison" };
@@ -57,7 +58,9 @@ function withMurs(document: PlanDocument, murs: readonly PlanMur[]): PlanDocumen
     const delta = shift.get(o.murId);
     return delta ? { ...o, decalageMm: round(o.decalageMm + delta) } : o;
   });
-  return packOpenings({ ...document, murs, ouvertures }, changed) ?? document;
+  const packed = packOpenings({ ...document, murs, ouvertures }, changed);
+  // Lot 7 : les objets liés à un mur le suivent.
+  return packed ? followWalls(packed) : document;
 }
 
 /**
@@ -241,6 +244,8 @@ export function deleteWalls(document: PlanDocument, murIds: readonly string[]): 
     ...document,
     murs: document.murs.filter((mur) => !ids.has(mur.id)),
     ouvertures: document.ouvertures.filter((ouverture) => !ids.has(ouverture.murId)),
+    // Lot 7 : un objet lié à un mur supprimé est libéré (il reste en place).
+    equipements: (document.equipements ?? []).map((objet) => objet.murId && ids.has(objet.murId) ? { ...objet, murId: null, face: null, decalageMm: null } : objet),
     contours: document.contours.map((contour) => contour.murIds.some((id) => ids.has(id)) ? { ...contour, murIds: contour.murIds.filter((id) => !ids.has(id)) } : contour),
   };
 }
@@ -307,10 +312,9 @@ export function mergeWalls(document: PlanDocument, firstId: string, secondId: st
     : ouverture.murId === second.id ? reposition(ouverture, second) : ouverture);
   const contours = document.contours.map((contour) => contour.murIds.includes(second.id)
     ? { ...contour, murIds: [...new Set(contour.murIds.map((id) => (id === second.id ? first.id : id)))] } : contour);
-  return {
-    document: fitOpenings({ ...document, murs: document.murs.filter((mur) => mur.id !== second.id).map((mur) => (mur.id === first.id ? merged : mur)), ouvertures, contours }),
-    error: null,
-  };
+  const next = fitOpenings({ ...document, murs: document.murs.filter((mur) => mur.id !== second.id).map((mur) => (mur.id === first.id ? merged : mur)), ouvertures, contours });
+  // Lot 7 : objets liés aux deux murs reportés sur le mur fusionné, à leur position réelle.
+  return { document: followWalls(relinkAfterMerge(document, next, second.id, merged)), error: null };
 }
 
 export type SplitResult = { document: PlanDocument; error: string | null };
@@ -332,7 +336,7 @@ export function splitWall(document: PlanDocument, murId: string, offsetMm: numbe
     ? { ...o, murId: newId, decalageMm: round(o.decalageMm - offsetMm) } : o);
   const contours = document.contours.map((contour) => contour.murIds.includes(murId) ? { ...contour, murIds: [...contour.murIds, newId] } : contour);
   const murs = document.murs.flatMap((item) => (item.id === murId ? [firstPart, secondPart] : [item]));
-  return { document: fitOpenings({ ...document, murs, ouvertures, contours }), error: null };
+  return { document: followWalls(relinkAfterSplit(fitOpenings({ ...document, murs, ouvertures, contours }), murId, offsetMm, newId)), error: null };
 }
 
 /**

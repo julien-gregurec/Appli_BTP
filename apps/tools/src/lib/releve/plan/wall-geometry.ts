@@ -130,7 +130,8 @@ export function openingIssues(document: PlanDocument, network: WallNetwork = com
     const key = `${issue.ouvertureId}:${issue.code}`;
     if (!seen.has(key)) { seen.add(key); issues.push(issue); }
   };
-  for (const issue of validatePlanDocument({ ...document, contours: [] })) {
+  // Ouvertures seulement : contours et objets (Lot 7) ne sont pas concernés.
+  for (const issue of validatePlanDocument({ ...document, contours: [], equipements: [] })) {
     const match = /^ouvertures\.([^.]+)\./.exec(issue.path);
     if (match && issue.code) push({ ouvertureId: match[1], code: issue.code, message: issue.message });
   }
