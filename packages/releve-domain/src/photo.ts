@@ -35,6 +35,23 @@ export class PhotoTargetError extends Error {
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /**
+ * Lot 6 — murs proposés comme cible d'une photo. Un plan dérivé (Lot 5) RECOPIE les murs de son
+ * plan de base (nouvel identifiant, lignée `origineId`) : sans filtre, chaque mur apparaissait
+ * une fois par plan de l'étage. On ne garde que la copie la plus récente de chaque lignée (un mur
+ * dont une copie active existe est remplacé par elle) ; `keepId` (cible actuelle d'une photo, par
+ * exemple le mur d'un plan figé) reste proposé.
+ */
+export function photoWallTargets<T extends Pick<ReleveElement, "id" | "type" | "deletedAt" | "donnees">>(elements: readonly T[], keepId: string | null = null): T[] {
+  const walls = elements.filter((element) => element.type === "mur" && !element.deletedAt);
+  const superseded = new Set<string>();
+  for (const wall of walls) {
+    const origine = (wall.donnees as { origineId?: string | null }).origineId;
+    if (origine) superseded.add(origine);
+  }
+  return walls.filter((wall) => !superseded.has(wall.id) || wall.id === keepId);
+}
+
+/**
  * Ancre + colonnes de rattachement pour une cible. Refuse une cible absente, supprimée ou
  * d'un autre relevé : l'erreur est levée avant tout envoi.
  */

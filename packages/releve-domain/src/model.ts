@@ -282,7 +282,20 @@ export type OuvertureDonnees = {
   readonly metadata?: Readonly<Record<string, unknown>>;
   /** Lot 5 (facultatif) : ouverture du plan de base dont celle-ci est la copie. */
   readonly origineId?: string | null;
+  /** Lot 6 (facultatif) : nombre de vantaux (1 simple, 2 double). */
+  readonly vantaux?: OuvertureVantaux;
+  /** Lot 6 (facultatif) : débattement vu depuis la face de référence du mur (gauche de A → B). */
+  readonly poussee?: OuverturePoussee;
+  /** Lot 6 (facultatif) : modèle de menuiserie (battant, oscillo-battant, coulissant, galandage, fixe). */
+  readonly modele?: OuvertureModele;
 };
+/** Lot 6 : attributs de menuiserie (facultatifs, absents des ouvertures antérieures). */
+export const OUVERTURE_VANTAUX = [1, 2] as const;
+export type OuvertureVantaux = (typeof OUVERTURE_VANTAUX)[number];
+export const OUVERTURE_POUSSEES = ["poussant", "tirant"] as const;
+export type OuverturePoussee = (typeof OUVERTURE_POUSSEES)[number];
+export const OUVERTURE_MODELES = ["battant", "oscillo_battant", "coulissant", "galandage", "fixe"] as const;
+export type OuvertureModele = (typeof OUVERTURE_MODELES)[number];
 /** Catégories métier d'ouverture demandées par le contrat produit. */
 export const OUVERTURE_FAMILLES = { porte: ["porte", "porte_fenetre"], fenetre: ["fenetre"], baie: ["baie"], ouverture_libre: ["tremie", "passage"] } as const satisfies Record<string, readonly OuvertureType[]>;
 

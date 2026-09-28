@@ -29,11 +29,11 @@ function fakeClient(responses: Record<string, { data: unknown; error: unknown }>
 }
 
 describe("SupabasePlanRepository", () => {
-  it("liste et charge un plan (murs, ouvertures) depuis PostgREST sous RLS", async () => {
+  it("charge un plan : ligne du plan sous RLS, géométrie par la RPC de lecture (Lot 6)", async () => {
     const calls: Call[] = [];
     const repo = new SupabasePlanRepository(fakeClient({
       tools_releves_plans: { data: row, error: null },
-      tools_releves_elements: { data: [
+      tools_releve_plan_elements: { data: [
         { id: U(11), type: "mur", piece_id: null, parent_element_id: null, donnees: { a: { x: 0, y: 0 }, b: { x: 3000, y: 0 }, epaisseurMm: 200, hauteurMm: 2500, typeMur: "porteur" } },
         { id: U(12), type: "ouverture", piece_id: null, parent_element_id: U(11), donnees: { decalageMm: 100, largeurMm: 800, hauteurMm: 2040, allegeMm: null, typeOuverture: "porte", sens: "gauche" } },
       ], error: null },
@@ -43,7 +43,8 @@ describe("SupabasePlanRepository", () => {
     expect(loaded.plan.reglages).toEqual({});
     expect(loaded.document.murs[0]).toMatchObject({ id: U(11), b: { x: 3000, y: 0 } });
     expect(loaded.document.ouvertures[0]).toMatchObject({ murId: U(11), largeurMm: 800 });
-    expect(calls.find((c) => c.name === "tools_releves_elements")!.filters).toEqual(expect.arrayContaining([`eq:plan_id,${U(1)}`, "is:deleted_at,"]));
+    expect(calls.find((c) => c.name === "tools_releve_plan_elements")).toMatchObject({ kind: "rpc", args: { p_plan_id: U(1) } });
+    expect(calls.some((c) => c.name === "tools_releves_elements")).toBe(false);
   });
 
   it("écritures par RPC uniquement ; conflit PT409 (HTTP 409) → ReleveConflictError avec la révision serveur", async () => {

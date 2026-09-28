@@ -7,7 +7,7 @@
  * degrés (repère Y haut, sens trigonométrique, 0° = vers la droite).
  */
 import type { PlanContour, PlanDocument, PlanMur, PlanOuverture } from "@elsatia/releve-domain";
-import { PLAN_LIMITS } from "@elsatia/releve-domain";
+import { ouvertureModele, PLAN_LIMITS } from "@elsatia/releve-domain";
 import { boundsFromPoints, pointAtPolar, polarAngle } from "@/lib/geometry/engine/measure";
 import type { BoundingBox2D, Point2D } from "@/lib/geometry/engine/types";
 import type { ParsedNumber } from "../forms";
@@ -108,36 +108,94 @@ export function overallDimensions(document: PlanDocument): OverallDimensions | n
 
 // ── Symboles d'ouverture ─────────────────────────────────────────────────────
 
+export type SymbolLine = { a: Point2D; b: Point2D; style?: "trait" | "tirets" | "vitrage" };
+export type SymbolArc = { centre: Point2D; radius: number; start: number; end: number; style?: "trait" | "tirets" };
+
 export type OpeningSymbol = {
-  /** Baie dans le mur (à « effacer » : trait couleur fond sur l'épaisseur du mur). */
+  /** Baie dans le mur (le mur est interrompu entre ces deux points de l'axe). */
   gap: { a: Point2D; b: Point2D };
-  /** Traits du symbole (vantail, dormants, vitrage). */
-  lines: { a: Point2D; b: Point2D }[];
-  /** Arc de débattement d'une porte : centre, rayon, angles (radians, repère monde). */
-  arc: { centre: Point2D; radius: number; start: number; end: number } | null;
+  /** Traits du symbole (vantaux, dormants, vitrage, rails, linteau). */
+  lines: SymbolLine[];
+  /** Arcs de débattement (portes, fenêtres battantes) : centre, rayon, angles (radians, repère monde, parcours trigonométrique de start à end). */
+  arcs: SymbolArc[];
+  /** Compatibilité Lot 5 : premier arc (porte), sinon null. */
+  arc: SymbolArc | null;
 };
 
+const TWO_PI = 2 * Math.PI;
+/** Arc le plus court entre deux directions, parcouru dans le sens trigonométrique. */
+function quarterArc(centre: Point2D, radius: number, from: number, to: number, style?: SymbolArc["style"]): SymbolArc {
+  let diff = ((to - from) % TWO_PI + TWO_PI) % TWO_PI;
+  if (diff > Math.PI) diff -= TWO_PI;
+  return diff >= 0 ? { centre, radius, start: from, end: to, style } : { centre, radius, start: to, end: from, style };
+}
+
+/**
+ * Symbole normalisé d'une ouverture (plan d'architecte, vue de dessus) :
+ * - porte battante : vantail + arc de débattement (simple : paumelles à gauche = côté A ou à
+ *   droite = côté B ; double : deux vantaux), du côté de la POUSSÉE (tirant = face de
+ *   référence, gauche de A → B ; poussant = autre face) ;
+ * - porte coulissante : vantail en applique le long de la face + rail en tirets sur le mur ;
+ *   à galandage : vantail dans l'épaisseur, poche en tirets ;
+ * - fenêtre / porte-fenêtre / baie : dormants sur les deux faces + vitrage sur l'axe ; battant :
+ *   arcs de débattement en tirets ; coulissant : deux vantaux décalés ; fixe : vitrage seul ;
+ * - ouverture libre / trémie : linteau en tirets sur les deux faces.
+ */
 export function openingSymbol(mur: PlanMur, ouverture: PlanOuverture): OpeningSymbol {
   const { start, end } = openingSegment(mur, ouverture);
   const angle = polarAngle(mur.a, mur.b);
   const normal = angle + Math.PI / 2;
   const half = mur.epaisseurMm / 2;
+  const side = ouverture.poussee === "poussant" ? -1 : 1;
+  const sideAngle = side > 0 ? normal : normal + Math.PI;
   const shift = (p: Point2D, d: number) => pointAtPolar(p, d, normal);
-  const symbol: OpeningSymbol = { gap: { a: start, b: end }, lines: [], arc: null };
+  const along = (p: Point2D, d: number) => pointAtPolar(p, d, angle);
+  const lines: SymbolLine[] = [];
+  const arcs: SymbolArc[] = [];
   const type = ouverture.typeOuverture;
-  if (type === "porte" || type === "porte_fenetre") {
-    const hinge = ouverture.sens === "droite" ? end : start;
-    const other = ouverture.sens === "droite" ? start : end;
-    const leafEnd = pointAtPolar(hinge, ouverture.largeurMm, normal);
-    symbol.lines.push({ a: shift(hinge, half), b: shift(leafEnd, half) });
-    const from = polarAngle(hinge, other);
-    symbol.arc = { centre: shift(hinge, half), radius: ouverture.largeurMm, start: from, end: normal };
-    if (type === "porte_fenetre") symbol.lines.push({ a: start, b: end });
-  } else if (type === "fenetre" || type === "baie") {
-    symbol.lines.push({ a: shift(start, half), b: shift(end, half) }, { a: shift(start, -half), b: shift(end, -half) }, { a: start, b: end });
+  const modele = ouvertureModele(ouverture);
+  const vantaux = ouverture.vantaux ?? 1;
+  const width = ouverture.largeurMm;
+
+  /** Vantail battant : paumelle sur la face côté poussée, ouvert à 90°. */
+  const leaf = (hinge: Point2D, toward: Point2D, length: number, style?: SymbolArc["style"]) => {
+    const base = shift(hinge, side * half);
+    lines.push({ a: base, b: pointAtPolar(base, length, sideAngle), style: style === "tirets" ? "tirets" : "trait" });
+    arcs.push(quarterArc(base, length, polarAngle(hinge, toward), sideAngle, style));
+  };
+  const frames = () => lines.push({ a: shift(start, half), b: shift(end, half) }, { a: shift(start, -half), b: shift(end, -half) });
+
+  if (type === "porte") {
+    if (modele === "coulissant") {
+      const face = side * (half + 40);
+      lines.push({ a: shift(start, face), b: shift(end, face) });
+      lines.push({ a: shift(end, face), b: shift(along(end, width), face), style: "tirets" });
+    } else if (modele === "galandage") {
+      lines.push({ a: start, b: end }, { a: end, b: along(end, width), style: "tirets" });
+    } else if (vantaux === 2) {
+      leaf(start, end, width / 2); leaf(end, start, width / 2);
+    } else {
+      const hinge = ouverture.sens === "droite" ? end : start;
+      leaf(hinge, ouverture.sens === "droite" ? start : end, width);
+    }
+  } else if (type === "porte_fenetre" || type === "fenetre" || type === "baie") {
+    frames();
+    if (modele === "coulissant") {
+      const offset = half / 3;
+      const middle = along(start, width / 2);
+      lines.push({ a: shift(start, offset), b: shift(along(middle, 60), offset), style: "vitrage" });
+      lines.push({ a: shift(along(middle, -60), -offset), b: shift(end, -offset), style: "vitrage" });
+    } else {
+      lines.push({ a: start, b: end, style: "vitrage" });
+      if (modele !== "fixe") {
+        const dashed = type === "porte_fenetre" ? undefined : "tirets" as const;
+        if (vantaux === 2) { leaf(start, end, width / 2, dashed); leaf(end, start, width / 2, dashed); }
+        else { const hinge = ouverture.sens === "droite" ? end : start; leaf(hinge, ouverture.sens === "droite" ? start : end, width, dashed); }
+      }
+    }
   } else {
-    // Passage, trémie : baie libre, jambages seulement.
-    symbol.lines.push({ a: shift(start, half), b: shift(start, -half) }, { a: shift(end, half), b: shift(end, -half) });
+    // Passage, trémie : baie libre, linteau en tirets.
+    lines.push({ a: shift(start, half), b: shift(end, half), style: "tirets" }, { a: shift(start, -half), b: shift(end, -half), style: "tirets" });
   }
-  return symbol;
+  return { gap: { a: start, b: end }, lines, arcs, arc: arcs[0] ?? null };
 }

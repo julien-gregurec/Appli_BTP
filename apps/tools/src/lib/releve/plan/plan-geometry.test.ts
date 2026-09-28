@@ -160,14 +160,20 @@ describe("édition", () => {
     expect(split.document.ouvertures[0]).toMatchObject({ murId: "m2", decalageMm: 500 });
     expect(splitWall(base, "m", 3000, "m3").error).toMatch(/cheval/);
   });
-  it("ouvertures : porte / fenêtre / baie / ouverture libre, toujours contenues dans le mur", () => {
-    let doc: PlanDocument = { ...EMPTY_PLAN_DOCUMENT, murs: [mur("m", 0, 0, 3000, 0)] };
+  // Lot 6 : les ouvertures ne se chevauchent plus (Lot 5 : centrées l'une sur l'autre) et un mur
+  // raccourci ne réduit plus leur largeur en silence (refus si elles ne tiennent plus).
+  it("ouvertures : porte / fenêtre / baie / ouverture libre, toujours contenues dans le mur, jamais superposées", () => {
+    let doc: PlanDocument = { ...EMPTY_PLAN_DOCUMENT, murs: [mur("m", 0, 0, 6000, 0)] };
     for (const kind of ["porte", "fenetre", "baie", "ouverture_libre"] as const) doc = addOpening(doc, "m", OPENING_PRESETS[kind], id());
     expect(doc.ouvertures.map((o) => o.typeOuverture)).toEqual(["porte", "fenetre", "baie", "passage"]);
-    doc = updateOpening(doc, doc.ouvertures[0].id, { decalageMm: 2900 });
-    expect(doc.ouvertures[0].decalageMm + doc.ouvertures[0].largeurMm).toBeLessThanOrEqual(3000);
-    const shorter = fitOpenings(setWallLength(doc, "m", 1000));
-    expect(shorter.ouvertures.every((o) => o.decalageMm + o.largeurMm <= 1000)).toBe(true);
+    expect(validatePlanDocument(doc)).toEqual([]);
+    expect(addOpening(doc, "m", OPENING_PRESETS.baie, id())).toBe(doc);
+    const moved = updateOpening(doc, doc.ouvertures[0].id, { decalageMm: 5900 });
+    expect(moved.ouvertures[0].decalageMm + moved.ouvertures[0].largeurMm).toBeLessThanOrEqual(6000);
+    expect(setWallLength(doc, "m", 4000)).toBe(doc);
+    const shorter = fitOpenings(setWallLength(doc, "m", 5500));
+    expect(shorter.ouvertures.map((o) => o.largeurMm)).toEqual(doc.ouvertures.map((o) => o.largeurMm));
+    expect(shorter.ouvertures.every((o) => o.decalageMm >= 0 && o.decalageMm + o.largeurMm <= 5500)).toBe(true);
     expect(validatePlanDocument(shorter)).toEqual([]);
   });
   it("pièces : association à la pièce métier, recalage quand un mur bouge, contour ouvert signalé", () => {
@@ -214,7 +220,10 @@ describe("rendu et unités", () => {
     expect(openingSegment(hote, porte)).toEqual({ start: { x: 1000, y: 0 }, end: { x: 1830, y: 0 } });
     const symbol = openingSymbol(hote, porte);
     expect(symbol.arc?.radius).toBe(830);
-    expect(openingSymbol(hote, { ...OPENING_PRESETS.fenetre, id: "f", murId: "m", decalageMm: 0 } as never).lines).toHaveLength(3);
+    // Fenêtre : dormants + vitrage (3 traits) ; battante à deux vantaux (Lot 6) : + 2 vantaux, 2 arcs.
+    expect(openingSymbol(hote, { ...OPENING_PRESETS.fenetre, modele: "fixe", id: "f", murId: "m", decalageMm: 0 } as never).lines).toHaveLength(3);
+    const fenetre = openingSymbol(hote, { ...OPENING_PRESETS.fenetre, id: "f", murId: "m", decalageMm: 0 } as never);
+    expect([fenetre.lines.length, fenetre.arcs.length]).toEqual([5, 2]);
   });
   it("seuls les murs visibles sont dessinés", () => {
     expect(visibleWalls(rectangle().murs, { minX: -50, minY: 1000, maxX: 50, maxY: 2000 }).map((m) => m.id)).toEqual(["w"]);
@@ -227,7 +236,11 @@ describe("compatibilité export SVG (DXF / PDF à venir)", () => {
     const svg = planToSvg(doc, { pieceName: () => "Séjour <1>" });
     expect(svg).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" viewBox="0 0 5200 4200" width="5200mm"/);
     for (const layer of ["MURS", "OUVERTURES", "PIECES", "COTES"]) expect(svg).toContain(`<g id="${layer}"`);
-    expect(svg).toContain('x1="0" y1="0" x2="4200" y2="0" stroke-width="200"');
+    // Lot 6 : murs à l'épaisseur réelle, raccordés en onglet (coin extérieur 4300,-100), interrompus
+    // au droit de la porte (deux parties pour le mur sud), arc de débattement.
+    expect(svg).toContain("4300,-100");
+    expect(svg.match(/<polygon[^>]*data-ref="s"/g)).toHaveLength(2);
+    expect(svg).toMatch(/<path d="M[^"]+ A830,830 0 0 1 [^"]+" data-ref="o"\/>/);
     expect(svg).toContain("Séjour &lt;1&gt;");
     expect(svg.match(/scale\(1 -1\)/g)!.length).toBe(1 + 4 + 1); // groupe racine + 4 cotes + 1 nom de pièce
   });
