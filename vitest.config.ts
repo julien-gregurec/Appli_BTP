@@ -23,6 +23,9 @@ export default defineConfig({
         new URL("./packages/releve-domain/src/index.ts", import.meta.url),
       ),
       "@elsatia/identity": fileURLToPath(new URL("./packages/elsatia-identity/src/index.ts", import.meta.url)),
+      "@elsatia/incident-control": fileURLToPath(
+        new URL("./packages/incident-control/src/index.ts", import.meta.url),
+      ),
       // Next.js intercepte cet import spécial au build ; en dehors de son
       // bundler (ici Vitest), le vrai paquet lève systématiquement une
       // erreur. On le neutralise comme le fait Next, uniquement pour les tests.
