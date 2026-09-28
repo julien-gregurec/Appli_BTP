@@ -6,6 +6,15 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { headers } from "next/headers";
 
 export async function origineApplication() {
+  // Sécurité : les liens d'e-mail d'authentification (confirmation, réinitialisation
+  // de mot de passe) sont construits sur cette base d'URL. Les en-têtes Origin /
+  // X-Forwarded-Host / Host sont contrôlables par l'appelant ; s'y fier permet un
+  // empoisonnement d'hôte (le lien du mail pointe vers un domaine attaquant, avec
+  // potentielle exfiltration du jeton). En production on ancre donc l'URL sur la
+  // configuration serveur de confiance (NEXT_PUBLIC_APP_URL), comme le fait déjà le
+  // parcours Stripe. Le repli sur les en-têtes ne sert qu'en développement local.
+  const configuree = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (configuree) return configuree;
   const entetes = await headers();
   return entetes.get("origin") ?? `${entetes.get("x-forwarded-proto") ?? "https"}://${entetes.get("x-forwarded-host") ?? entetes.get("host")}`;
 }

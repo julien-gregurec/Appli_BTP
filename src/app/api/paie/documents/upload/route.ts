@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { validerJustificatif } from "@/lib/expenses/files";
 import { sha256 } from "@/lib/expenses/integrity";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { cheminInterneSur } from "@/lib/redirections";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       await supabase.storage.from("documents-paie").remove([chemin]);
       throw new Error(erreurInsertion.message);
     }
-    const destination = retour.startsWith("/") && !retour.startsWith("//") ? retour : "/paie";
+    const destination = cheminInterneSur(retour, "/paie");
     return NextResponse.redirect(new URL(`${destination}${destination.includes("?") ? "&" : "?"}success=${encodeURIComponent("Pièce jointe privée ajoutée")}`, request.url), 303);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Import impossible" }, { status: 400 });

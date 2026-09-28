@@ -7,6 +7,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { cheminInterneSur } from "@/lib/redirections";
 import {
   bicEstValide,
   chiffrerDonneeBancaire,
@@ -26,10 +27,7 @@ const chemin = "/paiements-bancaires";
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const erreur = (message: string): never => redirect(`${chemin}?error=${encodeURIComponent(message)}`);
 const succes = (message: string): never => redirect(`${chemin}?success=${encodeURIComponent(message)}`);
-const retourAutorise = (formData: FormData) => {
-  const retour = texte(formData, "retour");
-  return retour.startsWith("/") && !retour.startsWith("//") && !retour.includes(":") ? retour : chemin;
-};
+const retourAutorise = (formData: FormData) => cheminInterneSur(texte(formData, "retour"), chemin);
 const redirigerMessage = (retour: string, type: "error" | "success", message: string): never =>
   redirect(`${retour}${retour.includes("?") ? "&" : "?"}${type}=${encodeURIComponent(message)}`);
 

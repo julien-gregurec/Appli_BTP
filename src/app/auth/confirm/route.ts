@@ -1,10 +1,10 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { cheminInterneSur } from "@/lib/redirections";
 import { createClient } from "@/lib/supabase/server";
 
 function destinationSure(valeur: string | null, type: EmailOtpType | null) {
-  if (valeur?.startsWith("/") && !valeur.startsWith("//")) return valeur;
-  return type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
+  return cheminInterneSur(valeur, type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding");
 }
 
 export async function GET(request: NextRequest) {
