@@ -18,14 +18,15 @@
 -- Studio fermée et inerte (…100000, Studio OFF en première Preview).
 -- Contrôles 24-26 (train canonique V5) : réabonnement Stripe (…0928 201,
 -- ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1), Réserves hôte suspendu en lecture seule (…0928 301, D-01),
--- Relevé & Métré plan 2D (…0928 101, Lot 5).
+-- Relevé & Métré plan 2D (…0928 101, Lot 5). Contrôle 30 : données personnelles des salariés
+-- (…0928 701, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (358, '20260928000601')),
+attendu_train(nb, derniere) as (values (359, '20260928000701')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -370,6 +371,29 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not has_function_privilege('authenticated', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
            and not has_function_privilege('service_role', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
            and exists (select 1 from pg_trigger where not tgisinternal and tgenabled <> 'D' and tgname = 'tools_releves_plans_surface_sync'), true
+  union all
+  -- 30 : données personnelles des salariés (20260928000701) : colonnes sensibles de `employes`
+  -- non lisibles directement par authenticated/anon, fiche détaillée via employes_fiche
+  -- (authenticated seulement), export RGPD filtré par section.
+  select 30, 'Employés : colonnes personnelles fermées à la lecture directe (20260928000701)',
+         '0 colonne sensible lisible, employes_fiche authentifiés seuls, export filtré',
+         concat_ws(', ',
+           (select count(*) from unnest(array['email','telephone','notes','numero_inscription','identifiant_interne',
+                    'code_stock_hash','carte_btp_storage_path','carte_btp_numero','signature_storage_path']) c
+             where has_column_privilege('authenticated', 'public.employes', c, 'select')
+                or has_column_privilege('anon', 'public.employes', c, 'select'))::text || ' colonne(s) sensible(s) lisible(s)',
+           case when to_regclass('public.employes_fiche') is null then 'employes_fiche ABSENTE'
+                when has_table_privilege('anon', 'public.employes_fiche', 'select') then 'employes_fiche EXPOSÉE à anon'
+                else 'employes_fiche authentifiés seuls' end,
+           case when to_regprocedure('public.export_rgpd_section_autorisee(uuid,text)') is null then 'export NON filtré'
+                else 'export filtré' end),
+         (select count(*) from unnest(array['email','telephone','notes','numero_inscription','identifiant_interne',
+                  'code_stock_hash','carte_btp_storage_path','carte_btp_numero','signature_storage_path']) c
+           where has_column_privilege('authenticated', 'public.employes', c, 'select')
+              or has_column_privilege('anon', 'public.employes', c, 'select')) = 0
+           and to_regclass('public.employes_fiche') is not null
+           and not has_table_privilege('anon', 'public.employes_fiche', 'select')
+           and to_regprocedure('public.export_rgpd_section_autorisee(uuid,text)') is not null, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles
