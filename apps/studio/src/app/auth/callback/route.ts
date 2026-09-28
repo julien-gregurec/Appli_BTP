@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createStudioClient } from "../../../lib/supabase";
 import { safeStudioDestination } from "@elsatia/studio-domain";
 import { studioOrigin } from "../../../lib/config";
+import { notices } from "../../../lib/notices";
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (code) {
@@ -16,6 +17,9 @@ export async function GET(request: NextRequest) {
       );
   }
   return NextResponse.redirect(
-    new URL("/login?error=Lien+invalide+ou+expiré", studioOrigin()),
+    new URL(
+      `/login?error=${encodeURIComponent(notices.invalidLink)}`,
+      studioOrigin(),
+    ),
   );
 }

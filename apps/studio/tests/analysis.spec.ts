@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fixtures } from "./media-fixtures";
+import { fixtures, fileInputReady } from "./media-fixtures";
 const password = "Studio-Montage-Local-398!";
 async function user(page: Page) {
   const api = createClient(
@@ -103,6 +103,7 @@ async function upload(page: Page, photos: number, videos: number) {
       mimeType: "video/mp4",
       buffer: sample.mp4,
     });
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     photos + videos,
@@ -123,7 +124,7 @@ async function render(page: Page, id: string) {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(panel.locator("[data-render-job]")).toHaveCount(1);
   const job = panel.locator("[data-render-job]").first();
-  await expect(job.getByRole("status")).toContainText("completed", {
+  await expect(job.getByRole("status")).toContainText("Terminé", {
     timeout: 600000,
   });
   await job.getByRole("button", { name: "Voir la vidéo", exact: true }).click();

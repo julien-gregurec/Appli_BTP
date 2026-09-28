@@ -4,6 +4,8 @@ import Shell from "../../components/Shell";
 import Notice from "../../components/Notice";
 import Submit from "../../components/Submit";
 import { getActiveStudioWorkspace } from "../../lib/workspaces";
+import { createStudioClient } from "../../lib/supabase";
+import { bytes } from "../../lib/media-contract";
 import {
   renameWorkspace,
   createProfessional,
@@ -17,6 +19,14 @@ export default async function Settings({
   const params = await searchParams;
   const context = await getActiveStudioWorkspace(params.workspace);
   const { workspace, membership } = context;
+  const usage = canManageWorkspace(membership.role)
+    ? await createStudioClient()
+        .then((client) =>
+          client.rpc("studio_workspace_usage", { p_workspace: workspace.id }),
+        )
+        .then((r) => r.data)
+        .catch(() => null)
+    : null;
   return (
     <Shell context={context} page="settings">
       <p className="eyebrow">PARAMÈTRES</p>
@@ -55,6 +65,20 @@ export default async function Settings({
             </Link>
           </p>
         </section>
+        {usage && (
+          <section className="card" aria-label="Utilisation">
+            <h2>Utilisation ce mois-ci</h2>
+            <p>
+              {usage.exports} vidéo{usage.exports > 1 ? "s" : ""} exportée
+              {usage.exports > 1 ? "s" : ""} ·{" "}
+              {Math.round(usage.render_seconds / 60)} min de rendu
+            </p>
+            <p>
+              Médias stockés : {bytes(usage.media_bytes)} · Vidéos rendues :{" "}
+              {bytes(usage.render_bytes)}
+            </p>
+          </section>
+        )}
         <section className="card">
           <h2>Un nouvel espace professionnel</h2>
           <p>
@@ -92,6 +116,14 @@ export default async function Settings({
           </form>
         </section>
       )}
+      <section className="card" aria-label="Compte ELSATIA">
+        <h2>Votre compte</h2>
+        <p>
+          Studio utilise votre compte ELSATIA. Sa suppression se fait depuis
+          ELSATIA : vos données Studio sont alors effacées selon la politique
+          RGPD de Studio.
+        </p>
+      </section>
     </Shell>
   );
 }

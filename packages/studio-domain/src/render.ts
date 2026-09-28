@@ -17,7 +17,7 @@ export interface StudioRenderJob {
   requested_by: string;
   status: RenderStatus;
   progress_percent: number;
-  profile: "preview" | "standard";
+  profile: "preview" | "standard" | "hd720";
   width: number;
   height: number;
   fps: 30;
@@ -25,7 +25,12 @@ export interface StudioRenderJob {
   error_code: string | null;
   error_message: string | null;
   created_at: string;
-  snapshot: { timeline: TimelineDocument; assets: StudioMediaAsset[] };
+  snapshot: {
+    timeline: TimelineDocument;
+    assets: StudioMediaAsset[];
+    /** Stamped by the database from the workspace flag; the client cannot set it. */
+    watermark?: boolean;
+  };
   lease_token: string | null;
 }
 export interface StudioRenderOutput {

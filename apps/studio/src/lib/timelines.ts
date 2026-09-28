@@ -82,8 +82,14 @@ export async function generateStudioTimeline(
   projectId: string,
   options?: unknown,
   selection?: { ids: string[]; revision: number },
+  attachBrandLogo = false,
 ) {
-  const { client, project } = await authorizeProject(projectId, true);
+  let { client, project } = await authorizeProject(projectId, true);
+  if (attachBrandLogo) {
+    // Attaching a shared reference bumps the project revision: re-read it before saving.
+    checked(await client.rpc("studio_attach_brand_logo", { p_project: projectId }));
+    ({ client, project } = await authorizeProject(projectId, true));
+  }
   let assets =
     checked(
       await client.rpc("studio_list_project_media", {

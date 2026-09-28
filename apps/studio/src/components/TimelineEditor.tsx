@@ -3,6 +3,7 @@
 import TemplateGallery from "./TemplateGallery";
 import { useEffect, useState } from "react";
 import {
+  type StudioBrandKit,
   animationNames,
   transitionNames,
   type StudioProject,
@@ -66,10 +67,12 @@ export default function TimelineEditor({
   project,
   canWrite,
   canDelete,
+  brandKit = null,
 }: {
   project: string;
   canWrite: boolean;
   canDelete: boolean;
+  brandKit?: StudioBrandKit | null;
 }) {
   const [projectInfo, setProjectInfo] = useState<StudioProject | null>(null);
   const [active, setActive] = useState<TimelineDocument | null>(null),
@@ -137,7 +140,10 @@ export default function TimelineEditor({
     void command({ action: "order", ids });
   }
   const available = assets.filter(
-      (a) => a.upload_status === "ready" && !a.deleted_at,
+      (a) =>
+        a.upload_status === "ready" &&
+        !a.deleted_at &&
+        a.media_type !== "audio",
     ),
     byId = new Map(assets.map((a) => [a.id, a]));
   return (
@@ -183,10 +189,12 @@ export default function TimelineEditor({
           busy={busy}
           active={!!active}
           initialTemplate={active?.presentation?.template.id}
-          onGenerate={(template) =>
+          brandKit={brandKit}
+          onGenerate={(template, extra) =>
             void command({
               action: "generate",
               ...(template ? { template } : {}),
+              ...(extra?.attachBrandLogo ? { attachBrandLogo: true } : {}),
             })
           }
         />

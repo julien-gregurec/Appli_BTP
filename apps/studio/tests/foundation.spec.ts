@@ -20,6 +20,8 @@ test("onboarding réel sans entreprise, scopes, membres, révocation et logout",
   await expect(page).toHaveURL(/\/signup/);
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Mot de passe", { exact: false }).fill(password);
+  // Consent to the terms is now required at sign-up.
+  await page.locator("input[name=terms]").check();
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page).toHaveURL(/\/onboarding/);
   await page
@@ -83,7 +85,7 @@ test("onboarding réel sans entreprise, scopes, membres, révocation et logout",
   ).not.toBeNull();
   await page.goto(`/dashboard?workspace=${workspaceB}`);
   await expect(
-    page.getByRole("heading", { name: "Espace inaccessible." }),
+    page.getByRole("heading", { name: "Page ou espace inaccessible." }),
   ).toBeVisible();
   await expect(page.getByText("Privé B", { exact: true })).toHaveCount(0);
   await page.goto(`/settings?workspace=${workspaceA}`);

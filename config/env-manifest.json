@@ -6727,6 +6727,105 @@
       "dr_critical": false,
       "example_required": true,
       "required_when": "dès que Studio est déployé"
+    },
+    {
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "visibility": "server",
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "name": "STUDIO_MAIL_PROVIDER",
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "secret": false,
+      "category": "email",
+      "description": "Fournisseur des e-mails d'invitation Studio (apps/studio/src/lib/mailer.ts) : mailpit (local, 127.0.0.1 exigé) | resend | absent. Absent ou inconnu : aucun envoi, le lien d'invitation est affiché une fois à l'administrateur pour être copié (fail-closed : jamais d'envoi implicite). Lot STUDIO POST-H PORT V1 (docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed",
+      "allowed_values": [
+        "mailpit",
+        "resend"
+      ]
+    },
+    {
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "visibility": "server",
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "name": "STUDIO_MAIL_FROM",
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "secret": false,
+      "category": "email",
+      "description": "Expéditeur des e-mails d'invitation Studio (fournisseur resend). Défaut : « ELSATIA Studio <studio@localhost> ». Lot STUDIO POST-H PORT V1 (docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "default"
+    },
+    {
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "visibility": "server",
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "name": "STUDIO_RESEND_API_KEY",
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "secret": true,
+      "category": "email",
+      "description": "Clé API Resend PROPRE à Studio (e-mails d'invitation), distincte de toute clé GP. Lue seulement si STUDIO_MAIL_PROVIDER=resend ; absente : aucun envoi. Lot STUDIO POST-H PORT V1 (docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "closed"
+    },
+    {
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "visibility": "server",
+      "build_time": false,
+      "runtime": true,
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "name": "STUDIO_LEGAL_TEXT_VERSION",
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "secret": false,
+      "category": "legal",
+      "description": "Version affichée des textes légaux Studio (pages /legal/*, gabarits LEGAL REVIEW REQUIRED). Absente : « provisoire ». Aucun effet d'accès. Lot STUDIO POST-H PORT V1 (docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md). Studio reste EXCLU de la première Preview : aucune valeur n'est à poser tant que Studio n'est pas déployé.",
+      "fail_mode": "default"
     }
   ]
 }

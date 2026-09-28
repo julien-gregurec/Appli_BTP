@@ -4,6 +4,7 @@ import Link from "next/link";
 import RenderPanel from "../../../components/RenderPanel";
 import TimelineEditor from "../../../components/TimelineEditor";
 import { projectStats } from "../../../lib/projects";
+import { getBrandKit } from "../../../lib/brand-kit";
 import { bytes } from "../../../lib/media-contract";
 import { notFound, redirect } from "next/navigation";
 import Shell from "../../../components/Shell";
@@ -41,6 +42,7 @@ export default async function Project({
   const p = access.project,
     context = await getActiveStudioWorkspace(p.workspace_id),
     limits = await mediaLimits(),
+    brandKit = await getBrandKit(p.workspace_id).catch(() => null),
     edit = canEditProject(access.role, p.status);
   return (
     <Shell context={context} page="projects">
@@ -93,7 +95,7 @@ export default async function Project({
           Format {p.target_aspect_ratio} · Durée{" "}
           {durationLabel(p.target_duration_seconds)}
         </p>
-        <p>Template : à configurer dans un prochain lot.</p>
+        <p>Choisissez un modèle dans l’éditeur de montage.</p>
       </section>
       <p>
         <Link href={`/projects/${p.id}/editor`} prefetch={false}>
@@ -110,6 +112,7 @@ export default async function Project({
         project={p.id}
         canWrite={edit}
         canDelete={edit && ["owner", "admin"].includes(access.role)}
+        brandKit={brandKit}
       />
       <RenderPanel project={p.id} canWrite={edit} />
       {edit && <ProjectOrdering project={p} />}

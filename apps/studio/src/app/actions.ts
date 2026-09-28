@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  parseBrandKitInput,
   canManageWorkspace,
   isStudioId,
   isStudioRole,
@@ -13,11 +14,19 @@ import {
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "../lib/supabase";
 import { studioOrigin } from "../lib/config";
+import { notices } from "../lib/notices";
+import {
+  InvitationError,
+  acceptInvitation as acceptInvitationRpc,
+  inviteMember as inviteMemberRpc,
+  revokeInvitation as revokeInvitationRpc,
+} from "../lib/invitations";
 import { canWrite, identityMode, READ_ONLY_MESSAGE } from "../lib/identity-policy";
 import {
   createPersonalStudioWorkspace,
   createStudioWorkspace,
   getActiveStudioWorkspace,
+  requireWritableStudioUser,
   StudioReadOnlyError,
 } from "../lib/workspaces";
 const field = (form: FormData, key: string) => {
@@ -183,4 +192,108 @@ export async function changeMember(form: FormData) {
     );
   revalidatePath("/", "layout");
   redirect(path);
+}
+// Lot post-H (porté) : identité de marque et invitations. Même garde que les autres écritures :
+// lecture seule (droit retiré, compte désactivé) refusée ici, puis par la base (studio_guard).
+export async function saveBrandKit(form: FormData) {
+  const { user, workspace, membership } = await getActiveStudioWorkspace(
+    field(form, "workspace"),
+  );
+  const path = `/brand-kit?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  let data: ReturnType<typeof parseBrandKitInput>;
+  try {
+    data = parseBrandKitInput({
+      company_name: field(form, "company_name"),
+      tagline: field(form, "tagline"),
+      phone: field(form, "phone"),
+      website: field(form, "website"),
+      email: "",
+      logo_asset_id: field(form, "logo") || null,
+    });
+  } catch {
+    failure(path, notices.brandInvalid);
+  }
+  const revision = Number(field(form, "revision"));
+  const client = await createStudioClient();
+  const { error } = await client.rpc("studio_save_brand_kit", {
+    p_workspace: workspace.id,
+    p_data: data,
+    p_revision: Number.isInteger(revision) && revision > 0 ? revision : null,
+  });
+  if (error)
+    failure(
+      path,
+      error.code === "40001"
+        ? notices.brandConflict
+        : error.code === "22023" && /Logo/.test(error.message)
+          ? notices.brandLogoInvalid
+          : error.code === "22023"
+            ? notices.brandInvalid
+            : notices.brandFailed,
+    );
+  revalidatePath("/", "layout");
+  redirect(`${path}&saved=1`);
+}
+export async function inviteMember(form: FormData) {
+  const { workspace, membership, user } = await getActiveStudioWorkspace(
+    field(form, "workspace"),
+  );
+  const path = `/settings/members?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  let result: Awaited<ReturnType<typeof inviteMemberRpc>>;
+  try {
+    result = await inviteMemberRpc(
+      workspace.id,
+      workspace.name,
+      user.email,
+      field(form, "email"),
+      field(form, "role"),
+    );
+  } catch (error) {
+    if (error instanceof InvitationError) failure(path, notices.inviteInvalid);
+    throw error;
+  }
+  revalidatePath("/settings/members");
+  // Sans fournisseur d'e-mail, le lien est affiché une fois pour être copié.
+  redirect(
+    `${path}&invited=${result.emailed ? "sent" : "link"}&link=${encodeURIComponent(result.emailed ? "" : result.url)}`,
+  );
+}
+export async function revokeInvitation(form: FormData) {
+  const { user, workspace, membership } = await getActiveStudioWorkspace(
+    field(form, "workspace"),
+  );
+  const path = `/settings/members?workspace=${workspace.id}`;
+  if (!canWrite(user.access)) failure(path, READ_ONLY_MESSAGE);
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  try {
+    await revokeInvitationRpc(field(form, "invitation"));
+  } catch {
+    failure(path, notices.inviteFailed);
+  }
+  revalidatePath("/settings/members");
+  redirect(path);
+}
+export async function acceptInvitation(form: FormData) {
+  const token = field(form, "token");
+  const back = `/invitations/${encodeURIComponent(token)}`;
+  let workspace: string;
+  try {
+    await requireWritableStudioUser();
+    workspace = await acceptInvitationRpc(token);
+  } catch (error) {
+    failure(
+      back,
+      error instanceof StudioReadOnlyError
+        ? READ_ONLY_MESSAGE
+        : error instanceof InvitationError
+          ? error.message
+          : "Invitation invalide ou expirée.",
+    );
+  }
+  revalidatePath("/", "layout");
+  redirect(`/dashboard?workspace=${workspace}`);
 }

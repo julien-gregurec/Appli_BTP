@@ -9,6 +9,7 @@ import { canWrite, READ_ONLY_MESSAGE } from "./identity-policy";
 import { storageAdmin, STUDIO_BUCKET, PREVIEW_SECONDS } from "./storage-admin";
 import { supabaseConfig } from "./config";
 import { inspectMedia } from "./media-inspection";
+import sharp from "sharp";
 import {
   validateFile,
   writable,
@@ -303,4 +304,31 @@ export async function getStudioMediaSignedUrl(id: string) {
     .createSignedUrl(asset.storage_key, PREVIEW_SECONDS);
   if (error || !data) throw new MediaError("Aperçu indisponible.", 503);
   return { url: data.signedUrl, expiresIn: PREVIEW_SECONDS };
+}
+/** Small WebP preview generated on demand from the private original (V1 pilot; browser-cached). */
+export async function getAssetThumbnail(id: string): Promise<Buffer> {
+  const { asset } = await authorizeAsset(id);
+  if (
+    asset.media_type !== "image" ||
+    asset.upload_status !== "ready" ||
+    asset.deleted_at
+  )
+    throw new MediaError("Miniature indisponible.", 404);
+  const file = await storageAdmin()
+    .storage.from(STUDIO_BUCKET)
+    .download(asset.storage_key);
+  if (file.error || !file.data)
+    throw new MediaError("Miniature indisponible.", 503);
+  try {
+    return await sharp(Buffer.from(await file.data.arrayBuffer()), {
+      limitInputPixels: 100_000_000,
+      failOn: "error",
+    })
+      .rotate()
+      .resize({ width: 320, height: 320, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 70 })
+      .toBuffer();
+  } catch {
+    throw new MediaError("Miniature indisponible.", 415);
+  }
 }

@@ -1,4 +1,4 @@
-import { textFilters } from "./text-layout.ts";
+import { textFilters, watermarkFilter } from "./text-layout.ts";
 import {
   validatePresentation,
   safeAreas,
@@ -36,6 +36,8 @@ export interface Probe {
 export interface Runtime {
   ffmpeg: string;
   ffprobe: string;
+  /** Set only from the server-side job snapshot: draws the ELSATIA watermark on the final encode. */
+  watermark?: boolean;
   signal: AbortSignal;
   progress: (stage: string, percent: number) => Promise<void>;
 }
@@ -160,7 +162,12 @@ export async function command(
     });
   });
 }
-export async function probe(path: string, r: Runtime): Promise<Probe> {
+export async function probe(
+  path: string,
+  r: Runtime,
+  // Untrusted inputs still get a bounded deadline (30 s: a saturated host took over 10 s); our own output waits longer.
+  timeoutMs = 30000,
+): Promise<Probe> {
   try {
     const result: Probe = JSON.parse(
       await command(
@@ -178,7 +185,7 @@ export async function probe(path: string, r: Runtime): Promise<Probe> {
           "json",
           path,
         ],
-        AbortSignal.any([r.signal, AbortSignal.timeout(10000)]),
+        AbortSignal.any([r.signal, AbortSignal.timeout(timeoutMs)]),
       ),
     );
     const v = result.streams.find((x) => x.codec_type === "video");
@@ -194,6 +201,64 @@ export async function probe(path: string, r: Runtime): Promise<Probe> {
   } catch {
     throw new RenderError("ASSET_UNREADABLE");
   }
+}
+/** Audio-only sibling of probe(): the track must contain a decodable audio stream and no video. */
+export async function probeAudio(path: string, r: Runtime): Promise<Probe> {
+  try {
+    const result: Probe = JSON.parse(
+      await command(
+        r.ffprobe,
+        [
+          "-v",
+          "error",
+          "-protocol_whitelist",
+          "file,pipe",
+          "-format_whitelist",
+          "mov,mp3,wav",
+          "-show_streams",
+          "-show_format",
+          "-of",
+          "json",
+          path,
+        ],
+        AbortSignal.any([r.signal, AbortSignal.timeout(20000)]),
+      ),
+    );
+    const a = result.streams.find((x) => x.codec_type === "audio");
+    if (
+      !a ||
+      result.streams.some((x) => x.codec_type === "video") ||
+      !(Number(result.format.duration) > 0.1)
+    )
+      throw new RenderError("MUSIC_UNREADABLE");
+    return result;
+  } catch {
+    throw new RenderError("MUSIC_UNREADABLE");
+  }
+}
+/**
+ * [1:a] is the (looped) track, [0:a] the montage's own audio. The track is cut to the video length,
+ * faded, then summed with a limiter so that loud clips plus music never clip.
+ */
+export function musicGraph(
+  m: { volume: number; fade_in_ms: number; fade_out_ms: number },
+  seconds: number,
+): string {
+  const fixed = (n: number) => n.toFixed(3),
+    fadeIn = Math.min(m.fade_in_ms / 1000, seconds),
+    fadeOut = Math.min(m.fade_out_ms / 1000, seconds);
+  const track = [
+    "aresample=48000",
+    "aformat=sample_fmts=fltp:channel_layouts=stereo",
+    `volume=${fixed(m.volume)}`,
+    ...(fadeIn > 0 ? [`afade=t=in:st=0:d=${fixed(fadeIn)}`] : []),
+    ...(fadeOut > 0
+      ? [`afade=t=out:st=${fixed(Math.max(0, seconds - fadeOut))}:d=${fixed(fadeOut)}`]
+      : []),
+    `atrim=0:${fixed(seconds)}`,
+    "asetpts=PTS-STARTPTS",
+  ].join(",");
+  return `[1:a]${track}[m];[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[c];[c][m]amix=inputs=2:duration=first:normalize=0:dropout_transition=0,alimiter=limit=0.95[a]`;
 }
 export function motionFilter(c: TimelineClipDraft, p: Profile, n: number) {
   const m = c.metadata_json.motion,
@@ -426,6 +491,15 @@ export async function renderTimeline(
     list,
     segments.map((s) => `file '${s.replaceAll("'", "'\\''")}'`).join("\n"),
   );
+  // Imported track (one per montage): looped when shorter, cut when longer, mixed under the clips' audio.
+  const track = t.presentation?.music ?? null;
+  let music: { path: string; settings: NonNullable<typeof track> } | null = null;
+  if (track) {
+    const path = files.get(track.asset_id);
+    if (!path) throw new RenderError("ASSET_MISSING");
+    await probeAudio(path, r);
+    music = { path, settings: track };
+  }
   const output = join(dir, "output.mp4");
   await command(
     r.ffmpeg,
@@ -439,10 +513,19 @@ export async function renderTimeline(
       "file,pipe",
       "-i",
       list,
+      ...(music
+        ? ["-stream_loop", "-1", "-protocol_whitelist", "file,pipe", "-i", music.path]
+        : []),
+      ...(music
+        ? ["-filter_complex", musicGraph(music.settings, frames(t.total_duration_ms) / 30)]
+        : []),
       "-map",
       "0:v",
       "-map",
-      "0:a",
+      music ? "[a]" : "0:a",
+      ...(r.watermark
+        ? ["-vf", await watermarkFilter(dir, p.width, p.height)]
+        : []),
       ...videoCodec,
       "-c:a",
       "aac",
@@ -458,7 +541,7 @@ export async function renderTimeline(
     ],
     r.signal,
   );
-  const result = await probe(output, r),
+  const result = await probe(output, r, 60000),
     v = result.streams.find((s) => s.codec_type === "video"),
     a = result.streams.find((s) => s.codec_type === "audio");
   if (

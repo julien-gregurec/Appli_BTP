@@ -76,7 +76,7 @@ export function selectWorkspace(
 export function safeStudioDestination(value: unknown): string {
   if (
     typeof value !== "string" ||
-    !/^\/(dashboard|settings|onboarding)(\?|$)/.test(value) ||
+    !/^\/((dashboard|settings|onboarding)(\?|$)|invitations\/[A-Za-z0-9_-]{43}$)/.test(value) ||
     /[\\\r\n]/.test(value)
   )
     return "/dashboard";
@@ -98,3 +98,4 @@ export * from "./templates";
 export * from "./editor";
 
 export * from "./analysis";
+export * from "./brand";

@@ -3,7 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { fixtures } from "./media-fixtures";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { mkdtemp } from "node:fs/promises";
+import { fixtures, fileInputReady } from "./media-fixtures";
 test.use({ actionTimeout: 15000 });
 const password = "Studio-Montage-Local-398!";
 async function user(page: Page) {
@@ -90,6 +94,7 @@ async function upload(page: Page, photos: number, videos: number) {
       mimeType: "video/mp4",
       buffer: sample.mp4,
     });
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     photos + videos,
@@ -110,7 +115,7 @@ async function render(page: Page, id: string) {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(panel.locator("[data-render-job]")).toHaveCount(1);
   const job = panel.locator("[data-render-job]").first();
-  await expect(job.getByRole("status")).toContainText("completed", {
+  await expect(job.getByRole("status")).toContainText("Terminé", {
     timeout: 600000,
   });
   await job.getByRole("button", { name: "Voir la vidéo", exact: true }).click();
@@ -579,4 +584,279 @@ test("Lot G 10 100 500 clips : DOM borné sélection et déplacement", async ({
     path: "test-results/studio-editor-500.png",
     fullPage: true,
   });
+});
+test("Lot S2 suppression au clavier sur sélection périmée et édition conservée à la navigation", async ({
+  page,
+}) => {
+  test.setTimeout(300000);
+  page.on("dialog", (d) => void d.accept());
+  const a = await setup(page, "Chantier S2", "chantier-pro", 3, 0);
+  const count = async () => (await montage(page, a.id)).active.clips.length;
+  const before = await count();
+  // Remove a photo clip (not the title card): the selection it held no longer exists.
+  await select(page, 2);
+  await page
+    .getByRole("button", { name: "Retirer du montage", exact: true })
+    .click();
+  await saved(page);
+  expect(await count()).toBe(before - 1);
+  // Delete with that stale selection must neither crash the page nor lose the history.
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Delete");
+  await expect(
+    page.getByRole("heading", { name: "Chantier S2", exact: true }),
+  ).toBeVisible();
+  await saved(page);
+  expect(await count()).toBeLessThanOrEqual(before - 1);
+  // The undo history survived: two undo steps restore the whole montage.
+  const undo = page.getByRole("button", {
+    name: "Annuler la modification",
+    exact: true,
+  });
+  await undo.click();
+  await saved(page);
+  if ((await count()) < before) {
+    await undo.click();
+    await saved(page);
+  }
+  expect(await count()).toBe(before);
+  // An edit made in the last debounce window survives a hard navigation.
+  await select(page, 1);
+  await page
+    .getByLabel("Contenu du texte", { exact: true })
+    .first()
+    .fill("Conservé à la sortie");
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/dashboard/);
+  await expect
+    .poll(async () => {
+      const r = await request(page, `/api/timelines/${a.id}`);
+      return JSON.stringify(r.body.active?.presentation?.overlays ?? []);
+    })
+    .toContain("Conservé à la sortie");
+});
+test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style et logo de la marque", async ({
+  page,
+}) => {
+  test.setTimeout(300000);
+  page.on("dialog", (d) => void d.accept());
+  const a = await setup(page, "Chantier Marque", "chantier-pro", 3, 0);
+  await page.goto(`/brand-kit?workspace=${a.workspace}`);
+  await page.getByLabel("Nom de l’entreprise").fill("Dupont Bâtiment");
+  await page.getByLabel("Signature (texte de fin par défaut)").fill("Rénover avec soin");
+  await page.getByLabel("Téléphone").fill("+33 3 88 00 00 00");
+  await page.getByLabel("Site web").fill("dupont.example");
+  await page.getByLabel("Logo").selectOption({ index: 1 });
+  await page
+    .getByRole("button", { name: "Enregistrer l’identité de marque" })
+    .click();
+  await expect(page.locator("p.notice")).toContainText(
+    "Identité de marque enregistrée.",
+  );
+  // Emoji cannot be drawn by the bundled fonts: refused before any render fails.
+  await page.getByLabel("Nom de l’entreprise").fill("Plage 😀");
+  await page
+    .getByRole("button", { name: "Enregistrer l’identité de marque" })
+    .click();
+  await expect(page.locator("p.notice")).toContainText("pas d’emoji");
+  await page.goto(`/brand-kit?workspace=${a.workspace}`);
+  await expect(page.getByLabel("Nom de l’entreprise")).toHaveValue(
+    "Dupont Bâtiment",
+  );
+  // The style form is prefilled from the kit and offers the brand logo.
+  await page.goto(`/projects/${a.id}`);
+  await page
+    .getByRole("button", { name: "Changer de style", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Choisir Chantier Pro", exact: true })
+    .click();
+  await expect(page.getByLabel("Entreprise (facultatif)")).toHaveValue(
+    "Dupont Bâtiment",
+  );
+  await expect(page.getByLabel("Téléphone (facultatif)")).toHaveValue(
+    "+33 3 88 00 00 00",
+  );
+  await expect(page.getByLabel("Texte de fin")).toHaveValue("Rénover avec soin");
+  await expect(page.locator('select[name="logo"]')).toHaveValue("__brand__");
+  await page.getByRole("button", { name: "Régénérer le montage" }).click();
+  await expect
+    .poll(async () => {
+      const r = await request(page, `/api/timelines/${a.id}`);
+      return r.body.active?.presentation?.logo?.asset_id ?? "";
+    })
+    .toMatch(/^[0-9a-f-]{36}$/);
+  const active = (await montage(page, a.id)).active;
+  expect(JSON.stringify(active.presentation)).toContain("Dupont Bâtiment");
+});
+test("Lot J2 partage : lien public sans session, robots, lien invalide, révocation et refus tiers", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(900000);
+  const a = await setup(page, "Chantier Partage", "chantier-pro", 3, 0);
+  await render(page, a.id);
+  // The gate forces 540x960 previews: promote the finished job to a final export in the disposable DB only.
+  const state = JSON.parse(
+    await readFile(join(process.cwd(), ".local-test.json"), "utf8"),
+  );
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      `supabase_db_${state.projectId}`,
+      "psql",
+      "-XAt",
+      "-U",
+      "postgres",
+      "-c",
+      `update public.studio_render_jobs set profile='standard' where project_id='${a.id}'`,
+    ],
+    { timeout: 30000 },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Créer un lien de partage (7 jours)" })
+    .first()
+    .click();
+  const link = await page.getByLabel("Lien de partage").inputValue();
+  expect(link).toMatch(/\/s\/[A-Za-z0-9_-]{43}$/);
+  const anonymous = await browser.newContext();
+  const visitor = await anonymous.newPage();
+  try {
+    await visitor.goto(link);
+    const video = visitor.getByLabel("Vidéo Chantier Partage");
+    await expect(video).toBeVisible();
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
+        timeout: 60000,
+      })
+      .toBeGreaterThanOrEqual(1);
+    await expect(visitor.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex/,
+    );
+    // No account data on the public page (the signed URL path carries only opaque storage UUIDs).
+    expect(await visitor.content()).not.toContain("@example.test");
+    await visitor.goto(`/s/${"a".repeat(43)}`);
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+    await visitor.goto("/s/court");
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+    // Another tenant cannot create or revoke links on this project.
+    const other = await browser.newPage();
+    const b = await user(other);
+    void b;
+    const denied = await request(other, `/api/renders/${a.id}`, {
+      action: "share",
+      output: randomUUID(),
+      days: 7,
+    });
+    expect([403, 404]).toContain(denied.status);
+    await other.close();
+    // Revocation is immediate for the public page.
+    await page
+      .getByRole("button", { name: "Révoquer ce lien" })
+      .first()
+      .click();
+    await expect(page.getByText("Lien révoqué")).toBeVisible();
+    await visitor.goto(link);
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+  } finally {
+    await anonymous.close();
+  }
+});
+
+// ---- Lot M: imported music -------------------------------------------------
+const workerRequire = createRequire(
+  join(process.cwd(), "../../workers/studio-video/package.json"),
+);
+const ffmpegBinary = workerRequire("ffmpeg-static") as string;
+const ffprobeBinary = (workerRequire("ffprobe-static") as { path: string }).path;
+function audioWindow(file: string, from: number, length: number) {
+  const pcm = execFileSync(ffmpegBinary, [
+    "-v", "error", "-ss", String(from), "-t", String(length), "-i", file,
+    "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1",
+  ]);
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i += 4) sum += pcm.readFloatLE(i) ** 2;
+  return Math.sqrt(sum / Math.max(1, pcm.length / 4));
+}
+async function tracks(dir: string) {
+  const make = (name: string, seconds: number) => {
+    execFileSync(ffmpegBinary, [
+      "-y", "-v", "error", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, join(dir, name),
+    ]);
+    return join(dir, name);
+  };
+  return { short: make("court.wav", 2), long: make("long.mp3", 40) };
+}
+async function downloadLatest(page: Page, id: string, name: string) {
+  const list = await request(page, `/api/renders/${id}`);
+  const output = list.body.outputs[0];
+  const signed = await request(page, `/api/renders/${id}`, { action: "preview", output: output.id });
+  const bytes = await (await page.request.get(signed.body.url)).body();
+  const file = test.info().outputPath(name);
+  await writeFile(file, bytes);
+  return file;
+}
+test("Lot M musique : import, choix, rendu AAC audible, remplacement, suppression et fichier manquant", async ({ page }) => {
+  test.setTimeout(900000);
+  const a = await setup(page, "Chantier Musique", "chantier-pro", 3, 0);
+  const dir = await mkdtemp(join(tmpdir(), "studio-music-e2e-"));
+  const files = await tracks(dir);
+  // Import the two tracks in the media library like any other media.
+  await page.goto(`/projects/${a.id}`);
+  await fileInputReady(page);
+  await page.getByLabel("Choisir des fichiers").setInputFiles([files.short, files.long]);
+  await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(2, { timeout: 180000 });
+  await page.reload();
+  await expect(page.getByText("MUSIQUE", { exact: true }).first()).toBeVisible();
+  // A track is not a clip: it never appears among the media offered for the montage.
+  await page.goto(`/projects/${a.id}/editor`);
+  const picker = page.getByLabel("Média à ajouter ou remplacer");
+  await expect(picker.locator("option", { hasText: "long.mp3" })).toHaveCount(0);
+  // Choose the long track (cut to the video length) with a fade-out.
+  const musicSelect = page.getByLabel("Musique du montage");
+  await musicSelect.selectOption({ label: "long.mp3" });
+  await page.getByLabel("Fondu de sortie (secondes)").fill("1");
+  await saved(page);
+  const stored = (await montage(page, a.id)).active.presentation.music;
+  expect(stored).toMatchObject({ volume: 0.5, fade_in_ms: 500, fade_out_ms: 1000 });
+  await page.reload();
+  await expect(page.getByLabel("Musique du montage").locator("option:checked")).toHaveText("long.mp3");
+  // Real render: AAC audio, audible music, montage duration unchanged (40 s track cut to the video).
+  await render(page, a.id);
+  const first = test.info().outputPath("edited-output.mp4");
+  expect(audioWindow(first, 1, 1)).toBeGreaterThan(0.01);
+  const probe = JSON.parse(execFileSync(ffprobeBinary, ["-v", "error", "-show_streams", "-of", "json", first]).toString());
+  expect(probe.streams.find((s: { codec_type: string }) => s.codec_type === "audio").codec_name).toBe("aac");
+  // Replace by the shorter track (looped) and render again.
+  await page.getByLabel("Musique du montage").selectOption({ label: "court.wav" });
+  await saved(page);
+  await page.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Vidéo exportée" });
+  await expect(panel.locator("[data-render-job]")).toHaveCount(2, { timeout: 60000 });
+  await expect(panel.locator("[data-render-job]").first().getByRole("status")).toContainText("Terminé", { timeout: 600000 });
+  const second = await downloadLatest(page, a.id, "replaced.mp4");
+  expect(audioWindow(second, 0.5, 1)).toBeGreaterThan(0.01);
+  // Removal: no music selected anymore, persisted.
+  await page.getByLabel("Musique du montage").selectOption({ label: "Aucune musique" });
+  await saved(page);
+  expect((await montage(page, a.id)).active.presentation.music ?? null).toBeNull();
+  // A track whose file vanished is refused with a clear message, never a silent render.
+  await page.getByLabel("Musique du montage").selectOption({ label: "long.mp3" });
+  await saved(page);
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.STUDIO_STORAGE_SERVICE_KEY!, { auth: { persistSession: false } });
+  const order = await request(page, `/api/projects/${a.id}/order`);
+  const longAsset = order.body.assets.find((x: { original_filename: string }) => x.original_filename === "long.mp3");
+  expect((await admin.storage.from("studio-originals").remove([longAsset.storage_key])).error).toBeNull();
+  await page.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("introuvable", { timeout: 60000 });
 });
