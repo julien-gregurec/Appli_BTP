@@ -1,5 +1,12 @@
 import { euros } from "@/lib/devis";
 
+// Ce module est aussi chargé côté navigateur (EmailDocumentButton) : il n'importe pas
+// `@elsatia/email`, qui porte le transport serveur. Même échappement que
+// `echapperHtml` du paquet (couvert par email.test.ts).
+function echapperHtml(valeur: string): string {
+  return valeur.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 type ClientMail = { nom: string | null; prenom: string | null; societe: string | null; email: string | null };
 
 export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string}){
@@ -54,13 +61,18 @@ export function contenuEmailDocument(opts: {
 // Version HTML du même message texte que contenuEmailDocument(), avec un
 // bouton d'accès au document. Le texte source reste la référence : cette
 // fonction ne fait qu'y ajouter une mise en forme minimale + le lien.
+//
+// Le texte source contient des données saisies (raison sociale, nom du client, prénom de
+// l'émetteur, lien de paiement) : il est échappé bloc par bloc, et le lien aussi. Un lien
+// qui n'est pas http(s) n'est pas rendu.
 export function corpsHtmlEmailDocument(corpsTexte: string, lienDocument: string | null): string {
   const paragraphes = corpsTexte
     .split("\n\n")
-    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").join("<br>")}</p>`)
+    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").map(echapperHtml).join("<br>")}</p>`)
     .join("");
-  const bouton = lienDocument
-    ? `<p style="margin:20px 0;"><a href="${lienDocument}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Consulter le document</a></p>`
+  const lienSur = lienDocument && /^https?:\/\//i.test(lienDocument) ? echapperHtml(lienDocument) : null;
+  const bouton = lienSur
+    ? `<p style="margin:20px 0;"><a href="${lienSur}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Consulter le document</a></p>`
     : "";
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px;">${paragraphes}${bouton}</div>`;
 }

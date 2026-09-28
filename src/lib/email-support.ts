@@ -1,4 +1,5 @@
 import { MARQUE } from "@/lib/brand";
+import { ligneLegale } from "@elsatia/email";
 
 // E-mail ELSATIA → demandeur, envoyé quand le support répond dans le fil in-app.
 // Fonctions PURES, sur le modèle de `src/lib/email-abonnement.ts` : aucun envoi,
@@ -103,6 +104,8 @@ export function contenuEmailReponseSupport(opts: {
     "",
     "Cordialement,",
     `L'équipe ${MARQUE}`,
+    "--",
+    ligneLegale(),
   ].join("\n");
 
   return {

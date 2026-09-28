@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { brevoEstConfigure, envoyerEmailBrevo } from "./brevo";
 
 afterEach(() => {
@@ -21,6 +21,13 @@ describe("brevoEstConfigure", () => {
 });
 
 describe("envoyerEmailBrevo", () => {
+  // Ces cas décrivent le transport de PRODUCTION : hors Production, la garde des
+  // destinataires s'applique d'abord (voir le bloc suivant).
+  beforeEach(() => {
+    vi.stubEnv("ELSATIA_APPLICATION_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "");
+  });
+
   it("échoue explicitement si Brevo n'est pas configuré", async () => {
     vi.stubEnv("BREVO_API_KEY", "");
     vi.stubEnv("EMAIL_FROM_ADDRESS", "");
@@ -96,5 +103,52 @@ describe("envoyerEmailBrevo", () => {
     await expect(envoyerEmailBrevo({ to: "client@example.invalid", sujet: "Rappel", texte: "Bonjour" })).rejects.toThrow(
       "Envoi email impossible (Brevo a répondu 401)",
     );
+  });
+});
+
+describe("envoyerEmailBrevo hors Production", () => {
+  beforeEach(() => {
+    vi.stubEnv("BREVO_API_KEY", "clé-test");
+    vi.stubEnv("EMAIL_FROM_ADDRESS", "no-reply@elsatia.fr");
+    vi.stubEnv("ELSATIA_APPLICATION_ENV", "preview");
+  });
+
+  it("bloque un destinataire hors liste AVANT tout appel réseau", async () => {
+    vi.stubEnv("EMAIL_PREVIEW_ALLOWLIST", "qa@elsatia.fr");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(envoyerEmailBrevo({ to: "vrai.client@example.com", sujet: "Facture", texte: "Bonjour" })).rejects.toThrow(
+      "Envoi e-mail bloqué hors Production",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("bloque tout le monde quand la liste est absente", async () => {
+    vi.stubEnv("EMAIL_PREVIEW_ALLOWLIST", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(envoyerEmailBrevo({ to: "qa@elsatia.fr", sujet: "T", texte: "B" })).rejects.toThrow("bloqué");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sert un destinataire autorisé, avec objet préfixé et bannière", async () => {
+    vi.stubEnv("EMAIL_PREVIEW_ALLOWLIST", "@elsatia.fr");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ messageId: "m" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await envoyerEmailBrevo({ to: "qa@elsatia.fr", sujet: "Facture F-1", texte: "Bonjour", html: "<html><body><p>x</p></body></html>" });
+    const corps = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(corps.subject).toBe("[PREVIEW] Facture F-1");
+    expect(corps.textContent).toContain("PREVIEW — e-mail émis depuis un environnement de test");
+    expect(corps.htmlContent).toContain("data-elsatia-environnement");
+  });
+
+  it("une Preview Vercel qui hérite de ELSATIA_APPLICATION_ENV=production reste une Preview", async () => {
+    vi.stubEnv("ELSATIA_APPLICATION_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_PREVIEW_ALLOWLIST", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(envoyerEmailBrevo({ to: "client@example.com", sujet: "T", texte: "B" })).rejects.toThrow("bloqué");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

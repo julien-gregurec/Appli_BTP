@@ -956,7 +956,8 @@
         "gestion_pro",
         "colors",
         "reserves",
-        "studio"
+        "studio",
+        "platform"
       ],
       "required": true,
       "environments": [
@@ -970,7 +971,7 @@
       "build_time": true,
       "runtime": true,
       "category": "env_indicator",
-      "description": "INDICATEUR D'ENVIRONNEMENT CANONIQUE : local | test | preview | production. Doit être posé explicitement sur tout déploiement. Repli actuel du code quand il est absent ou inconnu : « local » (URL localhost dans le sélecteur d'applications) : un déploiement mal configuré se croit local. Studio (2026-09-27) : lue pour interdire STUDIO_IDENTITY_MODE=local en preview|production (apps/studio/src/lib/identity-policy.ts, garde de build apps/studio/scripts/verify-identity-mode.mjs).",
+      "description": "INDICATEUR D'ENVIRONNEMENT CANONIQUE : local | test | preview | production. Doit être posé explicitement sur tout déploiement. Repli actuel du code quand il est absent ou inconnu : « local » (URL localhost dans le sélecteur d'applications) : un déploiement mal configuré se croit local. Studio (2026-09-27) : lue pour interdire STUDIO_IDENTITY_MODE=local en preview|production (apps/studio/src/lib/identity-policy.ts, garde de build apps/studio/scripts/verify-identity-mode.mjs). E-mails (2026-09-28) : packages/email/src/environnement.ts n'autorise l'envoi à un destinataire quelconque qu'en Production AVÉRÉE (valeur « production » ET VERCEL_ENV absent ou « production ») ; tout autre cas applique EMAIL_PREVIEW_ALLOWLIST (docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md).",
       "fail_mode": "default",
       "deprecated": false,
       "replacement": null,
@@ -1045,7 +1046,8 @@
     {
       "name": "NEXT_PUBLIC_APP_URL",
       "applications": [
-        "gestion_pro"
+        "gestion_pro",
+        "platform"
       ],
       "required": true,
       "environments": [
@@ -1070,7 +1072,8 @@
       "name": "NEXT_PUBLIC_COLORS_URL",
       "applications": [
         "colors",
-        "gestion_pro"
+        "gestion_pro",
+        "platform"
       ],
       "required": true,
       "environments": [
@@ -1124,7 +1127,8 @@
     {
       "name": "NEXT_PUBLIC_RESERVES_URL",
       "applications": [
-        "reserves"
+        "reserves",
+        "platform"
       ],
       "required": true,
       "environments": [
@@ -1151,7 +1155,8 @@
     {
       "name": "NEXT_PUBLIC_TOOLS_URL",
       "applications": [
-        "tools"
+        "tools",
+        "platform"
       ],
       "required": false,
       "environments": [
@@ -1175,7 +1180,8 @@
     {
       "name": "NEXT_PUBLIC_STUDIO_URL",
       "applications": [
-        "studio"
+        "studio",
+        "platform"
       ],
       "required": true,
       "environments": [
@@ -1431,7 +1437,8 @@
     {
       "name": "SUPPORT_EMAIL",
       "applications": [
-        "gestion_pro"
+        "gestion_pro",
+        "platform"
       ],
       "required": false,
       "environments": [
@@ -1444,13 +1451,39 @@
       "build_time": false,
       "runtime": true,
       "category": "email",
-      "description": "Adresse de contact affichée aux utilisateurs (boîte professionnelle).",
+      "description": "Adresse de contact affichée aux utilisateurs (boîte professionnelle). Également l'adresse de contact des e-mails transactionnels (packages/email/src/identite.ts) : absente ou mal formée, aucun e-mail n'affiche d'adresse. contact@elsatia.fr n'est PAS une valeur par défaut du code.",
       "fail_mode": "default",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
       "required_when": "dès que l'envoi d'e-mails est activé"
+    },
+    {
+      "name": "EMAIL_PREVIEW_ALLOWLIST",
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "Liste d'autorisation des destinataires HORS Production (packages/email/src/destinataires.ts) : adresses exactes et/ou domaines exacts préfixés par @ (ex. « qa@elsatia.fr, @recette.elsatia.fr »), séparés par virgule, point-virgule ou espace ; aucun joker. Absente ou vide : AUCUN e-mail applicatif ne part hors Production (EnvoiEmailBloqueError avant tout appel réseau). Ignorée en Production avérée. Ne concerne pas les e-mails Supabase Auth (SMTP du projet).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "pour recevoir un e-mail applicatif en Preview ou en local"
     },
     {
       "name": "RATE_LIMIT_HMAC_KEY",

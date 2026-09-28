@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
+import { origineApplication, resoudreEnvironnementEmail } from "@elsatia/email";
 
 /**
  * Jeton d'invitation à une intervention.
@@ -26,9 +27,19 @@ export const DUREE_INVITATION_JOURS = 30;
 /**
  * URL publique de l'application Réserves. Sert à composer le lien d'invitation : il doit
  * être absolu, puisqu'il voyage par e-mail.
+ *
+ * L'origine est validée par le registre commun (`@elsatia/email`) : en Production,
+ * `https://reserves.elsatia.fr` exactement ; en Preview, HTTPS et jamais un hôte de
+ * Production. Le repli `http://localhost:3020` n'existe plus qu'en local et en test :
+ * ailleurs, une origine absente ou invalide LÈVE plutôt que d'envoyer un lien mort ou
+ * pointant vers une autre application.
  */
 export function urlApplicationReserves(): string {
-  return (process.env.NEXT_PUBLIC_RESERVES_URL ?? "http://localhost:3020").replace(/\/+$/, "");
+  const origine = origineApplication("reserves");
+  if (origine.ok) return origine.origine;
+  const env = resoudreEnvironnementEmail();
+  if ((env === "local" || env === "test") && origine.motif === "origine_absente") return "http://localhost:3020";
+  throw new Error(`Origine publique de Réserves inutilisable (${origine.motif}) : aucun lien n'est émis.`);
 }
 
 export function urlInvitation(jeton: string): string {

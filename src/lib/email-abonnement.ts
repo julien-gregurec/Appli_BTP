@@ -1,6 +1,7 @@
 import { euros } from "@/lib/devis";
 import { offreTarifaireParCle } from "@/lib/tarification";
 import { MARQUE } from "@/lib/brand";
+import { echapperHtml, ligneLegale } from "@elsatia/email";
 
 // Emails métier ELSATIA → entreprise cliente (abonnement), à distinguer des
 // emails entreprise cliente → ses propres clients (devis/factures/relances,
@@ -9,13 +10,15 @@ import { MARQUE } from "@/lib/brand";
 
 export type ContenuEmail = { sujet: string; texte: string; html: string };
 
+// Le nom d'entreprise est une donnée saisie : tout le texte est échappé, et le lien
+// (facture hébergée Stripe) n'est rendu que s'il est en https.
 function paragraphesHtml(texte: string, bouton?: { libelle: string; lien: string } | null) {
   const corps = texte
     .split("\n\n")
-    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").join("<br>")}</p>`)
+    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").map(echapperHtml).join("<br>")}</p>`)
     .join("");
-  const action = bouton
-    ? `<p style="margin:20px 0;"><a href="${bouton.lien}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">${bouton.libelle}</a></p>`
+  const action = bouton && /^https:\/\//i.test(bouton.lien)
+    ? `<p style="margin:20px 0;"><a href="${echapperHtml(bouton.lien)}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">${echapperHtml(bouton.libelle)}</a></p>`
     : "";
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px;">${corps}${action}</div>`;
 }
@@ -83,6 +86,9 @@ export function contenuEmailPaiementEchoue(opts: {
     "",
     "Cordialement,",
     `L'équipe ${MARQUE}`,
+    "--",
+    // Ligne légale commune (packages/email) : éditeur et RCS, jamais l'adresse personnelle.
+    ligneLegale(),
   ].join("\n");
 
   return {

@@ -16,6 +16,9 @@ export const HOTES_ELSATIA_PAR_DEFAUT: readonly string[] = [
   "colors.elsatia.fr",
   "outils.elsatia.fr",
   "reserves.elsatia.fr",
+  // Alignement sur le registre des applications de `@elsatia/email` (APPLICATIONS_EMAIL).
+  "tools.elsatia.fr",
+  "studio.elsatia.fr",
 ];
 
 export type ResultatLien =

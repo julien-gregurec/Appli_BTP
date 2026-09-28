@@ -314,7 +314,9 @@ export async function reinitialiserMotDePassePlateformeAction(entrepriseId:strin
   if(erreurVerification)redirect(`/plateforme?error=${encodeURIComponent(erreurVerification.message)}`);
   const{error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo});
   if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
-  redirect(`/plateforme?succes=${encodeURIComponent(`Lien de réinitialisation envoyé à ${email}`)}`);
+  // L'adresse ne voyage pas dans l'URL de retour (historique, journaux d'accès) : l'opérateur
+  // vient de la saisir, et l'action est journalisée avec elle côté base.
+  redirect(`/plateforme?succes=${encodeURIComponent("Lien de réinitialisation envoyé")}`);
 }
 
 export async function signalerImpayePlateformeAction(entrepriseId:string,formData:FormData){
