@@ -224,8 +224,8 @@ export STUDIO_IDENTITY_REVALIDATE_S=43200
 export STUDIO_IDENTITY_MAX_SESSION_S=86400
 export STUDIO_RENDER_TMP=$E2E_DIR/render-tmp
 export STUDIO_RENDER_TIMEOUT_SECONDS=300
-export STUDIO_FFMPEG_PATH=\${STUDIO_FFMPEG_PATH:-$(command -v ffmpeg || true)}
-export STUDIO_FFPROBE_PATH=\${STUDIO_FFPROBE_PATH:-$(command -v ffprobe || true)}
+export STUDIO_FFMPEG_PATH=${STUDIO_FFMPEG_PATH:-$(command -v ffmpeg || true)}
+export STUDIO_FFPROBE_PATH=${STUDIO_FFPROBE_PATH:-$(command -v ffprobe || true)}
 EOF
   # shellcheck disable=SC1091
   source "$E2E_DIR/env.sh"

@@ -131,3 +131,42 @@ export async function waitFor<T>(fn: () => T | Promise<T>, ok: (v: T) => boolean
   }
   return last;
 }
+
+/** Fichiers de test réels : JPEG/PNG (sharp), MP4 H.264 + AAC et MP3 (ffmpeg du banc). */
+export async function mediaFixtures() {
+  const { mkdtempSync, existsSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const sharp = (await import("sharp")).default;
+  const dir = mkdtempSync(join(tmpdir(), "studio-e2e-media-"));
+  const jpg = join(dir, "photo-chantier.jpg");
+  const png = join(dir, "logo-entreprise.png");
+  const mp4 = join(dir, "clip.mp4");
+  const mp3 = join(dir, "musique.mp3");
+  await sharp({ create: { width: 320, height: 200, channels: 3, background: { r: 200, g: 120, b: 40 } } }).jpeg().toFile(jpg);
+  await sharp({ create: { width: 256, height: 256, channels: 4, background: { r: 20, g: 90, b: 160, alpha: 1 } } }).png().toFile(png);
+  const ffmpeg = process.env.STUDIO_FFMPEG_PATH || "ffmpeg";
+  execFileSync(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=25:duration=2", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-profile:v", "baseline", "-c:a", "aac", "-shortest", "-movflags", "+faststart", mp4]);
+  execFileSync(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=3", "-c:a", "libmp3lame", "-b:a", "96k", mp3]);
+  for (const f of [jpg, png, mp4, mp3]) if (!existsSync(f)) throw new Error(`fixture absente ${f}`);
+  return { dir, jpg, png, mp4, mp3 };
+}
+
+/** Importe des fichiers par la vraie interface (tus → storage-api) et attend « prêt » en base. */
+export async function uploadMedia(page: Page, projectId: string, files: string[]) {
+  await page.goto(`/projects/${projectId}`);
+  const before = Number(studioSql(`select count(*) from studio_media_assets where project_id = ${quote(projectId)} and upload_status = 'ready'`));
+  await page.locator('input[type="file"]').first().setInputFiles(files);
+  await waitFor(
+    () => Number(studioSql(`select count(*) from studio_media_assets where project_id = ${quote(projectId)} and upload_status = 'ready'`)),
+    (n) => n >= before + files.length,
+    120_000,
+  );
+  return studioSql(`select id || '|' || original_filename || '|' || storage_key from studio_media_assets where project_id = ${quote(projectId)} and upload_status='ready' order by created_at`)
+    .split("\n")
+    .map((l) => {
+      const [id, name, key] = l.split("|");
+      return { id, name, key };
+    });
+}
