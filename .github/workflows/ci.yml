@@ -149,3 +149,26 @@ jobs:
           name: seeds-report
           path: seeds-report.json
           if-no-files-found: ignore
+
+  # Train canonique V6 : chaîne du projet Supabase DÉDIÉ Studio (apps/studio/supabase/migrations
+  # seule) sur PostgreSQL 16 vierge, garde d'écriture centrale, fondation RGPD et suites pgTAP
+  # Studio ; échoue si une table non Studio apparaît dans le projet dédié. Aucun service distant.
+  # Voir docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md (§15, D6).
+  studio-dedicated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: PostgreSQL 16 local + pgTAP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-16-pgtap postgresql-plpython3-16 python3-nacl
+          sudo systemctl start postgresql
+
+      # Copie lisible par le rôle système `postgres` (le script lit les migrations en `su postgres`).
+      - name: Chaîne dédiée Studio + pgTAP
+        run: |
+          sudo cp -r "$GITHUB_WORKSPACE" /tmp/elsatia-ci && sudo chmod -R a+rX /tmp/elsatia-ci
+          sudo bash /tmp/elsatia-ci/apps/studio/scripts/dedicated-db-check.sh
