@@ -28,7 +28,7 @@ export default async function DemarragePage() {
   return <main className="min-h-screen bg-neutral-50 p-4 sm:p-8 dark:bg-neutral-950">
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="rounded-2xl bg-[#0d1b2a] p-6 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e5c978]">Liria Gestion Pro V3</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e5c978]">ELSATIA Gestion Pro V3</p>
         <h1 className="mt-2 text-2xl font-semibold">Préparez votre espace de travail</h1>
         <p className="mt-2 text-sm text-white/70">Ces étapes utilisent les données réelles de {ctx.entrepriseNom}. Vous pouvez les réaliser dans l’ordre qui vous convient.</p>
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full bg-[#c9a24a]" style={{ width: `${Math.round(completed / steps.length * 100)}%` }}/></div>

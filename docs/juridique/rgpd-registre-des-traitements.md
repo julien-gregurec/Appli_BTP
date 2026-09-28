@@ -1,7 +1,10 @@
 # Registre des activités de traitement
 
 _Document interne — Article 30 du RGPD — à conserver et tenir à jour._
-_Responsable : [Julien GREGUREC], entrepreneur individuel — [contact@liria… ] — Dernière mise à jour : [JJ/MM/AAAA]_
+_Responsable : Julien GREGUREC, entrepreneur individuel (EI), 850 559 873 R.C.S. Strasbourg — contact@elsatia.fr — Dernière mise à jour : 28/09/2026_
+
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
+
 
 Ce registre recense les traitements réalisés **en tant que responsable de traitement**. Les traitements réalisés pour le compte des entreprises clientes (sous-traitance) relèvent du DPA et du registre du sous-traitant (ci-dessous, §7).
 

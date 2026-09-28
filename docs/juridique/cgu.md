@@ -1,10 +1,12 @@
 # Conditions Générales d'Utilisation (CGU)
 
-_Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
+_Dernière mise à jour : 28/09/2026 — Version 1.0_
+
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
 
 ## Article 1 — Objet
 
-Les présentes Conditions Générales d'Utilisation (« CGU ») définissent les règles d'accès et d'usage du service **Liria Gestion Pro** (« le Service »). Elles complètent les Conditions Générales de Vente et la Politique de confidentialité.
+Les présentes Conditions Générales d'Utilisation (« CGU ») définissent les règles d'accès et d'usage du service **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC**, entrepreneur individuel (EI), immatriculé sous le numéro **850 559 873 R.C.S. Strasbourg** (« l'Éditeur »). Elles complètent les Conditions Générales de Vente et la Politique de confidentialité.
 
 ## Article 2 — Accès au Service
 

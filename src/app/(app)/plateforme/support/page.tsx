@@ -64,7 +64,7 @@ export default async function PlateformeSupportPage({ searchParams }: { searchPa
                     return (
                       <div key={m.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${plateforme ? "self-end bg-[#0d1b2a] text-white" : "self-start bg-neutral-100 dark:bg-neutral-800"}`}>
                         <div className={`mb-0.5 text-[10px] uppercase tracking-wide ${plateforme ? "text-white/60" : "text-neutral-500"}`}>
-                          {plateforme ? "Support LIRIA" : m.auteur_nom || "Entreprise"}
+                          {plateforme ? "Support ELSATIA" : m.auteur_nom || "Entreprise"}
                         </div>
                         <div className="whitespace-pre-wrap">{m.contenu}</div>
                         <div className={`mt-1 text-[10px] ${plateforme ? "text-white/50" : "text-neutral-400"}`}>

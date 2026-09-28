@@ -315,7 +315,7 @@ export async function preparerConnecteurFournisseurLibreAction(formData: FormDat
     activation_demandee_at: new Date().toISOString(),
     configuration: { portail_url: portailUrl, fournisseur_libre: true, aucun_secret_stocke: true },
     dernier_message: mode === "portail"
-      ? "Compte fournisseur référencé. Le portail peut être ouvert depuis Liria Gestion Pro et les tarifs peuvent être importés."
+      ? "Compte fournisseur référencé. Le portail peut être ouvert depuis ELSATIA Gestion Pro et les tarifs peuvent être importés."
       : "Connexion préparée. Demandez au fournisseur ses paramètres officiels ou son fichier de tarifs négociés.",
     updated_at: new Date().toISOString(),
   }, { onConflict: "entreprise_id,domaine,nom" });

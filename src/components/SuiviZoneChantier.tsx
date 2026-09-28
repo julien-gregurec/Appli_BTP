@@ -97,7 +97,7 @@ export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: 
       📍 Suivi de zone actif — votre position est vérifiée toutes les {frequenceMinutes} minutes pendant que vous êtes pointé.
       {dernierStatut === "hors_zone" && " Vous semblez hors de la zone du chantier."}
       {suiviSuspendu && " Autorisez la localisation précise pour poursuivre le suivi."}
-      {" Gardez Liria ouverte en arrière-plan : le téléphone peut suspendre le suivi si l’application est fermée ou forcée à quitter."}
+      {" Gardez ELSATIA ouverte en arrière-plan : le téléphone peut suspendre le suivi si l’application est fermée ou forcée à quitter."}
     </p>
   );
 }

@@ -226,7 +226,7 @@ export async function ouvrirPortailAbonnementSuspenduAction() {
   const { data: permission } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", "gerer_parametres").eq("autorise", true).maybeSingle() : { data: null };
   if (support !== true && !permission) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Seul un administrateur peut gérer l’abonnement")}`);
   const { data: entreprise } = await supabase.from("entreprises").select("stripe_customer_id").eq("id", profil.entreprise_active_id).maybeSingle();
-  if (!entreprise?.stripe_customer_id) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Aucun abonnement Stripe n’est associé. Contactez Liria Gestion Pro.")}`);
+  if (!entreprise?.stripe_customer_id) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Aucun abonnement Stripe n’est associé. Contactez ELSATIA Gestion Pro.")}`);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!baseUrl) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Adresse publique non configurée")}`);
   let destination: string;

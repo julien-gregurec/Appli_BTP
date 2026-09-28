@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { verifierCommercialisationOuverte } from "@/lib/identite-legale";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -190,6 +191,7 @@ export async function creerSessionAbonnementStripe(params: {
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
 }) {
+  verifierCommercialisationOuverte();
   const prix = prixStripePour(params.offre, params.periodicite);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!prix || !baseUrl) throw new Error("Les tarifs Stripe Billing ne sont pas encore configurés");

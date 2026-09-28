@@ -39,8 +39,8 @@ export function Sidebar({
     <header className="fixed inset-x-0 top-0 z-[60] flex h-16 items-center justify-between border-b border-[#243447] bg-[#0d1b2a] px-4 text-white md:hidden">
       <div className="flex min-w-0 items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" className="h-10 w-14 rounded bg-white object-contain p-1" />
-        <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.08em]">LIRIA <span className="text-[#c9a24a]">GESTION PRO</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
+        <img src="/liria-gestion-pro-logo-v5.png" alt="ELSATIA Gestion Pro" className="h-10 w-14 rounded bg-white object-contain p-1" />
+        <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.08em]">ELSATIA <span className="text-[#c9a24a]">GESTION PRO</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
       </div>
       <button type="button" onClick={() => setOuvert((valeur) => !valeur)} aria-label="Ouvrir le menu" aria-expanded={ouvert} aria-controls="navigation-mobile" className="relative z-[65] touch-manipulation rounded-md border border-white/30 px-4 py-2 text-sm font-semibold active:bg-white/20">☰ Menu</button>
     </header>
@@ -49,9 +49,9 @@ export function Sidebar({
       <div className="border-b border-white/10 p-4">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={58} height={40} className="h-10 w-[58px] rounded bg-white object-contain p-1" />
+          <img src="/liria-gestion-pro-logo-v5.png" alt="ELSATIA Gestion Pro" width={58} height={40} className="h-10 w-[58px] rounded bg-white object-contain p-1" />
           <div className="min-w-0">
-            <div className="text-sm font-semibold tracking-[0.14em]">LIRIA</div>
+            <div className="text-sm font-semibold tracking-[0.14em]">ELSATIA</div>
             <div className="text-[10px] tracking-[0.16em] text-[#c9a24a]">GESTION PRO <span className="rounded border border-[#c9a24a]/50 px-1">V3</span></div>
           </div>
           <button type="button" onClick={() => setOuvert(false)} className="ml-auto rounded px-2 py-1 text-2xl text-white/70 md:hidden" aria-label="Fermer le menu">×</button>

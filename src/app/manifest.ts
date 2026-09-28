@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Liria Gestion Pro",
-    short_name: "Liria Pro",
+    name: "ELSATIA Gestion Pro",
+    short_name: "ELSATIA Pro",
     description: "Gestion des chantiers, équipes, devis, factures, stock et matériel pour les entreprises du BTP.",
     start_url: "/dashboard",
     scope: "/",

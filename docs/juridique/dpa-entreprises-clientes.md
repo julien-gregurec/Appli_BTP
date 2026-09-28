@@ -1,8 +1,10 @@
 # Accord de traitement des données (DPA)
 
 _Annexe aux Conditions Générales de Vente — Article 28 du RGPD_
-_Entre l'entreprise cliente (« le Responsable de traitement ») et [Julien GREGUREC], entrepreneur individuel, éditeur de Liria Gestion Pro (« le Sous-traitant »)._
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Entre l'entreprise cliente (« le Responsable de traitement ») et Julien GREGUREC, entrepreneur individuel (EI), 850 559 873 R.C.S. Strasbourg, éditeur d'ELSATIA Gestion Pro (« le Sous-traitant »)._
+_Dernière mise à jour : 28/09/2026_
+
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
 
 ## 1. Objet
 
@@ -46,7 +48,7 @@ Le Responsable :
 
 ## 7. Localisation et transferts
 
-Les données sont hébergées dans l'Union européenne (**région à confirmer**). Tout transfert hors UE par un sous-traitant ultérieur est encadré par des clauses contractuelles types ou un mécanisme équivalent.
+Les données sont hébergées dans l'Union européenne (**région à confirmer**). <!-- LEGAL_REVIEW_REQUIRED: confirmer la région Supabase. --> Tout transfert hors UE par un sous-traitant ultérieur est encadré par des clauses contractuelles types ou un mécanisme équivalent.
 
 ## 8. Sous-traitants ultérieurs autorisés
 

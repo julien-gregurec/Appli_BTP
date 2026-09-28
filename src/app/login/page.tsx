@@ -20,7 +20,7 @@ export default async function LoginPage({
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={220} height={246} priority className="h-32 w-auto" />
+          <Image src="/liria-gestion-pro-logo-v5.png" alt="ELSATIA Gestion Pro" width={220} height={246} priority className="h-32 w-auto" />
           <h1 className="text-xl font-semibold">Connexion</h1>
         </div>
 

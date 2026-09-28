@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Hors ligne — Liria Gestion Pro" };
+export const metadata: Metadata = { title: "Hors ligne — ELSATIA Gestion Pro" };
 
 export default function OfflinePage() {
   return (
@@ -18,7 +18,7 @@ export default function OfflinePage() {
       <div className="space-y-2">
         <h1 className="text-xl font-semibold">Vous êtes hors ligne</h1>
         <p className="max-w-sm text-sm text-white/70">
-          Liria Gestion Pro a besoin d&apos;une connexion Internet pour afficher vos données.
+          ELSATIA Gestion Pro a besoin d&apos;une connexion Internet pour afficher vos données.
           Vérifiez votre réseau, puis réessayez.
         </p>
       </div>

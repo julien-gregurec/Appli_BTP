@@ -1,8 +1,10 @@
 # Politique de confidentialité
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 28/09/2026_
 
-La présente politique explique comment **Liria Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
+
+La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC**, entrepreneur individuel (EI), 850 559 873 R.C.S. Strasbourg (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
 
 ## 1. Deux rôles distincts
 
@@ -49,7 +51,7 @@ Vos données sont accessibles à l'Éditeur et à ses sous-traitants techniques,
 | Supabase, Inc. | Base de données, stockage, authentification | UE visée (**à confirmer**) | Clauses contractuelles types (CCT) |
 | Vercel, Inc. | Hébergement de l'application | UE / États-Unis | CCT / Data Privacy Framework |
 | Stripe Payments Europe, Ltd. | Paiement et facturation | Irlande (UE) | Conforme RGPD |
-| [Prestataire e-mail — ex. Resend] | Envoi d'e-mails transactionnels | UE / États-Unis | CCT |
+| Prestataire e-mail transactionnel (non activé à ce jour) | Envoi d'e-mails transactionnels | À déterminer | CCT |
 
 La liste détaillée est tenue dans notre `rgpd-sous-traitants.md`.
 
@@ -61,7 +63,7 @@ Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un
 
 Vous disposez des droits d'**accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité**, ainsi que du droit de définir des directives post-mortem.
 
-**Pour les exercer** : écrivez à **[contact@liria… — À COMPLÉTER]**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
+**Pour les exercer** : écrivez à **contact@elsatia.fr**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
 
 Vous pouvez introduire une réclamation auprès de la **CNIL** (www.cnil.fr).
 
@@ -75,4 +77,4 @@ Nous mettons en œuvre des mesures techniques et organisationnelles adaptées : 
 
 ## 10. Contact
 
-Responsable de traitement : **[Julien GREGUREC]** — **[contact@liria… — À COMPLÉTER]**.
+Responsable de traitement : **Julien GREGUREC**, entrepreneur individuel (EI), 850 559 873 R.C.S. Strasbourg — **contact@elsatia.fr**.

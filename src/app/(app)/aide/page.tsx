@@ -25,7 +25,7 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
         <div>
           <h1 className="text-xl font-semibold">Aide & support</h1>
-          <p className="text-sm text-neutral-500">Une question, un souci ? Écrivez à l&apos;équipe Liria Gestion Pro, nous vous répondons ici.</p>
+          <p className="text-sm text-neutral-500">Une question, un souci ? Écrivez à l&apos;équipe ELSATIA Gestion Pro, nous vous répondons ici.</p>
         </div>
 
         <section className="flex flex-col gap-3 rounded-lg border border-[#c9a24a]/50 bg-[#c9a24a]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -84,7 +84,7 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
             return (
               <div key={m.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${plateforme ? "self-start bg-neutral-100 dark:bg-neutral-800" : "self-end bg-[#0d1b2a] text-white"}`}>
                 <div className={`mb-0.5 text-[10px] uppercase tracking-wide ${plateforme ? "text-neutral-500" : "text-white/60"}`}>
-                  {plateforme ? "Support Liria Gestion Pro" : m.auteur_nom || "Vous"}
+                  {plateforme ? "Support ELSATIA Gestion Pro" : m.auteur_nom || "Vous"}
                 </div>
                 <div className="whitespace-pre-wrap">{m.contenu}</div>
                 <div className={`mt-1 text-[10px] ${plateforme ? "text-neutral-400" : "text-white/50"}`}>

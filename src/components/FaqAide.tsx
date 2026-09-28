@@ -70,7 +70,7 @@ const categories: Categorie[] = [
       },
       {
         question: "La signature numérique remplace-t-elle toujours une signature qualifiée ?",
-        reponse: "Non. Le niveau de signature requis dépend du document et de l’enjeu. Utilisez le circuit prévu dans Liria, conservez l’identité, l’horodatage et l’audit, puis faites valider les cas sensibles par votre conseil juridique.",
+        reponse: "Non. Le niveau de signature requis dépend du document et de l’enjeu. Utilisez le circuit prévu dans ELSATIA, conservez l’identité, l’horodatage et l’audit, puis faites valider les cas sensibles par votre conseil juridique.",
       },
     ],
   },
@@ -144,7 +144,7 @@ const categories: Categorie[] = [
       },
       {
         question: "Où consulter les localisations enregistrées toutes les 30 minutes ?",
-        reponse: "Un responsable autorisé ouvre Pointage puis « Gérer et vérifier ». Chaque session affiche un volet « Contrôles de zone » avec la date, l’heure, la distance au chantier, la précision GPS et un lien vers la position. Le suivi doit être activé dans Paramètres et fonctionne uniquement pendant une session ouverte, tant que la page Liria reste ouverte.",
+        reponse: "Un responsable autorisé ouvre Pointage puis « Gérer et vérifier ». Chaque session affiche un volet « Contrôles de zone » avec la date, l’heure, la distance au chantier, la précision GPS et un lien vers la position. Le suivi doit être activé dans Paramètres et fonctionne uniquement pendant une session ouverte, tant que la page ELSATIA reste ouverte.",
       },
       {
         question: "Comment demander un congé ?",
@@ -271,7 +271,7 @@ const categories: Categorie[] = [
     titre: "Abonnement, stockage et notifications",
     questions: [
       {
-        question: "Où voir le coût de Liria Gestion Pro ?",
+        question: "Où voir le coût de ELSATIA Gestion Pro ?",
         reponse: "L’administrateur ouvre Administration > Abonnement. Il y retrouve l’offre, les comptes facturables, options, dépassements d’appareils, stockage, factures et accès au portail Stripe.",
       },
       {
@@ -284,7 +284,7 @@ const categories: Categorie[] = [
       },
       {
         question: "Comment activer les notifications ?",
-        reponse: "Autorisez-les sur l’appareil lorsque Liria le propose. Les alertes restent filtrées par les droits : planning, pointages, validations, échéances et autres événements autorisés.",
+        reponse: "Autorisez-les sur l’appareil lorsque ELSATIA le propose. Les alertes restent filtrées par les droits : planning, pointages, validations, échéances et autres événements autorisés.",
       },
     ],
   },
@@ -297,7 +297,7 @@ const categories: Categorie[] = [
         reponse: "Notez la page, l’heure, le compte et l’action effectuée. Actualisez une fois, puis vérifiez les droits et le statut de la fiche. Si le problème persiste, envoyez ces éléments au support sans joindre de secret.",
       },
       {
-        question: "Comment utiliser Liria sur mobile ?",
+        question: "Comment utiliser ELSATIA sur mobile ?",
         reponse: "Ouvrez l’adresse sécurisée puis installez l’application web sur l’écran d’accueil. Autorisez la caméra, la position et les notifications uniquement si le poste utilise ces fonctions.",
       },
       {

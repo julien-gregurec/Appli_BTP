@@ -1,10 +1,14 @@
 # Conditions Générales de Vente (CGV)
 
-_Applicables aux professionnels — Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
+_Applicables aux professionnels — Dernière mise à jour : 28/09/2026 — Version 1.0_
+
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
 
 ## Article 1 — Objet et champ d'application
 
-Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **Liria Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
+Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **ELSATIA Gestion Pro** (« le Service »), édité et commercialisé par **Julien GREGUREC**, entrepreneur individuel (EI), immatriculé sous le numéro **850 559 873 R.C.S. Strasbourg**, site https://elsatia.fr (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
+
+Les souscriptions payantes sont ouvertes à compter du **1er octobre 2026**, date de commencement de l'activité.
 
 Le Service est un logiciel de gestion en ligne (SaaS) destiné aux entreprises du bâtiment : devis, factures, clients, chantiers, planning, pointage, stock, et modules associés.
 
@@ -26,7 +30,7 @@ Le Service peut être proposé avec une **période d'essai gratuite de 30 jours*
 
 4.1 Le Service est proposé selon plusieurs offres (à titre indicatif : Essentiel, Pro, Premium), dont le contenu et les tarifs sont présentés sur la page Tarifs du Service. Chaque offre inclut un nombre de comptes ; les comptes supplémentaires et certains dépassements d'usage (espace de stockage, nombre d'appareils) sont facturés en sus selon la grille en vigueur.
 
-4.2 Les prix sont indiqués en euros. **TVA non applicable, article 293 B du Code général des impôts** (l'Éditeur bénéficie de la franchise en base). En cas de dépassement des seuils applicables ou de changement de régime, la TVA sera appliquée de plein droit et les prix indiqués s'entendront alors hors taxes.
+4.2 Les prix sont indiqués en euros. **TVA non applicable, article 293 B du Code général des impôts** (l'Éditeur bénéficie de la franchise en base). <!-- LEGAL_REVIEW_REQUIRED: confirmer le régime de TVA ; la page Tarifs affiche des prix « HT » et la boutique applique un taux de TVA. --> En cas de dépassement des seuils applicables ou de changement de régime, la TVA sera appliquée de plein droit et les prix indiqués s'entendront alors hors taxes.
 
 4.3 Le paiement annuel ouvre droit à une remise (à titre indicatif : −20 %) par rapport au paiement mensuel.
 
@@ -108,4 +112,4 @@ L'Éditeur peut modifier les présentes CGV. La version applicable est celle en 
 
 ---
 
-_Ces CGV sont un modèle à faire valider par un professionnel du droit avant mise en ligne._
+_Ces CGV sont un modèle à faire valider par un professionnel du droit avant mise en ligne._ <!-- LEGAL_REVIEW_REQUIRED -->

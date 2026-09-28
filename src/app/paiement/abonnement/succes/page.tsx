@@ -10,7 +10,7 @@ export default function AbonnementSuccesPage() {
           Votre moyen de paiement est enregistré de façon sécurisée par Stripe. Aucun prélèvement n’est effectué pendant l’essai de 30 jours.
         </p>
         <Link href="/abonnement?succes=1" className="mt-6 inline-flex rounded-md bg-[#0d1b2a] px-5 py-3 text-sm font-semibold text-white">
-          Retourner dans Liria Gestion Pro
+          Retourner dans ELSATIA Gestion Pro
         </Link>
       </section>
     </main>

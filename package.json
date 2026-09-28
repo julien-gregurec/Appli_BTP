@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "verify:legal": "vitest run src/lib/identite-legale.test.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "verify:migrations": "node scripts/verify-migrations.mjs",
     "verify:secrets": "node scripts/verify-secrets.mjs",

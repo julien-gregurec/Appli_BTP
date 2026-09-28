@@ -1,12 +1,14 @@
 # Politique de cookies
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 28/09/2026_
+
+<!-- LEGAL_REVIEW_REQUIRED: document à faire relire par un professionnel du droit avant le 01/10/2026. -->
 
 ## 1. Qu'est-ce qu'un cookie ?
 
 Un cookie est un petit fichier déposé sur votre appareil lors de la consultation d'un service en ligne. Il permet notamment de vous reconnaître d'une page à l'autre et de maintenir votre session.
 
-## 2. Cookies utilisés par Liria Gestion Pro
+## 2. Cookies utilisés par ELSATIA Gestion Pro
 
 Le Service utilise **uniquement des cookies strictement nécessaires** à son fonctionnement. Ceux-ci ne requièrent pas votre consentement préalable (article 82 de la loi Informatique et Libertés).
 
@@ -27,4 +29,4 @@ Vous pouvez configurer votre navigateur pour refuser ou supprimer les cookies. L
 
 ## 5. Contact
 
-Pour toute question : **[contact@liria… — À COMPLÉTER]**.
+Pour toute question : **contact@elsatia.fr**.

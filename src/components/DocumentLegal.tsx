@@ -3,6 +3,7 @@ import path from "node:path";
 import Link from "next/link";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { preparerDocumentLegal } from "@/lib/documents-legaux";
 
 const PAGES = [
   { href: "/mentions-legales", libelle: "Mentions légales" },
@@ -34,9 +35,7 @@ const composants = {
 
 export function DocumentLegal({ fichier }: { fichier: string }) {
   const chemin = path.join(process.cwd(), "docs/juridique", fichier);
-  let contenu = fs.readFileSync(chemin, "utf8");
-  // Champ contact laissé vide pour le moment (à renseigner à l'immatriculation).
-  contenu = contenu.replace(/\[contact@liria[^\]]*\]/g, "—");
+  const contenu = preparerDocumentLegal(fs.readFileSync(chemin, "utf8"));
 
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-12 dark:bg-neutral-950">

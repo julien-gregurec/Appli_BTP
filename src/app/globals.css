@@ -16,7 +16,7 @@
   --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  /* Palette de marque Liria — utilisable directement (bg-liria-navy, text-liria-gold…). */
+  /* Palette de marque ELSATIA — utilisable directement (bg-liria-navy, text-liria-gold…). */
   --color-liria-navy: var(--liria-navy);
   --color-liria-anthracite: var(--liria-anthracite);
   --color-liria-gold: var(--liria-gold);

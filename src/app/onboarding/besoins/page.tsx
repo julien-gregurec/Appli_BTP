@@ -39,7 +39,7 @@ export default async function BesoinsPage({
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
             </p>
             <p className="mt-2 text-xs text-neutral-500">
-              Estimation indicative. La tarification définitive vous sera confirmée par LIRIA.
+              Estimation indicative. La tarification définitive vous sera confirmée par ELSATIA.
             </p>
           </div>
           <div className="flex flex-col gap-2">

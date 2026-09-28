@@ -23,7 +23,7 @@ export default async function PlateformeBoutiquePage({ searchParams }: { searchP
   const produits = (data ?? []) as Produit[];
 
   return <main className="p-3 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
-    <div><h1 className="text-xl font-semibold">Catalogue boutique Liria</h1><p className="text-sm text-neutral-500">Gestion réservée à la plateforme : produits, prix et stock vendus aux entreprises clientes.</p></div>
+    <div><h1 className="text-xl font-semibold">Catalogue boutique ELSATIA</h1><p className="text-sm text-neutral-500">Gestion réservée à la plateforme : produits, prix et stock vendus aux entreprises clientes.</p></div>
     {params.error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{params.error}</p>}
     {params.success && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{params.success}</p>}
 
