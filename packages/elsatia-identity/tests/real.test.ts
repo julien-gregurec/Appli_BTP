@@ -461,3 +461,140 @@ describe.skipIf(!REAL)("admission Studio dédiée (migrations métier + pont)", 
     expect(error).not.toBeNull();
   });
 });
+
+// Garde d'écriture centrale (20260928100000) : la protection est la BASE, pas l'UI. Appels PostgREST
+// directs avec le vrai jeton GoTrue Studio de l'utilisateur, sans passer par l'application.
+describe.skipIf(!REAL)("garde d'écriture centrale — contournement par RPC directe", () => {
+  it("droit retiré : chaque RPC d'écriture appelée directement → 403 « Accès Studio en lecture seule », rien modifié", async () => {
+    const s = await bridge(p).login(await platformUser(p));
+    const c = studioUserClient(p, s.session.access_token);
+    const ws = (await c.rpc("studio_create_workspace", { p_name: "Garde", p_type: "professional" })).data as string;
+    const project = (await c.rpc("studio_create_project", { p_workspace: ws, p_name: "Projet", p_type: "free" })).data as string;
+    expect(project).toMatch(/^[0-9a-f-]{36}$/);
+    const subject = sql(env.studioDb!, `select subject from studio_identity.links where user_id='${s.userId}'`);
+    sql(env.studioDb!, `update studio_identity.subject_state set granted = false where subject='${subject}'`);
+    const rev = () => Number(sql(env.studioDb!, `select revision from public.studio_projects where id='${project}'`));
+    const before = sql(env.studioDb!, `select md5(string_agg(to_jsonb(x)::text, '|' order by x.id)) from public.studio_projects x where workspace_id='${ws}'`);
+    const attempts: [string, Record<string, unknown>][] = [
+      ["studio_create_workspace", { p_name: "Autre", p_type: "professional" }],
+      ["studio_rename_workspace", { p_workspace_id: ws, p_name: "Renommé" }],
+      ["studio_archive_workspace", { p_workspace_id: ws }],
+      ["studio_create_project", { p_workspace: ws, p_name: "P2", p_type: "free" }],
+      ["studio_save_project", { p_workspace: ws, p_project: null, p_data: { name: "P3", project_type: "free", status: "draft" } }],
+      ["studio_save_project", { p_workspace: ws, p_project: project, p_data: { name: "Édité", project_type: "free", status: "draft" }, p_revision: rev() }],
+      ["studio_project_lifecycle", { p_project: project, p_action: "archive" }],
+      ["studio_duplicate_project", { p_project: project }],
+      ["studio_order_project_media", { p_project: project, p_ids: null, p_chronological: true, p_revision: rev() }],
+      ["studio_reserve_media", { p_project: project, p_request: randomUUID(), p_name: "a.jpg", p_mime: "image/jpeg", p_bytes: 10 }],
+      ["studio_request_analysis", { p_project: project, p_force: true }],
+      ["studio_cancel_analysis", { p_project: project }],
+    ];
+    for (const [fn, args] of attempts) {
+      const r = await c.rpc(fn, args);
+      expect([fn, r.status, r.error?.code, r.error?.message]).toEqual([fn, 403, "42501", "Accès Studio en lecture seule"]);
+    }
+    // Écriture de table directe (REST) avec le jeton utilisateur : aucun privilège.
+    const direct = await c.from("studio_projects").update({ name: "Direct" }).eq("id", project).select();
+    expect(direct.error?.code).toBe("42501");
+    expect(sql(env.studioDb!, `select md5(string_agg(to_jsonb(x)::text, '|' order by x.id)) from public.studio_projects x where workspace_id='${ws}'`)).toBe(before);
+    // Lecture conservée, droit rétabli : le même appel passe.
+    expect((await c.from("studio_projects").select("id").eq("id", project)).data).toHaveLength(1);
+    sql(env.studioDb!, `update studio_identity.subject_state set granted = true where subject='${subject}'`);
+    expect((await c.rpc("studio_rename_workspace", { p_workspace_id: ws, p_name: "Renommé" })).error).toBeNull();
+  });
+
+  it("clé service : écriture de table directe refusée (seuls les chemins système bornés écrivent)", async () => {
+    const r = await p.studioAdmin.from("studio_media_assets").update({ upload_status: "failed" }).eq("upload_status", "ready").select();
+    expect(r.error?.code).toBe("42501");
+    sql(env.studioDb!, "grant select, update on public.studio_projects to service_role");
+    try {
+      const g = await p.studioAdmin.from("studio_projects").update({ name: "x" }).eq("name", "__aucun__").select();
+      expect(g.error?.message).toBe("Écriture service hors chemin système (UPDATE public.studio_projects)");
+    } finally {
+      sql(env.studioDb!, "revoke select, update on public.studio_projects from service_role");
+    }
+    // Chemin système légitime (réconciliation d'identité) : inchangé.
+    expect((await p.studioAdmin.rpc("studio_identity_purge")).error).toBeNull();
+  });
+
+  it("Studio en lecture seule (mode global) : l'utilisateur est refusé, la révocation continue", async () => {
+    const s = await bridge(p).login(await platformUser(p));
+    const c = studioUserClient(p, s.session.access_token);
+    sql(env.studioDb!, "update studio_guard.control set mode = 'read_only', reason = 'test'");
+    try {
+      const r = await c.rpc("studio_create_workspace", { p_name: "Mon Studio", p_type: "personal" });
+      expect([r.status, r.error?.message]).toEqual([403, "Studio en lecture seule"]);
+      const revoked = await p.studioAdmin.rpc("studio_identity_revoke_sessions", { p_user_id: s.userId });
+      expect(revoked.error).toBeNull();
+      expect(await studioGetUser(s.session.access_token)).toBe(403);
+    } finally {
+      sql(env.studioDb!, "update studio_guard.control set mode = 'read_write', reason = null");
+    }
+  });
+});
+
+// Fondation RGPD (20260928110000) de bout en bout : compte central supprimé → événement signé →
+// Studio bloque et ouvre la demande → exécuteur Studio réel (apps/studio/src/lib/erasure-runner.ts)
+// contre PostgREST + GoTrue admin réels. Storage : pas de storage-api dans cette pile ; l'adaptateur
+// ci-dessous agit sur storage.objects en SQL, ce qui exerce la garde Storage (trigger) réelle.
+describe.skipIf(!REAL)("RGPD Studio — compte ELSATIA supprimé", () => {
+  it("blocage immédiat, demande ouverte, exécution gardée, effacement complet et rejouable", async () => {
+    const { runErasureCycle } = await import("../../../apps/studio/src/lib/erasure-runner");
+    const b = bridge(p);
+    const endpoint = await b.lifecycleEndpoint();
+    const u = await platformUser(p);
+    const s = await b.login(u);
+    const c = studioUserClient(p, s.session.access_token);
+    const ws = (await c.rpc("studio_create_workspace", { p_name: "Mon Studio", p_type: "personal" })).data as string;
+    await c.rpc("studio_create_project", { p_workspace: ws, p_name: "Vacances", p_type: "free" });
+    sql(env.studioDb!, `set studio.write_path = 'storage_maintenance'; insert into storage.buckets(id,name) values ('studio-originals','studio-originals') on conflict do nothing; insert into storage.objects(bucket_id,name,metadata) values ('studio-originals','studio/${ws}/derives/vignette.jpg','{}')`);
+
+    await p.platformAdmin.auth.admin.deleteUser(u.id);
+    await dispatch(b, endpoint.url);
+    await endpoint.close();
+    const subject = b.issuer.subjectFor(u.id, STUDIO_AUDIENCE);
+    expect(await studioGetUser(s.session.access_token)).toBe(403); // sessions invalidées
+    expect((await b.login(u).catch((e) => e))).toBeInstanceOf(Error); // plus aucun passage
+    expect(sql(env.studioDb!, `select status from studio_identity.erasure_requests where subject='${subject}'`)).toBe("pending");
+
+    const storageShim = {
+      from: (bucket: string) => ({
+        list: async (prefix: string, { offset }: { limit: number; offset: number }) => {
+          if (offset) return { data: [], error: null };
+          const rows = sql(env.studioDb!, `select string_agg(distinct split_part(substr(name, ${prefix.length + 2}), '/', 1) || case when position('/' in substr(name, ${prefix.length + 2})) > 0 then '/' else '' end, ',') from storage.objects where bucket_id='${bucket}' and name like '${prefix}/%'`);
+          return { data: rows ? rows.split(",").map((n) => (n.endsWith("/") ? { name: n.slice(0, -1), id: null } : { name: n, id: "o" })) : [], error: null };
+        },
+        remove: async (paths: string[]) => {
+          try {
+            sql(env.studioDb!, `delete from storage.objects where bucket_id='${bucket}' and name in (${paths.map((x) => `'${x}'`).join(",")})`);
+            return { error: null };
+          } catch (error) {
+            return { error };
+          }
+        },
+      }),
+    };
+    const client = { rpc: p.studioAdmin.rpc.bind(p.studioAdmin), auth: p.studioAdmin.auth, storage: storageShim } as never;
+    const mine = () => sql(env.studioDb!, `select status from studio_identity.erasure_requests where subject='${subject}'`);
+
+    expect((await runErasureCycle(client)).mode).toBe("off"); // défaut : rien
+    expect(mine()).toBe("pending");
+    sql(env.studioDb!, "update studio_identity.erasure_policy set mode = 'execute', decision_ref = 'DEC-TEST-LOCAL', grace_period = interval '0'");
+    try {
+      const run = await runErasureCycle(client, { limit: 200 });
+      expect(run.mode).toBe("execute");
+      expect(mine()).toBe("completed");
+      expect(sql(env.studioDb!, `select count(*) from public.studio_workspaces where id='${ws}'`)).toBe("0");
+      expect(sql(env.studioDb!, `select count(*) from storage.objects where name like 'studio/${ws}/%'`)).toBe("0");
+      expect(sql(env.studioDb!, `select count(*) from studio_identity.links where subject='${subject}'`)).toBe("0");
+      expect((await p.studioAdmin.auth.admin.getUserById(s.userId)).error?.status).toBe(404);
+      expect(sql(env.studioDb!, `select account from studio_identity.subject_state where subject='${subject}'`)).toBe("deleted");
+      expect(sql(env.studioDb!, `select string_agg(action, ',' order by e.id) from studio_identity.erasure_events e join studio_identity.erasure_requests r on r.id=e.request_id where r.subject='${subject}'`))
+        .toBe("opened,planned,db_erased,data_erased,completed");
+      await runErasureCycle(client, { limit: 200 }); // rejeu : sans effet
+      expect(mine()).toBe("completed");
+    } finally {
+      sql(env.studioDb!, "update studio_identity.erasure_policy set mode = 'off', decision_ref = null, grace_period = null");
+    }
+  });
+});

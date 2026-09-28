@@ -26,6 +26,11 @@ run() { # fichier
   [ "$nok" = 0 ] && [ -z "$err" ] && [ "$ok" -gt 0 ]
 }
 status=0
+# Instance jetable : ses comptes de test ne passent pas par le pont (non liés). La garde d'écriture
+# centrale les refuse par défaut (fail-closed) ; on l'autorise ici EXPLICITEMENT, comme
+# scripts/local-test.mjs. Jamais sur un projet hébergé. La suite studio_db_write_guard le remet à
+# false pour prouver le refus.
+pg "-d $DB -c \"update studio_guard.control set allow_unlinked_writes = true\"" >/dev/null
 # Suites propres au projet dédié (politique héritée laissée « closed » : elles la posent elles-mêmes).
 for t in "$REPO"/apps/studio/supabase/tests/*.test.sql; do run "$t" || status=1; done
 run "$REPO/supabase/tests/studio_signup_policy.test.sql" || status=1

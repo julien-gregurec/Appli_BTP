@@ -18,6 +18,13 @@ const READ_RPCS = new Set([
   "studio_dashboard_stats", "studio_project_summaries", "studio_list_project_media", "studio_project_media_stats",
   "studio_get_timeline", "studio_list_analysis", "studio_my_role", "studio_identity_session_status",
 ]);
+// Clé service, bornées EN BASE à un chemin système déclaré (studio_guard.system_paths) : jamais
+// appelées pour le compte d'un utilisateur, pas de garde applicative requise (la base les borne).
+const SYSTEM_RPCS = new Set([
+  "studio_fail_media",
+  "studio_erasure_due", "studio_erasure_prepare", "studio_erasure_execute", "studio_erasure_storage_batch",
+  "studio_erasure_storage_done", "studio_erasure_finalize", "studio_erasure_confirm_auth_deleted",
+]);
 const GUARD = /authorize(?:Project|Asset)\([^()]*,\s*true\)|writableContext\(\)|requireWritableStudioUser\(\)|canWrite\(/;
 const DIRECT_WRITE = /\.(?:insert|update|upsert|createSignedUploadUrl|upload)\(\s*[{"'a-z]/;
 
@@ -34,7 +41,7 @@ function units(code: string): string[] {
 it("toute RPC appelée par Studio est classée lecture ou écriture", () => {
   for (const file of sources(resolve("src"))) {
     for (const m of readFileSync(file, "utf8").matchAll(/\.rpc\(\s*"([a-z_]+)"/g))
-      expect(WRITE_RPCS.has(m[1]) || READ_RPCS.has(m[1]), `${file} : RPC non classée ${m[1]}`).toBe(true);
+      expect(WRITE_RPCS.has(m[1]) || READ_RPCS.has(m[1]) || SYSTEM_RPCS.has(m[1]), `${file} : RPC non classée ${m[1]}`).toBe(true);
   }
 });
 
@@ -56,4 +63,12 @@ it("chaque écriture est précédée d'une garde d'écriture dans la même fonct
   }
   expect(unguarded).toEqual([]);
   expect(writes).toBeGreaterThanOrEqual(WRITE_RPCS.size);
+});
+
+it("les RPC système ne sont appelées que par les modules serveur à clé service", () => {
+  for (const file of sources(resolve("src"))) {
+    for (const m of readFileSync(file, "utf8").matchAll(/\.rpc\(\s*"([a-z_]+)"/g))
+      if (SYSTEM_RPCS.has(m[1]))
+        expect(/media-service\.ts$|erasure-runner\.ts$/.test(file), `${file} : RPC système ${m[1]} hors module serveur`).toBe(true);
+  }
 });
