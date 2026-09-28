@@ -249,14 +249,16 @@ export const SEEDS = [
     path: "scripts/e2e/prepare-gp-reserves-integration.sql",
     classification: "CI_ONLY",
     target: "recette e2e GP ↔ Réserves (tests/e2e/gp-reserves-pile-locale/preparer-base.sh)",
-    idempotent: true,
+    // Décor à usage unique : preparer-base.sh reconstruit la base avant chaque chargement
+    // (sous-traitants et compteurs ajoutés à chaque passe : non rejouable, déclaré ici).
+    idempotent: false,
     harness: {
       setup: [PARITE_GOTRUE, ISOLATION_MULTITENANT],
       run: [
         { sql: "scripts/e2e/prepare-gp-reserves-integration.sql" },
         { sql: "scripts/e2e/prepare-local-recipe.sql" },
       ],
-      runs: 3,
+      runs: 1,
     },
     bypass: {
       capacite_personnes_bypass: "Décor e2e : `set local` dans la transaction du script, base jetable uniquement.",
@@ -269,7 +271,8 @@ export const SEEDS = [
     path: "scripts/local-postgres-bootstrap/releve_e2e_seed.sql",
     classification: "CI_ONLY",
     target: "recette e2e Relevé & Métré (scripts/local-postgres-bootstrap/releve_e2e_stack.sh)",
-    idempotent: true,
+    // Chargé une fois par releve_e2e_stack.sh, sur une base reconstruite : non rejouable.
+    idempotent: false,
     harness: {
       setup: [
         PARITE_GOTRUE,
@@ -279,7 +282,7 @@ export const SEEDS = [
       run: [
         { inline: "\\set ua 'e2e0a000-0000-4000-8000-00000000000a'\n\\set ub 'e2e0b000-0000-4000-8000-00000000000b'\nselect id as ea from public.entreprises where reference_interne = 'PILOTE-BTP-V1' \\gset\n\\ir scripts/local-postgres-bootstrap/releve_e2e_seed.sql" },
       ],
-      runs: 3,
+      runs: 1,
     },
     bypass: {
       capacite_personnes_bypass: "Recette e2e : `set` de session sur la base jetable de la pile Relevé, superutilisateur uniquement.",
@@ -334,8 +337,6 @@ export const SEEDS = [
       run: [
         { sql: "scripts/local-postgres-bootstrap/upgrade_v1_v2_seed_complement.sql" },
         { sql: "scripts/local-postgres-bootstrap/upgrade_v2_v3_seed_complement.sql" },
-        // Train V4 : complément de l'upgrade V3 → V4 (repris par l'upgrade V4 → V5).
-        { sql: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql" },
       ],
       runs: 1,
     },
@@ -351,8 +352,10 @@ export const SEEDS = [
     id: "upgrade-complement-v4",
     path: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql",
     classification: "CI_ONLY",
-    target: "qualification d'upgrade V3 → V4 (et V4 → V5)",
-    coveredBy: "upgrade-complements",
+    // Écrit des commandes directement à leur statut, comme sur une vraie base V3 : ne se charge
+    // que sur une base AVANT le verrou 20260926000506, jamais sur une base fraîche du train.
+    target: "qualification d'upgrade V3 → V4 (et V4 → V5, base V4 construite depuis V3)",
+    coveredBy: "upgrade-harness",
   },
   {
     id: "upgrade-complement-v3",

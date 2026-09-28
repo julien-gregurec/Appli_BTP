@@ -44,10 +44,15 @@ insert into public.utilisateurs (id, prenom, nom) values
   ('c9000000-0000-0000-0000-0000000000a1', 'Sacha', 'Couvreur')
 on conflict (id) do nothing;
 
-insert into public.entreprises (id, nom, code_adhesion, abonnement_statut, abonnement_offre, abonnement_echeance) values
-  ('a9000000-0000-0000-0000-000000000001', 'RECETTE_HOTE_SUSPENSION', 'RHSU0001', 'actif', 'entreprise', current_date + 365),
-  ('c9000000-0000-0000-0000-000000000001', 'RECETTE_COUVREUR_S', 'RCSU0001', 'actif', 'entreprise', current_date + 365)
-on conflict (id) do nothing;
+-- Insertion des seules organisations absentes (train V5, patron du durcissement des seeds) : un
+-- INSERT … ON CONFLICT DO NOTHING déclenche quand même le trigger BEFORE INSERT de référence
+-- d'entreprise, qui consommait un numéro du compteur global à chaque rejeu.
+insert into public.entreprises (id, nom, code_adhesion, abonnement_statut, abonnement_offre, abonnement_echeance)
+select v.id, v.nom, v.code, 'actif', 'entreprise', current_date + 365
+from (values
+  ('a9000000-0000-0000-0000-000000000001'::uuid, 'RECETTE_HOTE_SUSPENSION', 'RHSU0001'),
+  ('c9000000-0000-0000-0000-000000000001'::uuid, 'RECETTE_COUVREUR_S', 'RCSU0001')) as v(id, nom, code)
+where not exists (select 1 from public.entreprises e where e.id = v.id);
 
 -- Rejouable : une recette interrompue pendant la suspension laisse H suspendu.
 update public.entreprises
