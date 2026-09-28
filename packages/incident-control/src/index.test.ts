@@ -102,6 +102,15 @@ describe("decisionIncident — coupure d'application (isolation)", () => {
     expect(decide("gestion_pro", "GET", "/plateformex", tout)).toMatchObject({ code: "SAFE_MODE_APP_OFF" });
   });
 
+  it("verrou de réconciliation : crons refusés (état commercial périmé), webhooks reçus", () => {
+    const e = etat(["global", "app_coupee"], ["global", "reconciliation_stripe_requise"]);
+    expect(decide("gestion_pro", "GET", "/api/cron/abonnements", e)).toMatchObject({ code: "SAFE_MODE_STRIPE_RECONCILIATION" });
+    expect(decide("reserves", "GET", "/api/cron/notifications", e)).toMatchObject({ code: "SAFE_MODE_STRIPE_RECONCILIATION" });
+    expect(decide("studio", "POST", "/api/elsatia/erasure", e)).toMatchObject({ code: "SAFE_MODE_STRIPE_RECONCILIATION" });
+    expect(decide("gestion_pro", "POST", "/api/stripe/abonnement/webhook", e)).toEqual({ action: "continuer" });
+    expect(decide("gestion_pro", "GET", "/api/cron/abonnements", etat(["global", "app_coupee"]))).toEqual({ action: "continuer" });
+  });
+
   it("coupure : les webhooks Stripe restent reçus (réconciliation avant réouverture)", () => {
     const tout = etat(["global", "app_coupee"], ["global", "reconciliation_stripe_requise"]);
     expect(decide("gestion_pro", "POST", "/api/stripe/abonnement/webhook", tout)).toEqual({ action: "continuer" });

@@ -84,5 +84,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
     }
   }
+  // Fin de traitement : la réservation n'est plus reprenable (migration 20260928000702). Un échec ici
+  // n'annule rien : la réservation non finalisée sera reprise à la prochaine livraison (idempotent).
+  await admin.rpc("finaliser_evenement_webhook_stripe_service", { p_stripe_event_id: evenement.id });
   return NextResponse.json({ received: true });
 }

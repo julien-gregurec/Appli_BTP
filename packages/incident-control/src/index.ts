@@ -98,6 +98,12 @@ export type ReglesApplication = {
    * l'émetteur (Stripe) les REJOUE plus tard au lieu d'échouer à mi-traitement.
    */
   serveurAServeur: MotifChemin[];
+  /**
+   * Tâches planifiées (crons). Refusées tant que `reconciliation_stripe_requise` est actif : après
+   * une restauration, un cron d'abonnements (suspensions, conversions d'essai, purge RGPD) agirait
+   * sur un état commercial périmé. Les webhooks, eux, restent reçus (c'est la réconciliation).
+   */
+  crons: MotifChemin[];
   uploads: MotifChemin[];
   exports: MotifChemin[];
   paiements: MotifChemin[];
@@ -134,6 +140,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
       exact("/api/paiements-bancaires/powens"),
       exact("/api/elsatia-identity"),
     ],
+    crons: [exact("/api/cron")],
     uploads: [
       /^\/api\/devis\/[^/]+\/pieces-jointes\/(?:preparer|finaliser)$/,
       exact("/api/messagerie/pieces-jointes/preparer"),
@@ -165,6 +172,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     toujoursOuverts: [exact("/api/health"), exact("/api/status")],
     pilotage: [exact("/login"), exact("/auth"), exact("/hors-ligne"), exact("/acces-refuse"), exact("/abonnement-requis")],
     serveurAServeur: [exact("/api/cron")],
+    crons: [exact("/api/cron")],
     uploads: [exact("/api/offline/photo")],
     exports: [/^\/api\/documents\/chantier\/[^/]+\/pdf$/, exact("/imprimer"), /^\/chantiers\/[^/]+\/export$/],
     paiements: [],
@@ -176,6 +184,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     toujoursOuverts: [exact("/api/health"), exact("/api/status")],
     pilotage: [exact("/login"), exact("/auth"), exact("/acces-refuse"), exact("/abonnement-requis")],
     serveurAServeur: [],
+    crons: [],
     uploads: [exact("/api/photos"), exact("/api/ocr")],
     exports: [exact("/api/export")],
     paiements: [],
@@ -187,6 +196,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     toujoursOuverts: [exact("/api/health"), exact("/api/status")],
     pilotage: [exact("/login"), exact("/auth")],
     serveurAServeur: [exact("/api/elsatia")],
+    crons: [exact("/api/elsatia/erasure"), exact("/api/elsatia/reconcile")],
     uploads: [exact("/api/media")],
     exports: [exact("/api/renders")],
     paiements: [],
@@ -200,6 +210,7 @@ export const REGLES_PAR_APPLICATION: Readonly<Record<ApplicationIncident, Regles
     toujoursOuverts: [],
     pilotage: [],
     serveurAServeur: [],
+    crons: [],
     uploads: [],
     exports: [],
     paiements: [],
@@ -221,7 +232,8 @@ export type CodeIncident =
   | "SAFE_MODE_EXPORTS_OFF"
   | "SAFE_MODE_PAYMENTS_OFF"
   | "SAFE_MODE_INVITATIONS_OFF"
-  | "SAFE_MODE_PUBLIC_LINKS_OFF";
+  | "SAFE_MODE_PUBLIC_LINKS_OFF"
+  | "SAFE_MODE_STRIPE_RECONCILIATION";
 
 export type DecisionIncident =
   | { action: "continuer" }
@@ -237,6 +249,8 @@ export const MESSAGES_INCIDENT: Readonly<Record<CodeIncident, string>> = {
   SAFE_MODE_PAYMENTS_OFF: "Les paiements en ligne sont momentanément suspendus. Aucun montant n'a été prélevé.",
   SAFE_MODE_INVITATIONS_OFF: "Les invitations sont momentanément suspendues. Votre lien reste valable.",
   SAFE_MODE_PUBLIC_LINKS_OFF: "Ce lien de partage est momentanément indisponible.",
+  SAFE_MODE_STRIPE_RECONCILIATION:
+    "Tâches planifiées suspendues jusqu'à la réconciliation Stripe post-restauration.",
 };
 
 const bloquer = (code: CodeIncident, reessayerApres = 120): DecisionIncident => ({
@@ -273,6 +287,10 @@ export function decisionIncident(entree: {
   const lectureSeule = controleActif(etat, app, "lecture_seule");
 
   if (controleActif(etat, app, "app_coupee") && !pilotage && !serveur) return bloquer("SAFE_MODE_APP_OFF", 300);
+
+  if (correspond(chemin, regles.crons) && controleActif(etat, app, "reconciliation_stripe_requise")) {
+    return bloquer("SAFE_MODE_STRIPE_RECONCILIATION", 900);
+  }
 
   if (lectureSeule) {
     if (serveur) return bloquer("SAFE_MODE_READ_ONLY", 600);

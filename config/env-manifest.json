@@ -232,6 +232,10 @@
       {
         "path": "packages/elsatia-identity/scripts/",
         "justification": "Outils locaux de @elsatia/identity (pile GoTrue/PostgREST jetable, keygen, passerelle de test). Jamais déployés."
+      },
+      {
+        "path": "scripts/incident/",
+        "justification": "Drill d'incident LOCAL (npm run incident:drill, INCIDENT RESPONSE & SAFE MODE V1) : pile jetable GoTrue/PostgREST/Redis/mocks Stripe-Brevo sur 127.0.0.1, secrets générés pour le drill. Ses variables (PORT, NOM, INCIDENT_DRILL_*) sont propres au banc ; jamais déployé ni lu par une application."
       }
     ],
     "literal_prefixes": [

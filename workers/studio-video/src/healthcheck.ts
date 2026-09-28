@@ -16,6 +16,9 @@ export async function pingRedis(
     maxRetriesPerRequest: 1,
     connectTimeout: timeoutMs,
   });
+  // Sans écouteur, ioredis journalise « Unhandled error event » avec l'hôte et le port : l'échec
+  // remonte déjà par connect()/ping(), seul le journal JSON borné ci-dessous doit sortir.
+  connection.on("error", () => undefined);
   try {
     await connection.connect();
     const reply = await connection.ping();

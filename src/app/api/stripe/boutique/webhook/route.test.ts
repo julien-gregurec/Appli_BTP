@@ -129,4 +129,17 @@ describe("webhook boutique — rejeu après échec (D3)", () => {
     expect(reponse.status).toBe(200);
     expect(deps.finaliser).not.toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", expect.anything());
   });
+
+  // INCIDENT RESPONSE V1 (migration 20260928000702) : une réservation finalisée n'est plus
+  // reprenable ; une réservation dont le traitement a échoué n'est jamais finalisée.
+  it("finalise la réservation après succès, jamais après échec", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");
+    await poster(evenement(false));
+    expect(deps.finaliser).toHaveBeenLastCalledWith("finaliser_evenement_webhook_stripe_service", { p_stripe_event_id: "evt_test_1" });
+    deps.finaliser.mockClear();
+    deps.finaliser.mockImplementation(async (fn: string) => fn === "boutique_finaliser_commande_payee"
+      ? { error: { code: "PT503", message: "lecture seule" } } : { error: null });
+    await poster(evenement(false));
+    expect(deps.finaliser).not.toHaveBeenCalledWith("finaliser_evenement_webhook_stripe_service", expect.anything());
+  });
 });

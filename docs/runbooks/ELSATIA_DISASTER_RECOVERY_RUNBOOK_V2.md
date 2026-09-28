@@ -46,8 +46,8 @@ Incident détecté (alerte, signalement client, anomalie interne)
 │
 ├─ Les données manquantes/corrompues sont-elles identifiées précisément
 │  (tables, plage temporelle, entreprises concernées) ?
-│   ├─ NON → Geler les écritures sur le périmètre suspect (feature flag /
-│   │         maintenance ciblée), puis investiguer (logs applicatifs,
+│   ├─ NON → Geler les écritures sur le périmètre suspect (mode sûr
+│   │         `lecture_seule`, docs/runbooks/incident/README.md), puis investiguer (logs applicatifs,
 │   │         `pg_stat_activity`, audit trail applicatif) avant toute
 │   │         action destructive.
 │   └─ OUI → continuer
@@ -66,7 +66,9 @@ Incident détecté (alerte, signalement client, anomalie interne)
 │             PUIS basculer.
 │
 └─ Après restauration (test ou réelle) : exécuter la §5 Validation
-   ci-dessous avant de rouvrir l'accès aux utilisateurs.
+   ci-dessous, puis l'ordre complet de docs/runbooks/incident/POST_RESTAURATION.md
+   (verrou de réconciliation Stripe, Storage, Auth, rejeu Stripe, RGPD,
+   santé) avant de rouvrir l'accès aux utilisateurs.
 ```
 
 ## 3. Sauvegarde — ce qui est prouvé vs ce qui ne l'est pas

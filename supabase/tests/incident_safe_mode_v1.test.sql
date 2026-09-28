@@ -346,6 +346,19 @@ select lives_ok($$select public.plateforme_incident_basculer('global','app_coupe
   'réouverture autorisée après réconciliation');
 reset role;
 
+-- Statut public posé par l'opérateur SQL (Auth indisponible) : journalisé, jamais par un rôle applicatif.
+select ok(not has_function_privilege('authenticated', 'public.incident_statut_operateur(text,text,text,text,text)', 'EXECUTE'),
+  'statut opérateur : authenticated exclu');
+select ok(not has_function_privilege('service_role', 'public.incident_statut_operateur(text,text,text,text,text)', 'EXECUTE'),
+  'statut opérateur : service_role exclu');
+select lives_ok($$select public.incident_statut_operateur('astreinte-julien','auth','OUTAGE','Connexion momentanément indisponible.','RESTORE-1 GoTrue en panne')$$,
+  'statut posé en SQL par l''opérateur');
+select is(public.incident_etat_public() #>> '{statuts,auth,statut}', 'OUTAGE', 'statut opérateur visible publiquement');
+select is((select acteur_role from public.incident_journal where action = 'statut_modifie' order by id desc limit 1), 'operateur_sql',
+  'statut opérateur journalisé');
+select throws_ok($$select public.incident_statut_operateur('astreinte-julien','auth','OUTAGE',null,'court')$$, '22023', null,
+  'statut opérateur : motif obligatoire');
+
 -- ═════════════ 11. Expiration automatique ═════════════
 set local role authenticated;
 select pg_temp.jwt('30000000-0000-0000-0000-000000000001', 'authenticated');

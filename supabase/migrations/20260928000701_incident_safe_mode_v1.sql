@@ -363,6 +363,42 @@ $$;
 revoke all on function public.plateforme_incident_statut_definir(text,text,text,text) from public, anon;
 grant execute on function public.plateforme_incident_statut_definir(text,text,text,text) to authenticated;
 
+-- Secours (Auth indisponible) : statut public posé depuis la console SQL, journalisé.
+create or replace function public.incident_statut_operateur(
+  p_operateur text, p_service text, p_statut text, p_message_public text, p_motif text
+)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_ancien public.incident_statuts_services;
+begin
+  if p_operateur is null or char_length(btrim(p_operateur)) < 3 then
+    raise exception 'Identité de l''opérateur obligatoire' using errcode = '22023';
+  end if;
+  if p_motif is null or char_length(btrim(p_motif)) < 10 then
+    raise exception 'Motif obligatoire (10 caractères minimum)' using errcode = '22023';
+  end if;
+  if p_statut is null or p_statut not in ('OPERATIONAL','DEGRADED','READ_ONLY','OUTAGE') then
+    raise exception 'Statut inconnu : %', p_statut using errcode = '22023';
+  end if;
+  select * into v_ancien from public.incident_statuts_services where service = p_service for update;
+  if not found then
+    raise exception 'Service inconnu : %', p_service using errcode = '22023';
+  end if;
+  update public.incident_statuts_services
+     set statut = p_statut, message_public = nullif(btrim(coalesce(p_message_public,'')),''),
+         maj_par = null, maj_at = now()
+   where service = p_service;
+  insert into public.incident_journal (acteur_id, acteur_libelle, acteur_role, action, service, ancien, nouveau, motif)
+  values (null, 'operateur_sql:' || btrim(p_operateur), 'operateur_sql', 'statut_modifie', p_service,
+          jsonb_build_object('statut', v_ancien.statut),
+          jsonb_build_object('statut', p_statut, 'message', p_message_public), btrim(p_motif));
+  return jsonb_build_object('service', p_service, 'statut', p_statut);
+end;
+$$;
+revoke all on function public.incident_statut_operateur(text,text,text,text,text)
+  from public, anon, authenticated, service_role;
+
 -- Lecture interne (motifs compris) : tout membre plateforme actif.
 create or replace function public.plateforme_incident_journal_lister(p_limite integer default 100)
 returns setof public.incident_journal

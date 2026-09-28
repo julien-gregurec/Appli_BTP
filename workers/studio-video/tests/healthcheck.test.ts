@@ -15,6 +15,7 @@ vi.mock("ioredis", () => ({
     connect = () => state.connect();
     ping = () => state.ping();
     disconnect = () => state.disconnect();
+    on = () => this;
   },
 }));
 

@@ -187,6 +187,10 @@ const server = http.createServer(async (req, res) => {
     const u = new URL(req.url, 'http://local');
     const segments = u.pathname.split('/').filter(Boolean);
 
+    // GET /status : sonde de disponibilité (comme storage-api), sans authentification ni donnée.
+    // Utilisée par /api/health (INCIDENT RESPONSE V1).
+    if (req.method === 'GET' && u.pathname === '/status') return json(res, 200, { status: 'ok' });
+
     // POST /object/sign/<bucket>  (batch create, storage-js createSignedUrls) -- each path is
     // RLS-checked with ONE select as the caller; refused paths come back with an error, like
     // storage-api ("Either the object does not exist or you do not have access to it").
