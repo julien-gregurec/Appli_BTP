@@ -75,3 +75,4 @@ output/verification/
 /output/video/points.json
 /playwright-report-colors/
 /tests/e2e/colors-pile-locale/stockage-recette/
+__pycache__/
