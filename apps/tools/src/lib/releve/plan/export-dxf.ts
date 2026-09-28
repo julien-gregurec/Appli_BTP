@@ -23,6 +23,8 @@ function entity(e: PlanExportEntity): string {
       return pair(0, "LINE") + pair(8, e.layer) + (e.style === "tirets" ? pair(6, "DASHED") : "")
         + pair(10, e.a.x) + pair(20, e.a.y) + pair(30, 0) + pair(11, e.b.x) + pair(21, e.b.y) + pair(31, 0);
     case "arc":
+      // Lot 7 : cercle complet (symboles d'objets) → CIRCLE natif.
+      if (Math.abs(e.end - e.start - 2 * Math.PI) < 1e-9) return pair(0, "CIRCLE") + pair(8, e.layer) + pair(10, e.centre.x) + pair(20, e.centre.y) + pair(30, 0) + pair(40, e.radius);
       return pair(0, "ARC") + pair(8, e.layer) + pair(10, e.centre.x) + pair(20, e.centre.y) + pair(30, 0) + pair(40, e.radius)
         + pair(50, deg(e.start)) + pair(51, deg(e.end));
     case "polygon":

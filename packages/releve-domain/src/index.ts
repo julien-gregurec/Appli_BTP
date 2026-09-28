@@ -18,6 +18,7 @@
  * | `photo` | Lot 4 : rattachement photo sur la hiérarchie, repères, annotations (registre des formes) |
  * | `gallery` | Lot 4 : galerie par relevé / chantier / bâtiment / étage / zone / pièce, filtres, pagination |
  * | `media-service` / `upload-queue` | Lot 4 : cas d'usage photo, file locale « à synchroniser » |
+ * | `equipement` | Lot 7 : objets du plan (catalogue, calques, règles miroir SQL, fiche pièce) |
  * | `plan` / `plan-memory` | Lot 5 : plan 2D par étage (états, murs, ouvertures, contours), enregistrement par différence, gel, ancres photo, contrat d'export |
  * | `gp-sync` | contrat v1 de transmission vers Gestion Pro (non branché) |
  * | `repository` / `service` | port de persistance et cas d'usage |
@@ -41,5 +42,6 @@ export * from "./photo";
 export * from "./gallery";
 export * from "./media-service";
 export * from "./upload-queue";
+export * from "./equipement";
 export * from "./plan";
 export * from "./plan-memory";

@@ -9,7 +9,10 @@
  * Toutes existent nativement en SVG, en PDF et en DXF (LWPOLYLINE / POLYLINE fermée, LINE,
  * ARC, TEXT) : les écrivains n'ont qu'à sérialiser, en millimètres, repère Y haut.
  */
-import { murLongueurMm, type PlanDocument, type PlanExportEntity } from "@elsatia/releve-domain";
+import {
+  CALQUE_DES_CATEGORIES, EXPORT_LAYER_OF_CALQUE, calquesEffectifs, murLongueurMm, type PlanCalques, type PlanDocument, type PlanExportEntity,
+} from "@elsatia/releve-domain";
+import { equipmentSymbol } from "./equipment-symbols";
 import { contourLabelPoint } from "./geometry";
 import { formatLongueurM, formatSurfaceContour, openingSymbol } from "./render";
 import { computeWallNetwork, wallParts, type WallNetwork } from "./wall-geometry";
@@ -18,12 +21,15 @@ export type PlanGeometryExportOptions = {
   readonly pieceName?: (pieceId: string) => string;
   readonly surfaces?: Readonly<Record<string, number>>;
   readonly network?: WallNetwork;
+  /** Lot 7 : état des calques (défaut : celui mémorisé dans le plan). Un calque masqué n'est pas exporté. */
+  readonly calques?: PlanCalques;
 };
 
 export function planGeometryEntities(document: PlanDocument, options: PlanGeometryExportOptions = {}): PlanExportEntity[] {
   const network = options.network ?? computeWallNetwork(document.murs);
   const murs = new Map(document.murs.map((mur) => [mur.id, mur]));
   const entities: PlanExportEntity[] = [];
+  const calques = options.calques ?? calquesEffectifs(document.reglages.calques);
   for (const contour of document.contours) {
     entities.push({ layer: "PIECES", kind: "polygon", points: contour.points, ref: contour.pieceId });
   }
@@ -36,6 +42,18 @@ export function planGeometryEntities(document: PlanDocument, options: PlanGeomet
     const symbol = openingSymbol(mur, ouverture);
     for (const line of symbol.lines) entities.push({ layer: "OUVERTURES", kind: "line", a: line.a, b: line.b, widthMm: 0, style: line.style ?? "trait", ref: ouverture.id });
     for (const arc of symbol.arcs) entities.push({ layer: "OUVERTURES", kind: "arc", centre: arc.centre, radius: arc.radius, start: arc.start, end: arc.end, ref: ouverture.id });
+  }
+  // Lot 7 : objets visibles des calques visibles — emprise, marques du symbole, libellé.
+  for (const objet of document.equipements ?? []) {
+    const calque = CALQUE_DES_CATEGORIES[objet.categorie];
+    if (!objet.visible || !calques[calque].visible) continue;
+    const layer = EXPORT_LAYER_OF_CALQUE[calque];
+    const symbol = equipmentSymbol(objet);
+    entities.push({ layer, kind: "polygon", points: symbol.outline, ref: objet.id });
+    for (const polygon of symbol.polygons) entities.push({ layer, kind: "polygon", points: polygon, ref: objet.id });
+    for (const line of symbol.lines) entities.push({ layer, kind: "line", a: line.a, b: line.b, widthMm: 0, style: line.style ?? "trait", ref: objet.id });
+    for (const circle of symbol.circles) entities.push({ layer, kind: "arc", centre: circle.centre, radius: circle.radius, start: 0, end: 2 * Math.PI, ref: objet.id });
+    if (calques.annotations.visible) entities.push({ layer, kind: "text", at: objet.position, text: objet.libelle, ref: objet.id });
   }
   for (const mur of document.murs) {
     entities.push({ layer: "COTES", kind: "text", at: { x: (mur.a.x + mur.b.x) / 2, y: (mur.a.y + mur.b.y) / 2 }, text: formatLongueurM(murLongueurMm(mur)), ref: mur.id });

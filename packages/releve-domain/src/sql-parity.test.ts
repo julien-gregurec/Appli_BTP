@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { RELEVE_METRE_OFFER, TOOLS_ADDON_CAPABILITIES, TOOLS_OFFERS, TOOLS_PRO_CAPABILITIES, expandOfferCapabilities, offerCapabilities } from "./entitlement";
 import {
-  ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
+  ANNOTATION_FORMES, ELEMENT_TYPES, EQUIPEMENT_CATEGORIES, EQUIPEMENT_CATEGORIES_LOT2, REVETEMENT_TYPES, mesureUniteAttendue, ETAGE_ETATS, MATERIAU_CATEGORIES, MEDIA_CATEGORIES, MESURE_SOURCES, MESURE_TYPES,
   MESURE_UNITES, MUR_TYPES, OUVERTURE_TYPES, PIECE_USAGES, QUANTITE_QUALITES, QUANTITE_UNITES, RELEVE_STATUTS,
   RELEVE_VISIBILITES, VERSION_TYPES, ZONE_TYPES, ENTITY_REF_KINDS, ZONE_TYPES_LOT2, PIECE_USAGES_LOT2, CHANTIER_STATUTS, ETAGE_TYPES_NIVEAU, PIECE_STATUTS,
 } from "./model";
@@ -97,7 +97,7 @@ describe("parité domaine ↔ migration tools_releve_metre_lot2_complements", ()
 
 describe("parité domaine ↔ migration tools_releve_metre_contrat_elements_v2 (validateur courant des éléments)", () => {
   it.each([
-    ["types de mur", MUR_TYPES], ["types d'ouverture", OUVERTURE_TYPES], ["catégories d'équipement", EQUIPEMENT_CATEGORIES],
+    ["types de mur", MUR_TYPES], ["types d'ouverture", OUVERTURE_TYPES], ["catégories d'équipement (Lot 2)", EQUIPEMENT_CATEGORIES_LOT2],
     ["types de mesure", MESURE_TYPES], ["unités de mesure", MESURE_UNITES], ["sources de mesure", MESURE_SOURCES],
     ["catégories de matériau", MATERIAU_CATEGORIES], ["unités de quantité", QUANTITE_UNITES], ["qualités", QUANTITE_QUALITES],
     ["formes d'annotation", ANNOTATION_FORMES], ["revêtements", REVETEMENT_TYPES],

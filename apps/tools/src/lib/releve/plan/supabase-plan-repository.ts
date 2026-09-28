@@ -7,8 +7,8 @@
  * direct aux utilisateurs.
  */
 import {
-  ReleveConflictError, murFromElement, ouvertureFromElement,
-  type LoadedPlan, type Plan, type PlanContour, type PlanEtat, type PlanOperations, type PlanSaveResult, type ReleveElement, type RelevePlanRepository,
+  ReleveConflictError, equipementFromElement, murFromElement, ouvertureFromElement,
+  type DeletedPlanEquipement, type LoadedPlan, type PieceEquipementRow, type Plan, type PlanContour, type PlanEtat, type PlanOperations, type PlanSaveResult, type ReleveElement, type RelevePlanRepository,
 } from "@elsatia/releve-domain";
 import { ReleveRemoteError, type ReleveSupabaseClient } from "../supabase-repository";
 
@@ -19,7 +19,7 @@ export type PlanRow = {
   version_id: string | null; empreinte: string | null; created_at: string; updated_at: string; deleted_at: string | null;
 };
 
-type ElementRow = { id: string; type: "mur" | "ouverture"; piece_id: string | null; parent_element_id: string | null; donnees: Record<string, unknown> };
+type ElementRow = { id: string; type: "mur" | "ouverture" | "equipement"; piece_id: string | null; parent_element_id: string | null; donnees: Record<string, unknown> };
 
 export function planFromRow(row: PlanRow): Plan {
   return {
@@ -70,6 +70,9 @@ export class SupabasePlanRepository implements RelevePlanRepository {
           .map((row) => murFromElement({ id: row.id, pieceId: row.piece_id, donnees: row.donnees } as unknown as ReleveElement<"mur">)),
         ouvertures: rows.filter((row) => row.type === "ouverture").sort(byId)
           .map((row) => ouvertureFromElement({ id: row.id, parentElementId: row.parent_element_id, donnees: row.donnees } as unknown as ReleveElement<"ouverture">)),
+        // Lot 7 : objets du plan (même RPC de lecture).
+        equipements: rows.filter((row) => row.type === "equipement").sort(byId)
+          .map((row) => equipementFromElement({ id: row.id, pieceId: row.piece_id, donnees: row.donnees } as unknown as ReleveElement<"equipement">)),
         contours: loaded.contours, cadre: loaded.cadre, reglages: loaded.reglages,
       },
     };
@@ -86,6 +89,24 @@ export class SupabasePlanRepository implements RelevePlanRepository {
     if (error) fail("Enregistrement du plan", error);
     const result = data as { revision: number | string; contours: PlanContour[] };
     return { revision: Number(result.revision), contours: result.contours ?? [] };
+  }
+
+  async listDeletedEquipements(planId: string): Promise<DeletedPlanEquipement[]> {
+    const { data, error } = await this.client.rpc("tools_releve_plan_equipements_supprimes", { p_plan_id: planId });
+    if (error) fail("Chargement de la corbeille", error);
+    return ((data ?? []) as { id: string; piece_id: string | null; donnees: Record<string, unknown>; deleted_at: string }[]).map((row) => ({
+      objet: equipementFromElement({ id: row.id, pieceId: row.piece_id, donnees: row.donnees } as unknown as ReleveElement<"equipement">),
+      deletedAt: row.deleted_at,
+    }));
+  }
+
+  /** Lot 7 — fiche pièce : équipements actifs d'une pièce (tous plans ; le domaine retient le plan de référence). */
+  async listPieceEquipements(pieceId: string): Promise<PieceEquipementRow[]> {
+    const { data, error } = await this.client.from("tools_releves_elements").select("id, plan_id, piece_id, donnees")
+      .eq("piece_id", pieceId).eq("type", "equipement").is("deleted_at", null).limit(2000);
+    if (error) fail("Chargement des équipements", error);
+    return ((data ?? []) as { id: string; plan_id: string | null; piece_id: string | null; donnees: PieceEquipementRow["donnees"] }[])
+      .map((row) => ({ id: row.id, planId: row.plan_id, pieceId: row.piece_id, donnees: row.donnees }));
   }
 
   async freezePlan(planId: string, expectedRevision: number, libelle: string | null = null): Promise<Plan> {
