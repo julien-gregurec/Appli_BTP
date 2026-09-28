@@ -112,7 +112,7 @@ create or replace function public.incident_journal_immuable()
 returns trigger language plpgsql set search_path = public as $$
 begin
   raise exception 'incident_journal est append-only (% refusé)', tg_op
-    using errcode = '42501', hint = 'ELSATIA_INCIDENT_JOURNAL_IMMUABLE';
+    using errcode = '42501', hint = 'INCIDENT_JOURNAL_IMMUABLE';
 end;
 $$;
 revoke all on function public.incident_journal_immuable() from public, anon, authenticated;
@@ -234,7 +234,7 @@ begin
   if not p_actif and p_portee = 'global' and p_controle in ('lecture_seule','app_coupee')
      and public.incident_controle_actif('global', 'reconciliation_stripe_requise') then
     raise exception 'Réouverture refusée : réconciliation Stripe non attestée'
-      using errcode = '42501', hint = 'ELSATIA_RECONCILIATION_STRIPE_REQUISE';
+      using errcode = '42501', hint = 'RECONCILIATION_STRIPE_REQUISE';
   end if;
 
   select * into v_ancien from public.incident_controles
@@ -461,14 +461,14 @@ begin
   -- le socle partagé n'est gelé que par la portée globale.
   if public.incident_controle_actif(v_app, 'lecture_seule') then
     raise exception 'ELSATIA est temporairement en lecture seule (maintenance de sécurité). Aucune donnée n''est perdue.'
-      using errcode = 'PT503', hint = 'ELSATIA_SAFE_MODE_READ_ONLY',
+      using errcode = 'PT503', hint = 'SAFE_MODE_READ_ONLY',
             detail = 'table=' || tg_table_name;
   end if;
 
   v_role := public.incident_role_requete();
   if v_role in ('anon','authenticated') and public.incident_controle_actif(v_app, 'app_coupee') then
     raise exception 'Cette application ELSATIA est temporairement indisponible.'
-      using errcode = 'PT503', hint = 'ELSATIA_SAFE_MODE_APP_OFF',
+      using errcode = 'PT503', hint = 'SAFE_MODE_APP_OFF',
             detail = 'table=' || tg_table_name;
   end if;
   return null;
@@ -483,7 +483,7 @@ language plpgsql security definer set search_path = public as $$
 begin
   if public.incident_controle_actif(tg_argv[0], 'invitations') then
     raise exception 'Les invitations sont temporairement suspendues.'
-      using errcode = 'PT503', hint = 'ELSATIA_SAFE_MODE_INVITATIONS_OFF';
+      using errcode = 'PT503', hint = 'SAFE_MODE_INVITATIONS_OFF';
   end if;
   return null;
 end;
@@ -580,9 +580,9 @@ begin
     raise exception 'Fonction temporairement suspendue (maintenance de sécurité).'
       using errcode = 'PT503',
             hint = case p_controle
-                     when 'liens_publics' then 'ELSATIA_SAFE_MODE_PUBLIC_LINKS_OFF'
-                     when 'invitations' then 'ELSATIA_SAFE_MODE_INVITATIONS_OFF'
-                     else 'ELSATIA_SAFE_MODE' end;
+                     when 'liens_publics' then 'SAFE_MODE_PUBLIC_LINKS_OFF'
+                     when 'invitations' then 'SAFE_MODE_INVITATIONS_OFF'
+                     else 'SAFE_MODE' end;
   end if;
 end;
 $$;

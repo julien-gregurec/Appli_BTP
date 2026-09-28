@@ -31,6 +31,9 @@
       ],
       "@elsatia/platform-support-comms": [
         "../../packages/platform-support-comms/src/index.ts"
+      ],
+      "@elsatia/incident-control": [
+        "../../packages/incident-control/src/index.ts"
       ]
     }
   },

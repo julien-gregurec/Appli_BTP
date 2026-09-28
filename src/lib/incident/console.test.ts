@@ -43,7 +43,7 @@ describe("lireDemandeStatut", () => {
 
 describe("messageRefusConsole", () => {
   it("explique le verrou de réconciliation Stripe", () => {
-    expect(messageRefusConsole({ code: "42501", hint: "ELSATIA_RECONCILIATION_STRIPE_REQUISE" })).toContain("réconciliation Stripe");
+    expect(messageRefusConsole({ code: "42501", hint: "RECONCILIATION_STRIPE_REQUISE" })).toContain("réconciliation Stripe");
   });
   it("explique le refus RBAC sans exposer le texte SQL", () => {
     const m = messageRefusConsole({ code: "42501", message: "Action réservée aux rôles total (votre rôle : support)" });

@@ -99,7 +99,7 @@ export function lireDemandeStatut(formData: FormData):
 
 /** Traduit un refus de la base en message opérateur (jamais le texte SQL brut). */
 export function messageRefusConsole(erreur: { code?: string | null; hint?: string | null; message?: string | null }): string {
-  if (erreur.hint === "ELSATIA_RECONCILIATION_STRIPE_REQUISE") {
+  if (erreur.hint === "RECONCILIATION_STRIPE_REQUISE") {
     return "Réouverture refusée : la réconciliation Stripe n'est pas attestée. Rejouez les événements Stripe (runbook RESTORE), puis levez d'abord le verrou « Réconciliation Stripe requise ».";
   }
   if (erreur.code === "42501" || /AAL2/.test(erreur.message ?? "")) {

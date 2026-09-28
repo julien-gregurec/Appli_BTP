@@ -5,6 +5,7 @@ import {
   codeHttpSante,
   codeIncidentDepuisErreur,
   controleActif,
+  creerGardeProxy,
   creerLecteurEtatIncident,
   decisionIncident,
   evaluerSante,
@@ -288,9 +289,9 @@ describe("chargeurPostgrest", () => {
 
 describe("codeIncidentDepuisErreur", () => {
   it("reconnaît les indices de la base", () => {
-    expect(codeIncidentDepuisErreur({ hint: "ELSATIA_SAFE_MODE_READ_ONLY" })).toBe("SAFE_MODE_READ_ONLY");
-    expect(codeIncidentDepuisErreur({ hint: "ELSATIA_SAFE_MODE_APP_OFF" })).toBe("SAFE_MODE_APP_OFF");
-    expect(codeIncidentDepuisErreur({ hint: "ELSATIA_SAFE_MODE_PUBLIC_LINKS_OFF" })).toBe("SAFE_MODE_PUBLIC_LINKS_OFF");
+    expect(codeIncidentDepuisErreur({ hint: "SAFE_MODE_READ_ONLY" })).toBe("SAFE_MODE_READ_ONLY");
+    expect(codeIncidentDepuisErreur({ hint: "SAFE_MODE_APP_OFF" })).toBe("SAFE_MODE_APP_OFF");
+    expect(codeIncidentDepuisErreur({ hint: "SAFE_MODE_PUBLIC_LINKS_OFF" })).toBe("SAFE_MODE_PUBLIC_LINKS_OFF");
     expect(codeIncidentDepuisErreur({ code: "PT503" })).toBe("SAFE_MODE_READ_ONLY");
     expect(codeIncidentDepuisErreur({ code: "42501", hint: "RESERVES_HOTE_SUSPENDU" })).toBeNull();
     expect(codeIncidentDepuisErreur(null)).toBeNull();
@@ -345,5 +346,21 @@ describe("evaluerSante", () => {
       controles: [ok("db"), { nom: "email", critique: false, executer: async () => "non_configure" as const }],
     });
     expect(r.statut).toBe("OPERATIONAL");
+  });
+});
+
+describe("creerGardeProxy", () => {
+  it("rend une réponse 503 pour l'application concernée seulement", async () => {
+    const lecteur = { lire: async () => etat(["reserves", "app_coupee"]), invalider() {} };
+    const reserves = creerGardeProxy({ app: "reserves", urlSupabase: "https://x", clePublique: "pk", lecteur });
+    const colors = creerGardeProxy({ app: "colors", urlSupabase: "https://x", clePublique: "pk", lecteur });
+    const r = await reserves({ chemin: "/dashboard", methode: "GET", entetes: new Headers({ accept: "text/html" }) });
+    expect(r?.statut).toBe(503);
+    expect(r?.entetes["Content-Type"]).toContain("text/html");
+    expect(await colors({ chemin: "/dashboard", methode: "GET", entetes: new Headers() })).toBeNull();
+  });
+  it("sans configuration Supabase : aucun blocage, aucun appel réseau", async () => {
+    const garde = creerGardeProxy({ app: "reserves", urlSupabase: undefined, clePublique: undefined });
+    expect(await garde({ chemin: "/api/offline/photo", methode: "POST", entetes: new Headers() })).toBeNull();
   });
 });

@@ -417,16 +417,46 @@ export function chargeurPostgrest(options: {
   };
 }
 
+/**
+ * Garde prête à l'emploi pour le proxy d'une application : rend la réponse 503 à servir (corps,
+ * en-têtes) ou `null`. Sans dépendance à Next : chaque proxy l'enveloppe dans sa NextResponse.
+ * Sans configuration Supabase (build, tests), l'état est inconnu et rien n'est bloqué.
+ */
+export function creerGardeProxy(options: {
+  app: ApplicationIncident;
+  urlSupabase: string | undefined;
+  clePublique: string | undefined;
+  lecteur?: LecteurEtatIncident;
+}) {
+  const lecteur = options.lecteur ?? creerLecteurEtatIncident({
+    charger: options.urlSupabase && options.clePublique
+      ? chargeurPostgrest({ urlSupabase: options.urlSupabase, clePublique: options.clePublique })
+      : async () => null,
+  });
+  return async (requete: { chemin: string; methode: string; entetes: Headers }) => {
+    const decision = decisionIncident({
+      app: options.app,
+      chemin: requete.chemin,
+      methode: requete.methode,
+      estServerAction: requete.entetes.has("next-action"),
+      etat: await lecteur.lire(),
+    });
+    if (decision.action === "continuer") return null;
+    const accepteHtml = !requete.chemin.startsWith("/api/") && (requete.entetes.get("accept") ?? "").includes("text/html");
+    return reponseIncident(decision, accepteHtml);
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Erreurs renvoyées par la base
 // ─────────────────────────────────────────────────────────────────────────────
 
 const INDICES_BASE: Readonly<Record<string, CodeIncident>> = {
-  ELSATIA_SAFE_MODE_READ_ONLY: "SAFE_MODE_READ_ONLY",
-  ELSATIA_SAFE_MODE_APP_OFF: "SAFE_MODE_APP_OFF",
-  ELSATIA_SAFE_MODE_UPLOADS_OFF: "SAFE_MODE_UPLOADS_OFF",
-  ELSATIA_SAFE_MODE_PUBLIC_LINKS_OFF: "SAFE_MODE_PUBLIC_LINKS_OFF",
-  ELSATIA_SAFE_MODE_INVITATIONS_OFF: "SAFE_MODE_INVITATIONS_OFF",
+  SAFE_MODE_READ_ONLY: "SAFE_MODE_READ_ONLY",
+  SAFE_MODE_APP_OFF: "SAFE_MODE_APP_OFF",
+  SAFE_MODE_UPLOADS_OFF: "SAFE_MODE_UPLOADS_OFF",
+  SAFE_MODE_PUBLIC_LINKS_OFF: "SAFE_MODE_PUBLIC_LINKS_OFF",
+  SAFE_MODE_INVITATIONS_OFF: "SAFE_MODE_INVITATIONS_OFF",
 };
 
 /** Reconnaît un refus du mode sûr renvoyé par la base (indice PostgREST stable ou SQLSTATE PT503). */
@@ -435,7 +465,7 @@ export function codeIncidentDepuisErreur(
 ): CodeIncident | null {
   if (!erreur) return null;
   if (erreur.hint && INDICES_BASE[erreur.hint]) return INDICES_BASE[erreur.hint];
-  if (erreur.hint === "ELSATIA_SAFE_MODE" || erreur.code === "PT503") return "SAFE_MODE_READ_ONLY";
+  if (erreur.hint === "SAFE_MODE" || erreur.code === "PT503") return "SAFE_MODE_READ_ONLY";
   return null;
 }
 
@@ -509,6 +539,43 @@ export async function evaluerSante(options: {
     mode_sur: { lecture_seule: lectureSeule, application_coupee: coupee },
     horodatage: (options.maintenant?.() ?? new Date()).toISOString(),
   };
+}
+
+/**
+ * Sondes Supabase sans effet de bord, avec la clé PUBLIQUE : base (RPC publique de l'état
+ * d'incident, qui traverse PostgREST et Postgres), Auth (`/auth/v1/health`), Storage
+ * (`/storage/v1/status`). Base et Auth sont critiques ; Storage dégrade seulement.
+ */
+export function controlesSupabase(options: {
+  urlSupabase: string | undefined;
+  clePublique: string | undefined;
+  rpcEtat?: string;
+  fetchImpl?: typeof fetch;
+}): ControleSante[] {
+  const url = options.urlSupabase?.replace(/\/+$/, "");
+  const cle = options.clePublique;
+  const f = options.fetchImpl ?? fetch;
+  const nonConfigure = async (): Promise<ResultatControle> => "non_configure";
+  if (!url || !cle) {
+    return [
+      { nom: "db", critique: true, executer: nonConfigure },
+      { nom: "auth", critique: true, executer: nonConfigure },
+      { nom: "storage", critique: false, executer: nonConfigure },
+    ];
+  }
+  const entetes = { apikey: cle, Authorization: `Bearer ${cle}` };
+  const sonde = async (p: Promise<Response>): Promise<ResultatControle> => ((await p).ok ? "ok" : "ko");
+  return [
+    {
+      nom: "db",
+      critique: true,
+      executer: (signal) => sonde(f(`${url}/rest/v1/rpc/${options.rpcEtat ?? "incident_etat_public"}`, {
+        method: "POST", headers: { ...entetes, "Content-Type": "application/json" }, body: "{}", cache: "no-store", signal,
+      })),
+    },
+    { nom: "auth", critique: true, executer: (signal) => sonde(f(`${url}/auth/v1/health`, { headers: entetes, cache: "no-store", signal })) },
+    { nom: "storage", critique: false, executer: (signal) => sonde(f(`${url}/storage/v1/status`, { headers: entetes, cache: "no-store", signal })) },
+  ];
 }
 
 /** Code HTTP du rapport : 503 seulement en OUTAGE (les sondes externes déclenchent l'alerte). */

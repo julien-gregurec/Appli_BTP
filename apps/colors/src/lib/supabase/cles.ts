@@ -44,3 +44,11 @@ export function clePubliqueSupabase(): string {
   if (!cle) throw new Error("Configuration Supabase incomplète : NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY absente");
   return cle;
 }
+
+/**
+ * Clé publique telle qu'elle est configurée, sans exigence. Réservée au mode sûr (proxy, santé) :
+ * une configuration absente y signifie « état d'incident inconnu », jamais une panne du proxy.
+ */
+export function clePubliqueSupabaseConfiguree(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || undefined;
+}

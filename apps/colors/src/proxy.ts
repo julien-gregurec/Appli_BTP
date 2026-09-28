@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { POLITIQUE_RESSOURCES_PUBLIQUES, construireCspColors } from "@/lib/security/en-tetes";
 import { clePubliqueSupabase, urlSupabase, urlSupabaseConfiguree } from "@/lib/supabase/cles";
 import { porteCookieSession } from "@/lib/destination-connexion";
+import { reponseModeSur } from "@/lib/incident";
 import {
   EN_TETE_CHEMIN,
   EN_TETE_SESSION,
@@ -36,6 +37,13 @@ export async function proxy(request: NextRequest) {
     const reponse = NextResponse.next();
     reponse.headers.set("Content-Security-Policy", POLITIQUE_RESSOURCES_PUBLIQUES);
     return reponse;
+  }
+
+  // Mode sûr (incident) : décidé avant toute session ou appel à la base.
+  const modeSur = await reponseModeSur(request.nextUrl.pathname, request.method, request.headers);
+  if (modeSur) {
+    modeSur.headers.set("Content-Security-Policy", POLITIQUE_RESSOURCES_PUBLIQUES);
+    return modeSur;
   }
 
   const nonce = nonceRequete();
