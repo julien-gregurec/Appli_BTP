@@ -75,3 +75,7 @@ output/verification/
 /output/video/points.json
 /playwright-report-colors/
 /tests/e2e/colors-pile-locale/stockage-recette/
+
+# Qualification Preview distante : journaux, rapports Playwright et synthèse (le JSON
+# artifacts/preview-qualification.json, masqué, reste versionnable).
+/artifacts/preview-qualification/

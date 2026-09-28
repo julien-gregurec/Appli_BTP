@@ -1,0 +1,36 @@
+{
+  "schema": "elsatia.preview-target.v1",
+  "train": "V5",
+  "supabase": {
+    "project_ref": "pgvvpqyjziyapbbkydmc",
+    "project_name": "A_REMPLACER_nom_exact_du_projet_Supabase_Preview"
+  },
+  "vercel": {
+    "team_id": "team_A_REMPLACER",
+    "allowed_custom_preview_domains": [],
+    "projects": {
+      "gp": { "project_id": "prj_A_REMPLACER", "project_name": "A_REMPLACER", "preview_origin": "https://A-REMPLACER-gp.vercel.app" },
+      "tools": { "project_id": "prj_A_REMPLACER", "project_name": "A_REMPLACER", "preview_origin": "https://A-REMPLACER-tools.vercel.app" },
+      "colors": { "project_id": "prj_A_REMPLACER", "project_name": "A_REMPLACER", "preview_origin": "https://A-REMPLACER-colors.vercel.app" },
+      "reserves": { "project_id": "prj_A_REMPLACER", "project_name": "A_REMPLACER", "preview_origin": "https://A-REMPLACER-reserves.vercel.app" }
+    }
+  },
+  "stripe": { "account_id": "acct_1TtrTU0bT5C0WG2a", "mode": "test" },
+  "brevo": {
+    "environment": "recette",
+    "account_email": "A_REMPLACER@exemple.fr",
+    "recipient_allowlist": ["A_REMPLACER@exemple.fr"]
+  },
+  "qa": {
+    "tenant_a": { "email": "A_REMPLACER@exemple.fr", "entreprise_id": "A_REMPLACER", "user_id": "A_REMPLACER", "apps": ["gp", "colors", "reserves"] },
+    "tenant_b": { "email": "A_REMPLACER@exemple.fr", "entreprise_id": "A_REMPLACER", "user_id": "A_REMPLACER", "apps": ["gp"] }
+  },
+  "confirmations": {
+    "supabase_project_ref": "A_REMPLACER_recopier_supabase.project_ref",
+    "vercel_preview_projects": ["prj_A_REMPLACER"],
+    "stripe_mode": "A_REMPLACER_par_sk_test",
+    "brevo_environment": "A_REMPLACER_par_recette",
+    "confirmed_by": "",
+    "confirmed_at": "A_REMPLACER_date_ISO_8601"
+  }
+}

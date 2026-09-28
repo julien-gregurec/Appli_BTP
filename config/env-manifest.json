@@ -138,7 +138,8 @@
         "tests/",
         "playwright.config.ts",
         "vitest.config.ts",
-        "scripts/e2e/"
+        "scripts/e2e/",
+        "playwright.remote.config.ts"
       ]
     },
     "ci": {
@@ -365,6 +366,18 @@
       {
         "path": "scripts/configurer-portail-stripe.mjs",
         "justification": "Script manuel Billing Security V3 : lit les STRIPE_PRICE_<OFFRE>_{MENSUEL,ANNUEL} des offres commercialisées via une table de noms littérale ; chaque nom figure au manifeste."
+      },
+      {
+        "path": "scripts/preview/qualification/run.mjs",
+        "justification": "Qualification Preview distante : q(nom) lit une variable OPÉRATEUR nommée littéralement par l'appelant (ELSATIA_PREVIEW_DB_URL, VERCEL_TOKEN, SUPABASE_ACCESS_TOKEN, VERCEL_AUTOMATION_BYPASS_SECRET, STUDIO_REDIS_URL, ELSATIA_QA_PASSWORD_A/B — toutes déclarées) dans le shell puis qualification.env ; valeurs masquées dans toute sortie."
+      },
+      {
+        "path": "scripts/preview/qualification/steps/helpers.mjs",
+        "justification": "exigerVars(c, fichier, noms) teste la PRÉSENCE de variables nommées littéralement par chaque étape dans un fichier dotenv Preview chargé (pas process.env) ; aucune valeur affichée."
+      },
+      {
+        "path": "scripts/preview/qualification/steps/preflight.mjs",
+        "justification": "--pull-env : recopie dans un fichier dotenv opérateur (hors dépôt, 0600) les variables Preview renvoyées par l'API Vercel pour chaque projet, sous leur propre nom ; ces noms sont ensuite contrôlés contre le manifeste par preflight.env. Aucune valeur affichée."
       }
     ]
   },
@@ -5253,7 +5266,8 @@
     {
       "name": "VERCEL_AUTOMATION_BYPASS_SECRET",
       "applications": [
-        "ops_scripts"
+        "ops_scripts",
+        "e2e"
       ],
       "required": false,
       "environments": [
@@ -5264,7 +5278,7 @@
       "build_time": false,
       "runtime": true,
       "category": "tooling",
-      "description": "Secret « Protection Bypass for Automation » du projet Vercel Preview, posé dans le shell de l'OPÉRATEUR pour scripts/preview/http-smoke.mjs (en-tête x-vercel-protection-bypass, jamais affiché). À régénérer après chaque campagne.",
+      "description": "Secret « Protection Bypass for Automation » du projet Vercel Preview, posé dans le shell de l'OPÉRATEUR pour scripts/preview/http-smoke.mjs (en-tête x-vercel-protection-bypass, jamais affiché). À régénérer après chaque campagne. Également transmis à playwright.remote.config.ts (recette distante).",
       "fail_mode": "none",
       "deprecated": false,
       "replacement": null,
@@ -5719,14 +5733,15 @@
       ],
       "required": true,
       "environments": [
-        "production"
+        "production",
+        "preview"
       ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
       "runtime": true,
       "category": "tooling",
-      "description": "Jeton d'accès Supabase du shell de l'OPÉRATEUR du cutover (pas une variable d'application). Lu par les scripts de cutover, jamais par un déploiement.",
+      "description": "Jeton d'accès Supabase du shell de l'OPÉRATEUR du cutover (pas une variable d'application). Lu par les scripts de cutover, jamais par un déploiement. Preview : facultatif pour scripts/preview/qualification (nom du projet, supabase link avant db push, logs).",
       "fail_mode": "none",
       "deprecated": false,
       "replacement": null,
@@ -6727,6 +6742,290 @@
       "dr_critical": false,
       "example_required": true,
       "required_when": "dès que Studio est déployé"
+    },
+    {
+      "name": "VERCEL_TOKEN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Jeton Vercel de l'OPÉRATEUR (lecture suffit), dans ~/elsatia-preview/qualification.env ou le shell. Lu par scripts/preview/qualification (identité des projets et déploiements Preview, commit déployé, logs runtime). Jamais posé sur un déploiement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_QA_PASSWORD_A",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe du compte de recette A (qa.tenant_a du fichier de cible) sur la Preview, pour la qualification distante (Auth, Storage cross-tenant, Playwright). Opérateur uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_QA_PASSWORD_B",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe du compte de recette B (qa.tenant_b, seconde entreprise) sur la Preview, pour la qualification distante. Opérateur uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PLAYWRIGHT_JSON_OUTPUT_NAME",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Fichier du rapporteur JSON de Playwright, posé par scripts/preview/qualification pour la recette distante (artifacts/preview-qualification/playwright-<app>.json).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_BASE_URL",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Origine Preview (Vercel) de l'application sous recette distante, posée par scripts/preview/qualification pour playwright.remote.config.ts.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_APP",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Application sous recette distante (gp, tools, colors, reserves), posée par scripts/preview/qualification.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_EMAIL_A",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "E-mail du compte de recette A transmis à la recette Playwright distante (depuis le fichier de cible opérateur).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_EMAIL_B",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "E-mail du compte de recette B transmis à la recette Playwright distante.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_PASSWORD_A",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe du compte de recette A transmis à la recette Playwright distante (copie de ELSATIA_QA_PASSWORD_A, jamais affiché ; traces Playwright désactivées).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_PASSWORD_B",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe du compte de recette B transmis à la recette Playwright distante (copie de ELSATIA_QA_PASSWORD_B).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_APPS_A",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Applications auxquelles le compte de recette A a accès (liste gp,colors,reserves) : un parcours authentifié hors liste est SAUTÉ, jamais compté réussi.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_REMOTE_APPS_B",
+      "applications": [
+        "ops_scripts",
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Applications auxquelles le compte de recette B a accès.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_PREVIEW_TARGET_JSON",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Contenu JSON du fichier de cible de la qualification Preview distante (schéma elsatia.preview-target.v1 : identifiants publics et confirmations, aucun secret), pour un environnement cloud où déposer ~/elsatia-preview/preview-target.json n'est pas possible. Ignoré si --target désigne un fichier existant.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
     }
   ]
 }

@@ -35,6 +35,8 @@
     "preview:storage-smoke": "node scripts/preview/storage-smoke.mjs",
     "preview:redis-check": "node scripts/preview/redis-check.mjs",
     "test:preview-pack": "node --test scripts/preview/preview-pack.test.mjs",
+    "preview:qualification": "node scripts/preview/qualification/run.mjs",
+    "test:preview-qualification": "node --test scripts/preview/qualification/qualification.test.mjs",
     "sync:train-expectations": "node scripts/preview/train-expectations.mjs --write",
     "verify:train-expectations": "node scripts/preview/train-expectations.mjs --check",
     "test:stripe-ordering-script": "node --test scripts/qualification/stripe-ordering-test-mode.test.mjs",

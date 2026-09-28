@@ -1,0 +1,10 @@
+{
+  "$comment": "Train canonique qualifié par ce pack. Changer de train = modifier ce fichier par revue (jamais silencieusement).",
+  "train": "V5",
+  "branch": "integration/elsatia-canonical-train-v5",
+  "qualified_commit": "f6399f1517424311082b57a58bbbef211e8d493f",
+  "local_verdict": "CANONICAL TRAIN V5 LOCALLY QUALIFIED",
+  "report": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V5_CONVERGENCE_V1.md",
+  "newer_train_pattern": "integration/elsatia-canonical-train-v*",
+  "newer_train_verdict_regex": "CANONICAL TRAIN V(\\d+) (LOCALLY QUALIFIED|READY FOR REMOTE PREVIEW)"
+}
