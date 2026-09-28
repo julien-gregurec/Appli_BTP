@@ -23,9 +23,11 @@ import { CLASSES, SEEDS, seedById } from "./registry.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ACTIVE_CLASSES = new Set(["ACTIVE", "CI_ONLY", "PREVIEW", "PRODUCTION_TOOL"]);
 // Couvertures déclarées hors de ce harnais (suites pgTAP, CI Studio, recette avec passerelle).
-// "upgrade-harness" : exécuté par scripts/qualification/upgrade-v4-v5.sh (base V4 construite depuis V3) ou upgrade-v5-v6.sh (base V5)
-// : le complément suppose un état antérieur au train courant, jamais une base fraîche.
-const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness"]);
+// "upgrade-harness" : exécuté par scripts/qualification/upgrade-v4-v5.sh (base V4 construite depuis V3), upgrade-v5-v6.sh (base V5)
+// ou upgrade-v6-v7.sh (base V6) : le complément suppose un état antérieur au train courant, jamais une base fraîche.
+// "dr-v2-drill" : exécuté par scripts/dr/v2/drill.sh (`npm run dr:verify`) sur des bases jetables
+// elsatia_dr_v2_* dérivées de la base du harnais d'upgrade (docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md).
+const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness", "dr-v2-drill"]);
 
 // Où vivent les scripts de données, et à quoi ils ressemblent.
 const DISCOVERY = [

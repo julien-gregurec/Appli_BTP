@@ -55,3 +55,11 @@ BACKUP_DIR=$(./05_backup.sh)
 - **Preview/Production hébergés** : rien ici n'a été exécuté ni testé contre
   un projet Supabase hébergé. Voir le verdict `HOSTED_RPO/RTO = NOT_PROVEN`
   dans le rapport de qualification.
+
+## V2 — reprise après catastrophe qualifiée (`scripts/dr/v2/`)
+
+`npm run dr:verify` exécute la qualification DR V2 : jeu réaliste du train (harnais d'upgrade),
+sauvegarde avec manifeste et SHA-256, 4 catastrophes (suppression accidentelle, migration cassée,
+purge RGPD interrompue, corruption de l'état Stripe local), comparaison stricte après
+restauration, smokes métier, Storage avec la vraie storage-api et limites Auth avec un vrai GoTrue.
+Voir `scripts/dr/v2/README.md` et `docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md`.
