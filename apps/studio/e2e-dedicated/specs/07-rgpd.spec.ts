@@ -29,8 +29,6 @@ async function erasureCycle() {
   });
   return { status: res.status, body: (await res.json()) as Record<string, number | string> };
 }
-const requestOf = (userId: string) =>
-  studioSql(`select coalesce((select status from studio_identity.erasure_requests where user_id = ${quote(userId)} or subject = (select subject from studio_identity.links where user_id = ${quote(userId)})), 'none')`);
 const TEST_POLICY = "update studio_identity.erasure_policy set mode = 'execute', decision_ref = 'E2E-TEST-ONLY', grace_period = interval '0'";
 const PRODUCT_POLICY = "update studio_identity.erasure_policy set mode = 'off', decision_ref = null, grace_period = null";
 

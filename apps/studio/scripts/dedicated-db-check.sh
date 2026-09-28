@@ -6,7 +6,10 @@
 set -uo pipefail
 DB="${1:-studio_dedicated_check}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-pg() { su postgres -c "psql -X -q -v ON_ERROR_STOP=1 $*"; }
+# Local : super-utilisateur par `su postgres` (socket). CI sans root : DEDICATED_PSQL_ARGS désigne un
+# serveur local de test (ex. "-h 127.0.0.1 -p 56440 -U postgres").
+psqlx() { if [ -n "${DEDICATED_PSQL_ARGS:-}" ]; then eval "psql $DEDICATED_PSQL_ARGS $*"; else su postgres -c "psql $*"; fi; }
+pg() { psqlx "-X -q -v ON_ERROR_STOP=1 $*"; }
 
 pg "-c 'drop database if exists \"$DB\";' -c 'create database \"$DB\";'" || exit 1
 pg "-v dbname=$DB -d $DB -f $REPO/scripts/local-postgres-bootstrap/pg_bootstrap.sql" >/dev/null 2>&1 || { echo "bootstrap KO"; exit 1; }
@@ -16,11 +19,11 @@ for f in "$REPO"/apps/studio/supabase/migrations/*.sql; do
   pg "-d $DB -f $f" >/dev/null || { echo "ÉCHEC migration $(basename "$f")"; exit 1; }
 done
 echo "chaîne dédiée : $(ls "$REPO"/apps/studio/supabase/migrations/*.sql | wc -l) migrations appliquées"
-gp=$(su postgres -c "psql -X -At -d $DB -c \"select count(*) from pg_tables where schemaname='public' and tablename not like 'studio\\_%'\"")
+gp=$(psqlx "-X -At -d $DB -c \"select count(*) from pg_tables where schemaname='public' and tablename not like 'studio\\_%'\"")
 [ "$gp" = "0" ] || { echo "ÉCHEC : $gp table(s) non Studio dans le projet dédié"; exit 1; }
 
 run() { # fichier
-  out=$(su postgres -c "psql -X -q -At -d $DB -f $1" 2>&1)
+  out=$(psqlx "-X -q -At -d $DB -f $1" 2>&1)
   ok=$(grep -c '^ok' <<<"$out"); nok=$(grep -c '^not ok' <<<"$out"); err=$(grep -m1 'ERROR' <<<"$out")
   printf '%-52s ok=%-4s not_ok=%s %s\n' "$(basename "$1")" "$ok" "$nok" "$err"
   [ "$nok" = 0 ] && [ -z "$err" ] && [ "$ok" -gt 0 ]
