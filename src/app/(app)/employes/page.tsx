@@ -100,8 +100,10 @@ export default async function EmployesPage() {
   const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
 
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }, { data: couts }] = await Promise.all([
+    // employes_fiche : coordonnées pour acces_employes, numéro d'inscription
+    // seulement pour gerer_employes (20260928000701).
     supabase
-      .from("employes")
+      .from("employes_fiche")
       .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),

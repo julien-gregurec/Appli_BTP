@@ -32,8 +32,11 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe");
   const peutGererRib = !ctx.accesSupportPlateforme && (permissions === null || permissions.includes("gerer_coordonnees_bancaires"));
 
+  // Lecture via employes_fiche (20260928000701) : les colonnes sensibles de
+  // `employes` ne sont plus lisibles directement ; la vue masque la note RH,
+  // le numéro d'inscription et les fichiers selon gerer_employes / soi-même.
   const { data: employe } = await supabase
-    .from("employes")
+    .from("employes_fiche")
     .select("*, profil_acces:postes(nom)")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
@@ -128,7 +131,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {employe.statut === "sorti" && ligne("Date de sortie", employe.date_sortie ? formatDateFr(employe.date_sortie) : null)}
           {peutVoirTauxFacture&&ligne("Taux facturé", formatEuro(employe.taux_horaire))}
           {peutVoirCoutInterne&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
-          {ligne("Notes", employe.notes)}
+          {peutGerer&&ligne("Notes", employe.notes)}
         </section>
 
         {peutVoirHistoriqueFrais&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Historique des notes de frais</h2><p className="text-sm text-neutral-500">Justificatifs, décisions et montants conservés dans la fiche du salarié.</p></div><Link href={`/notes-frais?employe=${id}`} className="rounded border px-3 py-2 text-sm font-medium">Ouvrir le dossier complet</Link></div><div className="grid gap-2">{(notesFrais??[]).slice(0,12).map(note=>{const statut=statutNoteFrais(note.statut);const chantier=Array.isArray(note.chantier)?note.chantier[0]:note.chantier;return <Link key={note.id} href={`/notes-frais/${note.id}`} className="grid gap-1 rounded border p-3 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900 sm:grid-cols-[120px_1fr_1fr_auto_auto] sm:items-center"><strong className="font-mono">{note.reference}</strong><span>{note.fournisseur??"Sans fournisseur"}</span><span className="text-neutral-500">{chantier?.nom??"Frais généraux"} · {note.date_frais}</span><span style={{color:statut.couleur}}>{statut.libelle}</span><strong className="font-mono">{euros(note.montant_ttc)}</strong></Link>})}{!(notesFrais??[]).length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune note de frais enregistrée pour cet employé.</p>}</div></section>}

@@ -14,7 +14,7 @@ const LIBELLES_TYPE_ACTIVITE:Record<string,string>={chantier:"Chantier",bureau:"
 export default async function MonEspacePage({searchParams}:{searchParams:Promise<{error?:string;succes?:string}>}){
   const messages=await searchParams;
   const ctx=await getContexteEntreprise(),supabase=await createClient();
-  const{data:employe}=await supabase.from("employes").select("id,prenom,nom,email,telephone,poste,identifiant_interne,numero_inscription,code_stock_active,code_stock_modifie_at,carte_btp_storage_path,carte_btp_numero,carte_btp_expiration,utilisateur_id,profil_acces:postes(nom)").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();
+  const{data:employe}=await supabase.from("employes_fiche").select("id,prenom,nom,email,telephone,poste,identifiant_interne,numero_inscription,code_stock_active,code_stock_modifie_at,carte_btp_storage_path,carte_btp_numero,carte_btp_expiration,utilisateur_id,profil_acces:postes(nom)").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();
   if(!employe){
     if(isEmailLoginDisabled())return <main className="p-8"><div className="mx-auto max-w-3xl space-y-5"><div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Votre fiche personnelle, votre carte BTP et vos affectations.</p></div><div className="rounded-md border border-dashed p-6 text-sm text-neutral-600">Les informations personnelles sont disponibles avec un compte utilisateur individuel.</div></div></main>;
     const{data:profil}=await supabase.from("utilisateurs").select("nom").eq("id",ctx.userId).maybeSingle();
