@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cheminInterneStrict } from "@elsatia/email";
 import { createClient } from "@/lib/supabase/server";
 import {
   MIMES_PHOTO, MIMES_PLAN, TAILLE_MAX_PHOTO, TAILLE_MAX_PLAN,
@@ -45,7 +46,9 @@ function texteOuNull(formData: FormData, cle: string) {
 }
 
 function cheminSur(valeur: string, defaut: string) {
-  return valeur.startsWith("/") && !valeur.startsWith("//") ? valeur : defaut;
+  // Même validateur que le callback d'authentification : refuse `//`, `/\`, les
+  // caractères de contrôle et leurs formes encodées.
+  return cheminInterneStrict(valeur) ? valeur : defaut;
 }
 
 export async function connexionAction(formData: FormData) {
@@ -642,7 +645,8 @@ export async function inviterIntervenantAction(formData: FormData) {
 
   revalidatePath(retour);
   if (resultat.envoye) {
-    redirect(`${retour}?message=${encodeURIComponent(`Invitation envoyée à ${email}.`)}`);
+    // L'adresse du destinataire ne voyage pas dans l'URL (historique, journaux d'accès).
+    redirect(`${retour}?message=${encodeURIComponent("Invitation envoyée par e-mail.")}`);
   }
   // Le lien est remis à l'utilisateur par un cookie éphémère, JAMAIS par l'URL de retour :
   // un jeton d'invitation placé dans une URL se retrouve aussitôt dans l'historique du

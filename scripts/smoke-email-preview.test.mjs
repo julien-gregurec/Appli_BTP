@@ -99,7 +99,7 @@ test("--brevo-sandbox : un refus Brevo fait échouer le smoke", async () => {
 
 test("--brevo-send : passe par le transport applicatif injecté", async () => {
   let recu;
-  const r = await executer(["--brevo-send", "--to", "moi@exemple.fr"], preview, { envoyer: async (p) => { recu = p; return { messageId: "m" }; } });
+  const r = await executer(["--brevo-send", "--to", "moi@exemple.fr"], { ...preview, EMAIL_PREVIEW_ALLOWLIST: "moi@exemple.fr" }, { envoyer: async (p) => { recu = p; return { messageId: "m" }; } });
   assert.equal(r.code, 0);
   assert.equal(recu.to, "moi@exemple.fr");
   assert.match(recu.sujet, /\[PREVIEW\]\[SMOKE\]/);
@@ -113,4 +113,16 @@ test("--auth-recovery : POST /auth/v1/recover avec la clé publishable", async (
   assert.equal(requete.url, `https://${REF_PREVIEW_AUTORISEE}.supabase.co/auth/v1/recover`);
   assert.equal(requete.init.headers.apikey, clePublique);
   assert.equal(r.sortie.includes(clePublique), false);
+});
+
+test("--brevo-send : refusé si --to n'est pas dans EMAIL_PREVIEW_ALLOWLIST (avant tout réseau)", async () => {
+  let appele = false;
+  const envoyer = async () => { appele = true; return { messageId: "m" }; };
+  const sansListe = await executer(["--brevo-send", "--to", "moi@exemple.fr"], preview, { envoyer });
+  assert.equal(sansListe.code, 2);
+  const autre = await executer(["--brevo-send", "--to", "moi@exemple.fr"], { ...preview, EMAIL_PREVIEW_ALLOWLIST: "@elsatia.fr, *" }, { envoyer });
+  assert.equal(autre.code, 2);
+  assert.equal(appele, false);
+  const domaine = await executer(["--brevo-send", "--to", "moi@exemple.fr"], { ...preview, EMAIL_PREVIEW_ALLOWLIST: "@exemple.fr" }, { envoyer });
+  assert.equal(domaine.code, 0);
 });

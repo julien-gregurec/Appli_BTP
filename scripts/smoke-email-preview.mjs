@@ -63,6 +63,17 @@ export function refDepuisUrl(url) {
   }
 }
 
+/** Même règle que packages/email/src/destinataires.ts : adresse exacte ou @domaine exact. */
+export function destinataireDansListe(to, liste) {
+  const adresse = String(to ?? "").trim().toLowerCase();
+  const domaine = adresse.slice(adresse.lastIndexOf("@") + 1);
+  return String(liste ?? "")
+    .split(/[,;\s]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e && !e.includes("*"))
+    .some((e) => e === adresse || (e.startsWith("@") && e.slice(1) === domaine));
+}
+
 /** Contrôles communs, avant tout réseau. Lève Refus. */
 export function verifierCible(env, { mode, to, previewRef }) {
   const declare = env.ELSATIA_APPLICATION_ENV?.trim();
@@ -83,6 +94,9 @@ export function verifierCible(env, { mode, to, previewRef }) {
   if (mode === "--brevo-sandbox" || mode === "--brevo-send") {
     if (!env.BREVO_API_KEY || !env.EMAIL_FROM_ADDRESS) throw new Refus("BREVO_API_KEY et EMAIL_FROM_ADDRESS sont requises");
   }
+  if (mode === "--brevo-send" && !destinataireDansListe(to, env.EMAIL_PREVIEW_ALLOWLIST)) {
+    throw new Refus("--to doit figurer dans EMAIL_PREVIEW_ALLOWLIST (garde des destinataires hors Production)");
+  }
 }
 
 /** Rapport de configuration sans valeur. */
@@ -94,6 +108,9 @@ export function rapportConfiguration(env) {
   lignes.push(["EMAIL_FROM_ADDRESS", present(env.EMAIL_FROM_ADDRESS) ? "présente" : "absente"]);
   lignes.push(["EMAIL_FROM_NAME", present(env.EMAIL_FROM_NAME) ? "présente" : "absente (défaut « ELSATIA »)"]);
   lignes.push(["SUPPORT_EMAIL", present(env.SUPPORT_EMAIL) ? "présente" : "absente (replyTo des flux 5/6)"]);
+  // Hors Production, le transport applicatif (packages/email) ne sert QUE les destinataires
+  // de cette liste : sans elle, --brevo-send est refusé par le transport lui-même.
+  lignes.push(["EMAIL_PREVIEW_ALLOWLIST", present(env.EMAIL_PREVIEW_ALLOWLIST) ? "présente" : "absente (aucun e-mail applicatif ne part hors Production)"]);
   const ref = refDepuisUrl(env.NEXT_PUBLIC_SUPABASE_URL ?? "");
   lignes.push(["NEXT_PUBLIC_SUPABASE_URL", ref ? (ref === REF_PRODUCTION_CONNUE ? "PRODUCTION — refusée" : ref === REF_PREVIEW_AUTORISEE ? "projet Preview connu" : "projet non répertorié (passer --preview-ref)") : "absente ou non Supabase"]);
   return {

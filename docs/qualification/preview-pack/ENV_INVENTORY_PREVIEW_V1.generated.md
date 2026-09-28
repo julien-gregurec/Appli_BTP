@@ -6,10 +6,10 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 123 | 19 | 83 | 21 | 0 | 11 | 18 | 12 |
+| gestion_pro | 124 | 19 | 84 | 21 | 1 | 11 | 18 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
-| reserves | 9 | 5 | 2 | 2 | 0 | 3 | 2 | 4 |
+| reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
 | studio | 23 | 7 | 8 | 8 | 0 | 3 | 3 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
 
@@ -43,6 +43,7 @@
 | `ELSATIA_STUDIO_EXCHANGE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
 | `ELSATIA_STUDIO_LIFECYCLE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
 | `EMAIL_FROM_ADDRESS` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
+| `EMAIL_PREVIEW_ALLOWLIST` | CONDITIONAL |  |  |  | oui |  |  |  | pour recevoir un e-mail applicatif en Preview ou en local |
 | `GOOGLE_PLAY_RTDN_AUDIENCE` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
 | `GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | CONDITIONAL |  | oui |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
@@ -175,6 +176,7 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
 | `BREVO_API_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `EMAIL_FROM_ADDRESS` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
+| `EMAIL_PREVIEW_ALLOWLIST` | CONDITIONAL |  |  |  | oui |  |  |  | pour recevoir un e-mail applicatif en Preview ou en local |
 | `EMAIL_FROM_NAME` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `PDF_CHROMIUM_EXECUTABLE_PATH` | OPTIONAL |  |  |  |  |  |  |  |  |
 
