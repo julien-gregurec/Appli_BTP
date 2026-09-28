@@ -386,18 +386,18 @@ volume de Production ni de l'hébergé.
 
 | Mesure | Run A | Run B (reconstruit de zéro) |
 |---|---|---|
-| Construction du jeu (355 migrations + harnais d'upgrade) | réutilisé | RUN_B_DATASET |
-| `pg_dump` | 0,43 s | RUN_B_PGDUMP |
-| Backup complet (dump + rôles + réglages + instantané + inventaire + manifeste) | 24,1 s | RUN_B_BACKUP |
-| Vérification du backup (restauration de test + comparaison stricte) | 24,6 s (restauration 2,4 s) | RUN_B_VERIFY |
-| Restauration (D1 / D2 / D3 / D4) | 3,10 / 3,00 / 2,75 / 3,02 s | RUN_B_RESTORE |
-| Vérification après restauration (instantané + comparaison) | 21,0 – 21,6 s | RUN_B_VERIFY2 |
-| Smokes métier (35 + 16) | 0,41 s | RUN_B_SMOKES |
-| RPO local observé (âge du backup au sinistre D1) | 49,3 s | RUN_B_RPO |
-| Storage : backup base / fichiers / manifeste | 0,15 / 0,19 / 0,49 s | RUN_B_ST_BK |
-| Storage : restauration base / fichiers / redémarrage API / vérification | 0,34 / 0,04 / 2,19 / 0,34 s | RUN_B_ST_RS |
-| Auth : backup / restauration | 0,13 / 0,42 s | RUN_B_AU |
-| `npm run dr:verify` complet | 263 s (jeu réutilisé) | RUN_B_TOTAL |
+| Construction du jeu (355 migrations + harnais d'upgrade) | réutilisé | 221,9 s |
+| `pg_dump` | 0,43 s | 0,43 s |
+| Backup complet (dump + rôles + réglages + instantané + inventaire + manifeste) | 24,1 s | 24,7 s |
+| Vérification du backup (restauration de test + comparaison stricte) | 24,6 s (restauration 2,4 s) | 24,9 s (restauration 2,7 s) |
+| Restauration (D1 / D2 / D3 / D4) | 3,10 / 3,00 / 2,75 / 3,02 s | 3,10 / 3,30 / 3,01 / 3,10 s |
+| Vérification après restauration (instantané + comparaison) | 21,0 – 21,6 s | 22,0 – 22,3 s |
+| Smokes métier (35 + 16) | 0,41 s | 0,45 s |
+| RPO local observé (âge du backup au sinistre D1) | 49,3 s | 50,2 s |
+| Storage : backup base / fichiers / manifeste | 0,15 / 0,19 / 0,49 s | 0,12 / 0,17 / 0,51 s |
+| Storage : restauration base / fichiers / redémarrage API / vérification | 0,34 / 0,04 / 2,19 / 0,34 s | 0,37 / 0,04 / 2,19 / 0,35 s |
+| Auth : backup / restauration | 0,13 / 0,42 s | 0,14 / 0,39 s |
+| `npm run dr:verify` complet | 263 s (jeu réutilisé) | 490 s |
 
 Lecture :
 
@@ -517,5 +517,31 @@ DR2_REBUILD=1 npm run dr:verify                 # → ELSATIA DR LOCALLY QUALIFI
 npm run dr:verify -- --backup /tmp/elsatia-dr-v2/run-…/db/backups/drv2-…   # vérifier une sauvegarde
 ```
 
+`npm run dr:verify -- --backup <B0 du run B>` rend `BACKUP VERIFIED — restaurable à l'identique`
+(0 écart, restauration de test 2,66 s, vérification 25,6 s).
+
 Les journaux et `results.json` des runs A et B sont hors dépôt (données de bases jetables). Ce
 rapport en reprend les valeurs.
+
+## 16. Contrôle de compatibilité V6 (hors base qualifiée)
+
+V6 a été déclaré qualifié pendant la mission (§1). Pour vérifier que l'outillage ne dépend pas du
+seul schéma V5, voici ce qui a été exécuté :
+
+1. B0 du run B restauré dans `elsatia_dr_v2_v6` ;
+2. les **3 migrations V6** appliquées depuis `origin/integration/elsatia-canonical-train-v6`
+   (`…0401` géométrie de bâtiment, `…0501` conservation RGPD des contrats v2, `…0601` surface de
+   pièce synchronisée), soit 358 migrations ;
+3. `backup.sh` puis `verify_backup.sh`.
+
+| Contrôle | Résultat |
+|---|---|
+| Migrations V6 sur les données DR | 3/3 appliquées |
+| Backup V6 | TOC 5 326 entrées |
+| Restauration de test + comparaison stricte | **0 écart** (restauration 2,69 s, vérification 25,1 s) |
+| Smokes DR après restauration | **16/16** |
+
+Ce contrôle ne rejoue ni les 4 catastrophes, ni Storage, ni Auth sur V6. Les contrôles métier V5
+(`upgrade_v4_v5_business_checks.sql`) sont propres au jeu V5. Lors de la fusion de cette branche
+avec V6, trois fichiers modifiés des deux côtés seront à réconcilier : `.github/workflows/ci.yml`,
+`scripts/seeds/registry.mjs` et `scripts/seeds/registry.test.mjs` (ensemble `EXTERNAL_COVERAGE`).
