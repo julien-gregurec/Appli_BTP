@@ -14,7 +14,7 @@ export const CENTRAL = () => env("ELSATIA_CENTRAL_URL");
 
 /** SQL sur la base du projet Studio DÉDIÉ (super-utilisateur local, préparation/constats). */
 export function studioSql(sql: string): string {
-  return execFileSync("psql", ["-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", env("STUDIO_DB_URL"), "-c", sql], { encoding: "utf8" }).trim();
+  return execFileSync("psql", ["-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", env("STUDIO_DB_URL"), "-c", sql], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 export function centralSql(sql: string): string {
   return execFileSync("psql", ["-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", env("PLATFORM_DB_URL"), "-c", sql], { encoding: "utf8" }).trim();

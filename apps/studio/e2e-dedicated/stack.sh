@@ -45,10 +45,18 @@ kill_port() { # port : arrête le processus qui écoute (npx/tsx lancent des sou
   for _ in $(seq 1 40); do fuser "$1/tcp" >/dev/null 2>&1 || return 0; sleep 0.25; done
   fuser -k -KILL "$1/tcp" >/dev/null 2>&1 || true
 }
-spawn() { # nom commande… (journal + pid dans $E2E_DIR)
+spawn() { # nom commande… (journal + pid dans $E2E_DIR) ; propre groupe de processus (setsid) pour
+  # que stop arrête aussi les sous-processus (npx → next, tsx → node → esbuild).
   local name=$1; shift
-  nohup "$@" >"$E2E_DIR/$name.log" 2>&1 &
+  setsid nohup "$@" >"$E2E_DIR/$name.log" 2>&1 &
   echo $! >"$E2E_DIR/$name.pid"
+}
+ALL_PORTS() { echo $P_PG_CENTRAL $P_PG_STUDIO $P_AUTH_CENTRAL $P_AUTH_STUDIO $P_REST_CENTRAL $P_REST_STUDIO \
+  $P_STORAGE $((P_STORAGE + 1)) $P_GW_CENTRAL $P_GW_STUDIO $P_REDIS $P_CENTRAL_APP $P_STUDIO_APP; }
+preflight_ports() {
+  local busy=""
+  for port in $(ALL_PORTS); do fuser "$port/tcp" >/dev/null 2>&1 && busy="$busy $port"; done
+  [ -z "$busy" ] || { log "ÉCHEC : port(s) du banc déjà occupé(s) :$busy (stack.sh stop ?)"; exit 1; }
 }
 
 # Plateforme Supabase minimale d'un projet hébergé, AVANT toute migration utilisateur : rôles,
@@ -117,6 +125,7 @@ apply_dedicated_chain() {
 
 start() {
   mkdir -p "$E2E_DIR"; chmod 777 "$E2E_DIR"
+  preflight_ports
   [ -x "$E2E_BIN/gotrue" ] && [ -x "$E2E_BIN/postgrest" ] || { log "binaires gotrue/postgrest absents de $E2E_BIN"; exit 1; }
   [ -f "$E2E_STORAGE_SRC/dist/start/server.js" ] || { log "storage-api non construit ($E2E_STORAGE_SRC/dist)"; exit 1; }
 
@@ -255,24 +264,34 @@ EOF
   log "banc prêt : source $E2E_DIR/env.sh"
 }
 
+stop_group() { # nom : SIGTERM au groupe, puis SIGKILL après 10 s
+  local f="$E2E_DIR/$1.pid" pid
+  [ -f "$f" ] || return 0
+  pid=$(cat "$f")
+  kill -TERM -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+  for _ in $(seq 1 40); do kill -0 -- "-$pid" 2>/dev/null || break; sleep 0.25; done
+  kill -KILL -- "-$pid" 2>/dev/null || true
+  rm -f "$f"
+}
+
 stop() {
-  for f in "$E2E_DIR"/*.pid; do
-    [ -f "$f" ] || continue
-    pid=$(cat "$f"); pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; rm -f "$f"
-  done
-  for port in $P_STUDIO_APP $P_CENTRAL_APP $P_STORAGE $P_GW_STUDIO $P_GW_CENTRAL $P_SMTP; do kill_port "$port"; done
-  pkill -f "$ROOT/workers/studio-video/src/worker.ts" 2>/dev/null || true
-  pkill -f "tsx src/worker.ts" 2>/dev/null || true
+  # Consommateurs d'abord (le worker attend Redis pour s'arrêter proprement), puis les services.
+  for name in studio worker central; do stop_group "$name"; done
+  for f in "$E2E_DIR"/*.pid; do [ -f "$f" ] && stop_group "$(basename "$f" .pid)"; done
+  for port in $P_STUDIO_APP $P_CENTRAL_APP $P_STORAGE $P_GW_STUDIO $P_GW_CENTRAL $P_SMTP \
+              $P_AUTH_CENTRAL $P_AUTH_STUDIO $P_REST_CENTRAL $P_REST_STUDIO $P_REDIS; do kill_port "$port"; done
   for name in central studio; do
     [ -d "$E2E_DIR/$name" ] && as_pg "$PGBIN/pg_ctl -D $E2E_DIR/$name stop -m fast >/dev/null" || true
   done
+  # Répertoire supprimé à la main : PostgreSQL orphelins arrêtés par port.
+  for port in $P_PG_CENTRAL $P_PG_STUDIO; do kill_port "$port"; done
 }
 
 # Reconstruit et relance l'application Studio seule (après une modification du code applicatif).
 rebuild_app() {
   # shellcheck disable=SC1091
   source "$E2E_DIR/env.sh"
-  [ -f "$E2E_DIR/studio.pid" ] && { pid=$(cat "$E2E_DIR/studio.pid"); pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; }
+  stop_group studio
   kill_port $P_STUDIO_APP
   (cd "$APP" && npm run build >"$E2E_DIR/studio-build.log" 2>&1) || { log "ÉCHEC build (voir $E2E_DIR/studio-build.log)"; exit 1; }
   (cd "$APP" && spawn studio npx next start -p $P_STUDIO_APP -H 127.0.0.1)
