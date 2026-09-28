@@ -23,6 +23,13 @@ Prérequis : PostgreSQL 16 local (pair `postgres` en root, sinon `DR_PG*` en TCP
 (`GOTRUE_BIN`, défaut `/tmp/gotrue-build/gotrue`, cf. `scripts/local-postgres-bootstrap/gotrue_pilot_bootstrap.sh`).
 Sans Docker ou sans GoTrue, la partie concernée rend `*_NOT_PROVEN` : rien n'est prétendu.
 
+**Train canonique V7** : le jeu vient du harnais d'upgrade du train courant
+(`scripts/qualification/upgrade-v6-v7.sh`, base `upg_v6_v7`, fresh `v7_fresh`) et les contrôles métier
+après restauration sont ceux de V7 (`upgrade_v6_v7_business_checks.sql`, 31). L'ancien harnais V4 → V5
+refuse une base au-delà de V5. Autre train : `DR2_UPGRADE_SCRIPT`, `DR2_METIER_SQL`, `DR2_METIER_N`,
+`DR2_SOURCE_DB`, `DR2_FRESH_DB`. Le dossier de sortie doit être traversable par le rôle système
+`postgres` (défaut `/tmp/elsatia-dr-v2/…`) : `pg_restore` s'exécute sous ce rôle.
+
 ## Garde-fous (`garde-cible.mjs`)
 
 - **Production refusée par défaut**, toujours : `VERCEL_ENV|ELSATIA_ENV|APP_ENV|NODE_ENV=production`,
