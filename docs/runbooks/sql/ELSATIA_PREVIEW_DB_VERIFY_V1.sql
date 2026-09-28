@@ -149,7 +149,7 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
   -- Train V3 (20260926000502/504) : politique RGPD des contrats acceptés retenue par le
   -- propriétaire ; tant que la durée n'est pas validée, l'état effectif est duree_requise
   -- (purge des contrats refusée, fail-closed). Un autre choix = dérive de la décision.
-  -- V2 (20260928000100, ELSATIA_RGPD_CONTRACT_RETENTION_PARAMETERIZATION_V2) : aucune durée ne
+  -- V2 (20260928000501, ELSATIA_RGPD_CONTRACT_RETENTION_PARAMETERIZATION_V2) : aucune durée ne
   -- doit être activée en Preview avant la décision écrite du propriétaire
   -- (docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md) ; une durée présente = écart
   -- bloquant, à lever par la migration de décision qui met aussi à jour ce contrôle.

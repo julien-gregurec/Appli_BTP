@@ -8,10 +8,10 @@
 # recommandations juridiques et aucune migration ne les écrit.
 #
 # Usage : scripts/qualification/rgpd-contract-retention-v2.sh <base-V4-sans-V2> [dossier-de-sortie]
-#   base-V4-sans-V2 : base neuve au train canonique V4 (352 migrations), SANS 20260928000100
+#   base-V4-sans-V2 : base neuve au train canonique (V4 : 352 migrations ; V6 : toutes sauf celle-ci), SANS 20260928000501
 #                     (rebuild_db.sh sur integration/elsatia-canonical-train-v4).
 # Étapes :
-#   1. UPGRADE : V4 + jeu réaliste → + 20260928000100 ; compteurs inchangés ; politique livrée
+#   1. UPGRADE : V4 + jeu réaliste → + 20260928000501 ; compteurs inchangés ; politique livrée
 #                non active ; schéma upgrade = schéma fresh (V4 + V2 sur base vide).
 #   2. FAIL-CLOSED : purge et échéance refusées avec la politique livrée.
 #   3. DR, pour chaque durée de TEST : sauvegarde B0 (avant purge) → paramètres de TEST → purge →
@@ -24,7 +24,7 @@ V4="${1:?usage: rgpd-contract-retention-v2.sh <base-V4-sans-V2> [sortie]}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 OUT="${2:-$(mktemp -d)}"; mkdir -p "$OUT"; chmod 777 "$OUT" 2>/dev/null || true
-MV2="$REPO/supabase/migrations/20260928000100_rgpd_conservation_contrats_parametrage_v2.sql"
+MV2="$REPO/supabase/migrations/20260928000501_rgpd_conservation_contrats_parametrage_v2.sql"
 DRIVER="$REPO/supabase/tests/fixtures/rgpd_purge_driver.inc"
 A=a0000000-0000-0000-0000-000000000001
 
@@ -95,9 +95,9 @@ ECARTS=0
 
 echo "== sortie : $OUT"
 # ─── 1. UPGRADE ────────────────────────────────────────────────────────
-echo "== 1. UPGRADE : V4 + jeu réaliste → + 20260928000100"
+echo "== 1. UPGRADE : V4 + jeu réaliste → + 20260928000501"
 db_new ret2_up "$V4"
-echo "   migrations V4 : $(ls "$REPO"/supabase/migrations/*.sql | grep -vc 20260928000100) ; V2 présente : $(pga -d ret2_up -c "select exists (select 1 from information_schema.columns where table_schema = 'platform' and table_name = 'purge_politique_contrats' and column_name = 'regles_depart')")"
+echo "   migrations V4 : $(ls "$REPO"/supabase/migrations/*.sql | grep -vc 20260928000501) ; V2 présente : $(pga -d ret2_up -c "select exists (select 1 from information_schema.columns where table_schema = 'platform' and table_name = 'purge_politique_contrats' and column_name = 'regles_depart')")"
 { echo "begin;"
   for f in isolation_multitenant rgpd_tenant_facture_emise rgpd_tenant_contrats_acceptes rgpd_tenant_commandes_fournisseurs; do
     echo "\\ir $REPO/supabase/tests/fixtures/$f.inc"

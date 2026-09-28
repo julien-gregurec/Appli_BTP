@@ -119,7 +119,7 @@ reset role;
 select set_config('request.jwt.claims', '', true);
 
 -- ─── 6. Activation simulée (durée de TEST), puis retour fail-closed ────
--- V2 (20260928000100) : l'appel à 4 arguments de 504 ne suffit plus (point de départ et
+-- V2 (20260928000501) : l'appel à 4 arguments de 504 ne suffit plus (point de départ et
 -- choix des photos non exprimés) : il reste non actif.
 select lives_ok(
   $$select platform.definir_politique_purge_contrats('conserver_contrat_minimise', 'TEST-DUREE-VALIDEE', interval '3 years', false)$$,

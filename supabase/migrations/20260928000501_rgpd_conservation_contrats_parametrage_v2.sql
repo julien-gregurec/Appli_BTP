@@ -1,5 +1,7 @@
 -- RGPD × contrats acceptés — paramétrage de la conservation (V2).
 -- Rapport : docs/qualification/ELSATIA_RGPD_CONTRACT_RETENTION_PARAMETERIZATION_V2.md
+-- Train canonique V6 : numéro d'origine 20260928000100 (antérieur à la dernière migration de V5,
+-- 20260928000301), renuméroté 20260928000501 ; corps inchangé.
 -- Décision attendue : docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md
 -- Mécanisme : 20260926000502 (instantanés, verrous), 20260926000504 (politique C retenue,
 -- durée non validée, fail-closed), 20260926000506 (purge d'une table, version courante).

@@ -1,4 +1,4 @@
--- RGPD × contrats acceptés — paramétrage de la conservation V2 (migration 20260928000100).
+-- RGPD × contrats acceptés — paramétrage de la conservation V2 (migration 20260928000501).
 -- Rapport : docs/qualification/ELSATIA_RGPD_CONTRACT_RETENTION_PARAMETERIZATION_V2.md
 --
 -- Les durées (1, 5, 10 ans) et règles de départ utilisées ici sont des PARAMÈTRES TECHNIQUES

@@ -99,7 +99,7 @@ async function afficherContratsAcceptes() {
   console.log(`\nContrats acceptés : ${r.devis_acceptes} devis, ${r.avenants_acceptes} avenant(s) actifs ; ${r.preuves} preuve(s) figée(s).`);
   const etat = r.etat ?? r.politique;
   console.log(`  Politique : ${r.politique}${r.decision_ref ? ` (décision ${r.decision_ref})` : ""} — état effectif : ${etat}${r.duree_conservation ? `, durée ${r.duree_conservation}` : ""}`);
-  // V2 (20260928000100) : point de départ et choix des photos font partie des paramètres à valider.
+  // V2 (20260928000501) : point de départ et choix des photos font partie des paramètres à valider.
   if (r.regles_depart) {
     console.log(`  Point de départ : ${r.regles_depart.join(" + ")}${r.regle_depart_repli ? ` (repli : ${r.regle_depart_repli})` : " (sans repli)"} ; photos : ${r.choix_photos_explicite ? (r.inclure_photos ? "conservées" : "non conservées") : "choix non exprimé"}`);
   }

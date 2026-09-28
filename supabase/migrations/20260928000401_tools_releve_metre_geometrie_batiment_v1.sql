@@ -1,7 +1,9 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 6 — OUVERTURES, JONCTIONS & GÉOMÉTRIE BÂTIMENT V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT6_GEOMETRIE_BATIMENT_V1.md
 --
--- Posée APRÈS le Lot 5 (20260927000901). Plage 10xx réservée au Lot 6.
+-- Posée APRÈS le Lot 5 (20260927000901 sur sa branche, 20260928000101 dans le train V5).
+-- Train canonique V6 : numéro d'origine 20260928001001, renuméroté 20260928000401 (après la dernière
+-- migration réelle de V5, 20260928000301) ; corps inchangé.
 --
 -- Strictement ADDITIF (aucune table, aucune colonne, aucune ligne existante modifiée ; aucune garde
 -- affaiblie) :
