@@ -56,6 +56,14 @@ TABLES_METIER = [
     "tools_releves_versions", "tools_releves_journal",
     "reserves_contacts", "reserves_conversations", "reserves_mutations_appliquees",
     "factures_abonnement", "stripe_evenements_ordre", "stripe_objets_ordre", "stripe_essai_ecarts",
+    # Train V6 (ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1 §10) : plan 2D (étendu par le Lot 6 et la
+    # synchronisation de surface), réabonnement Stripe, identité / Studio du projet partagé (inertes),
+    # et, qualifiées par leur schéma, les tables RGPD de la plateforme (paramétrage V2).
+    "tools_releves_plans", "stripe_subscriptions_remplacees", "stripe_webhook_events",
+    "elsatia_identity_subjects", "elsatia_identity_outbox",
+    "studio_workspaces", "studio_workspace_members", "studio_projects", "studio_media_assets", "studio_signup_policy",
+    "platform.purge_politique_contrats", "platform.purge_politique_contrats_journal",
+    "platform.contrats_acceptes_purges", "platform.purge_audit", "platform.commandes_fournisseurs_purgees",
 ]
 TABLES_SONDE_RLS = [
     "entreprises", "employes", "clients", "chantiers", "devis", "factures",
@@ -65,6 +73,8 @@ TABLES_SONDE_RLS = [
     # Train V5.
     "tools_releves", "tools_releves_elements", "tools_releves_medias", "reserves_contacts",
     "reserves_messages", "factures_abonnement",
+    # Train V6.
+    "tools_releves_plans", "tools_releves_pieces", "tools_releves_versions",
 ]
 
 
@@ -101,16 +111,18 @@ def main():
     colonnes = {}
     checksums = {}
     for t in TABLES_METIER:
-        if f"public.{t}" not in counts:
+        # « schéma.table » pour une table hors de public (train V6 : tables RGPD de platform).
+        schema, nom = t.split(".", 1) if "." in t else ("public", t)
+        if f"{schema}.{nom}" not in counts:
             continue
         cols = (ref or {}).get("colonnes", {}).get(t) or lignes(db, f"""
           select column_name from information_schema.columns
-           where table_schema='public' and table_name='{t}' order by ordinal_position;""")
+           where table_schema='{schema}' and table_name='{nom}' order by ordinal_position;""")
         colonnes[t] = cols
         liste = ",".join(f'"{c}"' for c in cols)
         checksums[t] = psql(db, f"""
           select md5(coalesce(string_agg(r::text, E'\\n' order by r::text), ''))
-            from (select {liste} from public."{t}") r;""").strip()
+            from (select {liste} from {schema}."{nom}") r;""").strip()
 
     rls_tables = lignes(db, """
       select c.relname||'|'||c.relrowsecurity||'|'||c.relforcerowsecurity
