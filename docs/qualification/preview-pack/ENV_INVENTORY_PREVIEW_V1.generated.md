@@ -10,7 +10,7 @@
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
-| studio | 23 | 7 | 8 | 8 | 0 | 3 | 3 | 4 |
+| studio | 27 | 7 | 8 | 12 | 0 | 3 | 4 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
 
 ### gestion_pro — ELSATIA Gestion Pro (inclut Boutique, DOE, API de facturation Tools)
@@ -205,7 +205,11 @@
 | `STUDIO_IDENTITY_MAX_SESSION_S` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `STUDIO_IDENTITY_MODE` | OPTIONAL |  |  |  |  |  | elsatia, local |  |  |
 | `STUDIO_IDENTITY_REVALIDATE_S` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `STUDIO_LEGAL_TEXT_VERSION` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `STUDIO_MAIL_FROM` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `STUDIO_MAIL_PROVIDER` | OPTIONAL |  |  |  |  |  | mailpit, resend |  |  |
 | `STUDIO_RENDER_INTERNAL_PREVIEW` | OPTIONAL |  |  |  |  |  | 0, 1 | **oui** |  |
+| `STUDIO_RESEND_API_KEY` | OPTIONAL |  | oui |  |  |  |  |  |  |
 | `STUDIO_RUNTIME_TRACE` | OPTIONAL |  |  |  |  |  | 0, 1 | **oui** |  |
 
 ### studio_worker — Worker vidéo Studio (hors Vercel)

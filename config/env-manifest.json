@@ -236,6 +236,14 @@
       {
         "path": "packages/elsatia-identity/scripts/",
         "justification": "Outils locaux de @elsatia/identity (pile GoTrue/PostgREST jetable, keygen, passerelle de test). Jamais déployés."
+      },
+      {
+        "path": "apps/studio/e2e-dedicated/",
+        "justification": "Banc Playwright Studio DÉDIÉ (train canonique V7, docs/qualification/ELSATIA_STUDIO_DEDICATED_PLAYWRIGHT_CI_V1.md) : pile locale jetable (PostgreSQL, GoTrue, PostgREST, storage-api, worker, identité centrale sans table GP). Ses variables (ELSATIA_CENTRAL_URL, E2E_*, STUDIO_DB_URL, STUDIO_FFMPEG_PATH, clés de signature de test) désignent ce banc, jamais un environnement déployé ; il n'est ni construit ni lu par l'application Studio."
+      },
+      {
+        "path": ".github/workflows/studio-dedicated-e2e.yml",
+        "justification": "Workflow CI du banc Studio dédié ci-dessus : ses variables (E2E_BIN, E2E_DIR, PGBIN, chemins FFmpeg) sont des chemins d'outillage du runner, sans secret de dépôt ni valeur applicative."
       }
     ],
     "literal_prefixes": [

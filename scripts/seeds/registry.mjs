@@ -415,6 +415,16 @@ export const SEEDS = [
     coveredBy: "upgrade-harness",
   },
   {
+    id: "upgrade-complement-v7",
+    path: "scripts/local-postgres-bootstrap/upgrade_v6_v7_seed_complement.sql",
+    classification: "CI_ONLY",
+    // Écrit l'état d'une base V6 (plan corrigé Lot 6 figé sans objet de plan, surface synchronisée,
+    // équipement Lot 2 hors plan) : ne se charge que sur une base au train V6 construite depuis V3
+    // par upgrade-v6-v7.sh (utilise le complément V5 → V6), jamais sur une base fraîche V7.
+    target: "qualification d'upgrade V6 → V7 (base V6 avec historique V3 → V4 → V5 → V6, jamais une base fraîche V7)",
+    coveredBy: "upgrade-harness",
+  },
+  {
     id: "upgrade-complement-v4",
     path: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql",
     classification: "CI_ONLY",

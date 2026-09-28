@@ -19,13 +19,16 @@
 -- Contrôles 24-26 (train canonique V5) : réabonnement Stripe (…0928 201,
 -- ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1), Réserves hôte suspendu en lecture seule (…0928 301, D-01),
 -- Relevé & Métré plan 2D (…0928 101, Lot 5).
+-- Contrôles 27-29 (train canonique V6) : Relevé Lot 6 (…0928 401), RGPD contrats V2 (…0928 501),
+-- surface de la pièce (…0928 601). Contrôle 30 (train canonique V7) : Relevé & Métré Lot 7, objets
+-- de plan et calques (…0928 701).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (358, '20260928000601')),
+attendu_train(nb, derniere) as (values (359, '20260928000701')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -370,6 +373,30 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not has_function_privilege('authenticated', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
            and not has_function_privilege('service_role', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
            and exists (select 1 from pg_trigger where not tgisinternal and tgenabled <> 'D' and tgname = 'tools_releves_plans_surface_sync'), true
+  union all
+  -- Contrôle 30 (train V7) : Relevé & Métré Lot 7, objets de plan (20260928000701). Équipements admis
+  -- dans un plan, corbeille par RPC SECURITY DEFINER réservée aux authentifiés, contrôles d'objet
+  -- fermés à anon. Lecture dynamique : sur une base au train V6 → échec propre, sans erreur.
+  select 30, 'Tools Relevé & Métré : objets de plan et calques (20260928000701)',
+         'équipements admis dans un plan, corbeille authentifiés seuls, contrôles d''objet fermés à anon',
+         concat_ws(', ',
+           case when coalesce((select pg_get_constraintdef(oid) like '%equipement%' from pg_constraint
+                                where conname = 'tools_releves_elements_plan_type'), false)
+                then 'équipements admis' else 'équipements NON admis' end,
+           case when to_regprocedure('public.tools_releve_plan_equipements_supprimes(uuid)') is null then 'corbeille ABSENTE'
+                when has_function_privilege('anon', 'public.tools_releve_plan_equipements_supprimes(uuid)', 'execute') then 'corbeille OUVERTE à anon'
+                when not (select prosecdef from pg_proc where oid = to_regprocedure('public.tools_releve_plan_equipements_supprimes(uuid)'))
+                  then 'corbeille SANS contrôle des droits'
+                else 'corbeille authentifiés' end,
+           case when to_regprocedure('public.tools_releve_plan_equipement_anomalie(jsonb)') is null then 'contrôle d''objet ABSENT'
+                when has_function_privilege('anon', 'public.tools_releve_plan_equipement_anomalie(jsonb)', 'execute') then 'contrôle d''objet OUVERT à anon'
+                else 'contrôle d''objet fermé à anon' end),
+         coalesce((select pg_get_constraintdef(oid) like '%equipement%' from pg_constraint where conname = 'tools_releves_elements_plan_type'), false)
+           and to_regprocedure('public.tools_releve_plan_equipements_supprimes(uuid)') is not null
+           and not has_function_privilege('anon', 'public.tools_releve_plan_equipements_supprimes(uuid)', 'execute')
+           and coalesce((select prosecdef from pg_proc where oid = to_regprocedure('public.tools_releve_plan_equipements_supprimes(uuid)')), false)
+           and to_regprocedure('public.tools_releve_plan_equipement_anomalie(jsonb)') is not null
+           and not has_function_privilege('anon', 'public.tools_releve_plan_equipement_anomalie(jsonb)', 'execute'), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles
