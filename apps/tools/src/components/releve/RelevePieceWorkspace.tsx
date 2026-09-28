@@ -8,7 +8,7 @@ import {
   type Piece, type PieceStatut, type PieceUsage, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure,
 } from "@elsatia/releve-domain";
 import { confirmRemovalMessage, formatHauteurCm, formatSurfaceM2, formatVolumeM3, parseHauteurCm } from "@/lib/releve/forms";
-import { ficheHref, pieceHref, readPieceSelection, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
+import { ficheHref, pieceHref, planHref, readPieceSelection, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { AutoNumber, AutoSelect, AutoText, SaveStatus, useAutosave } from "./autosave-ui";
 import { PIECE_STATUT_LABELS, USAGE_LABELS } from "./labels";
@@ -113,6 +113,7 @@ function PieceFiche({ service, actor, releveId, pieceId }: { service: ReleveServ
           <div><dt>Volume</dt><dd>{formatVolumeM3(piece.volumeCalculeMm3)}</dd></div>
         </dl>
         <p className={styles.feedback}>Calculés automatiquement à partir des murs relevés (lots suivants) : jamais saisis à la main.</p>
+        <Link className={styles.secondary} href={planHref({ releveId, etageId: piece.etageId, pieceId: piece.id })} data-testid="lien-plan-piece">Voir sur le plan (surface du contour)</Link>
       </section>
 
       {canEdit && <section className={styles.column} aria-label="Actions sur la pièce">

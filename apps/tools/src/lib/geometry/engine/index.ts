@@ -16,6 +16,8 @@ export * from "./validate";
 export * from "./offset";
 export * from "./simplify";
 export * from "./snap";
+export * from "./guides";
+export * from "./planar-faces";
 export * from "./constraints";
 export * from "./dimensions";
 export * from "./report";

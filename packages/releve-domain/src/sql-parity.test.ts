@@ -14,6 +14,8 @@ import { PHOTO_ANNOTATION_COULEURS, RELEVE_LIMITS } from "./validation";
 import { FORBIDDEN_LOCATION_KEYS, PHOTO_DATE_SOURCES, PHOTO_METADATA_KEYS, PHOTO_METADATA_REQUIRED_KEYS, PHOTO_ORIENTATIONS, PHOTO_SOURCES } from "./media";
 import { PHOTO_ANNOTATION_FORMES, PHOTO_ANNOTATION_FORMES_PREVUES, PHOTO_TARGET_KINDS } from "./photo";
 import { PHOTO_COMMENT_MAX } from "./media-service";
+import { DEFAULT_PLAN_CADRE, PLAN_CREATION_MESSAGES, PLAN_ETATS, PLAN_LIMITS } from "./plan";
+import { RELEVE_COORDINATE_LIMIT_MM } from "./model";
 
 /**
  * Parité TypeScript ↔ SQL. Le domaine et la migration sont deux copies d'un même contrat :
@@ -179,5 +181,42 @@ describe("parité domaine ↔ migration tools_releve_metre_capture_media_v1 (Lot
   it("formes prévues (rectangle, zone, dimension, symbole) refusées sur photo tant qu'elles ne sont pas livrées", () => {
     const geometrie = /function public\.tools_releve_geometrie_photo_valide[\s\S]*?\$\$;/.exec(capture)?.[0] ?? "";
     for (const forme of PHOTO_ANNOTATION_FORMES_PREVUES) expect(geometrie).not.toContain(`when '${forme}'`);
+  });
+});
+
+const plan2d = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/20260927000901_tools_releve_metre_plan_2d_v1.sql", import.meta.url)),
+  "utf8",
+).replace(/\s+/g, " ");
+
+describe("parité domaine ↔ migration tools_releve_metre_plan_2d_v1 (Lot 5)", () => {
+  it("états du plan = types de version", () => {
+    expect(PLAN_ETATS).toEqual(VERSION_TYPES);
+    expect(plan2d).toContain(`etat_documente in (${quoted(PLAN_ETATS)})`);
+  });
+  it("cadre par défaut identique", () => {
+    expect(plan2d).toContain(`'${JSON.stringify(DEFAULT_PLAN_CADRE)}'::jsonb`);
+  });
+  it("bornes des murs, ouvertures, contours et lots identiques", () => {
+    expect(plan2d).toContain(`::numeric > ${PLAN_LIMITS.epaisseurMaxMm}`);
+    expect(plan2d).toContain(`not between ${PLAN_LIMITS.hauteurMinMm} and ${PLAN_LIMITS.hauteurMaxMm}`);
+    expect(plan2d).toContain(`> v_longueur + ${PLAN_LIMITS.ouvertureToleranceMm}`);
+    expect(plan2d).toContain(`not between ${PLAN_LIMITS.pointsMin} and ${PLAN_LIMITS.pointsMax}`);
+    expect(plan2d).toContain(`jsonb_array_length(p) > ${PLAN_LIMITS.contoursMax}`);
+    expect(plan2d).toContain(`> ${PLAN_LIMITS.lotMax}`);
+    expect(plan2d).toContain(`> ${PLAN_LIMITS.supprimesMax}`);
+    expect(plan2d).toContain(`>= ${PLAN_LIMITS.cadreEtendueMinMm}`);
+    expect(plan2d).toContain(`char_length(libelle) <= ${PLAN_LIMITS.libelle}`);
+    expect(plan2d).toContain(`${RELEVE_COORDINATE_LIMIT_MM}`);
+  });
+  it("seuls murs et ouvertures appartiennent à un plan ; journal « plan »", () => {
+    expect(plan2d).toContain("plan_id is null or type in ('mur','ouverture')");
+    expect(plan2d).toContain("'version','plan'");
+  });
+  it("messages de création alignés sur la RPC", () => {
+    const sqlText = (message: string) => message.replace(/\.$/, "").replaceAll("'", "''");
+    for (const code of ["initial_not_first", "initial_with_base", "initial_missing", "base_not_found", "editable_exists"] as const) {
+      expect(plan2d).toContain(sqlText(PLAN_CREATION_MESSAGES[code]));
+    }
   });
 });

@@ -67,3 +67,34 @@ export function offsetPolyline(polyline: Polyline2D, distance: number): Polyline
   }
   return result;
 }
+
+/**
+ * Décale chaque arête d'un contour fermé de SA propre distance (positif = vers la gauche de
+ * l'arête, donc vers l'intérieur d'un contour en sens trigonométrique). Les sommets sont les
+ * intersections des supports décalés voisins (jonction en onglet) ; deux arêtes colinéaires
+ * gardent le point décalé commun. Lève une erreur si le résultat s'auto-intersecte ou change
+ * d'orientation : jamais de contour faux silencieux.
+ */
+export function offsetPolygonEdges(points: readonly Point2D[], distances: readonly number[]): Point2D[] {
+  if (points.length < 3) throw new Error("Un contour à décaler exige au moins trois points.");
+  if (distances.length !== points.length) throw new Error("Une distance de décalage est attendue par arête.");
+  const edges = points.map((start, i) => offsetSegment({ start, end: points[(i + 1) % points.length] }, distances[i]));
+  const result = points.map((_, i) => {
+    const previous = edges[(i - 1 + edges.length) % edges.length];
+    const next = edges[i];
+    const hit = lineLineIntersection(
+      { point: previous.start, direction: vectorBetween(previous.start, previous.end) },
+      { point: next.start, direction: vectorBetween(next.start, next.end) },
+    );
+    return hit.kind === "one" ? hit.points[0] : next.start;
+  });
+  if (hasSelfIntersection(result, true)) throw new Error("Décalage impossible : le contour résultant s'auto-intersecte.");
+  // Chaque arête décalée doit garder le sens de l'arête d'origine : sinon elle a disparu
+  // (arête trop courte pour son décalage) ou le contour s'est retourné.
+  for (let i = 0; i < points.length; i++) {
+    const original = vectorBetween(points[i], points[(i + 1) % points.length]);
+    const shifted = vectorBetween(result[i], result[(i + 1) % result.length]);
+    if (dot(original, shifted) <= 0) throw new Error("Décalage impossible : une arête du contour disparaît ou s'inverse.");
+  }
+  return result;
+}

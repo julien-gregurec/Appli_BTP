@@ -10,7 +10,7 @@ import {
 } from "@elsatia/releve-domain";
 import { formatAltitudeM, formatHauteurCm, confirmRemovalMessage, parseAltitudeM, parseHauteurCm, parseNiveau } from "@/lib/releve/forms";
 import {
-  ficheHref, photosHref, pieceHref, readStructureSelection, RELEVES_PATH, searchHitHref, structureFocus, structureHref, type StructureSelection,
+  ficheHref, photosHref, pieceHref, planHref, readStructureSelection, RELEVES_PATH, searchHitHref, structureFocus, structureHref, type StructureSelection,
 } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { AutoNumber, AutoSelect, AutoText, SaveStatus, useAutosave } from "./autosave-ui";
@@ -153,9 +153,11 @@ function StructureEditor({ service, actor, selection, navigate }: EditorProps) {
       <section className={styles.column} aria-label="Zones et pièces" data-level="pieces">
         <button type="button" className={styles.back} onClick={() => navigate({ releveId, chantierId, batimentId: batimentNode?.batiment.id ?? null, etageId: null })}>‹ Étages</button>
         <h2>Zones et pièces{etageNode ? ` · ${etageNode.etage.nom}` : ""}</h2>
+        {etageNode && <Link className={styles.secondary} href={planHref({ releveId, etageId: etageNode.etage.id })} data-testid="lien-plan-etage">Plan de l&apos;étage</Link>}
         {etageNode && <EtageProperties key={etageNode.etage.id} service={service} releveId={releveId} etageId={etageNode.etage.id} structure={structure} canEdit={canEdit} onChanged={reload} />}
         {etageNode?.zones.map(({ zone, pieces }) => <div key={zone.id} className={styles.zone}>
           <NodeRow {...nodeProps} kind="zone" id={zone.id} nom={zone.nom} revision={zone.revision} meta={`${ZONE_TYPE_LABELS[zone.type]} · ${pieces.length} pièce(s)`} zoneType={zone.type} />
+          <Link className={styles.pieceLink} href={planHref({ releveId, etageId: zone.etageId, zoneId: zone.id })}>Plan de la zone</Link>
           <PieceList {...nodeProps} pieces={pieces} />
         </div>)}
         {etageNode && etageNode.piecesSansZone.length > 0 && <div className={styles.zone}><h3>{etageNode.zones.length ? "Hors zone" : "Pièces"}</h3><PieceList {...nodeProps} pieces={etageNode.piecesSansZone} /></div>}

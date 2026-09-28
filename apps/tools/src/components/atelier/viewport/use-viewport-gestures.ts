@@ -116,6 +116,14 @@ export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPo
         return;
       }
 
+      // Un pointeur PRIMAIRE ouvre toujours un nouveau geste : aucun autre contact n'est actif.
+      // Un contact dont le relâchement n'a jamais été reçu (annulation système, fin de geste
+      // hors zone) ne doit pas transformer le toucher suivant en pincement.
+      if (event.isPrimary) {
+        pointers.current.clear();
+        pinchDistance.current = null;
+        pinchAnchor.current = null;
+      }
       pointers.current.set(event.pointerId, { ...point, pointerId: event.pointerId });
       dragged.current = false;
       if (pointers.current.size === 2) {
