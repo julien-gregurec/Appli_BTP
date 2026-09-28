@@ -395,7 +395,8 @@ Tout a été exécuté sur `9102ec80`, avec pour seul ajout le gate lui-même : 
 | `verify:migrations`, `test:migration-targets`, `verify:train-expectations` | ✅ |
 | `verify:secrets`, `verify:env-manifest`, `test:env-manifest` | ✅ (après l'exclusion du dossier du gate, voir ci-dessous) |
 | `test:seeds`, `test:preview-pack`, scripts Stripe test-mode (hors réseau) | ✅ |
-| `build` (GP + Tools, Réserves, Colors, Studio) | voir `executions[]` de l'artefact |
+| `build` (GP + Tools, Réserves, Colors, Studio ; `NEXT_PUBLIC_TOOLS_ENV=local`, `ELSATIA_APPLICATION_ENV=local`) | ✅ 5 applications construites |
+| **Gate complet** `--run-code --run-db` | 16/16 portes à code 0, **0 GO rétrogradé** ; verdict inchangé : `NOT YET PASSED` (21 P0) |
 
 **Constat d'outillage.** Le scanner du manifeste lit tout littéral en MAJUSCULES dont le préfixe est suivi (`TOOLS_RELEVE`, par exemple), ainsi que toute variable. Le dossier `scripts/commercialization/` est un registre documentaire qui cite des noms de variables. Il est donc exclu du scan, avec justification, dans `config/env-manifest.json` (`scan.exclude_paths`). C'est la seule modification hors du dossier du gate, avec les deux scripts de `package.json`.
 

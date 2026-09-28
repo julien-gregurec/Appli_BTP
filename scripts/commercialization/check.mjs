@@ -73,7 +73,8 @@ function executer(nom, cmd, args, env = {}) {
     maxBuffer: 256 * 1024 * 1024,
   });
   const duree_s = Math.round((Date.now() - t0) / 100) / 10;
-  const sortie = `${r.stdout ?? ""}\n${r.stderr ?? ""}`;
+  // stderr d'abord : la dernière ligne utile est celle du résultat (stdout).
+  const sortie = `${r.stderr ?? ""}\n${r.stdout ?? ""}`;
   // Dernières lignes utiles seulement (jamais le contenu complet ; aucun secret n'y est lu).
   const fin = sortie
     .split("\n")
