@@ -10,7 +10,7 @@ ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SORTIE="${SORTIE_PERF:-/tmp/perf/resultats}"; mkdir -p "$SORTIE"
 source "${ENV_PERF:?ENV_PERF requis}"
 EMP=d0000000-0000-4000-8000-000000000103
-PATHS="/dashboard,/inventaire,/inventaire?q=velours,/inventaire?q=PERF-02999,/inventaire?etat=ouvert&emplacement=$EMP,/inventaire?faible=1&tri=nom,/nuanciers,/nuanciers?hex=%232E5B8A,/mouvements,/activite,/depots"
+PATHS="/dashboard,/inventaire,/inventaire?q=velours,/inventaire?q=PERF-02999,/inventaire?etat=ouvert&emplacement=$EMP,/inventaire?faible=1&tri=nom,/nuanciers,/nuanciers?hex=%232E5B8A,/activite,/depots"
 node "$ICI/bench-http.mjs" --app http://localhost:3010 --supabase "$NEXT_PUBLIC_SUPABASE_URL" --anon "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
   --users "$USERS" --email 'colors-admin@recette.invalid' --password "${MDP_RECETTE:?MDP_RECETTE requis}" --iterations "$ITER" --warmup 1 \
   --paths "$PATHS" --out "$SORTIE/colors_${ETIQ}_u${USERS}.json"

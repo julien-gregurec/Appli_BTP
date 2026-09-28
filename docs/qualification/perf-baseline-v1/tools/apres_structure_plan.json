@@ -1,0 +1,52 @@
+{
+  "structure": {
+    "batiments": 3,
+    "etages": 24,
+    "pieces": 600,
+    "depotMs": 1267
+  },
+  "structurePages": {
+    "structure": [
+      3725,
+      3656,
+      3546,
+      3545,
+      3622
+    ],
+    "fiche": [
+      8852,
+      7606,
+      7613,
+      7689,
+      7622
+    ],
+    "heapMb": 190
+  },
+  "plan500x300": {
+    "saveMursMs": 456,
+    "saveOuverturesMs": 296,
+    "rendusMs": [
+      7619,
+      7223,
+      6869
+    ],
+    "drawnWalls": 500,
+    "drawnOpenings": 300,
+    "pan": {
+      "totalMs": 2344,
+      "frames": 112,
+      "p95FrameMs": 50,
+      "maxFrameMs": 100
+    },
+    "zoom": {
+      "totalMs": 1435,
+      "frames": 71,
+      "p95FrameMs": 33,
+      "maxFrameMs": 100
+    },
+    "editMs": 225,
+    "autosaveMs": 825,
+    "heapAvantMb": 132,
+    "heapMb": 205
+  }
+}

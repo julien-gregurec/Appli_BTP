@@ -1,0 +1,3 @@
+Après C4, médias dotés de leurs objets Storage (scripts/perf/baseline-v1/rate_limit_medias.sql) :
+B. page 200, 0 vignettes demandées vers /api/messagerie/pieces-jointes (80 URL signées Storage dans le document).
+Le passage « sans objets Storage » montre le repli volontaire vers la route quand la signature groupée ne renvoie rien.

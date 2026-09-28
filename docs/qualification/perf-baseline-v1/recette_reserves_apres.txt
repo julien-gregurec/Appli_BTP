@@ -1,0 +1,6 @@
+reserves-v3-collaboration :  1 passed (4.6s) 
+reserves-v4-listes-pdf :  11 passed (16.9s) 
+reserves-v4-offline-mobile :  6 passed (17.4s) 
+reserves-v5-offline :  13 passed (51.6s) 
+reserves-v6-securite :  23 passed (12.2s) 
+reserves-v6-performance :  5 passed (38.2s) 

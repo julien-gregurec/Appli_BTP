@@ -1,0 +1,30 @@
+{
+  "jeu200": {
+    "photos": 200,
+    "depotMs": 48885,
+    "octetsDeposes": 196331446
+  },
+  "galerie200": {
+    "premiereVueMs": 3224,
+    "galeriePiece50Ms": 243,
+    "galerieRelevé200AfficheeMs": 847,
+    "heapJsMo": 157,
+    "requetesSignatureGroupee": 6,
+    "telechargementsStorage": 200,
+    "tachesLonguesNb": 7,
+    "tacheLaPlusLongueMs": 433,
+    "vignettesAffichees": 200,
+    "defilementCompletMs": 7451
+  },
+  "envoiSequentiel12Mpx": {
+    "photos": 5,
+    "msParPhoto": [
+      3226,
+      1770,
+      1664,
+      1757,
+      2089
+    ],
+    "moyenneMs": 2101
+  }
+}

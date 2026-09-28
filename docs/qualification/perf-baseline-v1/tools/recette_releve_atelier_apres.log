@@ -1,0 +1,56 @@
+
+Running 52 tests using 1 worker
+
+[1/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:18:5 › Atelier — tracé libre : segment dessiné, pan, zoom molette
+[2/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:42:5 › Atelier — tablette : pincement deux doigts sur le viewport
+[3/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:65:7 › Outil arche : page et tracé SVG rendus
+[4/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:65:7 › Outil arche-avancee : page et tracé SVG rendus
+[5/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:65:7 › Outil rosace-radiale-simple : page et tracé SVG rendus
+[6/52] [desktop-chromium] › tests/e2e/tools-atelier-lot5-nonregression.spec.ts:65:7 › Outil fleur-6-petales : page et tracé SVG rendus
+[7/52] [desktop-chromium] › tests/e2e/tools-releve-lot2.spec.ts:34:5 › tenant A : création relevé → bâtiment → étage → pièce, navigation et persistance
+[8/52] [desktop-chromium] › tests/e2e/tools-releve-lot2.spec.ts:81:5 › tenant B : le relevé du tenant A est invisible et inaccessible par URL directe
+[9/52] [desktop-chromium] › tests/e2e/tools-releve-lot2.spec.ts:99:7 › smartphone : liste, fiche et structure utilisables sans débordement horizontal
+[10/52] [desktop-chromium] › tests/e2e/tools-releve-lot2.spec.ts:99:7 › tablette : liste, fiche et structure utilisables sans débordement horizontal
+[11/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:38:5 › parcours terrain : projet → chantier → bâtiment → étage → zone → pièce, édition, rechargement
+[12/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:118:5 › duplication, réordonnancement, suppression maîtrisée et restauration
+[13/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:166:5 › deux onglets : un conflit de modification n'écrase rien silencieusement
+[14/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:196:5 › recherche et filtres de la liste
+[15/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:221:5 › autre tenant : relevé, pièce et recherche inaccessibles
+[16/52] [desktop-chromium] › tests/e2e/tools-releve-lot3.spec.ts:238:5 › smartphone : navigation en profondeur, gros boutons, barre du pouce, sans débordement
+[17/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:163:5 › Storage : dépôt, lecture, URL signée, suppression et isolation entre tenants
+[18/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:205:5 › parcours terrain : ouvrir un relevé, aller dans une pièce, « Ajouter une photo » (12 Mpx, EXIF, GPS retiré, miniature)
+[19/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:272:5 › annotations (texte, flèche, cercle) modifiables, repères, commentaire en sauvegarde automatique — persistés après rechargement
+[20/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:339:5 › galerie par niveau (pièce, zone, étage, bâtiment, chantier, relevé), rattachements multiples, filtres
+[21/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:375:5 › caméra en direct : aperçu getUserMedia, capture, dépôt (source camera_web, date = horloge de capture)
+[22/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:404:5 › caméra refusée : message clair et repli sur l'appareil photo système / la galerie
+[23/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:426:5 › navigateur sans getUserMedia : caméra en direct non proposée, capture système et galerie disponibles
+[24/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:439:5 › refus clairs : type invalide, image illisible, fichier trop gros, doublon (aucune ligne ni fichier créés)
+[25/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:469:5 › hors ligne : la photo reste dans la file locale (IndexedDB, survit au rechargement) puis se synchronise
+[26/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:494:5 › navigateur fermé pendant l'attente : la file est reprise à la réouverture (profil persistant)
+[27/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:516:5 › upload interrompu entre le fichier et la ligne : reprise sans doublon (fichier « déjà présent »)
+[28/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:539:5 › remplacement puis suppression : rattachements conservés, anciens fichiers (et miniatures) retirés du bucket
+[29/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:574:5 › versions : une photo figée par une version reste lisible après suppression ; les photos suivantes portent la version
+[30/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:608:5 › cascade Lot 3 : pièce à la corbeille → ses photos disparaissent ; pièce restaurée → elles reviennent
+[31/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:627:5 › tenant B : photos du tenant A invisibles, page inaccessible, aucune ligne ni fichier lisible
+[32/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:645:5 › @perf 200 photos (50 dans une pièce) : chargement, galerie, mémoire, envoi séquentiel
+[33/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:776:7 › @responsive iPhone-like (390×844, tactile) : pièce → Ajouter une photo, prévisualisation, repère au toucher, sans débordement
+[34/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:776:7 › @responsive Android-like (412×915, tactile) : pièce → Ajouter une photo, prévisualisation, repère au toucher, sans débordement
+[35/52] [desktop-chromium] › tests/e2e/tools-releve-lot4.spec.ts:776:7 › @responsive tablette (820×1180, tactile) : pièce → Ajouter une photo, prévisualisation, repère au toucher, sans débordement
+[36/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:177:5 › Structure → plan de l'étage : plan initial créé, mur antérieur adopté, repères photo
+[37/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:196:5 › Dessin desktop : rectangle par longueurs et angles, accrochage, cotes, dimensions principales, sauvegarde
+[38/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:225:5 › Pièces : détection, association au Séjour (Lot 3), surface calculée par le serveur
+[39/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:244:5 › Édition : longueur, angle, glisser un point, glisser un mur, supprimer, annuler, rétablir
+[40/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:308:5 › Ouvertures foundation : porte, fenêtre, baie, ouverture libre (wall_id, position, largeur, hauteur, type)
+[41/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:331:5 › Corrections : redresser, scinder, fusionner, aligner
+[42/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:367:5 › Repère photo : clic → la photo s'affiche
+[43/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:380:5 › Conflit de version : modification concurrente détectée, rien n'est écrasé
+[44/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:401:5 › Versioning : plan figé immuable, plan corrigé dérivé, plan initial intact
+[45/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:435:5 › Portée zone et pièce : plan cadré, lien depuis la fiche pièce
+[46/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:446:5 › Sécurité : un autre tenant ne voit ni ne modifie le plan
+[47/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:479:5 › Tablette 820×1180 : tracé au toucher, pincement deux doigts, pan un doigt, sélection au toucher
+[48/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:540:5 › Smartphone 390×844 : consultation, tracé au toucher, aucun débordement
+[49/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:582:7 › Performance : 50 murs (rendu, pan, zoom, édition, sauvegarde)
+[50/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:582:7 › Performance : 100 murs (rendu, pan, zoom, édition, sauvegarde)
+[51/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:582:7 › Performance : 250 murs (rendu, pan, zoom, édition, sauvegarde)
+[52/52] [desktop-chromium] › tests/e2e/tools-releve-lot5.spec.ts:582:7 › Performance : 500 murs (rendu, pan, zoom, édition, sauvegarde)
+  52 passed (6.6m)

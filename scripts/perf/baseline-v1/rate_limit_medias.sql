@@ -17,6 +17,13 @@ with emp as (
 )
 insert into public.pieces_jointes_messages (entreprise_id, conversation_id, message_id, chantier_id, storage_path, nom_original, mime_type, type_media, taille_octets)
 select 'a0000000-0000-4000-a000-000000000001', 'c0c00000-0000-4000-8000-000000000001', msg.id, :'chantier',
-  'a0000000-0000-4000-a000-000000000001/perf/photo-' || g || '.jpg', 'photo-' || g || '.jpg', 'image/jpeg', 'image', 350000
+  'a0000000-0000-4000-a000-000000000001/c0c00000-0000-4000-8000-000000000001/photo-' || g || '.jpg', 'photo-' || g || '.jpg', 'image/jpeg', 'image', 350000
 from msg cross join generate_series(1, 80) g;
+-- Objets Storage correspondants (métadonnées, chemin <entreprise>/<conversation>/…, convention
+-- des policies messagerie_medias_*) : la page peut alors les signer comme en production.
+insert into storage.objects (bucket_id, name, metadata)
+select 'messagerie-medias', p.storage_path, '{"mimetype":"image/jpeg","size":350000}'::jsonb
+from public.pieces_jointes_messages p
+where p.conversation_id = 'c0c00000-0000-4000-8000-000000000001'
+  and not exists (select 1 from storage.objects o where o.bucket_id = 'messagerie-medias' and o.name = p.storage_path);
 select count(*) medias from public.pieces_jointes_messages where chantier_id = :'chantier';

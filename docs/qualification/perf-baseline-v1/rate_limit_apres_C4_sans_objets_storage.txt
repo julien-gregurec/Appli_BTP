@@ -1,0 +1,4 @@
+A. 15 connexions depuis une même IP : {"429":5,"500":10} → 429 à partir de la tentative n°11
+B. page 200, 80 vignettes demandées : {"429":21,"503":59} (302/503 = servie ou objet absent en local ; 429 = bloquée par la limite)
+C. 120 pages en 17.4 s : {"200":120}
+D. 25 utilisateurs × 20 pages (même IP) : {"200":500}

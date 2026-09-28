@@ -40,6 +40,8 @@ CONF
   nohup node tests/e2e/colors-pile-locale/passerelle.mjs > "${JOURNAUX_PERF:-/tmp/perf}/passerelle.log" 2>&1 &) </dev/null >/dev/null 2>&1
 (cd "$DEPOT" && PORT=54321 nohup node scripts/perf/baseline-v1/routeur-local.mjs > "${JOURNAUX_PERF:-/tmp/perf}/routeur.log" 2>&1 &) </dev/null >/dev/null 2>&1
 sleep 3
+# Le cache de schéma de PostgREST (357 migrations) peut demander plusieurs secondes : 503 d'ici là.
+for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3001/ && break; sleep 1; done
 curl -sf -o /dev/null http://127.0.0.1:3001/ || { echo "PostgREST KO"; tail "$POSTGREST_DIR/perf-postgrest.log"; exit 1; }
 # Garde-fou : exactement UN PostgREST, connecté à la base demandée (sinon un ancien processus
 # resté sur le port servirait une autre base et fausserait toute la campagne).
