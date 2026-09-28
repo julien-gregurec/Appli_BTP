@@ -196,3 +196,25 @@ export async function rpcAsUser(token: string, fn: string, args: Record<string, 
   const body = (await res.json().catch(() => null)) as { code?: string; hint?: string; message?: string } | null;
   return { status: res.status, body };
 }
+
+/** Vidéo longue (rendu de plusieurs dizaines de secondes) pour les scénarios « en cours de job ». */
+export async function longVideo(seconds = 40) {
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const file = join(mkdtempSync(join(tmpdir(), "studio-e2e-long-")), "long-clip.mp4");
+  execFileSync(process.env.STUDIO_FFMPEG_PATH || "ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", `testsrc2=size=1280x720:rate=30:duration=${seconds}`,
+    "-f", "lavfi", "-i", `sine=frequency=500:duration=${seconds}`, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", file]);
+  return file;
+}
+
+/** Prépare le montage et lance « Créer la vidéo » ; renvoie l'id du job. */
+export async function startRender(page: Page, projectId: string) {
+  await page.goto(`/projects/${projectId}`);
+  await page.getByRole("button", { name: "Préparer le montage", exact: true }).click();
+  await expect(page.locator(".montage-clip").first()).toBeVisible();
+  const panel = page.getByRole("region", { name: "Vidéo exportée" });
+  await panel.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
+  await expect(panel.locator("[data-render-job]")).toHaveCount(1);
+  return { panel, jobId: (await panel.locator("[data-render-job]").first().getAttribute("data-render-job"))! };
+}
