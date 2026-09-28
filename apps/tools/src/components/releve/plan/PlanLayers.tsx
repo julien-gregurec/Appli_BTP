@@ -15,10 +15,11 @@
  * n'apparaissent que lorsqu'ils sont lisibles à l'échelle courante.
  */
 import { memo, useMemo } from "react";
-import { CALQUE_DES_CATEGORIES, type MurType, type OuvertureType, type PlanCalques, type PlanDocument, type PlanEquipement, type PlanPhotoMarker } from "@elsatia/releve-domain";
+import { CALQUE_DES_CATEGORIES, formatLongueur, type PlanCote, type MurType, type OuvertureType, type PlanCalques, type PlanDocument, type PlanEquipement, type PlanPhotoMarker } from "@elsatia/releve-domain";
 import { equipmentSymbol, type EquipmentSymbol } from "@/lib/releve/plan/equipment-symbols";
 import { equipmentHandles, footprint } from "@/lib/releve/plan/equipments";
 import type { Point2D } from "@/lib/geometry/engine/types";
+import { dimensionGeometry, type DimensionLine } from "@/lib/releve/plan/dimensions";
 import { contourLabelPoint, pointAlongWall, wallLength, type DetectedRoom } from "@/lib/releve/plan/geometry";
 import { formatLongueurM, formatSurfaceContour, openingSymbol, overallDimensions, visibleWalls, wallDimension } from "@/lib/releve/plan/render";
 import { wallParts, type WallNetwork } from "@/lib/releve/plan/wall-geometry";
@@ -66,11 +67,17 @@ export type PlanLayersProps = {
   showObjectHandles: boolean;
   /** Lot 7 : aperçu de l'objet à poser (outil Objet). */
   objectGhost: Pick<PlanEquipement, "position" | "rotationRad" | "largeurMm" | "profondeurMm"> & { kind: string } | null;
+  /** Lot 8 : lignes de cote (manuelles, automatiques de la sélection et des pièces). */
+  dimensions?: readonly DimensionLine[];
+  /** Lot 8 : hauteurs ponctuelles (cotes sans second point). */
+  hauteurs?: readonly PlanCote[];
+  /** Lot 8 : cote manuelle sélectionnée. */
+  coteId?: string | null;
 };
 
 export const PlanLayers = memo(function PlanLayers({
   document, view, size, selection, openingId, scopePieceIds, pieceName, surfaces, markers, photoAnchorId, rooms, draft, snap, showHandles,
-  network, invalidOpenings, openingGhost, showOpeningHandles, calques, objetIds, showObjectHandles, objectGhost,
+  network, invalidOpenings, openingGhost, showOpeningHandles, calques, objetIds, showObjectHandles, objectGhost, dimensions = [], hauteurs = [], coteId = null,
 }: PlanLayersProps) {
   const project = (p: Point2D) => worldToScreen(p, view, size);
   const scale = view.scale;
@@ -205,6 +212,37 @@ export const PlanLayers = memo(function PlanLayers({
         <text x={x - 6} y={(topLeft.y + bottomLeft.y) / 2} transform={`rotate(-90 ${x - 6} ${(topLeft.y + bottomLeft.y) / 2})`} data-testid="plan-profondeur-totale">{formatLongueurM(overall.heightMm)}</text>
       </g>;
     })()}
+
+    {/* Lot 8 : lignes de cote (lignes d'attache, ligne de cote à flèches, valeur lisible à l'endroit). */}
+    {dimensions.length > 0 && <g className={styles.cotes} data-testid="plan-cotes">
+      {dimensions.map((dim) => {
+        const geometry = dimensionGeometry(dim);
+        const a = project(dim.a); const b = project(dim.b); const from = project(geometry.from); const to = project(geometry.to); const mid = project(geometry.mid);
+        const lengthPx = Math.hypot(to.x - from.x, to.y - from.y);
+        if (lengthPx < 18 && !dim.coteId) return null;
+        let degrees = (-geometry.angle * 180) / Math.PI;
+        while (degrees > 90) degrees -= 180;
+        while (degrees <= -90) degrees += 180;
+        const ux = (to.x - from.x) / (lengthPx || 1); const uy = (to.y - from.y) / (lengthPx || 1);
+        const tick = (p: { x: number; y: number }) => `M${p.x - 4 * (ux + uy)},${p.y - 4 * (uy - ux)} L${p.x + 4 * (ux + uy)},${p.y + 4 * (uy - ux)}`;
+        return <g key={dim.key} data-testid="plan-cote-ligne" data-kind={dim.kind} data-cote={dim.coteId ?? undefined} data-valeur={dim.valueMm}
+          data-selected={dim.coteId !== undefined && dim.coteId === coteId} data-ecart={dim.ecartMm ?? undefined}>
+          {dim.offsetMm !== 0 && <><line className={styles.coteAttache} x1={a.x} y1={a.y} x2={from.x} y2={from.y} /><line className={styles.coteAttache} x1={b.x} y1={b.y} x2={to.x} y2={to.y} /></>}
+          <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+          <path d={`${tick(from)} ${tick(to)}`} />
+          <text x={mid.x} y={mid.y - 4} transform={`rotate(${degrees} ${mid.x} ${mid.y})`}>{dim.text}</text>
+        </g>;
+      })}
+    </g>}
+    {hauteurs.length > 0 && <g className={styles.cotes}>
+      {hauteurs.map((cote) => {
+        const at = project(cote.a);
+        return <g key={cote.id} data-testid="plan-hauteur" data-cote={cote.id} data-valeur={cote.valeurMm} data-selected={cote.id === coteId}>
+          <path d={`M${at.x},${at.y - 9} L${at.x + 7},${at.y + 5} L${at.x - 7},${at.y + 5} Z`} />
+          <text x={at.x + 10} y={at.y + 4}>h {formatLongueur(cote.valeurMm, "m")}</text>
+        </g>;
+      })}
+    </g>}
 
     {/* Noms et surfaces des pièces */}
     {calques.annotations.visible && document.contours.map((contour) => {

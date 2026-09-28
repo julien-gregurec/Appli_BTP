@@ -223,7 +223,7 @@ export function setWallAngle(document: PlanDocument, murId: string, degrees: num
   return moveVertex(document, mur.b, pointAtPolar(mur.a, wallLength(mur), (degrees * Math.PI) / 180));
 }
 
-export type WallPatch = Partial<Pick<PlanMur, "epaisseurMm" | "hauteurMm" | "typeMur" | "pieceId">>;
+export type WallPatch = Partial<Pick<PlanMur, "epaisseurMm" | "hauteurMm" | "typeMur" | "pieceId" | "etatProjet">>;
 
 export function updateWall(document: PlanDocument, murId: string, patch: WallPatch): PlanDocument {
   let changed = false;

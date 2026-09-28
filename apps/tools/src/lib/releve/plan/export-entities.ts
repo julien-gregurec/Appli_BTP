@@ -12,6 +12,7 @@
 import {
   CALQUE_DES_CATEGORIES, EXPORT_LAYER_OF_CALQUE, calquesEffectifs, murLongueurMm, type PlanCalques, type PlanDocument, type PlanExportEntity,
 } from "@elsatia/releve-domain";
+import { dimensionGeometry, manualDimension } from "./dimensions";
 import { equipmentSymbol } from "./equipment-symbols";
 import { contourLabelPoint } from "./geometry";
 import { formatLongueurM, formatSurfaceContour, openingSymbol } from "./render";
@@ -57,6 +58,18 @@ export function planGeometryEntities(document: PlanDocument, options: PlanGeomet
   }
   for (const mur of document.murs) {
     entities.push({ layer: "COTES", kind: "text", at: { x: (mur.a.x + mur.b.x) / 2, y: (mur.a.y + mur.b.y) / 2 }, text: formatLongueurM(murLongueurMm(mur)), ref: mur.id });
+  }
+  // Lot 8 : cotes manuelles (ligne de cote décalée + lignes d'attache + valeur) et hauteurs ponctuelles.
+  for (const cote of document.cotes ?? []) {
+    const dim = manualDimension(cote);
+    if (!dim) { entities.push({ layer: "COTES", kind: "text", at: cote.a, text: `h ${formatLongueurM(cote.valeurMm)}`, ref: cote.id }); continue; }
+    const geometry = dimensionGeometry(dim);
+    entities.push({ layer: "COTES", kind: "line", a: geometry.from, b: geometry.to, widthMm: 0, style: "trait", ref: cote.id });
+    if (dim.offsetMm !== 0) {
+      entities.push({ layer: "COTES", kind: "line", a: dim.a, b: geometry.from, widthMm: 0, style: "tirets", ref: cote.id });
+      entities.push({ layer: "COTES", kind: "line", a: dim.b, b: geometry.to, widthMm: 0, style: "tirets", ref: cote.id });
+    }
+    entities.push({ layer: "COTES", kind: "text", at: geometry.mid, text: dim.text, ref: cote.id });
   }
   for (const contour of document.contours) {
     const at = contourLabelPoint(contour);

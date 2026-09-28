@@ -7,7 +7,7 @@
  * direct aux utilisateurs.
  */
 import {
-  ReleveConflictError, equipementFromElement, murFromElement, ouvertureFromElement,
+  ReleveConflictError, coteFromElement, equipementFromElement, murFromElement, ouvertureFromElement,
   type DeletedPlanEquipement, type LoadedPlan, type PieceEquipementRow, type Plan, type PlanContour, type PlanEtat, type PlanOperations, type PlanSaveResult, type ReleveElement, type RelevePlanRepository,
 } from "@elsatia/releve-domain";
 import { ReleveRemoteError, type ReleveSupabaseClient } from "../supabase-repository";
@@ -19,7 +19,7 @@ export type PlanRow = {
   version_id: string | null; empreinte: string | null; created_at: string; updated_at: string; deleted_at: string | null;
 };
 
-type ElementRow = { id: string; type: "mur" | "ouverture" | "equipement"; piece_id: string | null; parent_element_id: string | null; donnees: Record<string, unknown> };
+type ElementRow = { id: string; type: "mur" | "ouverture" | "equipement" | "mesure" | "materiau"; piece_id: string | null; parent_element_id: string | null; donnees: Record<string, unknown> };
 
 export function planFromRow(row: PlanRow): Plan {
   return {
@@ -73,6 +73,9 @@ export class SupabasePlanRepository implements RelevePlanRepository {
         // Lot 7 : objets du plan (même RPC de lecture).
         equipements: rows.filter((row) => row.type === "equipement").sort(byId)
           .map((row) => equipementFromElement({ id: row.id, pieceId: row.piece_id, donnees: row.donnees } as unknown as ReleveElement<"equipement">)),
+        // Lot 8 : cotes manuelles et hauteurs ponctuelles (les revêtements se lisent par le métré).
+        cotes: rows.filter((row) => row.type === "mesure").sort(byId)
+          .map((row) => coteFromElement({ id: row.id, pieceId: row.piece_id, donnees: row.donnees })),
         contours: loaded.contours, cadre: loaded.cadre, reglages: loaded.reglages,
       },
     };

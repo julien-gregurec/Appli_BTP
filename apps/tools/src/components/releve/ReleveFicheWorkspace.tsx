@@ -9,7 +9,7 @@ import {
   type Version, type VersionType,
 } from "@elsatia/releve-domain";
 import { confirmRemovalMessage, KIND_LABELS } from "@/lib/releve/forms";
-import { photosHref, readReleveId, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
+import { metreHref, photosHref, readReleveId, RELEVES_PATH, structureHref } from "@/lib/releve/navigation";
 import { Brand } from "../HomeDashboard";
 import { AutoSelect, AutoText, SaveStatus, useAutosave } from "./autosave-ui";
 import { CHANTIER_STATUT_LABELS, RELEVE_STATUT_LABELS } from "./labels";
@@ -88,6 +88,7 @@ function Fiche({ service, actor, releveId }: { service: ReleveService; actor: Re
       </dl>
       <div className={styles.toolbar}>
         <Link className={styles.secondary} href={photosHref(releveId)}>Photos terrain</Link>
+        <Link className={styles.secondary} href={metreHref({ releveId })} data-testid="lien-metre">Métré</Link>
         {actions.has("share") && !deleted && <button className={styles.secondary} type="button" onClick={() => void run(() => service.setVisibility(releveId, releve.visibilite === "prive" ? "entreprise" : "prive"), releve.visibilite === "prive" ? "Relevé partagé avec l'entreprise." : "Relevé redevenu privé.")}>{releve.visibilite === "prive" ? "Partager avec l'entreprise" : "Rendre privé"}</button>}
         {actions.has("delete") && (deleted
           ? <button className={styles.primary} type="button" onClick={() => void run(() => service.restore(releveId), "Relevé restauré.")}>Restaurer le relevé</button>
