@@ -205,6 +205,10 @@
     {
       "name": "LD_LIBRARY_PATH",
       "justification": "Système."
+    },
+    {
+      "name": "PGPASSWORD",
+      "justification": "Variable standard de libpq, positionnée pour le seul processus psql enfant de scripts/dr/v2/snapshot.py à partir de DR_PGPASSWORD."
     }
   ],
   "scan": {
@@ -365,6 +369,10 @@
       {
         "path": "scripts/configurer-portail-stripe.mjs",
         "justification": "Script manuel Billing Security V3 : lit les STRIPE_PRICE_<OFFRE>_{MENSUEL,ANNUEL} des offres commercialisées via une table de noms littérale ; chaque nom figure au manifeste."
+      },
+      {
+        "path": "scripts/dr/v2/garde-cible.mjs",
+        "justification": "Garde-fou DR V2 : lit, dans l'environnement reçu en paramètre, une liste fermée d'indicateurs de Production (VERCEL_ENV, ELSATIA_ENV, APP_ENV, NODE_ENV, NEXT_PUBLIC_SUPABASE_URL, DATABASE_URL) pour REFUSER une cible ; testé par garde-cible.test.mjs."
       }
     ]
   },
@@ -6727,6 +6735,204 @@
       "dr_critical": false,
       "example_required": true,
       "required_when": "dès que Studio est déployé"
+    },
+    {
+      "name": "DR_PGHOST",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Hôte PostgreSQL de l'outillage DR (scripts/dr/, scripts/dr/v2/). Défaut 127.0.0.1 ; toute valeur non locale est refusée par scripts/dr/v2/garde-cible.mjs sauf autorisation explicite (DR_ALLOW_REMOTE + DR_REMOTE_ALLOWLIST), et jamais pour un drill destructif.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR_PGPORT",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port PostgreSQL de l'outillage DR (défaut 5432). Base jetable locale uniquement.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR_PGUSER",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Rôle PostgreSQL de l'outillage DR en mode TCP (défaut postgres). Base jetable locale uniquement.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR_ALLOW_REMOTE",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Autorisation EXPLICITE d'une cible DR distante (valeur exacte 1), à combiner avec DR_REMOTE_ALLOWLIST. Absente par défaut : toute cible distante est refusée ; Production reste refusée même avec cette autorisation (docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md §13).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR_REMOTE_ALLOWLIST",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Liste (virgules, correspondance exacte) des hôtes distants autorisés pour la seule vérification non destructive d'une sauvegarde (mode verify-backup). Ignorée sans DR_ALLOW_REMOTE=1.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR2_PSQL_MODE",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Accès PostgreSQL de scripts/dr/v2/ : peer (runuser postgres, défaut en root sans DR_PGPASSWORD) ou tcp (DR_PG*).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "DR2_PROBE_WORKERS",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Nombre de sessions parallèles de la sonde RLS de scripts/dr/v2/snapshot.py (défaut 4).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STORAGE_URL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de la storage-api LOCALE jetable du drill Storage DR V2 (scripts/dr/v2/storage_client.mjs, défaut http://127.0.0.1:5055). Jamais un projet hébergé.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STORAGE_JWT_SECRET",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Secret HS256 éphémère de la storage-api locale du drill Storage DR V2, généré à chaque exécution par scripts/dr/v2/storage_drill.sh. Jamais une clé réelle.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
     }
   ]
 }

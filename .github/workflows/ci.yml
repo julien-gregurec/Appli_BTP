@@ -79,6 +79,12 @@ jobs:
       - name: Seeds — registre, seed Preview, garde du wrapper (sans base)
         run: npm run test:seeds
 
+      # Garde-fou de l'outillage DR V2 (Production refusée par défaut, cible distante sur
+      # autorisation explicite, bases elsatia_dr_* seulement). Sans base ni dépendance ; le drill
+      # lui-même (`npm run dr:verify`) exige PostgreSQL, Docker et GoTrue, il reste manuel.
+      - name: DR V2 — garde-fou de cible (sans base)
+        run: npm run test:dr-guard
+
       - name: Scan de secrets dans les fichiers suivis
         run: npm run verify:secrets
 

@@ -25,7 +25,9 @@ const ACTIVE_CLASSES = new Set(["ACTIVE", "CI_ONLY", "PREVIEW", "PRODUCTION_TOOL
 // Couvertures déclarées hors de ce harnais (suites pgTAP, CI Studio, recette avec passerelle).
 // "upgrade-harness" : exécuté par scripts/qualification/upgrade-v4-v5.sh sur une base V4 construite
 // depuis V3 (le complément suppose un état antérieur au train courant, jamais une base fraîche).
-const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness"]);
+// "dr-v2-drill" : exécuté par scripts/dr/v2/drill.sh (`npm run dr:verify`) sur des bases jetables
+// elsatia_dr_v2_* dérivées de la base du harnais d'upgrade (docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md).
+const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness", "dr-v2-drill"]);
 
 // Où vivent les scripts de données, et à quoi ils ressemblent.
 const DISCOVERY = [

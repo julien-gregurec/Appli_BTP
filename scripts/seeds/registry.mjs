@@ -182,6 +182,62 @@ export const SEEDS = [
     target: "amorce plateforme du drill DR (pas un seed de données)",
     coveredBy: "infrastructure",
   },
+  {
+    id: "dr-v2-dataset",
+    path: "scripts/dr/v2/dataset_complement.sql",
+    classification: "ACTIVE",
+    target: "base locale jetable elsatia_dr_v2_* copiée de la base du harnais d'upgrade V4 → V5 (planning, plan 2D, états Stripe ordonnés, audit, suppression RGPD programmée)",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-d2-migration",
+    path: "scripts/dr/v2/d2_migration_cassee.sql",
+    classification: "ACTIVE",
+    target: "Disaster 2 du drill DR V2 : migration FICTIVE à moitié appliquée, uniquement sur elsatia_dr_v2_live (jamais dans supabase/migrations/)",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-d3-empreinte",
+    path: "scripts/dr/v2/d3_empreinte.sql",
+    classification: "ACTIVE",
+    target: "Disaster 3 du drill DR V2 : empreinte d'état RGPD d'un tenant (lecture seule)",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-d4-evenements",
+    path: "scripts/dr/v2/d4_evenements_stripe_post_backup.sql",
+    classification: "ACTIVE",
+    target: "Disaster 4 du drill DR V2 : événements Stripe postérieurs au backup, appliqués puis rejoués par les RPC ordonnées (base jetable)",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-d4-corruption",
+    path: "scripts/dr/v2/d4_corruption.sql",
+    classification: "ACTIVE",
+    target: "Disaster 4 du drill DR V2 : corruption volontaire de l'état Stripe local, uniquement sur elsatia_dr_v2_live",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-controle-stripe",
+    path: "scripts/dr/v2/stripe_controle_post_restauration.sql",
+    classification: "ACTIVE",
+    target: "contrôle Stripe post-restauration (lecture seule) : droits ouverts dont la dernière décision Stripe précède backup_at",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-smokes",
+    path: "scripts/dr/v2/restore_smokes.sql",
+    classification: "ACTIVE",
+    target: "smokes métier après restauration (pgTAP, transaction annulée)",
+    coveredBy: "dr-v2-drill",
+  },
+  {
+    id: "dr-v2-storage-inventaire",
+    path: "scripts/dr/v2/storage_inventory.sql",
+    classification: "ACTIVE",
+    target: "inventaire des métadonnées Storage d'une sauvegarde DR V2 (lecture seule)",
+    coveredBy: "dr-v2-drill",
+  },
 
   // ── Fixtures de qualification, e2e, perf ─────────────────────────────────
   {
