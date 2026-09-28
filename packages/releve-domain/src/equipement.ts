@@ -1,6 +1,6 @@
 /**
  * Lot 7 — Objets du plan : mobilier, sanitaire, cuisine, équipements techniques (miroir de la
- * migration 20260928001101).
+ * migration 20260928000701 dans le train V7, 20260928001101 sur sa branche).
  *
  * Un objet de plan est un élément Relevé de type `equipement` rattaché à un plan (`plan_id`) : il
  * appartient donc à l'état documenté de ce plan (INITIAL / CORRECTED / PROJECTED / AS_BUILT), il

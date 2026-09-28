@@ -14,7 +14,7 @@ import {
 import { InMemoryPlanRepository, PlanRuleError } from "./plan-memory";
 
 const lot7 = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/20260928001101_tools_releve_metre_equipements_calques_v1.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/20260928000701_tools_releve_metre_equipements_calques_v1.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ").replace(/, /g, ",").replace(/\( /g, "(").replace(/ \)/g, ")");
 const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`).join(",");

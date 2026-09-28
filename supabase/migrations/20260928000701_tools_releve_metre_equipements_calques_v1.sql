@@ -1,7 +1,9 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 7 — MOBILIER, ÉQUIPEMENTS & CALQUES V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT7_EQUIPEMENTS_CALQUES_V1.md
 --
--- Posée APRÈS le Lot 6 (20260928001001). Plage 11xx réservée au Lot 7.
+-- Posée APRÈS le Lot 6 (20260928001001 sur sa branche, 20260928000401 dans le train V6).
+-- Train canonique V7 : numéro d'origine 20260928001101, renuméroté 20260928000701 (après la dernière
+-- migration réelle de V6, 20260928000601) ; corps inchangé.
 --
 -- Strictement ADDITIF (aucune table, aucune colonne ; aucune ligne existante invalidée ni réécrite ;
 -- aucune garde affaiblie) :
