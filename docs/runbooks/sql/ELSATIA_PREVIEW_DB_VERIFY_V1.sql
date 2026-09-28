@@ -25,7 +25,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (355, '20260928000301')),
+attendu_train(nb, derniere) as (values (358, '20260928000601')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -33,6 +33,19 @@ politique_contrats as (
   select case when to_regclass('platform.purge_politique_contrats') is null then null
               else (xpath('/row/e/text()', query_to_xml(
                 'select politique || '' / durée '' || coalesce(duree_conservation::text, ''non validée'') as e '
+                || 'from platform.purge_politique_contrats', false, true, '')))[1]::text
+         end as etat
+),
+-- Train V6 : paramètres V2 de la politique des contrats (20260928000501). Lecture dynamique :
+-- colonnes absentes d'une base au train V5 → NULL, contrôle 28 en échec propre.
+politique_contrats_v2 as (
+  select case when (select count(*) from information_schema.columns where table_schema = 'platform'
+                      and table_name = 'purge_politique_contrats'
+                      and column_name in ('regles_depart', 'regle_depart_repli', 'choix_photos_explicite')) < 3 then null
+              else (xpath('/row/e/text()', query_to_xml(
+                'select ''départ '' || coalesce(array_to_string(regles_depart, ''+''), ''aucun'') '
+                || '|| '' / repli '' || coalesce(regle_depart_repli, ''aucun'') '
+                || '|| '' / photos '' || case when choix_photos_explicite then ''choisies'' else ''non choisies'' end as e '
                 || 'from platform.purge_politique_contrats', false, true, '')))[1]::text
          end as etat
 ),
@@ -309,6 +322,54 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and (select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
                  and p.proname in ('tools_releve_plan_creer', 'tools_releve_plan_enregistrer', 'tools_releve_plan_figer')
                  and not has_function_privilege('anon', p.oid, 'execute')) = 3, true
+  union all
+  -- Contrôles 27-29 (train V6). 27 : Relevé & Métré Lot 6 — validation serveur des ouvertures
+  -- (contrôle des murs interne), lecture du plan par RPC réservée aux authentifiés.
+  select 27, 'Tools Relevé & Métré : ouvertures et géométrie (20260928000401)',
+         'lecture RPC authentifiés seuls, contrôle des murs interne, enregistrement fermé à anon',
+         concat_ws(', ',
+           case when to_regprocedure('public.tools_releve_plan_elements(uuid)') is null then 'lecture RPC ABSENTE'
+                when has_function_privilege('anon', 'public.tools_releve_plan_elements(uuid)', 'execute') then 'lecture RPC OUVERTE à anon'
+                else 'lecture RPC authentifiés' end,
+           case when to_regprocedure('public.tools_releve_plan_murs_anomalie(uuid,uuid[])') is null then 'contrôle des murs ABSENT'
+                when has_function_privilege('authenticated', 'public.tools_releve_plan_murs_anomalie(uuid,uuid[])', 'execute') then 'contrôle des murs EXPOSÉ'
+                else 'contrôle des murs interne' end),
+         to_regprocedure('public.tools_releve_plan_elements(uuid)') is not null
+           and not has_function_privilege('anon', 'public.tools_releve_plan_elements(uuid)', 'execute')
+           and to_regprocedure('public.tools_releve_plan_murs_anomalie(uuid,uuid[])') is not null
+           and not has_function_privilege('authenticated', 'public.tools_releve_plan_murs_anomalie(uuid,uuid[])', 'execute')
+           and not has_function_privilege('anon', 'public.tools_releve_plan_enregistrer(uuid,bigint,jsonb)', 'execute'), true
+  union all
+  -- 28 : RGPD contrats acceptés, paramétrage V2 — AUCUN point de départ, AUCUN choix des photos
+  -- (la durée est contrôlée par 14). Toute valeur = écart bloquant, à lever par la migration de
+  -- décision du propriétaire (docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md).
+  select 28, 'RGPD contrats : paramétrage V2 (20260928000501), rien d''activé',
+         'départ aucun / repli aucun / photos non choisies',
+         coalesce((select etat from politique_contrats_v2), 'paramètres V2 ABSENTS'),
+         coalesce((select etat = 'départ aucun / repli aucun / photos non choisies' from politique_contrats_v2), false), true
+  union all
+  -- 29 : surface de la pièce synchronisée par le serveur depuis le plan (20260928000601) : aucune
+  -- voie client (autorisation liée au txid sans droit d'API, synchronisation non exécutable).
+  select 29, 'Tools Relevé & Métré : surface pièce synchronisée par le serveur (20260928000601)',
+         'autorisation sans droit d''API, synchronisation non exécutable par l''application, déclencheur actif',
+         concat_ws(', ',
+           case when to_regclass('platform.tools_releve_surface_autorisations') is null then 'autorisation ABSENTE'
+                else (select count(*) from information_schema.role_table_grants where table_schema = 'platform'
+                       and table_name = 'tools_releve_surface_autorisations'
+                       and grantee in ('anon', 'authenticated', 'service_role'))::text || ' droit(s) d''API' end,
+           case when to_regprocedure('public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])') is null then 'synchronisation ABSENTE'
+                when has_function_privilege('authenticated', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
+                  or has_function_privilege('service_role', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
+                  then 'synchronisation EXPOSÉE' else 'synchronisation interne' end,
+           case when exists (select 1 from pg_trigger where not tgisinternal and tgenabled <> 'D'
+                              and tgname = 'tools_releves_plans_surface_sync') then 'déclencheur' else 'déclencheur ABSENT' end),
+         to_regclass('platform.tools_releve_surface_autorisations') is not null
+           and (select count(*) from information_schema.role_table_grants where table_schema = 'platform'
+                 and table_name = 'tools_releve_surface_autorisations' and grantee in ('anon', 'authenticated', 'service_role')) = 0
+           and to_regprocedure('public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])') is not null
+           and not has_function_privilege('authenticated', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
+           and not has_function_privilege('service_role', 'public.tools_releve_pieces_surface_synchroniser(uuid,uuid[])', 'execute')
+           and exists (select 1 from pg_trigger where not tgisinternal and tgenabled <> 'D' and tgname = 'tools_releves_plans_surface_sync'), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

@@ -155,7 +155,7 @@ test("db : sonde RLS — UUID strict (aucune injection), transaction en lecture 
 });
 
 test("db : RPC service-role only — accord à authenticated, absence, service_role manquant", () => {
-  assert.equal(RPC_SERVICE_SEULEMENT.length, 35); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201)
+  assert.equal(RPC_SERVICE_SEULEMENT.length, 37); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201) + 2 (V6 : RGPD contrats V2, …0928 501)
   assert.match(sqlServiceSeulement(), /unnest\(array\['reserver_evenement_abonnement_service'/);
   const r = evaluerServiceSeulement("a|f|f|t|1\nb|f|t|t|1\nc|f|f|f|0\nd|f|f|f|1\n");
   assert.deepEqual(r.map((x) => x.ok), [true, false, false, false]);
@@ -328,6 +328,17 @@ test("train : chiffres historiques V3 et V4 jamais réécrits (train V5)", async
   const v3 = readFileSync(resolve(racine, "docs/qualification/ELSATIA_CANONICAL_TRAIN_V3_FINAL_CONVERGENCE.md"), "utf8");
   assert.doesNotMatch(v3, /<!--train:(nb|derniere|controles)-->/);
   assert.doesNotMatch(v4, /<!--train:(nb|derniere|controles)-->/);
+});
+
+test("train : chiffres historiques V5 jamais réécrits (train V6)", async () => {
+  const te = await import("./train-expectations.mjs");
+  const racine = resolve(import.meta.dirname, "../..");
+  assert.ok(te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_CANONICAL_TRAIN_V5_CONVERGENCE_V1.md"));
+  assert.ok(te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md"));
+  const v5 = readFileSync(resolve(racine, "docs/qualification/ELSATIA_CANONICAL_TRAIN_V5_CONVERGENCE_V1.md"), "utf8");
+  assert.match(v5, /\*\*355\*\*, dernière \*\*`20260928000301`\*\*/);
+  assert.match(v5, /Base\s+neuve \*\*355\/355\*\*/);
+  assert.doesNotMatch(v5, /<!--train:(nb|derniere|controles)-->/);
 });
 
 test("train : réécriture des marqueurs SQL et Markdown", async () => {

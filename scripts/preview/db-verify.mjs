@@ -112,6 +112,9 @@ export const RPC_SERVICE_SEULEMENT = [
   "elsatia_identity_account_of", "elsatia_identity_prepare_handoff", "elsatia_identity_claim_outbox",
   "elsatia_identity_outbox_delivered", "elsatia_identity_outbox_failed", "elsatia_identity_resync",
   "elsatia_identity_enqueue_entitlement",
+  // Train canonique V6 : paramétrage RGPD des contrats V2 (…0928 501) — purge des échus et rapport,
+  // exploitation seule (la purge reste refusée tant que la politique n'est pas active).
+  "purger_contrats_conserves_echus", "rapport_echeances_contrats_conserves",
 ];
 
 export function sqlServiceSeulement() {
