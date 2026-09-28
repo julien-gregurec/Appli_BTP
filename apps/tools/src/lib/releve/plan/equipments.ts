@@ -338,3 +338,17 @@ export function setEquipmentsLocked(document: PlanDocument, ids: readonly string
 export function groupIds(document: PlanDocument, categorie: EquipementCategorie): string[] {
   return (document.equipements ?? []).filter((objet) => objet.categorie === categorie).map((objet) => objet.id);
 }
+
+// ── Poignées (rendu et désignation partagent ces positions) ──────────────────
+
+/** Écart (px) entre l'avant de l'objet et sa poignée de rotation. */
+export const ROTATION_HANDLE_PX = 30;
+
+/** Poignées d'un objet sélectionné : rotation (devant l'objet) et redimensionnement (coin avant droit). */
+export function equipmentHandles(objet: PlanEquipement, scale: number): { rotate: Point2D; resize: Point2D } {
+  const d = objet.profondeurMm / 2;
+  return {
+    rotate: localToWorld(objet, { x: 0, y: d + ROTATION_HANDLE_PX / Math.max(scale, 1e-6) }),
+    resize: localToWorld(objet, { x: objet.largeurMm / 2, y: d }),
+  };
+}

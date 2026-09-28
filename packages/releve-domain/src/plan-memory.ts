@@ -23,6 +23,11 @@ export class PlanRuleError extends Error {
 type StoredMur = PlanMur & { deleted: boolean };
 type StoredOuverture = PlanOuverture & { deleted: boolean };
 type StoredEquipement = PlanEquipement & { deleted: boolean; deletedAt: string | null };
+function storedToObjet(stored: StoredEquipement & { planId: string }): PlanEquipement {
+  const objet: Partial<StoredEquipement & { planId: string }> = { ...stored };
+  delete objet.deleted; delete objet.deletedAt; delete objet.planId;
+  return objet as PlanEquipement;
+}
 
 /** Aire (mm²) d'un contour — seule arithmétique locale, pour que le double reste autonome. */
 function shoelace(points: readonly { x: number; y: number }[]): number {
@@ -64,7 +69,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       document: {
         murs: [...this.murs.values()].filter((mur) => mur.planId === planId && !mur.deleted).map(strip).map((mur) => murFromElement({ id: mur.id as never, pieceId: mur.pieceId as never, donnees: { ...mur } as never })),
         ouvertures: [...this.ouvertures.values()].filter((o) => o.planId === planId && !o.deleted).map(strip).map((o) => ouvertureFromElement({ id: o.id as never, parentElementId: o.murId as never, donnees: { ...o } as never })),
-        equipements: [...this.equipements.values()].filter((e) => e.planId === planId && !e.deleted).map(({ deleted: _d, deletedAt: _a, planId: _p, ...objet }) => objet),
+        equipements: [...this.equipements.values()].filter((e) => e.planId === planId && !e.deleted).map(storedToObjet),
         contours: plan.contours, cadre: plan.cadre, reglages: plan.reglages,
       },
     };
@@ -181,7 +186,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
   async listDeletedEquipements(planId: string): Promise<DeletedPlanEquipement[]> {
     return [...this.equipements.values()].filter((e) => e.planId === planId && e.deleted)
       .sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""))
-      .map(({ deleted: _d, deletedAt, planId: _p, ...objet }) => ({ objet, deletedAt: deletedAt ?? "" }));
+      .map((stored) => ({ objet: storedToObjet(stored), deletedAt: stored.deletedAt ?? "" }));
   }
 
   async freezePlan(planId: string, expectedRevision: number, libelle: string | null = null): Promise<Plan> {

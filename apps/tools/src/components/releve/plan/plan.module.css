@@ -73,6 +73,30 @@
 .snap line { stroke: #0e7490; stroke-width: 1; stroke-dasharray: 4 4; }
 .snap rect { fill: none; stroke: #0e7490; stroke-width: 2; }
 
+/* ---- Lot 7 : objets du plan -------------------------------------------- */
+.object path, .object line, .object circle { fill: none; stroke: #6b4f28; stroke-width: 1; }
+.object .objectOutline { fill: #fffdf7; stroke-width: 1.4; }
+.object[data-calque="sanitaire"] path, .object[data-calque="sanitaire"] line, .object[data-calque="sanitaire"] circle { stroke: #0e6ba8; }
+.object[data-calque="sanitaire"] .objectOutline { fill: #f3faff; }
+.object[data-calque="cuisine"] path, .object[data-calque="cuisine"] line, .object[data-calque="cuisine"] circle { stroke: #3d7a1e; }
+.object[data-calque="cuisine"] .objectOutline { fill: #f7fff1; }
+.object[data-calque="technique"] path, .object[data-calque="technique"] line, .object[data-calque="technique"] circle { stroke: #b3261e; }
+.object[data-calque="technique"] .objectOutline { fill: #fff6f4; }
+.object [data-style="tirets"] { stroke-dasharray: 5 4; }
+.object[data-selected="true"] .objectOutline { stroke: #d97706; stroke-width: 2.6; }
+.object[data-locked="true"] .objectOutline { stroke-dasharray: 2 2; }
+.object[data-etat="a_deposer"] path, .object[data-etat="a_deposer"] line, .object[data-etat="a_deposer"] circle { stroke: #dc2626; stroke-dasharray: 6 3; }
+.object[data-etat="nouveau"] .objectOutline { fill: #dcfce7; }
+.object[data-etat="deplace"] .objectOutline { fill: #e0f2fe; }
+.objectLabel { fill: #3f2d13; font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.objectHandles circle, .objectHandles rect { fill: #fff; stroke: #d97706; stroke-width: 2.5; }
+.objectHandles line { stroke: #d97706; stroke-width: 1.5; stroke-dasharray: 3 3; }
+.objectGhost { fill: #16a34a; fill-opacity: .25; stroke: #15803d; stroke-width: 1.5; }
+.objectGhost[data-kind="libre"] { fill: #64748b; stroke: #475569; }
+.palette { display: grid; gap: 0; }
+.layerRow { grid-template-columns: minmax(90px, 1fr) auto auto; align-items: center; }
+.layerRow .toggle { min-height: 40px; padding: 0 10px; font-weight: 700; }
+
 @media (max-width: 1024px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .stage [role="application"] { height: clamp(360px, 62vh, 1000px); }

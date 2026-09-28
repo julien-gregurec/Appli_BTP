@@ -118,3 +118,5 @@ nav.thumbBar { display: grid; }
   .node { min-height: 56px; }
   .field input, .field select { min-height: 48px; font-size: 16px; }
 }
+.equipementList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.equipementList li { padding: 6px 0; border-top: 1px dashed #e2e5e3; }

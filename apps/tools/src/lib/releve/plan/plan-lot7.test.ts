@@ -67,6 +67,8 @@ describe("Lot 7 — objets : création, pièce, édition", () => {
     const dup = duplicateEquipments(doc, [table.id], nextId);
     doc = dup.document;
     expect(doc.equipements).toHaveLength(2);
+    const both = translateEquipments(doc, [table.id, dup.ids[0]], { x: -100, y: 50 }).document;
+    expect(find(both, dup.ids[0]).position).toEqual({ x: find(doc, dup.ids[0]).position.x - 100, y: find(doc, dup.ids[0]).position.y + 50 });
     doc = setEquipmentsVisible(doc, [dup.ids[0]], false).document;
     expect(find(doc, dup.ids[0]).visible).toBe(false);
     doc = setEquipmentsLocked(doc, [table.id], true).document;

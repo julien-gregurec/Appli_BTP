@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
-  CALQUE_DES_CATEGORIES, EQUIPEMENT_CATALOGUE, EQUIPEMENT_OBJETS, EQUIPMENT_ISSUE_CODES, EQUIPMENT_ISSUE_MESSAGES, PLAN_CALQUES,
+  CALQUE_DES_CATEGORIES, EQUIPEMENT_OBJETS, EQUIPMENT_ISSUE_CODES, EQUIPMENT_ISSUE_MESSAGES, PLAN_CALQUES,
   calquesEffectifs, catalogueEntry, countByCategorie, equipementAnomalie, equipementDonnees, equipementFromElement, equipementsDeLaPiece,
   newPlanEquipement, normalizeRotation, type PlanEquipement,
 } from "./equipement";

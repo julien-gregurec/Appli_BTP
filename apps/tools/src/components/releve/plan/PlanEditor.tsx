@@ -20,8 +20,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  diffPlan, isPlanEditable, isPlanOperationsEmpty, MUR_TYPES, newUuid, OUVERTURE_MODELE_LABELS, OUVERTURE_MODELES, OUVERTURE_POUSSEE_LABELS,
-  ouvertureModele, PLAN_ETAT_LABELS, planCreationRule, photoMarkersOnPlan, validatePlanSave,
+  CALQUE_DES_CATEGORIES, calquesEffectifs, catalogueEntry, EMPTY_PLAN_DOCUMENT, EQUIPEMENT_CATALOGUE, diffPlan, EQUIPEMENT_CATEGORIE_LABELS, isPlanEditable, isPlanOperationsEmpty, MUR_TYPES,
+  newUuid, OUVERTURE_MODELE_LABELS, OUVERTURE_MODELES, OUVERTURE_POUSSEE_LABELS, ouvertureModele, PLAN_CALQUE_LABELS, PLAN_ETAT_LABELS, planCreationRule,
+  photoMarkersOnPlan, validatePlanSave,
+  type DeletedPlanEquipement, type EquipementCategorie, type PlanCalque, type PlanCalques, type PlanEquipement,
   type Etage, type LoadedPlan, type MurType, type OuvertureModele, type OuverturePoussee, type PhotoLibrary, type Plan, type PlanDocument,
   type PlanEtat, type PlanOuverture, type ReleveMediaService, type RelevePlanRepository, type ReleveStructure,
 } from "@elsatia/releve-domain";
@@ -35,7 +37,14 @@ import {
   pointAtLength, setWallAngle, setWallLength, splitWall, splitWallAtJunctions, straightenWall, unassignRoom, updateWall, withRefreshedContours,
   type WallDefaults,
 } from "@/lib/releve/plan/editor";
-import { planToSvg } from "@/lib/releve/plan/export-svg";
+import { planToDxf } from "@/lib/releve/plan/export-dxf";
+import { planToPrintSvg, planToSvg } from "@/lib/releve/plan/export-svg";
+import { EQUIPMENT_SNAP_LABELS, resolveEquipmentSnap, type EquipmentSnap, type EquipmentSnapKind } from "@/lib/releve/plan/equipment-snap";
+import {
+  addEquipment, assignEquipmentPiece, changeEquipmentKind, createEquipment, deleteEquipments, duplicateEquipments, equipmentHandles, groupIds,
+  hitTestEquipment, moveEquipment, resizeEquipment, restoreEquipments, rotateEquipment, setEquipmentsVisible, syncEquipements, translateEquipments,
+  turnEquipment, updateEquipment, worldToLocal, type EquipmentResult,
+} from "@/lib/releve/plan/equipments";
 import { contourLabelPoint, detectRooms, hitTestVertex, hitTestWall, offsetAlongWall, planBounds, pointAlongWall, samePoint, wallAngleDegrees, wallLength } from "@/lib/releve/plan/geometry";
 import {
   changeOpeningKind, introducedIssue, moveOpening, OPENING_KIND_LABELS, OPENING_KIND_PRESETS, OPENING_KINDS, openingKindOf, patchChecked, placeOpening,
@@ -53,14 +62,16 @@ import { EMPTY_SELECTION, isSelected, selectSingle, toggleSelection, type Select
 import { screenToWorld, worldToScreen, type ScreenPoint } from "@/lib/viewport/viewport-math";
 import { SaveStatus, useAutosave } from "../autosave-ui";
 import { PlanLayers, MUR_TYPE_LABELS } from "./PlanLayers";
+import { EquipmentPalette, LayersPanel, ObjectPanel } from "./EquipmentPanels";
 import releveStyles from "../releve.module.css";
 import styles from "./plan.module.css";
 
-type Tool = "select" | "mur" | "ouverture" | "piece";
+type Tool = "select" | "mur" | "ouverture" | "objet" | "piece";
 type Drag =
   | { kind: "vertex"; from: Point2D; base: PlanDocument; origin: Point2D | null; exclude: Set<string> }
   | { kind: "wall"; murId: string; grab: Point2D; base: PlanDocument; a: Point2D }
-  | { kind: "opening"; id: string; mode: "corps" | "start" | "end"; grabOffset: number; base: PlanDocument; network: WallNetwork; precision: PointerPrecision };
+  | { kind: "opening"; id: string; mode: "corps" | "start" | "end"; grabOffset: number; base: PlanDocument; network: WallNetwork; precision: PointerPrecision }
+  | { kind: "objet"; mode: "corps" | "rotation" | "taille"; ids: string[]; grab: Point2D; offset: Point2D; base: PlanDocument; network: WallNetwork; precision: PointerPrecision };
 
 /** Anomalies qui interdisent une modification de mur (la jonction n'est que signalée). */
 const WALL_BLOCKING = new Set(["hors_mur", "plus_large_que_mur", "chevauchement", "largeur_nulle", "hauteur_incoherente"]);
@@ -70,6 +81,9 @@ const DERIVE_LABELS: Record<Exclude<PlanEtat, "initial">, string> = {
   corrige: "Nouveau plan corrigé", projete: "Nouveau plan projeté", as_built: "Nouveau plan tel que construit",
 };
 const MARKER_HIT_PX = 18;
+/** Premier objet de chaque groupe (choisi quand on change de groupe dans la palette). */
+const EQUIPEMENT_CATALOGUE_FIRST: Partial<Record<EquipementCategorie, string>> = {};
+for (const entry of EQUIPEMENT_CATALOGUE) EQUIPEMENT_CATALOGUE_FIRST[entry.categorie] ??= entry.objet;
 
 export type PlanEditorProps = {
   repository: RelevePlanRepository;
@@ -108,6 +122,15 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   const [showRooms, setShowRooms] = useState(false);
   const [openingKind, setOpeningKind] = useState<OpeningKind>("porte");
   const [ghost, setGhost] = useState<{ murId: string; decalageMm: number; largeurMm: number; valid: boolean } | null>(null);
+  // Lot 7 : objets du plan.
+  const [objetIds, setObjetIds] = useState<string[]>([]);
+  const [objetGroupe, setObjetGroupe] = useState<EquipementCategorie>("mobilier");
+  const [objetKind, setObjetKind] = useState("bureau");
+  const [objectGhost, setObjectGhost] = useState<(Pick<PlanEquipement, "position" | "rotationRad" | "largeurMm" | "profondeurMm"> & { kind: string }) | null>(null);
+  const [objectSnap, setObjectSnap] = useState<EquipmentSnapKind | null>(null);
+  const [showLayers, setShowLayers] = useState(false);
+  const [localCalques, setLocalCalques] = useState<PlanCalques | null>(null);
+  const [trash, setTrash] = useState<DeletedPlanEquipement[]>([]);
   const [surfaces, setSurfaces] = useState<Record<string, number>>(() => Object.fromEntries(loaded.document.contours.filter((c) => c.surfaceMm2 != null).map((c) => [c.pieceId, c.surfaceMm2!])));
   const drag = useRef<Drag | null>(null);
   const savedRef = useRef<PlanDocument>(loaded.document);
@@ -153,10 +176,35 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   // Géométrie raccordée (Lot 6) : du document affiché (aperçu compris) et du document validé.
   const committedNetwork = useMemo(() => computeWallNetwork(committed.murs), [committed.murs]);
   const network = useMemo(() => (doc.murs === committed.murs ? committedNetwork : computeWallNetwork(doc.murs)), [doc.murs, committed.murs, committedNetwork]);
-  const issues = useMemo(() => openingIssues(doc, network), [doc, network]);
+  // Anomalies d'ouverture et points remarquables : murs et ouvertures seulement (un objet déplacé
+  // ne les recalcule pas — Lot 7, fluidité du glisser à 1 000 objets).
+  const docMurs = doc.murs; const docOuvertures = doc.ouvertures;
+  const issues = useMemo(() => openingIssues({ ...EMPTY_PLAN_DOCUMENT, murs: docMurs, ouvertures: docOuvertures }, network), [docMurs, docOuvertures, network]);
   const invalidOpenings = useMemo(() => new Set(issues.map((issue) => issue.ouvertureId)), [issues]);
-  const features = useMemo(() => wallFeatures(doc, network), [doc, network]);
+  const features = useMemo(() => wallFeatures({ murs: docMurs, ouvertures: docOuvertures }, network), [docMurs, docOuvertures, network]);
   const junctions = useMemo(() => junctionSummary(committedNetwork), [committedNetwork]);
+
+  // Lot 7 : calques (mémorisés avec le plan ; plan figé ou consultation : affichage local seulement).
+  const storedCalques = useMemo(() => calquesEffectifs(committed.reglages.calques), [committed.reglages.calques]);
+  const calques = editable ? storedCalques : (localCalques ?? storedCalques);
+  const objetSelectable = useCallback((objet: PlanEquipement) => {
+    const calque = calques[CALQUE_DES_CATEGORIES[objet.categorie]];
+    return objet.visible && calque.visible && !calque.verrouille;
+  }, [calques]);
+  const wallsSelectable = calques.structure.visible && !calques.structure.verrouille;
+  const openingsSelectable = calques.ouvertures.visible && !calques.ouvertures.verrouille;
+
+  // Corbeille : objets supprimés (serveur) + supprimés pendant la séance ; un objet revenu (annuler) n'y est plus.
+  useEffect(() => {
+    let cancelled = false;
+    repository.listDeletedEquipements(plan.id).then((items) => { if (!cancelled) setTrash((current) => [...current, ...items]); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [repository, plan.id]);
+  const visibleTrash = useMemo(() => {
+    const present = new Set(doc.equipements.map((objet) => objet.id));
+    const seen = new Set<string>();
+    return trash.filter((item) => { if (present.has(item.objet.id) || seen.has(item.objet.id)) return false; seen.add(item.objet.id); return true; });
+  }, [trash, doc.equipements]);
 
   const commit = useCallback((next: PlanDocument, label: string, options: { refresh?: boolean; guardWalls?: boolean } = {}) => {
     if (!editable || next === committed) return;
@@ -173,6 +221,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       finalDoc = refreshed.document;
       setOuverts(refreshed.ouverts);
     }
+    // Lot 7 : objets liés qui suivent leur mur, pièce automatique des objets.
+    finalDoc = syncEquipements(finalDoc);
     setHistory((current) => pushHistory(current, finalDoc, label));
     autosave.queue({ document: finalDoc });
   }, [autosave, committed, committedNetwork, editable]);
@@ -183,6 +233,24 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     commit(result.document, label, { guardWalls: false });
     return true;
   }, [commit]);
+
+  /** Lot 7 : opération d'objet (verrou respecté, refus motivé). */
+  const commitObjet = useCallback((result: EquipmentResult, label: string) => {
+    if (result.error) { setMessage(result.error); return false; }
+    commit(result.document, label, { guardWalls: false });
+    if (result.skipped) setMessage(`${result.skipped} objet(s) verrouillé(s) laissé(s) inchangé(s).`);
+    return true;
+  }, [commit]);
+
+  const removeObjets = useCallback((ids: readonly string[], label: string) => {
+    const result = deleteEquipments(committed, ids);
+    if (result.error) { setMessage(result.error); return; }
+    commit(result.document, label, { guardWalls: false });
+    const now = new Date().toISOString();
+    setTrash((current) => [...result.removed.map((objet) => ({ objet, deletedAt: now })), ...current]);
+    setObjetIds([]);
+    setMessage(`${result.removed.length} objet(s) supprimé(s) — restaurables (Annuler ou corbeille des calques).${result.skipped ? ` ${result.skipped} verrouillé(s) conservé(s).` : ""}`);
+  }, [commit, committed]);
 
   /** Modification de mur demandée au panneau : un refus (document inchangé) est expliqué. */
   const commitWallEdit = useCallback((next: PlanDocument, label: string) => {
@@ -257,12 +325,20 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       const screen = worldToScreen(item.point, view, size);
       return Math.hypot(screen.x - local.x, screen.y - local.y) <= MARKER_HIT_PX;
     });
-    if (marker) { setPhotoAnchorId(marker.anchorId); return; }
+    if (marker && calques.photos.visible) { setPhotoAnchorId(marker.anchorId); return; }
     const tolerance = toleranceWorldFor(selectionTolerancePx(precision), view);
-    const hit = hitTestWall(doc.murs, world, tolerance);
     setPhotoAnchorId(null);
+    // Lot 7 : objets d'abord (ils sont posés sur le plan), hors calques masqués ou verrouillés.
+    const objet = hitTestEquipment(doc.equipements, world, tolerance, objetSelectable);
+    if (objet) {
+      setSelection(EMPTY_SELECTION); setOpeningId(null);
+      setObjetIds((current) => (additive ? (current.includes(objet.id) ? current.filter((id) => id !== objet.id) : [...current, objet.id]) : [objet.id]));
+      return;
+    }
+    setObjetIds([]);
+    const hit = wallsSelectable ? hitTestWall(doc.murs, world, tolerance) : null;
     if (!hit) { setSelection(EMPTY_SELECTION); setOpeningId(null); return; }
-    const opening = doc.ouvertures.find((o) => {
+    const opening = !openingsSelectable ? undefined : doc.ouvertures.find((o) => {
       if (o.murId !== hit.murId) return false;
       const mur = doc.murs.find((m) => m.id === o.murId)!;
       const along = distance(mur.a, hit.point);
@@ -270,7 +346,17 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     });
     setOpeningId(opening?.id ?? null);
     setSelection((current) => (additive ? toggleSelection(current, hit.murId) : selectSingle(current, hit.murId)));
-  }, [doc, markers, size, toWorld, view]);
+  }, [calques.photos.visible, doc, markers, objetSelectable, openingsSelectable, size, toWorld, view, wallsSelectable]);
+
+  /** Lot 7 — outil Objet : objet du catalogue au point visé, accroché (face, coin, objet, axe, grille). */
+  const objectPlacement = useCallback((local: ScreenPoint, precision: PointerPrecision): EquipmentSnap & { largeurMm: number; profondeurMm: number } => {
+    const entry = catalogueEntry(objetKind);
+    const snap = resolveEquipmentSnap(
+      { centre: toWorld(local), rotationRad: 0, largeurMm: entry.largeurMm, profondeurMm: entry.profondeurMm, mural: entry.mural },
+      { murs: committed.murs, network: committedNetwork, others: committed.equipements, toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view), gridMm: committed.reglages.grilleMm ?? null, enabled: snapOn },
+    );
+    return { ...snap, largeurMm: entry.largeurMm, profondeurMm: entry.profondeurMm };
+  }, [committed, committedNetwork, objetKind, snapOn, toWorld, view]);
 
   /** Outil Ouverture : mur visé et position (centre) accrochée — aperçu et pose. */
   const openingTarget = useCallback((local: ScreenPoint, precision: PointerPrecision) => {
@@ -298,6 +384,18 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       setGhost(null);
       return;
     }
+    if (tool === "objet" && editable) {
+      const entry = catalogueEntry(objetKind);
+      const calque = CALQUE_DES_CATEGORIES[entry.categorie];
+      if (calques[calque].verrouille || !calques[calque].visible) { setMessage(`Calque « ${PLAN_CALQUE_LABELS[calque]} » ${calques[calque].verrouille ? "verrouillé" : "masqué"} : affichez-le et déverrouillez-le pour y ajouter un objet.`); return; }
+      const placement = objectPlacement(local, precision);
+      const objet = createEquipment(objetKind, newUuid(), { position: placement.position, rotationRad: placement.rotationRad, link: placement.link });
+      commit(addEquipment(committed, objet), `Ajout d'objet (${entry.libelle})`, { guardWalls: false });
+      setObjetIds([objet.id]); setSelection(EMPTY_SELECTION); setOpeningId(null);
+      const where = `${placement.kind === "coin" ? " dans l'angle" : ""}${placement.link ? " contre le mur (lié)" : placement.kind !== "libre" && placement.kind !== "coin" ? ` (${EQUIPMENT_SNAP_LABELS[placement.kind].toLowerCase()})` : ""}`;
+      setMessage(`${entry.libelle} posé${where}.`);
+      return;
+    }
     if (tool === "piece" && editable) {
       if (!pieceToAssign) { setMessage("Choisissez d'abord la pièce à associer."); return; }
       const result = assignRoom(committed, toWorld(local), pieceToAssign);
@@ -307,9 +405,17 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       return;
     }
     selectAt(local, precision, modifiers.additive);
-  }, [commit, commitOpening, committed, committedNetwork, draftStart, editable, openingKind, openingTarget, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
+  }, [calques, commit, commitOpening, committed, committedNetwork, draftStart, editable, objectPlacement, objetKind, openingKind, openingTarget, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
 
   const onCanvasHover = useCallback((local: ScreenPoint | null, precision: PointerPrecision) => {
+    if (tool === "objet") {
+      setHover(null);
+      if (!local) { setObjectGhost(null); setObjectSnap(null); return; }
+      const placement = objectPlacement(local, precision);
+      setObjectGhost({ position: placement.position, rotationRad: placement.rotationRad, largeurMm: placement.largeurMm, profondeurMm: placement.profondeurMm, kind: placement.kind });
+      setObjectSnap(placement.kind);
+      return;
+    }
     if (tool === "ouverture") {
       setHover(null);
       const target = local ? openingTarget(local, precision) : null;
@@ -322,28 +428,47 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     }
     if (!local || tool !== "mur") { setHover(null); return; }
     setHover(snapAt(toWorld(local), precision, draftStart));
-  }, [committed, committedNetwork, draftStart, openingTarget, snapAt, tool, toWorld]);
+  }, [committed, committedNetwork, draftStart, objectPlacement, openingTarget, snapAt, tool, toWorld]);
 
   const deleteSelection = useCallback(() => {
+    if (objetIds.length) { removeObjets(objetIds, objetIds.length > 1 ? "Suppression d'objets" : "Suppression d'objet"); return; }
     if (openingId) { commit(deleteOpening(committed, openingId), "Suppression d'ouverture"); setOpeningId(null); return; }
     if (selection.length === 0) return;
     commit(deleteWalls(committed, selection), selection.length > 1 ? "Suppression de murs" : "Suppression de mur", { refresh: true });
     setSelection(EMPTY_SELECTION);
     setMessage(`${selection.length} mur(s) supprimé(s).`);
-  }, [commit, committed, openingId, selection]);
+  }, [commit, committed, objetIds, openingId, removeObjets, selection]);
 
   const onCanvasKeyDown = useCallback((key: string) => {
-    if (key === "Escape") { endChain(); setSelection(EMPTY_SELECTION); setOpeningId(null); setPhotoAnchorId(null); return true; }
+    if (key === "Escape") { endChain(); setSelection(EMPTY_SELECTION); setOpeningId(null); setPhotoAnchorId(null); setObjetIds([]); return true; }
+    if ((key === "r" || key === "R") && editable && objetIds.length) { commitObjet(turnEquipment(committed, objetIds, key === "r" ? Math.PI / 2 : -Math.PI / 2), "Rotation d'objet"); return true; }
     if (key === "Enter" && draftStart) { endChain(); setMessage("Tracé terminé."); return true; }
     if ((key === "Delete" || key === "Backspace") && editable) { deleteSelection(); return true; }
     return false;
-  }, [deleteSelection, draftStart, editable, endChain]);
+  }, [commitObjet, committed, deleteSelection, draftStart, editable, endChain, objetIds]);
 
   // Poignées : sommets et corps des murs sélectionnés (outil Sélection).
   const grab = useMemo(() => editable && tool === "select" ? {
     onDown: (local: ScreenPoint, pointerType: string | undefined) => {
       const precision = pointerPrecisionOf(pointerType);
       const world = toWorld(local);
+      // Lot 7 : objets sélectionnés — poignées (rotation, taille) de l'objet seul, puis corps.
+      const chosen = committed.equipements.filter((objet) => objetIds.includes(objet.id) && objetSelectable(objet));
+      if (chosen.length) {
+        const reach = handleGrabPx(precision);
+        const base = { base: committed, network: committedNetwork, precision, grab: world };
+        if (chosen.length === 1 && !chosen[0].verrouille) {
+          const handles = equipmentHandles(chosen[0], view.scale);
+          const near = (p: Point2D) => { const q = worldToScreen(p, view, size); return Math.hypot(q.x - local.x, q.y - local.y) <= reach; };
+          if (near(handles.rotate)) { drag.current = { kind: "objet", mode: "rotation", ids: [chosen[0].id], offset: { x: 0, y: 0 }, ...base }; return true; }
+          if (near(handles.resize)) { drag.current = { kind: "objet", mode: "taille", ids: [chosen[0].id], offset: { x: 0, y: 0 }, ...base }; return true; }
+        }
+        const under = hitTestEquipment(chosen, world, toleranceWorldFor(selectionTolerancePx(precision), view));
+        if (under && !under.verrouille) {
+          drag.current = { kind: "objet", mode: "corps", ids: chosen.filter((objet) => !objet.verrouille).map((objet) => objet.id), offset: { x: world.x - under.position.x, y: world.y - under.position.y }, ...base, grab: world };
+          return true;
+        }
+      }
       // Ouverture sélectionnée : tableaux (redimensionner) puis corps (glisser le long du mur).
       const opening = openingId ? committed.ouvertures.find((o) => o.id === openingId) : undefined;
       const host = opening ? committed.murs.find((mur) => mur.id === opening.murId) : undefined;
@@ -382,6 +507,34 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       const current = drag.current;
       if (!current) return;
       const world = toWorld(local);
+      if (current.kind === "objet") {
+        const objet = current.base.equipements.find((item) => item.id === current.ids[0]);
+        if (!objet) return;
+        let result: EquipmentResult;
+        if (current.mode === "rotation") {
+          let angle = Math.atan2(world.y - objet.position.y, world.x - objet.position.x) - Math.PI / 2;
+          // Accrochage angulaire : pas de 15° à ±4° près (rotation libre au-delà).
+          const step = Math.PI / 12;
+          if (snapOn && Math.abs(angle - Math.round(angle / step) * step) < (4 * Math.PI) / 180) angle = Math.round(angle / step) * step;
+          result = rotateEquipment(current.base, [objet.id], angle);
+          setObjectSnap(null);
+        } else if (current.mode === "taille") {
+          const localPoint = worldToLocal(objet, world);
+          result = resizeEquipment(current.base, objet.id, Math.max(20, Math.round(localPoint.x + objet.largeurMm / 2)), Math.max(20, Math.round(localPoint.y + objet.profondeurMm / 2)), { x: -1, y: -1 });
+        } else if (current.ids.length > 1) {
+          result = translateEquipments(current.base, current.ids, { x: world.x - current.grab.x, y: world.y - current.grab.y });
+        } else {
+          const entry = catalogueEntry(objet.objet);
+          const snap = resolveEquipmentSnap(
+            { centre: { x: world.x - current.offset.x, y: world.y - current.offset.y }, rotationRad: objet.rotationRad, largeurMm: objet.largeurMm, profondeurMm: objet.profondeurMm, mural: entry.mural },
+            { murs: current.base.murs, network: current.network, others: current.base.equipements.filter((item) => item.id !== objet.id), toleranceWorld: toleranceWorldFor(snapTolerancePx(current.precision), view), gridMm: current.base.reglages.grilleMm ?? null, enabled: snapOn },
+          );
+          setObjectSnap(snap.kind);
+          result = moveEquipment(current.base, objet.id, snap.position, { rotationRad: snap.kind === "face" || snap.kind === "coin" ? snap.rotationRad : undefined, link: snap.link });
+        }
+        if (!result.error) setPreview(result.document);
+        return;
+      }
       if (current.kind === "opening") {
         const opening = current.base.ouvertures.find((o) => o.id === current.id);
         const host = opening ? current.base.murs.find((mur) => mur.id === opening.murId) : undefined;
@@ -418,20 +571,70 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       setHover(null);
       const pending = previewRef.current;
       setPreview(null);
+      if (current?.kind === "objet") {
+        setObjectSnap(null);
+        const labels = { corps: current.ids.length > 1 ? "Déplacement d'objets" : "Déplacement d'objet", rotation: "Rotation d'objet", taille: "Redimensionnement d'objet" };
+        if (pending && pending !== current.base) commit(pending, labels[current.mode], { guardWalls: false });
+        return;
+      }
       if (current?.kind === "opening") {
         if (pending && pending !== current.base) commit(pending, current.mode === "corps" ? "Déplacement d'ouverture" : "Redimensionnement d'ouverture", { guardWalls: false });
         return;
       }
       if (current && pending && pending !== current.base) commit(pending, current.kind === "vertex" ? "Déplacement de point" : "Déplacement de mur", { refresh: true });
     },
-  } : undefined, [commit, committed, committedNetwork, editable, openingId, selection, setPreview, size, snapOn, tool, toWorld, view]);
+  } : undefined, [commit, committed, committedNetwork, editable, objetIds, objetSelectable, openingId, selection, setPreview, size, snapOn, tool, toWorld, view]);
 
   // ── Sélection courante ──────────────────────────────────────────────────────
   const selectedMurs = doc.murs.filter((mur) => isSelected(selection, mur.id));
   const single = selectedMurs.length === 1 ? selectedMurs[0] : null;
   const rooms = useMemo(() => (showRooms ? detectRooms(committed.murs) : []), [showRooms, committed.murs]);
 
-  const changeTool = (next: Tool) => { setTool(next); endChain(); setGhost(null); setMessage(""); };
+  const changeTool = (next: Tool) => { setTool(next); endChain(); setGhost(null); setObjectGhost(null); setObjectSnap(null); setMessage(""); };
+  const selectedObjets = doc.equipements.filter((objet) => objetIds.includes(objet.id));
+  const singleObjet = selectedObjets.length === 1 ? selectedObjets[0] : null;
+
+  // Calques et groupes (Lot 7).
+  const changeCalque = (calque: PlanCalque, patch: { visible?: boolean; verrouille?: boolean }) => {
+    const next = { ...calques, [calque]: { ...calques[calque], ...patch } };
+    if (patch.visible === false || patch.verrouille === true) {
+      if (calque === "structure") { setSelection(EMPTY_SELECTION); setOpeningId(null); }
+      if (calque === "ouvertures") setOpeningId(null);
+      setObjetIds((ids) => ids.filter((id) => { const objet = committed.equipements.find((item) => item.id === id); return objet && CALQUE_DES_CATEGORIES[objet.categorie] !== calque; }));
+    }
+    const label = `Calque ${PLAN_CALQUE_LABELS[calque]} : ${patch.visible === undefined ? (patch.verrouille ? "verrouillé" : "déverrouillé") : (patch.visible ? "affiché" : "masqué")}`;
+    if (!editable) { setLocalCalques(next); return; }
+    commit({ ...committed, reglages: { ...committed.reglages, calques: next } }, label, { guardWalls: false });
+    setMessage(label + ".");
+  };
+  const groupAction = (categorie: EquipementCategorie, action: "masquer" | "afficher" | "supprimer") => {
+    const ids = groupIds(committed, categorie);
+    const label = EQUIPEMENT_CATEGORIE_LABELS[categorie];
+    if (action === "supprimer") {
+      if (!window.confirm(`Supprimer les ${ids.length} objet(s) du groupe « ${label} » ? Ils resteront restaurables (Annuler, ou corbeille dans les calques).`)) return;
+      removeObjets(ids, `Tout supprimer : ${label}`);
+      return;
+    }
+    if (commitObjet(setEquipmentsVisible(committed, ids, action === "afficher"), `${action === "afficher" ? "Tout afficher" : "Tout masquer"} : ${label}`)) {
+      setObjetIds([]);
+      setMessage(`${label} : ${ids.length} objet(s) ${action === "afficher" ? "affiché(s)" : "masqué(s)"}.`);
+    }
+  };
+  const restoreFromTrash = (ids: readonly string[]) => {
+    const objets = visibleTrash.filter((item) => ids.includes(item.objet.id)).map((item) => item.objet);
+    if (!objets.length) return;
+    commit(restoreEquipments(committed, objets), objets.length > 1 ? "Restauration d'objets" : "Restauration d'objet", { guardWalls: false });
+    setMessage(`${objets.length} objet(s) restauré(s).`);
+  };
+  const groupCounts = useMemo(() => {
+    const counts: Partial<Record<EquipementCategorie, { total: number; masques: number }>> = {};
+    for (const objet of committed.equipements) {
+      const entry = counts[objet.categorie] ?? { total: 0, masques: 0 };
+      entry.total++; if (!objet.visible) entry.masques++;
+      counts[objet.categorie] = entry;
+    }
+    return counts;
+  }, [committed.equipements]);
   const selectedOpening = openingId ? doc.ouvertures.find((o) => o.id === openingId) ?? null : null;
 
   // ── Plans (états, gel) ──────────────────────────────────────────────────────
@@ -453,17 +656,22 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       onSwitchPlan(created.id);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Création impossible."); } finally { setBusy(false); }
   }
-  function exportSvg() {
-    const blob = new Blob([planToSvg(committed, { pieceName })], { type: "image/svg+xml" });
+  function download(content: string, type: string, extension: string) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url; link.download = `plan-${etage.nom}-${plan.etatDocumente}.svg`.replace(/\s+/g, "-");
+    link.href = url; link.download = `plan-${etage.nom}-${plan.etatDocumente}.${extension}`.replace(/\s+/g, "-");
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  // Exports : ce qui est visible (objets et calques masqués exclus).
+  const exportSvg = () => download(planToSvg(committed, { pieceName, calques }), "image/svg+xml", "svg");
+  const exportDxf = () => download(planToDxf(committed, { pieceName, calques }), "image/vnd.dxf", "dxf");
+  const exportPrint = () => download(planToPrintSvg(committed, { pieceName, calques, paper: "A3", title: `Plan ${etage.nom} · ${PLAN_ETAT_LABELS[plan.etatDocumente]}` }), "image/svg+xml", "a3.svg");
 
   const status = <>
-    <span data-testid="plan-compteurs">{doc.murs.length} mur(s) · {doc.ouvertures.length} ouverture(s) · {doc.contours.length} pièce(s)</span>
+    <span data-testid="plan-compteurs">{doc.murs.length} mur(s) · {doc.ouvertures.length} ouverture(s) · {doc.equipements.length} objet(s) · {doc.contours.length} pièce(s)</span>
+    {objectSnap && objectSnap !== "libre" && <span data-testid="plan-objet-snap">{EQUIPMENT_SNAP_LABELS[objectSnap]}</span>}
     {hover && hover.kind !== "libre" && <span data-testid="plan-snap-label">{PLAN_SNAP_LABELS[hover.kind]}{hover.angleDegrees !== undefined ? ` ${hover.angleDegrees}°` : ""}</span>}
   </>;
 
@@ -484,16 +692,20 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       {canEdit && (["corrige", "projete", "as_built"] as const).filter((etat) => planCreationRule(plans, etat, plan.id).ok).map((etat) =>
         <button key={etat} type="button" className={releveStyles.secondary} disabled={busy} onClick={() => void derive(etat)}>{DERIVE_LABELS[etat]}</button>)}
       <button type="button" className={releveStyles.secondary} onClick={exportSvg}>Exporter SVG</button>
+      <button type="button" className={releveStyles.secondary} data-testid="plan-export-dxf" onClick={exportDxf}>Exporter DXF</button>
+      <button type="button" className={releveStyles.secondary} data-testid="plan-export-a3" onClick={exportPrint} title="Feuille A3 à l'échelle, à imprimer en PDF">Feuille A3 (PDF)</button>
     </div>
 
     <div className={styles.toolbar} role="toolbar" aria-label="Outils du plan">
       <button type="button" aria-pressed={tool === "select"} onClick={() => changeTool("select")}>Sélection</button>
       {editable && <button type="button" aria-pressed={tool === "mur"} onClick={() => changeTool("mur")}>Mur</button>}
       {editable && <button type="button" aria-pressed={tool === "ouverture"} onClick={() => changeTool("ouverture")}>Ouverture</button>}
+      {editable && <button type="button" aria-pressed={tool === "objet"} data-testid="plan-outil-objet" onClick={() => changeTool("objet")}>Objet</button>}
       {editable && <button type="button" aria-pressed={tool === "piece"} onClick={() => changeTool("piece")}>Pièce</button>}
       {editable && <button type="button" disabled={!canUndo(history)} onClick={() => stepHistory("undo")} aria-label="Annuler">↶ Annuler</button>}
       {editable && <button type="button" disabled={!canRedo(history)} onClick={() => stepHistory("redo")} aria-label="Rétablir">↷ Rétablir</button>}
-      {editable && <button type="button" disabled={selection.length === 0 && !openingId} onClick={deleteSelection}>Supprimer</button>}
+      {editable && <button type="button" disabled={selection.length === 0 && !openingId && objetIds.length === 0} onClick={deleteSelection}>Supprimer</button>}
+      <button type="button" aria-pressed={showLayers} data-testid="plan-calques-bouton" onClick={() => setShowLayers((value) => !value)}>Calques</button>
       <button type="button" aria-pressed={showRooms} onClick={() => { setShowRooms((value) => !value); if (!showRooms) setMessage(`${detectRooms(committed.murs).length} pièce(s) fermée(s) détectée(s).`); }}>Détecter les pièces</button>
       {editable && <button type="button" onClick={() => {
         const result = cleanupJunctions(committed);
@@ -511,10 +723,15 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
         onClick={() => { setOpeningKind(kind); setGhost(null); }}>{OPENING_KIND_LABELS[kind]}</button>)}
     </div>}
 
+    {tool === "objet" && editable && <EquipmentPalette groupe={objetGroupe} objet={objetKind}
+      onGroupe={(groupe) => { setObjetGroupe(groupe); const first = EQUIPEMENT_CATALOGUE_FIRST[groupe]; if (first) setObjetKind(first); setObjectGhost(null); }}
+      onObjet={(objet) => { setObjetKind(objet); setObjectGhost(null); }} />}
+
     <p className={releveStyles.feedback} role="status" aria-live="polite" data-testid="plan-message">
       {message || (tool === "mur" ? (draftStart ? "Touchez l'extrémité du mur (Entrée ou même point : terminer)." : "Touchez le point de départ du mur.")
         : tool === "piece" ? "Choisissez une pièce puis touchez l'intérieur d'une pièce fermée."
-          : tool === "ouverture" ? `Touchez un mur pour y poser : ${OPENING_KIND_LABELS[openingKind]}.` : "")}
+          : tool === "ouverture" ? `Touchez un mur pour y poser : ${OPENING_KIND_LABELS[openingKind]}.`
+            : tool === "objet" ? `Touchez le plan pour poser : ${catalogueEntry(objetKind).libelle} (contre un mur : il s'y accroche).` : "")}
       {ouverts.length > 0 && ` Contour ouvert : ${ouverts.map(pieceName).join(", ")}.`}
     </p>
 
@@ -526,7 +743,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
           {({ view: v, size: s }) => <PlanLayers document={doc} view={v} size={s} selection={selection} openingId={openingId} scopePieceIds={scopePieceIds}
             pieceName={pieceName} surfaces={surfaces} markers={markers} photoAnchorId={photoAnchorId} rooms={rooms}
             draft={tool === "mur" && draftStart ? { start: draftStart, end: hover?.point ?? null } : null} snap={hover} showHandles={editable && tool === "select" && !openingId}
-            network={network} invalidOpenings={invalidOpenings} openingGhost={tool === "ouverture" ? ghost : null} showOpeningHandles={editable && tool === "select"} />}
+            network={network} invalidOpenings={invalidOpenings} openingGhost={tool === "ouverture" ? ghost : null} showOpeningHandles={editable && tool === "select"}
+            calques={calques} objetIds={objetIds} showObjectHandles={editable && tool === "select"} objectGhost={tool === "objet" ? objectGhost : null} />}
         </PlanViewport>
       </div>
 
@@ -582,6 +800,33 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
           onPosition={(start) => commitOpening(patchChecked(committed, committedNetwork, selectedOpening.id, { decalageMm: start }), "Position de l'ouverture")}
           onDelete={() => { commit(deleteOpening(committed, selectedOpening.id), "Suppression d'ouverture"); setOpeningId(null); }} />}
 
+        {tool === "select" && singleObjet && <ObjectPanel key={`${singleObjet.id}:${JSON.stringify(singleObjet)}`} objet={singleObjet}
+          editable={editable && !calques[CALQUE_DES_CATEGORIES[singleObjet.categorie]].verrouille}
+          pieces={pieces.map((piece) => ({ id: piece.id, nom: piece.nom }))} projete={plan.etatDocumente === "projete"}
+          murLabel={singleObjet.murId ? (() => { const host = doc.murs.find((mur) => mur.id === singleObjet.murId); return host ? formatLongueurM(wallLength(host)) : null; })() : null}
+          onPatch={(patch, label) => commitObjet(updateEquipment(committed, singleObjet.id, patch), label)}
+          onKind={(objet) => commitObjet(changeEquipmentKind(committed, singleObjet.id, objet), "Type d'objet")}
+          onSize={(w, d) => commitObjet(resizeEquipment(committed, singleObjet.id, w, d), "Dimensions de l'objet")}
+          onRotation={(deg) => commitObjet(rotateEquipment(committed, [singleObjet.id], (deg * Math.PI) / 180), "Rotation d'objet")}
+          onTurn={(deg) => commitObjet(turnEquipment(committed, [singleObjet.id], (deg * Math.PI) / 180), "Rotation d'objet")}
+          onPiece={(pieceId) => commitObjet(assignEquipmentPiece(committed, singleObjet.id, pieceId), "Pièce de l'objet")}
+          onDetach={() => commitObjet(moveEquipment(committed, singleObjet.id, singleObjet.position, { rotationRad: singleObjet.rotationRad, link: null }), "Détacher du mur")}
+          onDuplicate={() => { const result = duplicateEquipments(committed, [singleObjet.id], newUuid); commit(result.document, "Duplication d'objet", { guardWalls: false }); setObjetIds(result.ids); }}
+          onDelete={() => removeObjets([singleObjet.id], "Suppression d'objet")} />}
+
+        {tool === "select" && selectedObjets.length >= 2 && editable && <section className={styles.section} aria-label="Objets sélectionnés" data-testid="plan-objets-multi">
+          <h2>{selectedObjets.length} objets sélectionnés</h2>
+          <div className={releveStyles.toolbar}>
+            <button type="button" className={releveStyles.secondary} onClick={() => commitObjet(turnEquipment(committed, objetIds, Math.PI / 2), "Rotation d'objets")}>↺ 90°</button>
+            <button type="button" className={releveStyles.secondary} onClick={() => { const result = duplicateEquipments(committed, objetIds, newUuid); commit(result.document, "Duplication d'objets", { guardWalls: false }); setObjetIds(result.ids); }}>Dupliquer</button>
+            <button type="button" className={releveStyles.secondary} onClick={() => commitObjet(setEquipmentsVisible(committed, objetIds, false), "Masquer des objets")}>Masquer</button>
+            <button type="button" className={releveStyles.danger} onClick={() => removeObjets(objetIds, "Suppression d'objets")}>Supprimer</button>
+          </div>
+        </section>}
+
+        {showLayers && <LayersPanel calques={calques} editable={editable} counts={groupCounts} trash={visibleTrash}
+          onCalque={changeCalque} onGroup={groupAction} onRestore={restoreFromTrash} />}
+
         {tool === "select" && selectedMurs.length >= 2 && editable && <section className={styles.section} aria-label="Corrections">
           <h2>{selectedMurs.length} murs sélectionnés</h2>
           <div className={releveStyles.toolbar}>
@@ -604,7 +849,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
           <button type="button" className={releveStyles.secondary} onClick={() => setPhotoAnchorId(null)}>Fermer</button>
         </section>}
 
-        {tool === "select" && selectedMurs.length === 0 && !selectedPhoto && <section className={styles.section} aria-label="Aide">
+        {tool === "select" && selectedMurs.length === 0 && selectedObjets.length === 0 && !selectedPhoto && <section className={styles.section} aria-label="Aide">
           <h2>{editable ? "Édition" : "Consultation"}</h2>
           <p className={releveStyles.feedback}>
             {editable ? "Touchez un mur pour le sélectionner (Maj + clic : sélection multiple). Faites glisser ses extrémités ou le mur lui-même. Deux doigts : zoomer et déplacer."
