@@ -5,8 +5,9 @@
 #
 # Usage : scripts/dr/v2/drill.sh [dossier-de-sortie]
 #
-#   0. Jeu réaliste : base au train courant peuplée par le harnais d'upgrade V4 → V5
-#      (scripts/qualification/upgrade-v4-v5.sh, réutilisée si DR2_SOURCE_DB existe déjà),
+#   0. Jeu réaliste : base au train courant peuplée par le harnais d'upgrade du train
+#      (train V7 : scripts/qualification/upgrade-v6-v7.sh, base V6 avec historique V3 → V6 ; réutilisée
+#      si DR2_SOURCE_DB existe déjà ; DR2_UPGRADE_SCRIPT / DR2_METIER_SQL / DR2_METIER_N pour un autre train),
 #      copiée en `elsatia_dr_v2_src` + scripts/dr/v2/dataset_complement.sql ;
 #      `elsatia_dr_v2_live` = la base « de production » simulée.
 #   1. Backup B0 (backup.sh) + vérification (verify_backup.sh : restauration de test stricte).
@@ -26,8 +27,14 @@ set +e   # chaque étape est contrôlée explicitement (controle), y compris les
 
 OUT="${1:-${DR2_OUT:-/tmp/elsatia-dr-v2/run-$(date -u +%Y%m%dT%H%M%SZ)}}"
 mkdir -p "$OUT/backups"; chmod -R 777 "$OUT"
-SOURCE_DB="${DR2_SOURCE_DB:-upg_v4_v5}"
-FRESH_DB="${DR2_FRESH_DB:-v5_fresh}"
+SOURCE_DB="${DR2_SOURCE_DB:-upg_v6_v7}"
+FRESH_DB="${DR2_FRESH_DB:-v7_fresh}"
+# Train canonique V7 : le harnais V4 → V5 (d'origine du DR V2) refuse une base au-delà de V5
+# (« attendu 3 migrations V5 ») et ses contrôles métier supposent un état V5 (aucun plan 2D) ;
+# le jeu et les contrôles métier suivent donc le harnais d'upgrade du train courant.
+UPGRADE_SCRIPT="${DR2_UPGRADE_SCRIPT:-scripts/qualification/upgrade-v6-v7.sh}"
+METIER_SQL="${DR2_METIER_SQL:-scripts/local-postgres-bootstrap/upgrade_v6_v7_business_checks.sql}"
+METIER_N="${DR2_METIER_N:-31}"
 SRC=elsatia_dr_v2_src; LIVE=elsatia_dr_v2_live
 RES="$OUT/results.json"; echo '{"controles": []}' > "$RES"
 ECHECS=0
@@ -42,15 +49,15 @@ controle() { # controle <id> <libellé> <ok|ko> [détail]
 mesure() { res_set ".mesures[\"$1\"] = $2"; }
 snap() { python3 "$DR2_HERE/snapshot.py" "$1" "$2" >/dev/null; }
 comparer() { python3 "$DR2_HERE/compare.py" "$1" "$2" --json "$3"; }
-smokes() { # smokes <base> <préfixe> — contrôles métier V5 + smokes DR (transactions annulées)
-  local base="$1" p="$2" f1="$OUT/$2_metier_v5.tap" f2="$OUT/$2_smokes.tap" t0 ok1 ok2
+smokes() { # smokes <base> <préfixe> — contrôles métier du train + smokes DR (transactions annulées)
+  local base="$1" p="$2" f1="$OUT/$2_metier_train.tap" f2="$OUT/$2_smokes.tap" t0 ok1 ok2
   t0=$(dr2_now)
-  dr2_psqla "$base" -v ON_ERROR_STOP=0 -f "$DR2_REPO/scripts/local-postgres-bootstrap/upgrade_v4_v5_business_checks.sql" > "$f1" 2>&1
+  dr2_psqla "$base" -v ON_ERROR_STOP=0 -f "$DR2_REPO/$METIER_SQL" > "$f1" 2>&1
   dr2_psqla "$base" -v ON_ERROR_STOP=0 -f "$DR2_HERE/restore_smokes.sql" > "$f2" 2>&1
   mesure "${p}_smokes_s" "$(dr2_dur "$t0" "$(dr2_now)")"
   ok1=$(grep -cE '^ok ' "$f1"); ok2=$(grep -cE '^ok ' "$f2")
-  [[ "$ok1" == 35 && ! $(grep -E '^not ok|ERROR' "$f1") ]] && controle "$p-M" "contrôles métier V5 après restauration" ok "$ok1/35" \
-    || controle "$p-M" "contrôles métier V5 après restauration" ko "$ok1/35"
+  [[ "$ok1" == "$METIER_N" && ! $(grep -E '^not ok|ERROR' "$f1") ]] && controle "$p-M" "contrôles métier du train après restauration" ok "$ok1/$METIER_N" \
+    || controle "$p-M" "contrôles métier du train après restauration" ko "$ok1/$METIER_N"
   [[ "$ok2" == 16 && ! $(grep -E '^not ok|ERROR' "$f2") ]] && controle "$p-S" "smokes DR après restauration" ok "$ok2/16" \
     || controle "$p-S" "smokes DR après restauration" ko "$ok2/16"
 }
@@ -75,10 +82,10 @@ for b in "$SRC" "$LIVE" elsatia_dr_v2_verify elsatia_dr_v2_d3ref elsatia_dr_v2_d
 echo "== 0. Jeu de données réaliste"
 T0=$(dr2_now)
 if ! dr2_db_existe "$SOURCE_DB" || [[ "${DR2_REBUILD:-0}" == 1 ]]; then
-  echo "  construction : base fraîche $FRESH_DB + harnais d'upgrade V4 → V5 ($SOURCE_DB)"
+  echo "  construction : base fraîche $FRESH_DB + harnais d'upgrade $UPGRADE_SCRIPT ($SOURCE_DB)"
   bash "$DR2_REPO/scripts/local-postgres-bootstrap/rebuild_db.sh" "$FRESH_DB" > "$OUT/rebuild.log" 2>&1 || { echo "ÉCHEC rebuild"; exit 1; }
-  UPG_OUT="$OUT/upgrade" bash "$DR2_REPO/scripts/qualification/upgrade-v4-v5.sh" "$SOURCE_DB" "$FRESH_DB" > "$OUT/upgrade.log" 2>&1
-  grep -q "contrôles métier 35/35" "$OUT/upgrade.log" || { echo "ÉCHEC harnais d'upgrade (voir upgrade.log)"; exit 1; }
+  UPG_OUT="$OUT/upgrade" bash "$DR2_REPO/$UPGRADE_SCRIPT" "$SOURCE_DB" "$FRESH_DB" > "$OUT/upgrade.log" 2>&1
+  grep -q "contrôles métier $METIER_N/$METIER_N" "$OUT/upgrade.log" || { echo "ÉCHEC harnais d'upgrade (voir upgrade.log)"; exit 1; }
 fi
 dr2_db_copier "$SOURCE_DB" "$SRC"
 dr2_psqla "$SRC" -f "$DR2_HERE/dataset_complement.sql" > "$OUT/dataset.log" 2>&1 || { echo "ÉCHEC complément"; cat "$OUT/dataset.log"; exit 1; }
@@ -265,7 +272,7 @@ ALT="$OUT/backups/altere"; rm -rf "$ALT"; cp -r "$B0" "$ALT"; printf 'x' >> "$AL
   || { grep -q INTEGRITE "$OUT/f1.err" && controle F-1 "sauvegarde altérée (1 octet) refusée avant toute action" ok || controle F-1 "sauvegarde altérée" ko; }
 "$DR2_HERE/restore.sh" "$B0" "$LIVE" >/dev/null 2>"$OUT/f2.err" && controle F-2 "écrasement sans --force refusé" ko \
   || { grep -q -- '--force' "$OUT/f2.err" && controle F-2 "écrasement d'une base non vide sans --force refusé" ok || controle F-2 "sans --force" ko; }
-( "$DR2_HERE/restore.sh" "$B0" upg_v4_v5 --force ) >/dev/null 2>"$OUT/f3.err" && controle F-3 "base hors préfixe refusée" ko \
+( "$DR2_HERE/restore.sh" "$B0" "$SOURCE_DB" --force ) >/dev/null 2>"$OUT/f3.err" && controle F-3 "base hors préfixe refusée" ko \
   || controle F-3 "restauration vers une base hors préfixe elsatia_dr_ refusée" ok
 ( VERCEL_ENV=production "$DR2_HERE/restore.sh" "$B0" elsatia_dr_v2_verify --force ) >/dev/null 2>"$OUT/f4.err" && controle F-4 "Production refusée" ko \
   || { grep -q "Production refusée" "$OUT/f4.err" && controle F-4 "environnement Production refusé par défaut" ok || controle F-4 "Production" ko; }
