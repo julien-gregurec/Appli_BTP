@@ -5,6 +5,8 @@
 #   Variables : LOAD_S (durée d'un palier, défaut 180), COOL_MIN (défaut 15),
 #   SCENARIO (défaut mix), NODE_EXTRA (options node, ex. --max-old-space-size=512),
 #   SNAP=1 (heap snapshots), CYCLES (répétitions du dernier palier + refroidissement),
+#   LOADGEN_EXTRA (options supplémentaires de loadgen.mjs),
+#   SERVER_ENV (variables pour le seul serveur, ex. MALLOC_ARENA_MAX=2),
 #   LIMIT_MB (limite mémoire cgroup simulée, ex. 512),
 #   QUICK=1 (pas de refroidissement long : 60 s puis GC forcé — mesures par route).
 # Prérequis : build de production déjà fait (`next build`), pile Supabase locale
@@ -31,7 +33,7 @@ if [ -n "${LIMIT_MB:-}" ]; then
   echo 0 > "$CG/memory.failcnt" 2>/dev/null || true
 fi
 MEM_SAMPLER_DIR="$OUT" NODE_ENV=production CG="$CG" nohup sh -c '[ -n "$CG" ] && echo $$ > "$CG/cgroup.procs"; exec "$@"' sh \
-  node --expose-gc ${NODE_EXTRA:-} -r "$HERE/sampler.cjs" node_modules/next/dist/bin/next start -p 3000 > "$OUT/server.log" 2>&1 &
+  env ${SERVER_ENV:-} node --expose-gc ${NODE_EXTRA:-} -r "$HERE/sampler.cjs" node_modules/next/dist/bin/next start -p 3000 > "$OUT/server.log" 2>&1 &
 SRV=$!
 until curl -s -o /dev/null localhost:3000/login; do sleep 0.5; kill -0 $SRV 2>/dev/null || { echo "server died"; exit 1; }; done
 # RSS de l'arbre de processus (serveur + enfants éventuels : Chromium PDF), toutes les 2 s.
@@ -44,12 +46,12 @@ mark "idle"; sleep 60
 [ "${SNAP:-0}" = 1 ] && { mark "snap-idle"; cmd "snap:idle"; }
 for P in "${PALIERS[@]}"; do
   mark "load-$P"
-  node "$HERE/loadgen.mjs" --users "$P" --duration "$LOAD_S" --think "$THINK" --scenario "$SCENARIO" --out "$OUT/load-$P.json" | tee -a "$OUT/load.log"
+  node "$HERE/loadgen.mjs" --users "$P" --duration "$LOAD_S" --think "$THINK" --scenario "$SCENARIO" ${LOADGEN_EXTRA:-} --out "$OUT/load-$P.json" | tee -a "$OUT/load.log"
   mark "end-load-$P"
 done
 if [ "${QUICK:-0}" = 1 ]; then mark "cool-T0"; sleep 60; mark "gc"; cmd "gc"; [ "${SNAP:-0}" = 1 ] && { mark "snap-end"; cmd "snap:end"; }; CYCLES=0; fi
 for C in $(seq 1 "$CYCLES"); do
-  [ "$C" -gt 1 ] && { P="${PALIERS[-1]}"; mark "load-$P-cycle$C"; node "$HERE/loadgen.mjs" --users "$P" --duration "$LOAD_S" --think "$THINK" --scenario "$SCENARIO" --out "$OUT/load-$P-c$C.json" | tee -a "$OUT/load.log"; mark "end-load-$P-cycle$C"; }
+  [ "$C" -gt 1 ] && { P="${PALIERS[-1]}"; mark "load-$P-cycle$C"; node "$HERE/loadgen.mjs" --users "$P" --duration "$LOAD_S" --think "$THINK" --scenario "$SCENARIO" ${LOADGEN_EXTRA:-} --out "$OUT/load-$P-c$C.json" | tee -a "$OUT/load.log"; mark "end-load-$P-cycle$C"; }
   mark "cool-T0-c$C"; sleep 60; mark "cool-T1-c$C"; sleep 240; mark "cool-T5-c$C"
   sleep $(( (COOL_MIN - 5) * 60 )); mark "cool-T${COOL_MIN}-c$C"
   mark "gc-c$C"; cmd "gc"

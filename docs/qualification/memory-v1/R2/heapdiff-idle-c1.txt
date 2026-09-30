@@ -1,0 +1,58 @@
+A: /tmp/claude-0/mem/R2/heap-idle-1005.heapsnapshot
+   747353 objets, 88.83 MB
+B: /tmp/claude-0/mem/R2/heap-c1-1005.heapsnapshot
+   801546 objets, 102.58 MB  (Δ 13.76 MB, Δ objets 54193)
+
+Plus fortes croissances (taille propre) :
+    7.35 MB    -1321 obj  (B: 275994 / 29.16 MB)  code	(code)
+    2.29 MB      121 obj  (B: 4816 / 3.47 MB)  array	
+    0.56 MB     2653 obj  (B: 2788 / 0.61 MB)  hidden	system / WeakArrayList
+    0.54 MB     7851 obj  (B: 34257 / 2.35 MB)  object shape	system / Map
+    0.48 MB     4503 obj  (B: 100051 / 42.05 MB)  string	(string)
+    0.33 MB     4971 obj  (B: 20688 / 2.19 MB)  array	(object elements)
+    0.29 MB     5736 obj  (B: 41312 / 2.02 MB)  object	Object
+    0.28 MB     2044 obj  (B: 11099 / 1.91 MB)  object shape	system / DescriptorArray
+    0.22 MB      774 obj  (B: 8090 / 4.02 MB)  array	(object properties)
+    0.12 MB     2074 obj  (B: 12267 / 0.73 MB)  hidden	system / PropertyArray
+    0.11 MB       85 obj  (B: 290 / 1.32 MB)  native	system / JSArrayBufferData
+    0.10 MB     3176 obj  (B: 31918 / 0.97 MB)  object	Array
+    0.07 MB     4570 obj  (B: 8294 / 0.13 MB)  hidden	system / CodeWrapper
+    0.07 MB     2197 obj  (B: 75015 / 2.29 MB)  concatenated string	(string)
+    0.07 MB     1218 obj  (B: 25521 / 1.42 MB)  closure	closure 
+    0.06 MB     1065 obj  (B: 12999 / 0.87 MB)  object	system / Context
+    0.05 MB      154 obj  (B: 159 / 0.05 MB)  object	Client
+    0.04 MB      838 obj  (B: 1710 / 0.09 MB)  object shape	system / PrototypeInfo
+    0.04 MB     2837 obj  (B: 3348 / 0.05 MB)  number	heap number
+    0.03 MB      398 obj  (B: 960 / 0.10 MB)  object shape	system / TransitionArray
+    0.03 MB     1405 obj  (B: 14579 / 0.33 MB)  hidden	system / AccessorPair
+    0.03 MB      739 obj  (B: 1054 / 0.04 MB)  hidden	system / PropertyCell
+    0.02 MB      250 obj  (B: 251 / 0.02 MB)  object	PerformanceResourceTiming
+    0.02 MB       11 obj  (B: 14 / 0.03 MB)  hidden	system / NativeContext
+    0.02 MB       22 obj  (B: 30 / 0.02 MB)  hidden	system / WeakFixedArray
+
+Plus fortes croissances (nombre d'objets) :
+    7851 obj     0.54 MB  (B: 34257)  object shape	system / Map
+    5736 obj     0.29 MB  (B: 41312)  object	Object
+    4971 obj     0.33 MB  (B: 20688)  array	(object elements)
+    4570 obj     0.07 MB  (B: 8294)  hidden	system / CodeWrapper
+    4503 obj     0.48 MB  (B: 100051)  string	(string)
+    3176 obj     0.10 MB  (B: 31918)  object	Array
+    2837 obj     0.04 MB  (B: 3348)  number	heap number
+    2653 obj     0.56 MB  (B: 2788)  hidden	system / WeakArrayList
+    2197 obj     0.07 MB  (B: 75015)  concatenated string	(string)
+    2074 obj     0.12 MB  (B: 12267)  hidden	system / PropertyArray
+    2044 obj     0.28 MB  (B: 11099)  object shape	system / DescriptorArray
+    1405 obj     0.03 MB  (B: 14579)  hidden	system / AccessorPair
+    1218 obj     0.07 MB  (B: 25521)  closure	closure 
+    1065 obj     0.06 MB  (B: 12999)  object	system / Context
+     838 obj     0.04 MB  (B: 1710)  object shape	system / PrototypeInfo
+     774 obj     0.22 MB  (B: 8090)  array	(object properties)
+     739 obj     0.03 MB  (B: 1054)  hidden	system / PropertyCell
+     398 obj     0.03 MB  (B: 960)  object shape	system / TransitionArray
+     250 obj     0.02 MB  (B: 251)  object	PerformanceResourceTiming
+     242 obj     0.01 MB  (B: 662)  object shape	(enum cache)
+     228 obj     0.01 MB  (B: 432)  object	LRUNode
+     183 obj     0.01 MB  (B: 16790)  closure	closure native_bind
+     165 obj     0.00 MB  (B: 1640)  hidden	system / ClassPositions
+     154 obj     0.05 MB  (B: 159)  object	Client
+     154 obj     0.01 MB  (B: 154)  closure	closure Intercept
