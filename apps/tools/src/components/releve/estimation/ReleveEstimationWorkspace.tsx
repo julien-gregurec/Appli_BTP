@@ -14,7 +14,7 @@
  * Tablette d'abord : cartes repliables, aucune table à défilement horizontal, cibles ≥ 40 px.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   agregerEstimation, allowedActions, breadcrumbFor, buildEstimationGpPayload, centimesText, comparerEstimations, decimalString, ETAT_PROJET_LABELS, estimationDetails,
   estimationToCsv, formatHeures, formatMontant, formatPrixUnitaire, formatQuantiteOuvrage, METRE_SYNTHESE_ETAT_LABELS, METRE_SYNTHESE_ETATS, OUVRAGE_UNITE_LABELS,
@@ -101,18 +101,20 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
     setSources((current) => current?.map((source) => (source.planId === planId ? { ...source, quantitatif, estimation } : source)) ?? current);
   }, [repository]);
 
+  const canEdit = structure ? allowedActions(actor, structure.releve).includes("edit") : false;
+  // Contexte stable : un changement de niveau ne re-rend pas les cartes de prix (plans mémoïsés).
+  const ctx = useMemo<Ctx | null>(() => (structure ? { releveId, structure, repository, quantitatifs, canEdit, setFeedback, refreshPlan } : null),
+    [releveId, structure, repository, quantitatifs, canEdit, refreshPlan]);
   const details = useMemo(() => (structure && sources ? estimationDetails(structure, sources) : null), [structure, sources]);
   const groupes = useMemo(() => (details ? agregerEstimation(details, selection.niveau) : null), [details, selection.niveau]);
   const total = useMemo(() => (details ? totalEstimation(details) : null), [details]);
-  if (!structure || !sources || !details || !groupes || !total) return <p className={`shell ${releveStyles.feedback}`} role="status">{feedback || "Calcul de l'estimation…"}</p>;
+  if (!structure || !sources || !details || !groupes || !total || !ctx) return <p className={`shell ${releveStyles.feedback}`} role="status">{feedback || "Calcul de l'estimation…"}</p>;
 
-  const canEdit = allowedActions(actor, structure.releve).includes("edit");
   const crumbs = breadcrumbFor(structure, null);
   const couts = syntheseCouts(total);
   const pieceNom = new Map(structure.pieces.map((p) => [p.id as string, p.nom]));
   const anomalies = sources.flatMap((source) => source.estimation.anomalies.filter((a) => a.gravite !== "info").map((a) => ({ ...a, planId: source.planId, ouvrage: source.quantitatif.ouvrages.find((o) => o.id === a.ouvrageId) })));
   const erreurs = anomalies.filter((a) => a.gravite === "erreur").length;
-  const ctx: Ctx = { releveId, structure, repository, quantitatifs, canEdit, setFeedback, refreshPlan };
   const baseName = `estimation-${structure.releve.nom}-${selection.etat}`;
 
   const exporterGp = async () => {
@@ -174,7 +176,7 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
         <div className={styles.tile}><dt>Déplacement</dt><dd data-testid="est-deplacement">{formatMontant(couts.deplacement)}</dd></div>
         <div className={styles.tile}><dt>Travaux sur existant</dt><dd data-testid="est-existant">{formatMontant(couts.existant)}</dd></div>
         <div className={styles.tile}><dt>Main d&apos;œuvre</dt><dd data-testid="est-heures">{formatHeures(total.heures)}</dd></div>
-        <div className={styles.tile}><dt>Lignes</dt><dd data-testid="est-lignes">{total.lignes} · {total.sansPrix} sans prix · {total.ajustees} corrigée(s)</dd></div>
+        <div className={styles.tile}><dt>Lignes</dt><dd data-testid="est-compteurs">{total.lignes} · {total.sansPrix} sans prix · {total.ajustees} corrigée(s)</dd></div>
       </dl>
       <p className={q.chips} data-testid="est-par-type">
         {PRIX_TYPES.map((t) => <span key={t} className={q.chip} data-testid={`est-type-${t}`}>{PRIX_TYPE_LABELS[t]} {formatMontant(total.parType[t])}</span>)}
@@ -207,22 +209,24 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   </>;
 }
 
-function GroupeCard({ groupe, open }: { groupe: EstimationGroupe; open: boolean }) {
-  return <details className={styles.piece} data-testid="est-groupe" data-cle={groupe.cle} data-print open={open}>
+function GroupeCard({ groupe, open: initial }: { groupe: EstimationGroupe; open: boolean }) {
+  // Détail rendu seulement à l'ouverture (5 000 lignes : seuls les sous-totaux sont dessinés).
+  const [open, setOpen] = useState(initial);
+  return <details className={styles.piece} data-testid="est-groupe" data-cle={groupe.cle} data-print open={open} onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}>
     <summary><strong>{groupe.libelle}</strong>
       <span className={styles.value} data-testid="est-groupe-total">{formatMontant(groupe.total.montant)}</span>
       <span className={styles.muted}>{groupe.chemin.slice(0, -1).join(" › ")} · {groupe.ouvrages.length} ouvrage(s){groupe.total.sansPrix ? ` · ${groupe.total.sansPrix} ligne(s) sans prix` : ""}</span>
     </summary>
-    <ul className={`${styles.rows} ${styles.pieceBody}`}>{groupe.ouvrages.map((o) => <li key={o.cle} data-testid="est-groupe-ouvrage" data-cle={o.cle}>
+    {open && <ul className={`${styles.rows} ${styles.pieceBody}`}>{groupe.ouvrages.map((o) => <li key={o.cle} data-testid="est-groupe-ouvrage" data-cle={o.cle}>
       <span>{o.nom} <small className={styles.muted}>· {formatQuantiteOuvrage(o.quantite, o.unite)}{o.prixUnitaire !== null ? ` × ${formatPrixUnitaire(o.prixUnitaire)}` : ""}{o.forfait ? ` + forfait ${formatMontant(o.forfait)}` : ""}</small></span>
       <span className={styles.value}>{o.total.chiffrees === 0 ? "sans prix" : formatMontant(o.total.montant)}</span>
-    </li>)}</ul>
+    </li>)}</ul>}
   </details>;
 }
 
 // ── Prix d'un plan ────────────────────────────────────────────────────────────
 
-function PlanPrix({ source, ctx }: { source: EstimationSource; ctx: Ctx }) {
+const PlanPrix = memo(function PlanPrix({ source, ctx }: { source: EstimationSource; ctx: Ctx }) {
   const etage = ctx.structure.etages.find((e) => e.id === source.etageId);
   const editable = ctx.canEdit && !source.figeLe;
   const [busy, setBusy] = useState(false);
@@ -232,6 +236,12 @@ function PlanPrix({ source, ctx }: { source: EstimationSource; ctx: Ctx }) {
     return map;
   }, [source.estimation.lignes]);
   const prix = useMemo(() => new Map(source.estimation.prix.map((p) => [p.ouvrageId, p])), [source.estimation.prix]);
+  // Signature de contenu par ouvrage : après un recalcul, seules les cartes dont le contenu a changé sont redessinées.
+  const signatures = useMemo(() => {
+    const anomalies = new Map<string, unknown[]>();
+    for (const a of source.estimation.anomalies) anomalies.set(a.ouvrageId, [...(anomalies.get(a.ouvrageId) ?? []), a]);
+    return new Map(source.quantitatif.ouvrages.map((o) => [o.id, JSON.stringify([o, prix.get(o.id) ?? null, lignesParOuvrage.get(o.id) ?? [], anomalies.get(o.id) ?? []])]));
+  }, [source.quantitatif.ouvrages, source.estimation.anomalies, prix, lignesParOuvrage]);
   const run = async (action: () => Promise<unknown>, message: string | (() => string)) => {
     setBusy(true);
     try { await action(); await ctx.refreshPlan(source.planId); ctx.setFeedback(typeof message === "string" ? message : message()); }
@@ -256,16 +266,18 @@ function PlanPrix({ source, ctx }: { source: EstimationSource; ctx: Ctx }) {
     </div>}
     <div className={q.list}>
       {source.quantitatif.ouvrages.map((ouvrage) => <OuvragePrixCard key={ouvrage.id} ouvrage={ouvrage} prix={prix.get(ouvrage.id) ?? null} lignes={lignesParOuvrage.get(ouvrage.id) ?? []}
-        source={source} ctx={ctx} editable={editable} run={run} busy={busy} />)}
+        source={source} ctx={ctx} editable={editable} run={run} signature={signatures.get(ouvrage.id) ?? ""} />)}
     </div>
   </section>;
-}
+});
 
-function OuvragePrixCard({ ouvrage, prix, lignes, source, ctx, editable, run, busy }: {
+type OuvragePrixProps = {
   ouvrage: OuvrageRecord; prix: PrixOuvrage | null; lignes: EstimationLigne[]; source: EstimationSource; ctx: Ctx; editable: boolean;
-  run(action: () => Promise<unknown>, message: string): Promise<void>; busy: boolean;
-}) {
+  run(action: () => Promise<unknown>, message: string): Promise<void>; signature: string;
+};
+const OuvragePrixCard = memo(function OuvragePrixCard({ ouvrage, prix, lignes, source, ctx, editable, run }: OuvragePrixProps) {
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   let qte = BigInt(0); let montant = BigInt(0);
   for (const l of lignes) {
@@ -294,14 +306,15 @@ function OuvragePrixCard({ ouvrage, prix, lignes, source, ctx, editable, run, bu
         <button type="button" className={releveStyles.primary} data-testid="est-prix-modifier" onClick={() => setEditing(true)}>{prix ? "Modifier le prix" : "Saisir un prix"}</button>
         {prix && <button type="button" className={releveStyles.danger} data-testid="est-prix-retirer" disabled={busy} onClick={() => {
           if (!window.confirm(`Retirer le prix de « ${ouvrage.nom} » ? L'ouvrage reste dans le quantitatif.`)) return;
-          void run(() => ctx.repository.deletePrix(source.planId, ouvrage.id), "Prix retiré : ouvrage exploitable en quantitatif seul.");
+          setBusy(true);
+          void run(() => ctx.repository.deletePrix(source.planId, ouvrage.id), "Prix retiré : ouvrage exploitable en quantitatif seul.").finally(() => setBusy(false));
         }}>Retirer le prix</button>}
       </div>}
       {editable && editing && <PrixForm initial={prix?.donnees ?? null} unite={ouvrage.unite} onCancel={() => setEditing(false)}
         onSave={(donnees) => run(() => ctx.repository.savePrix(source.planId, ouvrage.id, donnees), `Prix de « ${ouvrage.nom} » enregistré : montants recalculés par le serveur.`).then(() => setEditing(false))} />}
     </div>}
   </details>;
-}
+}, (a, b) => a.signature === b.signature && a.editable === b.editable && a.ctx === b.ctx && a.source.planId === b.source.planId && a.source.figeLe === b.source.figeLe);
 
 function LigneRow({ ligne, ouvrage, source, ctx, editable, run }: {
   ligne: EstimationLigne; ouvrage: OuvrageRecord; source: EstimationSource; ctx: Ctx; editable: boolean; run(action: () => Promise<unknown>, message: string): Promise<void>;
