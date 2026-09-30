@@ -7,6 +7,7 @@
 #   SNAP=1 (heap snapshots), CYCLES (répétitions du dernier palier + refroidissement),
 #   LOADGEN_EXTRA (options supplémentaires de loadgen.mjs),
 #   SERVER_ENV (variables pour le seul serveur, ex. MALLOC_ARENA_MAX=2),
+#   APP_DIR (répertoire du build servi, défaut dépôt),
 #   LIMIT_MB (limite mémoire cgroup simulée, ex. 512),
 #   QUICK=1 (pas de refroidissement long : 60 s puis GC forcé — mesures par route).
 # Prérequis : build de production déjà fait (`next build`), pile Supabase locale
@@ -18,6 +19,9 @@ LOAD_S="${LOAD_S:-180}"; COOL_MIN="${COOL_MIN:-15}"; SCENARIO="${SCENARIO:-mix}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; REPO="$(cd "$HERE/../../.." && pwd)"
 mkdir -p "$OUT"; cd "$REPO"
 set -a; . ./.env.local; set +a
+# APP_DIR : répertoire du build à servir (défaut : le dépôt) — permet de comparer avant/après
+# avec un second worktree construit séparément.
+cd "${APP_DIR:-$REPO}"
 mark() { echo "{\"t\":$(date +%s%3N),\"phase\":\"$1\"}" >> "$OUT/phases.jsonl"; echo "[$(date +%T)] $1"; }
 cmd() { echo "$1" > "$OUT/cmd"; while [ -e "$OUT/cmd" ] && kill -0 "$SRV" 2>/dev/null; do sleep 0.5; done; rm -f "$OUT/cmd"; sleep 1; }
 su postgres -c "psql -X -q -d pilot_gp -c 'truncate rate_limits_applicatifs;'" >/dev/null 2>&1 || true

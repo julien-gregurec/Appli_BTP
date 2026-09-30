@@ -19,7 +19,14 @@ type A = {
 };
 type P={date:string;heures_normales:number;heures_supplementaires:number;verification_statut:string;employe_id:string;chantier_id:string|null};
 const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
-const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(d);
+// Formateurs construits une seule fois (ELSATIA_NEXT_MEMORY_CAPACITY_V1) : `new Intl.DateTimeFormat`
+// à chaque appel alloue des objets ICU natifs libérés seulement au GC ; appelé par cellule/ligne,
+// il faisait monter le serveur à ~3 Go de RSS (mémoire native retenue après GC). Instances immuables,
+// sans état : partageables entre requêtes.
+const FORMAT_ISO = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
+const FORMAT_JOUR_LONG = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+const FORMAT_JOUR_COURT = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric" });
+const iso = (d: Date) => FORMAT_ISO.format(d);
 function lundi(reference?: string) {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(reference ?? "") ? new Date(`${reference}T12:00:00`) : new Date();
   const decalage = (d.getDay() + 6) % 7;
@@ -27,8 +34,7 @@ function lundi(reference?: string) {
   d.setHours(12, 0, 0, 0);
   return d;
 }
-const dateFr = (d: Date, large = false) =>
-  new Intl.DateTimeFormat("fr-FR", large ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric" }).format(d);
+const dateFr = (d: Date, large = false) => (large ? FORMAT_JOUR_LONG : FORMAT_JOUR_COURT).format(d);
 
 const couleurs = [
   "border-l-blue-500 bg-blue-50",

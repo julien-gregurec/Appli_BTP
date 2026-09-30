@@ -14,8 +14,14 @@ type ValidationPointage={id:string;verification_statut:string;anomalie_niveau:st
 type Session={id:string;employe_id:string;chantier_id:string;arrivee_at:string;depart_at:string|null;pause_minutes:number;latitude_arrivee:number;longitude_arrivee:number;precision_arrivee_metres:number|null;latitude_depart:number|null;longitude_depart:number|null;precision_depart_metres:number|null;tache:string|null;pointage_id:string|null;pointage:ValidationPointage|ValidationPointage[]|null;employe:Relation|Relation[]|null;chantier:Relation|Relation[]|null};
 type Pointage={id:string;date:string;heures_normales:number;heures_supplementaires:number;latitude:number|null;longitude:number|null;verification_statut:string;origine_pointage:string;commentaire:string|null;employe:Relation|Relation[]|null;chantier:Relation|Relation[]|null};
 type VerificationZone={id:string;session_id:string;employe_id:string;chantier_id:string;latitude:number;longitude:number;precision_metres:number|null;distance_metres:number|null;dans_zone:boolean;created_at:string};
-const heure=(date:string)=>new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"}).format(new Date(date));
-const dateHeure=(date:string)=>new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(date));
+// Formateurs construits une seule fois (ELSATIA_NEXT_MEMORY_CAPACITY_V1) : `new Intl.DateTimeFormat`
+// à chaque appel alloue des objets ICU natifs libérés seulement au GC ; appelé par cellule/ligne,
+// il faisait monter le serveur à ~3 Go de RSS (mémoire native retenue après GC). Instances immuables,
+// sans état : partageables entre requêtes.
+const FORMAT_HEURE=new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"});
+const FORMAT_DATE_HEURE=new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+const heure=(date:string)=>FORMAT_HEURE.format(new Date(date));
+const dateHeure=(date:string)=>FORMAT_DATE_HEURE.format(new Date(date));
 
 export default async function GestionPointagesPage({searchParams}:{searchParams:Promise<{mois?:string;error?:string;succes?:string}>}){
   const params=await searchParams;
