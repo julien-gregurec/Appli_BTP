@@ -408,7 +408,11 @@ await scenario("S10 — e-mail indisponible (Brevo simulé en panne)", async () 
   const vraiFetch = globalThis.fetch;
   globalThis.fetch = (url, init) => vraiFetch(exigerCibleLocale(versMocks(url)), init);
   const env = { ...process.env };
-  Object.assign(process.env, { BREVO_API_KEY: "xkeysib-drill-local", EMAIL_FROM_ADDRESS: "drill@example.test" });
+  // Train V8 : depuis l'architecture e-mail V7 (@elsatia/email), hors Production un destinataire
+  // n'est servi que s'il figure dans EMAIL_PREVIEW_ALLOWLIST (fail-closed). Le drill déclare son
+  // destinataire, comme une Preview réelle : c'est bien la panne Brevo qui est éprouvée, pas la garde.
+  Object.assign(process.env, { BREVO_API_KEY: "xkeysib-drill-local", EMAIL_FROM_ADDRESS: "drill@example.test",
+    EMAIL_PREVIEW_ALLOWLIST: "client@example.test" });
   try {
     const profonde = await santeProfonde();
     verifier("sonde profonde : email ko → DEGRADED (pas OUTAGE)", profonde.statut === "DEGRADED" && profonde.controles.email === "ko", profonde);
@@ -428,6 +432,8 @@ await scenario("S10 — e-mail indisponible (Brevo simulé en panne)", async () 
     globalThis.fetch = vraiFetch;
     process.env.BREVO_API_KEY = env.BREVO_API_KEY;
     process.env.EMAIL_FROM_ADDRESS = env.EMAIL_FROM_ADDRESS;
+    if (env.EMAIL_PREVIEW_ALLOWLIST === undefined) delete process.env.EMAIL_PREVIEW_ALLOWLIST;
+    else process.env.EMAIL_PREVIEW_ALLOWLIST = env.EMAIL_PREVIEW_ALLOWLIST;
     await http(`${C.urls.brevo}/__retour`, { method: "POST" });
   }
 });
