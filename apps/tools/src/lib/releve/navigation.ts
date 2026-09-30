@@ -13,6 +13,7 @@
  * | Photos terrain (Lot 4) | `/releves/photos?id=&portee=&cible=&ajout=` (galerie du relevé ou d'un nœud) |
  * | Plan 2D (Lot 5) | `/releves/plan?id=&etage=&zone=&piece=&plan=` (plan de l'étage, cadré sur une zone ou une pièce) |
  * | Métré (Lot 8) | `/releves/metre?id=&etat=&piece=` (synthèse chantier → pièce, revêtements, ajustements, exports) |
+ * | Quantitatifs (Lot 9) | `/releves/quantitatifs?id=&etat=&niveau=` (ouvrages, takeoff, ajustements, anomalies, synthèse, exports CSV / GP) |
  */
 import { GALLERY_SCOPE_KINDS, isUuid, type GalleryScope, type SearchHit } from "@elsatia/releve-domain";
 
@@ -148,4 +149,28 @@ export function readMetreSelection(search: string): MetreSelection | null {
   const etat = params.get("etat");
   const pieceId = params.get("piece");
   return { releveId, etat: etat === "projete" || etat === "as_built" ? etat : "existant", pieceId: isUuid(pieceId) ? pieceId : null };
+}
+
+/** Lot 9 — Quantitatifs d'un relevé : état documenté et niveau d'agrégation. */
+export const RELEVE_QUANTITATIFS_PATH = "/releves/quantitatifs";
+export const QUANTITATIFS_NIVEAUX = ["chantier", "batiment", "etage", "zone", "piece", "lot", "ouvrage"] as const;
+export type QuantitatifsSelection = { releveId: string; etat: MetreSelection["etat"]; niveau: (typeof QUANTITATIFS_NIVEAUX)[number] };
+
+export function quantitatifsHref(selection: { releveId: string; etat?: MetreSelection["etat"] | null; niveau?: QuantitatifsSelection["niveau"] | null }): string {
+  const params = new URLSearchParams({ id: selection.releveId });
+  if (selection.etat && selection.etat !== "existant") params.set("etat", selection.etat);
+  if (selection.niveau && selection.niveau !== "ouvrage") params.set("niveau", selection.niveau);
+  return `${RELEVE_QUANTITATIFS_PATH}?${params.toString()}`;
+}
+
+export function readQuantitatifsSelection(search: string): QuantitatifsSelection | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id");
+  if (!isUuid(releveId)) return null;
+  const etat = params.get("etat");
+  const niveau = params.get("niveau");
+  return {
+    releveId, etat: etat === "projete" || etat === "as_built" ? etat : "existant",
+    niveau: (QUANTITATIFS_NIVEAUX as readonly string[]).includes(niveau ?? "") ? (niveau as QuantitatifsSelection["niveau"]) : "ouvrage",
+  };
 }
