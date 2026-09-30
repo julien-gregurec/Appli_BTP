@@ -27,7 +27,7 @@ import {
   type QuantitatifSource, type QuantitatifTotal, type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure, type RevetementSupport,
 } from "@elsatia/releve-domain";
 import { getElsatiaClient } from "@/lib/auth/client";
-import { ficheHref, metreHref, planHref, quantitatifsHref, readQuantitatifsSelection, RELEVES_PATH, type QuantitatifsSelection } from "@/lib/releve/navigation";
+import { estimationHref, ficheHref, metreHref, planHref, quantitatifsHref, readQuantitatifsSelection, RELEVES_PATH, type QuantitatifsSelection } from "@/lib/releve/navigation";
 import { SupabaseQuantitatifRepository } from "@/lib/releve/plan/supabase-quantitatif-repository";
 import { OUVERTURE_TYPE_LABELS } from "../plan/PlanLayers";
 import { Brand } from "../../HomeDashboard";
@@ -142,6 +142,7 @@ function QuantitatifsLoader({ service, actor, selection, onEtat, onNiveau }: {
         <button type="button" className={releveStyles.secondary} data-testid="qt-export-json" title="Contrat de données vers Gestion Pro (préparé, non transmis ; aucun devis créé)"
           onClick={() => download(JSON.stringify(buildQuantitatifGpPayload(releveId, selection.etat, sources, details), null, 2), "application/json", `${baseName}.gp.json`)}>Transfert GP (JSON)</button>
         <Link className={releveStyles.secondary} href={metreHref({ releveId, etat: selection.etat })} data-testid="qt-lien-metre">Métré</Link>
+        <Link className={releveStyles.secondary} href={estimationHref({ releveId, etat: selection.etat })} data-testid="qt-lien-estimation">Estimation (HT)</Link>
       </div>
 
       <dl className={styles.tiles} data-testid="qt-totaux">
