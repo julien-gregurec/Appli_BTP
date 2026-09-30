@@ -27,6 +27,19 @@ describe("callback Réserves — redirection ouverte", () => {
     },
   );
 
+  // Train V8 : témoins d'exploit REDTEAM-V2 (F2) rejoués sur la route FUSIONNÉE (double validation
+  // cheminInterneStrict + cheminInterneSur, origine configurée). Aucun ne doit quitter Réserves ni
+  // atteindre un chemin autre que le repli.
+  it.each(["/%09/evil.com", "/%0A/evil.com", "/.//evil.com", "/..//evil.com", "/%2e//evil.com", "/a/..//evil.com",
+    "/%252f%252fevil.com", "javascript:alert(1)", "https://user:pass@evil.com", "", "relatif"])(
+    "REDTEAM-V2 %j : repli /dashboard sur l'origine Réserves",
+    async (next) => {
+      const cible = await destination(next);
+      expect(cible.origin).toBe("https://reserves.elsatia.fr");
+      expect(cible.pathname).toBe("/dashboard");
+    },
+  );
+
   it("conserve une destination interne légitime", async () => {
     const cible = await destination("/reserves/123?onglet=photos");
     expect(cible.href).toBe("https://reserves.elsatia.fr/reserves/123?onglet=photos");
