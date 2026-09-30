@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { construireCsp, entetesSecurite } from "@/lib/securite/entetes";
+import { reponseModeSur } from "@/lib/incident";
 
 /**
  * Proxy de Réserves (l'ancien « middleware » de Next 15).
@@ -13,6 +14,10 @@ import { construireCsp, entetesSecurite } from "@/lib/securite/entetes";
  * L'ordre compte : le nonce doit exister avant que Next ne rende quoi que ce soit.
  */
 export async function proxy(request: NextRequest) {
+  // Mode sûr (incident) : décidé avant toute session ou appel à la base.
+  const modeSur = await reponseModeSur(request.nextUrl.pathname, request.method, request.headers);
+  if (modeSur) return modeSur;
+
   const nonce = crypto.randomUUID().replaceAll("-", "");
   // L'origine réellement servie, telle que le navigateur l'a demandée : c'est elle qui
   // décide de `upgrade-insecure-requests`, pas le mode de construction. Derrière un

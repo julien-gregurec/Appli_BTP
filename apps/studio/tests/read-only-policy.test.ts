@@ -29,6 +29,8 @@ const READ_RPCS = new Set([
   "studio_get_timeline", "studio_list_analysis", "studio_my_role", "studio_identity_session_status",
   "studio_workspace_usage", "studio_get_brand_kit", "studio_list_brand_logo_candidates",
   "studio_list_render_shares", "studio_list_invitations",
+  // Mode sûr (migration dédiée 20260928130000) : lectures STABLE, compteurs seulement.
+  "incident_worker_sante",
 ]);
 // Clé service, bornées EN BASE à un chemin système déclaré (studio_guard.system_paths) : jamais
 // appelées pour le compte d'un utilisateur, pas de garde applicative requise (la base les borne).

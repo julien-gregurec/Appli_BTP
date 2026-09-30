@@ -6,12 +6,17 @@ import {
   studioCookieOptions,
   supabaseConfig,
 } from "./lib/config";
+import { reponseModeSur } from "./lib/incident";
 export async function proxy(request: NextRequest) {
+  // Coupure de dernier recours, indépendante de la base (redéploiement requis pour changer).
   if (!studioEnabled(process.env.STUDIO_ENABLED))
     return new NextResponse("Studio temporairement indisponible.", {
       status: 503,
       headers: { "Cache-Control": "no-store", "Retry-After": "60" },
     });
+  // Mode sûr piloté en base (studio_guard.control.mode, propagation ≤ 10 s) : voir lib/incident.
+  const modeSur = await reponseModeSur(request.nextUrl.pathname, request.method, request.headers);
+  if (modeSur) return modeSur;
   const storageOrigin = new URL(supabaseConfig().url).origin;
   const directOrigin = storageOrigin.replace(
     /\.supabase\.co$/,

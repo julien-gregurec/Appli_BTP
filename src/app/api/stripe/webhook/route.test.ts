@@ -105,7 +105,21 @@ describe("webhook Stripe Connect des factures clients", () => {
   it("ignore un identifiant de facture qui n'est pas un UUID, comme auparavant", async () => {
     const reponse = await POST(requete(paiementReussi({ facture_id: "pas-un-uuid", entreprise_id: ENTREPRISE })));
     expect(reponse.status).toBe(200);
-    expect(deps.rpc).not.toHaveBeenCalled();
+    // Aucune RPC métier : seule la finalisation de la réservation (migration 20260928000702).
+    expect(deps.rpc.mock.calls.map((c) => c[0])).toEqual(["finaliser_evenement_webhook_stripe_service"]);
+  });
+
+  it("finalise la réservation après un traitement réussi (plus reprenable comme orpheline)", async () => {
+    const reponse = await POST(requete(paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE })));
+    expect(reponse.status).toBe(200);
+    expect(deps.rpc).toHaveBeenLastCalledWith("finaliser_evenement_webhook_stripe_service", { p_stripe_event_id: "evt_1" });
+  });
+
+  it("ne finalise jamais une réservation dont le traitement a échoué (elle est libérée)", async () => {
+    deps.rpc.mockResolvedValue({ data: null, error: { code: "PT503", message: "lecture seule" } });
+    const reponse = await POST(requete(paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE })));
+    expect(reponse.status).toBe(500);
+    expect(deps.rpc.mock.calls.map((c) => c[0])).not.toContain("finaliser_evenement_webhook_stripe_service");
   });
 
   it("transmet une entreprise non UUID comme absente (la RPC ignore alors la facture)", async () => {

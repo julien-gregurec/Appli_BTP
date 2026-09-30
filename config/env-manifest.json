@@ -244,6 +244,10 @@
       {
         "path": ".github/workflows/studio-dedicated-e2e.yml",
         "justification": "Workflow CI du banc Studio dédié ci-dessus : ses variables (E2E_BIN, E2E_DIR, PGBIN, chemins FFmpeg) sont des chemins d'outillage du runner, sans secret de dépôt ni valeur applicative."
+      },
+      {
+        "path": "scripts/incident/",
+        "justification": "Drill d'incident LOCAL (npm run incident:drill, INCIDENT RESPONSE & SAFE MODE V1) : pile jetable GoTrue/PostgREST/Redis/mocks Stripe-Brevo sur 127.0.0.1, secrets générés pour le drill. Ses variables (PORT, NOM, INCIDENT_DRILL_*) sont propres au banc ; jamais déployé ni lu par une application."
       }
     ],
     "literal_prefixes": [

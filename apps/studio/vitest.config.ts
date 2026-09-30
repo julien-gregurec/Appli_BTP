@@ -9,6 +9,9 @@ export default defineConfig({
       "@elsatia/identity": fileURLToPath(
         new URL("../../packages/elsatia-identity/src/index.ts", import.meta.url),
       ),
+      "@elsatia/incident-control": fileURLToPath(
+        new URL("../../packages/incident-control/src/index.ts", import.meta.url),
+      ),
     },
   },
   // Source-walking boundary tests read the whole tree; allow slow external volumes.

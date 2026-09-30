@@ -4,7 +4,7 @@ import { headersSecuriteColors } from "./src/lib/security/en-tetes";
 import { headersIndexationColors } from "./src/lib/seo/indexation";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@elsatia/application-access"],
+  transpilePackages: ["@elsatia/application-access", "@elsatia/incident-control"],
   poweredByHeader: false,
   // En-têtes constants seulement. La CSP porte un nonce régénéré à chaque
   // requête : elle est émise par `src/proxy.ts`, pas ici.

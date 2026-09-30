@@ -26,7 +26,8 @@
       "@elsatia/client-contracts": ["./packages/client-contracts/src/index.ts"],
       "@elsatia/platform-support-comms": ["./packages/platform-support-comms/src/index.ts"],
       "@elsatia/releve-domain": ["./packages/releve-domain/src/index.ts"],
-      "@elsatia/identity": ["./packages/elsatia-identity/src/index.ts"]
+      "@elsatia/identity": ["./packages/elsatia-identity/src/index.ts"],
+      "@elsatia/incident-control": ["./packages/incident-control/src/index.ts"]
     }
   },
   "include": [

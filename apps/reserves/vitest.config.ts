@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@elsatia/email": fileURLToPath(new URL("../../packages/email/src/index.ts", import.meta.url)),
+      "@elsatia/incident-control": fileURLToPath(new URL("../../packages/incident-control/src/index.ts", import.meta.url)),
       "server-only": fileURLToPath(new URL("./src/test/server-only-stub.ts", import.meta.url)),
     },
   },

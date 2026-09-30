@@ -23,6 +23,8 @@ vi.mock("@/lib/security/rate-limit", () => ({
   appliquerRateLimit: vi.fn(),
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+// Mode sûr nominal (aucun appel réseau) : couvert par proxy-mode-sur.test.ts.
+vi.mock("@/lib/incident/etat", () => ({ lecteurEtatIncident: () => ({ lire: async () => null, invalider() {} }) }));
 
 const { updateSession } = await import("@/lib/supabase/proxy");
 

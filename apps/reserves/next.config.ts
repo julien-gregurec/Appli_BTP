@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@elsatia/application-access", "@elsatia/email"],
+  transpilePackages: ["@elsatia/application-access", "@elsatia/email", "@elsatia/incident-control"],
   poweredByHeader: false,
   // Chromium headless et son pilote ne sont jamais empaquetés par le bundler : ils sont
   // chargés à l'exécution par la route de génération de PDF, comme dans Gestion Pro.
