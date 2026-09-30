@@ -116,7 +116,9 @@ test("interrupteur opérateur global read_only : écritures refusées pour tous,
   const projectId = await createProject(u.page, u.workspace, "Projet global");
   const token = await studioAccessToken(u.context);
   try {
-    studioSql("update studio_guard.control set mode = 'read_only'");
+    // Train V8 : le mode sûr Studio (migration dédiée 20260929180000) exige un motif pour toute
+    // bascule hors read_write (journalisée) ; le banc en fournit un, la règle n'est pas assouplie.
+    studioSql("update studio_guard.control set mode = 'read_only', reason = 'E2E 06 interrupteur global'");
     expect((await api(u.page, "GET", `/api/projects/${projectId}`)).status).toBe(200);
     const direct = await rpcAsUser(token, "studio_create_project", { p_workspace: u.workspace, p_name: "Global", p_type: "free" });
     expect(direct.status).toBe(403);
@@ -126,7 +128,7 @@ test("interrupteur opérateur global read_only : écritures refusées pour tous,
     await expect(u.page.getByRole("alert").or(u.page.getByText(/lecture seule|refusée/))).toBeVisible();
     expect(studioSql(`select name from studio_workspaces where id=${quote(u.workspace)}`)).not.toBe("Refus global");
   } finally {
-    studioSql("update studio_guard.control set mode = 'read_write'");
+    studioSql("update studio_guard.control set mode = 'read_write', reason = null");
   }
   const ok = await rpcAsUser(token, "studio_create_project", { p_workspace: u.workspace, p_name: "Retour", p_type: "free" });
   expect(ok.status).toBe(200);

@@ -196,8 +196,9 @@ select is((select count(*) from public.studio_render_shares where workspace_id =
 select is((select count(*) from public.studio_workspace_invitations where workspace_id = pg_temp.v('wr') and revoked_at is null), 0::bigint, 'Invitation de r révoquée');
 select is((select count(*) from public.studio_brand_kits where workspace_id = pg_temp.v('wr')), 0::bigint, 'Aucune identité de marque écrite par r');
 
--- Mode global read_only : écritures refusées pour tous, révocations maintenues.
-update studio_guard.control set mode = 'read_only';
+-- Mode global read_only : écritures refusées pour tous, révocations maintenues. Train V8 : le mode
+-- sûr Studio (20260929180000) exige un motif pour toute bascule hors read_write.
+update studio_guard.control set mode = 'read_only', reason = 'post-H : interrupteur global';
 select set_config('test.p.sa2', (select id from public.studio_render_shares where token_hash = pg_temp.h('share-a2'))::text, true);
 select set_config('test.p.sa', (select id from public.studio_render_shares where token_hash = pg_temp.h('share-a'))::text, true);
 set local role authenticated;
@@ -207,7 +208,7 @@ select throws_ok(format($$select public.studio_save_brand_kit(%L, '{"company_nam
 select lives_ok(format($$select public.studio_revoke_render_share(%L)$$, pg_temp.v('sa2')),
   'Mode global read_only : révocation maintenue');
 reset role;
-update studio_guard.control set mode = 'read_write';
+update studio_guard.control set mode = 'read_write', reason = null;
 
 -- Service : aucune écriture directe sur les tables post-H.
 set local role service_role;
