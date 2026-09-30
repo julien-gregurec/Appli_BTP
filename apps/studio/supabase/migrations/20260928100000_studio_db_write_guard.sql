@@ -25,7 +25,7 @@
 --              droit Studio accordé) ; 'unlinked' seulement si allow_unlinked_writes (instances
 --              jetables de test). Sinon 42501 « Accès Studio en lecture seule ».
 --   service  → UNIQUEMENT à l'intérieur d'un chemin système déclaré (GUC studio.write_path, posé par
---              la clause SET de la fonction, jamais par le client) et SEULEMENT sur les tables de ce
+--              l'enveloppe de la fonction système, jamais par le client) et SEULEMENT sur les tables de ce
 --              chemin. Écriture de table directe avec la clé service : refusée.
 --   operator → autorisé (maintenance explicite) ; s'il déclare un chemin, il y est borné.
 --   anon     → refusé.
@@ -50,7 +50,8 @@ create table studio_guard.control (
 insert into studio_guard.control (singleton) values (true);
 
 -- Chemins système : liste FERMÉE, revue en migration. Une fonction système porte
--- `set studio.write_path = '<chemin>'` ; la garde n'autorise alors que les tables listées.
+-- `studio.write_path = '<chemin>'` (posé par son enveloppe, voir studio_guard.bind_path) ; la garde
+-- n'autorise alors que les tables listées.
 create table studio_guard.system_paths (
   path text primary key check (path ~ '^[a-z_]{3,40}$'),
   tables text[] not null check (cardinality(tables) between 1 and 40),
@@ -234,31 +235,102 @@ revoke insert, update, delete, truncate on
   public.studio_signup_policy
   from anon, authenticated, service_role;
 
--- Chemins système : clause SET sur chaque fonction service_role qui écrit. Aucun corps modifié.
-alter function public.studio_identity_consume_handoff(uuid, timestamptz) set studio.write_path = 'identity';
-alter function public.studio_identity_accept_handoff(text, bigint, boolean, text, timestamptz) set studio.write_path = 'identity';
-alter function public.studio_identity_link(text, uuid, text) set studio.write_path = 'identity';
-alter function public.studio_identity_record_handoff(text, text) set studio.write_path = 'identity';
-alter function public.studio_identity_register_session(uuid, uuid, text) set studio.write_path = 'identity';
-alter function public.studio_identity_apply_lifecycle(uuid, text, bigint, text, text, boolean, boolean, text, timestamptz) set studio.write_path = 'identity';
-alter function public.studio_identity_confirm_ban(uuid, boolean) set studio.write_path = 'identity';
-alter function public.studio_identity_revoke_sessions(uuid, uuid) set studio.write_path = 'identity';
-alter function public.studio_identity_purge() set studio.write_path = 'identity';
-alter function public.studio_expire_media(uuid) set studio.write_path = 'media_cleanup';
-alter function public.studio_render_dispatch() set studio.write_path = 'render_worker';
-alter function public.studio_claim_render(uuid, uuid) set studio.write_path = 'render_worker';
-alter function public.studio_render_progress(uuid, uuid, text, integer, text) set studio.write_path = 'render_worker';
-alter function public.studio_complete_render(uuid, uuid, bigint, integer) set studio.write_path = 'render_worker';
-alter function public.studio_analysis_dispatch() set studio.write_path = 'analysis_worker';
-alter function public.studio_claim_analysis(uuid, uuid) set studio.write_path = 'analysis_worker';
-alter function public.studio_analysis_touch(uuid, uuid) set studio.write_path = 'analysis_worker';
-alter function public.studio_finish_analysis(uuid, uuid, jsonb, integer, boolean, text) set studio.write_path = 'analysis_worker';
+-- Chemins système : chaque fonction service_role qui écrit s'exécute dans un chemin déclaré.
+-- Pas de clause `SET studio.write_path` de fonction : sur un projet HÉBERGÉ (Supabase, PostgreSQL
+-- ≥ 15) le rôle de migration n'est pas super-utilisateur, et PostgreSQL refuse alors de stocker un
+-- paramètre personnalisé dans une clause SET (« permission denied to set parameter », 42501 ; ni
+-- GRANT SET ON PARAMETER). Sémantique identique sans clause SET : la fonction d'origine (corps
+-- INCHANGÉ) passe dans le schéma privé studio_guard_impl ; une enveloppe publique de même signature,
+-- mêmes droits, pose le chemin (set_config local), l'appelle, puis restaure le chemin précédent. En
+-- cas d'erreur, l'annulation de la (sous-)transaction restaure le paramètre, comme la clause SET.
+create schema studio_guard_impl;
+revoke all on schema studio_guard_impl from public;
+
+-- Registre des enveloppes (preuve d'inventaire pour les suites pgTAP).
+create table studio_guard.path_functions (
+  fn text primary key,
+  path text not null references studio_guard.system_paths (path),
+  bound_at timestamptz not null default now()
+);
+alter table studio_guard.path_functions enable row level security;
+revoke all on studio_guard.path_functions from public, anon, authenticated, service_role;
+create trigger studio_write_guard before insert or update or delete or truncate on studio_guard.path_functions
+  for each statement execute function studio_guard.statement_guard();
+
+create function studio_guard.bind_path(p_fn regprocedure, p_path text) returns void
+language plpgsql set search_path = '' as $$
+declare
+  v_proc pg_catalog.pg_proc;
+  v_sig text := p_fn::text;  -- search_path vide : public.nom(types), toujours qualifié
+  v_args text := pg_catalog.pg_get_function_arguments(p_fn);
+  v_result text := pg_catalog.pg_get_function_result(p_fn);
+  v_call text;
+  v_decl text := '';
+  v_invoke text;
+  v_return text := '';
+  v_wrapper regprocedure;
+  v_grantee oid;
+begin
+  select * into v_proc from pg_catalog.pg_proc where oid = p_fn;
+  if v_proc.pronamespace <> 'public'::regnamespace or v_proc.prokind <> 'f' or v_proc.provariadic <> 0
+     or v_proc.prorettype in ('trigger'::regtype, 'record'::regtype) and not v_proc.proretset
+     or v_proc.proallargtypes is not null and not v_proc.proretset
+     or exists (select 1 from unnest(coalesce(v_proc.proconfig, '{}')) c where c like 'studio.write_path=%') then
+    raise exception 'bind_path : fonction non prise en charge (%)', v_sig;
+  end if;
+  if not exists (select 1 from studio_guard.system_paths where path = p_path) then
+    raise exception 'bind_path : chemin système inconnu (%)', p_path;
+  end if;
+  if exists (select 1 from pg_catalog.pg_proc where pronamespace = 'studio_guard_impl'::regnamespace and proname = v_proc.proname) then
+    raise exception 'bind_path : déjà liée (%)', v_sig;
+  end if;
+  select coalesce(string_agg(format('$%s', i), ', ' order by i), '') into v_call from generate_series(1, v_proc.pronargs) i;
+  if v_proc.proretset then
+    v_invoke := format('return query select * from studio_guard_impl.%I(%s);', v_proc.proname, v_call);
+  elsif v_proc.prorettype = 'void'::regtype then
+    v_invoke := format('perform studio_guard_impl.%I(%s);', v_proc.proname, v_call);
+  else
+    v_decl := format(' studio_guard_result %s;', v_result);
+    v_invoke := format('studio_guard_result := studio_guard_impl.%I(%s);', v_proc.proname, v_call);
+    v_return := ' studio_guard_result';
+  end if;
+
+  execute format('alter function %s set schema studio_guard_impl', v_sig);
+  execute format(
+    'create function public.%I(%s) returns %s language plpgsql security definer%s set search_path = '''' as %L',
+    v_proc.proname, v_args, v_result, case when v_proc.proisstrict then ' strict' else '' end,
+    format(E'declare studio_guard_prev text := pg_catalog.current_setting(''studio.write_path'', true);%s\nbegin\n'
+           '  perform pg_catalog.set_config(''studio.write_path'', %L, true);\n  %s\n'
+           '  perform pg_catalog.set_config(''studio.write_path'', coalesce(studio_guard_prev, ''''), true);\n'
+           '  return%s;\nend', v_decl, p_path, v_invoke, v_return));
+  v_wrapper := v_sig::regprocedure;
+
+  -- Droits : l'enveloppe reçoit EXACTEMENT les droits d'exécution d'origine (les privilèges par
+  -- défaut du schéma public sont retirés) ; l'original n'est plus exécutable que par son propriétaire.
+  for v_grantee in select a.grantee from pg_catalog.pg_proc p, aclexplode(p.proacl) a
+                    where p.oid = v_wrapper and a.grantee <> p.proowner loop
+    execute format('revoke all on function %s from %s', v_sig, case when v_grantee = 0 then 'public' else quote_ident(v_grantee::regrole::text) end);
+  end loop;
+  execute format('revoke all on function %s from public', v_sig);
+  for v_grantee in select a.grantee from aclexplode(coalesce(v_proc.proacl, acldefault('f', v_proc.proowner))) a
+                    where a.privilege_type = 'EXECUTE' and a.grantee <> v_proc.proowner loop
+    execute format('grant execute on function %s to %s', v_sig, case when v_grantee = 0 then 'public' else quote_ident(v_grantee::regrole::text) end);
+  end loop;
+  for v_grantee in select a.grantee from aclexplode(coalesce(v_proc.proacl, acldefault('f', v_proc.proowner))) a
+                    where a.grantee <> v_proc.proowner loop
+    execute format('revoke all on function %s from %s', p_fn::regprocedure::text, case when v_grantee = 0 then 'public' else quote_ident(v_grantee::regrole::text) end);
+  end loop;
+  execute format('comment on function %s is %L', v_sig, coalesce(obj_description(p_fn, 'pg_proc') || ' ', '') || format('[chemin système : %s]', p_path));
+  insert into studio_guard.path_functions (fn, path) values (v_sig, p_path);
+end;
+$$;
+revoke all on function studio_guard.bind_path(regprocedure, text) from public, anon, authenticated, service_role;
 
 -- studio_finish_media : l'acteur est fourni par le serveur (clé service) ; la garde de chemin ne le
 -- voit pas. Il doit lui-même avoir un accès complet au moment de la validation (droit retiré entre
 -- la réservation et la confirmation = refus). Corps identique à 20260912160000 + cette vérification.
 create or replace function public.studio_finish_media(p_asset uuid,p_actor uuid,p_metadata jsonb) returns void
-language plpgsql security definer set search_path='' set studio.write_path = 'media_finalize' as $$
+language plpgsql security definer set search_path='' as $$
 declare asset public.studio_media_assets; role_name text;
 begin
  if studio_guard.user_write_access(p_actor) <> 'full' then raise exception 'Accès Studio en lecture seule' using errcode='42501', hint='STUDIO_READ_ONLY'; end if;
@@ -280,7 +352,7 @@ grant execute on function public.studio_finish_media(uuid,uuid,jsonb) to service
 -- remplacées par des RPC bornées au chemin media_cleanup.
 -- Échec de validation serveur : l'objet reste inaccessible jusqu'à l'expiration (inchangé).
 create function public.studio_fail_media(p_asset uuid) returns boolean
-language sql security definer set search_path = '' set studio.write_path = 'media_cleanup' as $$
+language sql security definer set search_path = '' as $$
   with u as (
     update public.studio_media_assets set upload_status = 'failed', updated_at = now()
      where id = p_asset and deleted_at is null and upload_status <> 'ready'
@@ -289,7 +361,7 @@ language sql security definer set search_path = '' set studio.write_path = 'medi
 $$;
 -- Réconciliation : objet « ready » absent du stockage.
 create function public.studio_mark_media_missing(p_asset uuid) returns boolean
-language sql security definer set search_path = '' set studio.write_path = 'media_cleanup' as $$
+language sql security definer set search_path = '' as $$
   with u as (
     update public.studio_media_assets set upload_status = 'failed', updated_at = now()
      where id = p_asset and upload_status = 'ready'
@@ -299,7 +371,7 @@ $$;
 -- Réconciliation : purge physique constatée (l'appelant a vérifié l'absence de l'objet). Refus si
 -- l'objet existe encore ou si une référence de projet subsiste.
 create function public.studio_mark_media_purged(p_asset uuid) returns boolean
-language plpgsql security definer set search_path = '' set studio.write_path = 'media_cleanup' as $$
+language plpgsql security definer set search_path = '' as $$
 declare a public.studio_media_assets;
 begin
   select * into a from public.studio_media_assets where id = p_asset for update;
@@ -316,5 +388,29 @@ revoke all on function public.studio_fail_media(uuid), public.studio_mark_media_
   public.studio_mark_media_purged(uuid) from public, anon, authenticated;
 grant execute on function public.studio_fail_media(uuid), public.studio_mark_media_missing(uuid),
   public.studio_mark_media_purged(uuid) to service_role;
+
+-- Liaison des chemins système (après les droits définitifs de chaque fonction).
+select studio_guard.bind_path('public.studio_identity_consume_handoff(uuid, timestamptz)', 'identity');
+select studio_guard.bind_path('public.studio_identity_accept_handoff(text, bigint, boolean, text, timestamptz)', 'identity');
+select studio_guard.bind_path('public.studio_identity_link(text, uuid, text)', 'identity');
+select studio_guard.bind_path('public.studio_identity_record_handoff(text, text)', 'identity');
+select studio_guard.bind_path('public.studio_identity_register_session(uuid, uuid, text)', 'identity');
+select studio_guard.bind_path('public.studio_identity_apply_lifecycle(uuid, text, bigint, text, text, boolean, boolean, text, timestamptz)', 'identity');
+select studio_guard.bind_path('public.studio_identity_confirm_ban(uuid, boolean)', 'identity');
+select studio_guard.bind_path('public.studio_identity_revoke_sessions(uuid, uuid)', 'identity');
+select studio_guard.bind_path('public.studio_identity_purge()', 'identity');
+select studio_guard.bind_path('public.studio_expire_media(uuid)', 'media_cleanup');
+select studio_guard.bind_path('public.studio_render_dispatch()', 'render_worker');
+select studio_guard.bind_path('public.studio_claim_render(uuid, uuid)', 'render_worker');
+select studio_guard.bind_path('public.studio_render_progress(uuid, uuid, text, integer, text)', 'render_worker');
+select studio_guard.bind_path('public.studio_complete_render(uuid, uuid, bigint, integer)', 'render_worker');
+select studio_guard.bind_path('public.studio_analysis_dispatch()', 'analysis_worker');
+select studio_guard.bind_path('public.studio_claim_analysis(uuid, uuid)', 'analysis_worker');
+select studio_guard.bind_path('public.studio_analysis_touch(uuid, uuid)', 'analysis_worker');
+select studio_guard.bind_path('public.studio_finish_analysis(uuid, uuid, jsonb, integer, boolean, text)', 'analysis_worker');
+select studio_guard.bind_path('public.studio_finish_media(uuid, uuid, jsonb)', 'media_finalize');
+select studio_guard.bind_path('public.studio_fail_media(uuid)', 'media_cleanup');
+select studio_guard.bind_path('public.studio_mark_media_missing(uuid)', 'media_cleanup');
+select studio_guard.bind_path('public.studio_mark_media_purged(uuid)', 'media_cleanup');
 
 commit;

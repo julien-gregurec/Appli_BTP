@@ -245,7 +245,7 @@ $$;
 
 -- Plan (dry-run) : inventaire classé, enregistré sur la demande. Aucune suppression.
 create function public.studio_erasure_prepare(p_request uuid) returns jsonb
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   pol studio_identity.erasure_policy;
   r studio_identity.erasure_requests;
@@ -275,7 +275,7 @@ $$;
 -- son entrée de liste d'admission ; met en file Storage les objets et préfixes AVANT de supprimer
 -- les lignes qui les référencent. Rejouable : chaque appel recalcule le périmètre restant.
 create function public.studio_erasure_execute(p_request uuid) returns jsonb
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   pol studio_identity.erasure_policy;
   r studio_identity.erasure_requests;
@@ -374,7 +374,7 @@ $$;
 
 -- Constat d'effacement Storage : vérifié EN BASE (aucun objet restant), jamais sur parole.
 create function public.studio_erasure_storage_done(p_queue_id bigint) returns boolean
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   q studio_identity.erasure_storage_queue;
 begin
@@ -394,7 +394,7 @@ $$;
 -- sessions ; anonymise l'état (droit/plan) en gardant le sujet opaque et « deleted » pour refuser
 -- tout jeton tardif. Retourne l'utilisateur Auth Studio à supprimer (GoTrue, par l'application).
 create function public.studio_erasure_finalize(p_request uuid) returns uuid
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   pol studio_identity.erasure_policy;
   r studio_identity.erasure_requests;
@@ -428,7 +428,7 @@ $$;
 
 -- Constat de suppression de l'utilisateur Auth Studio (vérifié en base).
 create function public.studio_erasure_confirm_auth_deleted(p_request uuid) returns boolean
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   r studio_identity.erasure_requests;
 begin
@@ -465,5 +465,12 @@ begin
   end loop;
 end;
 $$;
+
+-- Chemin système rgpd_erasure : enveloppes (studio_guard.bind_path, 20260928100000).
+select studio_guard.bind_path('public.studio_erasure_prepare(uuid)', 'rgpd_erasure');
+select studio_guard.bind_path('public.studio_erasure_execute(uuid)', 'rgpd_erasure');
+select studio_guard.bind_path('public.studio_erasure_storage_done(bigint)', 'rgpd_erasure');
+select studio_guard.bind_path('public.studio_erasure_finalize(uuid)', 'rgpd_erasure');
+select studio_guard.bind_path('public.studio_erasure_confirm_auth_deleted(uuid)', 'rgpd_erasure');
 
 commit;

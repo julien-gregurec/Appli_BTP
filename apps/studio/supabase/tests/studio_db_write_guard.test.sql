@@ -5,6 +5,9 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
+-- Plateforme Supabase réelle : storage.protect_delete refuse toute suppression SQL directe hors
+-- Storage API (storage.allow_delete_query). On émule ici storage-api pour éprouver la garde Studio.
+select set_config('storage.allow_delete_query', 'true', true);
 update studio_guard.control set mode = 'read_write', allow_unlinked_writes = false;
 
 create function pg_temp.id(k text) returns uuid language sql as $$select current_setting('test.g.'||k)::uuid$$;
@@ -172,7 +175,8 @@ set local role service_role;
 select throws_ok($$update public.studio_media_assets set upload_status = 'failed'$$, '42501', null, 'service_role : plus aucune écriture de table directe (droit retiré)');
 select throws_ok($$truncate public.studio_render_outbox$$, '42501', null, 'service_role : TRUNCATE refusé');
 reset role;
-grant update on public.studio_projects to service_role;
+-- SELECT inclus : `set name = name` lit la colonne (service_role n'a aucune lecture de studio_projects).
+grant select, update on public.studio_projects to service_role;
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select throws_ok($$update public.studio_projects set name = name$$, '42501', 'Écriture service hors chemin système (UPDATE public.studio_projects)', 'service_role même avec un GRANT : refusé hors chemin système');
@@ -203,8 +207,33 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
 select is((select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname = 'public' and p.proname like 'studio%' and p.provolatile = 'v'
               and has_function_privilege('service_role', p.oid, 'execute') and not has_function_privilege('authenticated', p.oid, 'execute')
-              and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'studio.write_path=%')),
+              and not exists (select 1 from studio_guard.path_functions f where f.fn::regprocedure = p.oid)),
           null, 'Chaque RPC service_role qui écrit déclare un chemin système');
+-- Chemins système par enveloppe (hébergé : aucune clause SET de paramètre personnalisé possible).
+select is((select count(*)::int from pg_proc p where exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'studio.write_path=%')),
+          0, 'Aucune clause SET studio.write_path (refusée par un projet hébergé non super-utilisateur)');
+select is((select count(*)::int from studio_guard.path_functions f join pg_proc p on p.oid = f.fn::regprocedure
+            join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.prosecdef and 'search_path=""' = any (p.proconfig)
+             and exists (select 1 from pg_proc i where i.pronamespace = 'studio_guard_impl'::regnamespace and i.proname = p.proname
+                           and i.proargtypes = p.proargtypes and i.prorettype = p.prorettype)),
+          (select count(*)::int from studio_guard.path_functions), 'Chaque chemin lié = enveloppe publique SECURITY DEFINER + original privé de même signature');
+select is((select count(*)::int from pg_proc i where i.pronamespace = 'studio_guard_impl'::regnamespace
+            and (has_function_privilege('anon', i.oid, 'execute') or has_function_privilege('authenticated', i.oid, 'execute')
+                 or has_function_privilege('service_role', i.oid, 'execute'))),
+          0, 'Originaux enveloppés : non exécutables par anon/authenticated/service_role');
+select ok(not has_schema_privilege('service_role', 'studio_guard_impl', 'usage') and not has_schema_privilege('authenticated', 'studio_guard_impl', 'usage'),
+          'Schéma studio_guard_impl : aucun accès API');
+select ok(not has_function_privilege('service_role', 'studio_guard.bind_path(regprocedure, text)', 'execute')
+          and not has_function_privilege('authenticated', 'studio_guard.bind_path(regprocedure, text)', 'execute'),
+          'bind_path : réservé aux migrations');
+-- Portée : posé pendant l'appel, restauré après (comme une clause SET).
+set local role service_role;
+select set_config('studio.write_path', 'avant', true);
+select lives_ok($$select public.studio_render_dispatch()$$, 'Enveloppe : appel service_role du chemin render_worker');
+select is(current_setting('studio.write_path', true), 'avant', 'Enveloppe : chemin précédent restauré après l''appel');
+select set_config('studio.write_path', '', true);
+reset role;
 select is((select array_agg(c.oid::regclass::text order by 1) from pg_class c join pg_namespace n on n.oid = c.relnamespace
             where c.relkind = 'r' and (n.nspname in ('studio_identity', 'studio_guard') or (n.nspname = 'public' and c.relname like 'studio%'))
               and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = 'studio_write_guard')),

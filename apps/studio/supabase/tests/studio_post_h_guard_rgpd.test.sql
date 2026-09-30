@@ -7,6 +7,9 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
+-- Plateforme Supabase réelle : storage.protect_delete refuse toute suppression SQL directe hors
+-- Storage API (storage.allow_delete_query). On émule ici storage-api pour éprouver la garde Studio.
+select set_config('storage.allow_delete_query', 'true', true);
 update studio_guard.control set mode = 'read_write', allow_unlinked_writes = false;
 update studio_identity.erasure_policy set mode = 'off', decision_ref = null, grace_period = null;
 
@@ -107,7 +110,7 @@ select ok((select bool_and(p.provolatile = 's' and has_function_privilege('servi
   'Résolutions publiques (lien, invitation) : service_role seul, STABLE (lecture)');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
             where n.nspname = 'public' and p.proname in ('studio_revoke_render_share','studio_revoke_invitation')
-              and 'studio.write_path=exposure_revocation' = any (p.proconfig)), 2,
+              and exists (select 1 from studio_guard.path_functions f where f.fn::regprocedure = p.oid and f.path = 'exposure_revocation')), 2,
   'Révocations : chemin exposure_revocation déclaré');
 select is((select array_agg(t order by t) from unnest(array['studio_render_limits','studio_usage_events','studio_brand_kits',
              'studio_render_shares','studio_workspace_invitations']) t

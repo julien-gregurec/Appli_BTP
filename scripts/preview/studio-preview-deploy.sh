@@ -32,7 +32,7 @@ guard() {
   local extra=()
   [ -n "${STUDIO_PREVIEW_WORKER_ENV:-}" ] && extra=(--worker-env-file "$STUDIO_PREVIEW_WORKER_ENV")
   node "$ROOT/scripts/preview/studio-preview-guard.mjs" --env-file "$STUDIO_PREVIEW_ENV_FILE" \
-    --studio-ref "$STUDIO_PREVIEW_REF" --check-links "${extra[@]}" || { echo "STOP WRITES" >&2; exit 1; }
+    --studio-ref "$STUDIO_PREVIEW_REF" --check-links ${extra[@]+"${extra[@]}"} || { echo "STOP WRITES" >&2; exit 1; }
 }
 supa() { (cd "$ROOT" && npx --yes supabase "$@" --workdir apps/studio); }
 vercel() { npx --yes vercel "$@" --cwd "$APP"; }
@@ -86,7 +86,7 @@ case "$cmd" in
   smoke)
     [ -n "${1:-}" ] || die "smoke <url>"
     extra=(); [[ "$1" == *"$DOMAIN"* ]] && extra=(--allow-custom-domain)
-    node "$ROOT/scripts/preview/studio-preview-smoke.mjs" --studio "$1" --supabase-url "https://$STUDIO_PREVIEW_REF.supabase.co" --env-file "$STUDIO_PREVIEW_ENV_FILE" "${extra[@]}"
+    node "$ROOT/scripts/preview/studio-preview-smoke.mjs" --studio "$1" --supabase-url "https://$STUDIO_PREVIEW_REF.supabase.co" --env-file "$STUDIO_PREVIEW_ENV_FILE" ${extra[@]+"${extra[@]}"}
     ;;
   disable)
     guard

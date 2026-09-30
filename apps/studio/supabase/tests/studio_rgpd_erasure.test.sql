@@ -4,6 +4,9 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
+-- Plateforme Supabase réelle : storage.protect_delete refuse toute suppression SQL directe hors
+-- Storage API (storage.allow_delete_query). On émule ici storage-api pour éprouver la garde Studio.
+select set_config('storage.allow_delete_query', 'true', true);
 update studio_guard.control set mode = 'read_write', allow_unlinked_writes = false;
 update studio_identity.erasure_policy set mode = 'off', decision_ref = null, grace_period = null;
 update public.studio_signup_policy set allowlist = array['efface@example.test', '@autre.test'];

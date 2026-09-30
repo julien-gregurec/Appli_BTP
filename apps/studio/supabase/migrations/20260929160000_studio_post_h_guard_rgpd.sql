@@ -86,8 +86,8 @@ end;
 $$;
 revoke all on function studio_guard.assert_write(text, text) from public, anon, authenticated, service_role;
 
-alter function public.studio_revoke_render_share(uuid) set studio.write_path = 'exposure_revocation';
-alter function public.studio_revoke_invitation(uuid) set studio.write_path = 'exposure_revocation';
+select studio_guard.bind_path('public.studio_revoke_render_share(uuid)', 'exposure_revocation');
+select studio_guard.bind_path('public.studio_revoke_invitation(uuid)', 'exposure_revocation');
 
 create or replace function studio_identity.erasure_inventory(p_request uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -155,8 +155,9 @@ begin
 end;
 $$;
 
-create or replace function public.studio_erasure_execute(p_request uuid) returns jsonb
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+-- Corps de l'original enveloppé (chemin rgpd_erasure posé par l'enveloppe publique).
+create or replace function studio_guard_impl.studio_erasure_execute(p_request uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
 declare
   pol studio_identity.erasure_policy;
   r studio_identity.erasure_requests;
@@ -251,8 +252,9 @@ begin
 end;
 $$;
 
-create or replace function public.studio_erasure_finalize(p_request uuid) returns uuid
-language plpgsql security definer set search_path = '' set studio.write_path = 'rgpd_erasure' as $$
+-- Corps de l'original enveloppé (chemin rgpd_erasure posé par l'enveloppe publique).
+create or replace function studio_guard_impl.studio_erasure_finalize(p_request uuid) returns uuid
+language plpgsql security definer set search_path = '' as $$
 declare
   pol studio_identity.erasure_policy;
   r studio_identity.erasure_requests;
