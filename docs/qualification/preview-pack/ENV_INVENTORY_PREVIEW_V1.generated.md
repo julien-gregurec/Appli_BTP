@@ -10,7 +10,7 @@
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
-| studio | 27 | 7 | 8 | 12 | 0 | 3 | 4 | 4 |
+| studio | 28 | 7 | 9 | 12 | 1 | 3 | 4 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
 
 ### gestion_pro — ELSATIA Gestion Pro (inclut Boutique, DOE, API de facturation Tools)
@@ -195,6 +195,7 @@
 | `ELSATIA_IDENTITY_ISSUER` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé (GP émetteur et Studio vérificateur) |
 | `ELSATIA_IDENTITY_JWKS` | CONDITIONAL |  |  |  |  |  |  |  | si ELSATIA_IDENTITY_JWKS_URL n'est pas posée |
 | `ELSATIA_IDENTITY_JWKS_URL` | CONDITIONAL |  |  |  |  |  |  |  | si ELSATIA_IDENTITY_JWKS n'est pas posée |
+| `EMAIL_PREVIEW_ALLOWLIST` | CONDITIONAL |  |  |  | oui |  |  |  | pour recevoir un e-mail applicatif en Preview ou en local |
 | `STUDIO_ANALYSIS_PYTHON` | CONDITIONAL |  |  |  |  |  |  |  | quand STUDIO_AI_ANALYSIS=1 |
 | `STUDIO_AUTH_SERVICE_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
 | `STUDIO_CRON_SECRET` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |

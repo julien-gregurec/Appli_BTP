@@ -1,4 +1,5 @@
 import "server-only";
+import { mayEmail } from "./mail-recipients";
 /**
  * Minimal transactional mailer. Providers: `mailpit` (local catcher), `resend` (HTTPS API), or none.
  * Without a provider nothing is sent and the caller shows the link to copy. Secrets never reach a log.
@@ -31,6 +32,8 @@ export async function sendMail(mail: Mail): Promise<boolean> {
     if (provider === "resend") {
       const key = process.env.STUDIO_RESEND_API_KEY;
       if (!key) return false;
+      // Preview/local: only allowlisted recipients (never a real customer); otherwise copy the link.
+      if (!mayEmail(mail.to)) return false;
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },

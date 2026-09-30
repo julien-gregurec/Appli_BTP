@@ -381,6 +381,10 @@
       {
         "path": "scripts/dr/v2/garde-cible.mjs",
         "justification": "Garde-fou DR V2 : lit, dans l'environnement reçu en paramètre, une liste fermée d'indicateurs de Production (VERCEL_ENV, ELSATIA_ENV, APP_ENV, NODE_ENV, NEXT_PUBLIC_SUPABASE_URL, DATABASE_URL) pour REFUSER une cible ; testé par garde-cible.test.mjs."
+      },
+      {
+        "path": "scripts/preview/studio-preview-guard.mjs",
+        "justification": "Garde de cible Studio Preview : parcourt, dans un fichier dotenv opérateur (jamais process.env), les NEXT_PUBLIC_* pour y détecter une clé de service, et teste la présence de variables nommées en liste fermée (ELSATIA_IDENTITY_ISSUER/HANDOFF_URL, STUDIO_RESEND_API_KEY, variables GP interdites au worker) ; aucune valeur affichée."
       }
     ]
   },
@@ -1480,7 +1484,8 @@
       "applications": [
         "gestion_pro",
         "platform",
-        "reserves"
+        "reserves",
+        "studio"
       ],
       "required": false,
       "environments": [

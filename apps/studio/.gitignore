@@ -6,3 +6,6 @@ next-env.d.ts
 test-results/
 playwright-report/
 .local-test.json
+supabase/.temp/
+supabase/.branches/
+.vercel/
