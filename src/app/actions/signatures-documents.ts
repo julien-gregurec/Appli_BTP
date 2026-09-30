@@ -67,7 +67,7 @@ export async function signerDocumentMetierAction(typeBrut: string, documentId: s
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
 
-  const { data: employe } = await supabase.from("employes")
+  const { data: employe } = await supabase.from("employes_fiche")
     .select("id,prenom,nom,poste,signature_storage_path,statut")
     .eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
   if (!employe || ["sorti", "suspendu"].includes(employe.statut)) {

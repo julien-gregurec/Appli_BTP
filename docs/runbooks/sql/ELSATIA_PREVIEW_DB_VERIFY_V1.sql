@@ -24,7 +24,8 @@
 -- de plan et calques (…0928 701).
 -- Contrôle 31 (train canonique V8) : cycle commercial (…0928 701-703,
 -- ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1). Contrôle 32 (train canonique V8) : suspension commerciale
--- par application (…0929 801).
+-- par application (…0929 801). Contrôle 33 (train canonique V8) : données personnelles des salariés
+-- (…0928 701, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -445,6 +446,29 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not coalesce(has_function_privilege('authenticated', to_regprocedure('public.compte_suspendu_globalement(uuid)'), 'execute'), true)
            and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from information_schema.column_privileges where table_schema = ''public'' and table_name = ''entreprises'' and column_name = ''suspension_globale_at'' and grantee = ''authenticated'' and privilege_type = ''UPDATE''', false, true, '')))[1]::text end) = '0'
            and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.rapport_migration_suspension_par_app_v1 where changement = ''perte_acces''', false, true, '')))[1]::text end) = '0', true
+  union all
+  -- 33 : données personnelles des salariés (20260928000701) : colonnes sensibles de `employes`
+  -- non lisibles directement par authenticated/anon, fiche détaillée via employes_fiche
+  -- (authenticated seulement), export RGPD filtré par section.
+  select 33, 'Employés : colonnes personnelles fermées à la lecture directe (20260928000701)',
+         '0 colonne sensible lisible, employes_fiche authentifiés seuls, export filtré',
+         concat_ws(', ',
+           (select count(*) from unnest(array['email','telephone','notes','numero_inscription','identifiant_interne',
+                    'code_stock_hash','carte_btp_storage_path','carte_btp_numero','signature_storage_path']) c
+             where has_column_privilege('authenticated', 'public.employes', c, 'select')
+                or has_column_privilege('anon', 'public.employes', c, 'select'))::text || ' colonne(s) sensible(s) lisible(s)',
+           case when to_regclass('public.employes_fiche') is null then 'employes_fiche ABSENTE'
+                when has_table_privilege('anon', 'public.employes_fiche', 'select') then 'employes_fiche EXPOSÉE à anon'
+                else 'employes_fiche authentifiés seuls' end,
+           case when to_regprocedure('public.export_rgpd_section_autorisee(uuid,text)') is null then 'export NON filtré'
+                else 'export filtré' end),
+         (select count(*) from unnest(array['email','telephone','notes','numero_inscription','identifiant_interne',
+                  'code_stock_hash','carte_btp_storage_path','carte_btp_numero','signature_storage_path']) c
+           where has_column_privilege('authenticated', 'public.employes', c, 'select')
+              or has_column_privilege('anon', 'public.employes', c, 'select')) = 0
+           and to_regclass('public.employes_fiche') is not null
+           and not has_table_privilege('anon', 'public.employes_fiche', 'select')
+           and to_regprocedure('public.export_rgpd_section_autorisee(uuid,text)') is not null, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

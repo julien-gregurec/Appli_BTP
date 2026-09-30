@@ -13,7 +13,7 @@ export async function SignatureDocumentMetier({
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const [{ data: employe }, { data: signatures }] = await Promise.all([
-    supabase.from("employes").select("id,signature_storage_path")
+    supabase.from("employes_fiche").select("id,signature_storage_path")
       .eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
     supabase.from("signatures_documents")
       .select("id,employe_id,nom_signataire,fonction_signataire,signature_sha256,document_sha256,signed_at,declaration")

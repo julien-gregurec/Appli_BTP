@@ -61,7 +61,7 @@ export async function anonymiserEmployeAction(formData: FormData) {
 
   const supabase = await createClient();
   const { data: employe } = await supabase
-    .from("employes")
+    .from("employes_fiche")
     .select("photo_storage_path, signature_storage_path, carte_btp_storage_path")
     .eq("id", employeId)
     .eq("entreprise_id", entrepriseId)

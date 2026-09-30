@@ -272,7 +272,7 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
   const supabase=await createClient();
   const fichier=formData.get("carte_btp"),numero=champ(formData,"carte_btp_numero"),expiration=champ(formData,"carte_btp_expiration");
   const formats:Record<string,string>={"application/pdf":"pdf","image/png":"png","image/jpeg":"jpg","image/webp":"webp"};
-  const{data:employe}=await supabase.from("employes").select("id,carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
+  const{data:employe}=await supabase.from("employes_fiche").select("id,carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
   if(!employe)redirect(`/employes/${employeId}?error=${encodeURIComponent("Employé introuvable")}`);
   if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une carte en PDF, PNG, JPG ou WebP de moins de 10 Mo")}`);
   const path=`${ctx.entrepriseId}/${employeId}/carte-btp-${crypto.randomUUID()}.${formats[fichier.type]}`;
@@ -284,7 +284,7 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
   revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP enregistrée")}`);
 }
 
-export async function supprimerCarteBtpAction(employeId:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient(),{data:employe}=await supabase.from("employes").select("carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(employe?.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);await supabase.from("employes").update({carte_btp_storage_path:null,carte_btp_nom:null,carte_btp_mime_type:null,carte_btp_taille_octets:null,carte_btp_numero:null,carte_btp_expiration:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP supprimée")}`);}
+export async function supprimerCarteBtpAction(employeId:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient(),{data:employe}=await supabase.from("employes_fiche").select("carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(employe?.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);await supabase.from("employes").update({carte_btp_storage_path:null,carte_btp_nom:null,carte_btp_mime_type:null,carte_btp_taille_octets:null,carte_btp_numero:null,carte_btp_expiration:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP supprimée")}`);}
 
 export async function importerPhotoEmployeAction(employeId:string,formData:FormData){
   const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);
@@ -326,7 +326,7 @@ export async function enregistrerSignatureEmployeAction(employeId: string, dataU
   if (!m) return { ok: false as const, erreur: "Signature invalide." };
   const buffer = Buffer.from(m[1], "base64");
   if (!buffer.length || buffer.length > 2 * 1024 * 1024) return { ok: false as const, erreur: "Signature vide ou trop volumineuse." };
-  const { data: employe } = await supabase.from("employes").select("id, signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: employe } = await supabase.from("employes_fiche").select("id, signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!employe) return { ok: false as const, erreur: "Employé introuvable." };
   const path = `${ctx.entrepriseId}/${employeId}/signature-${crypto.randomUUID()}.png`;
   const { error: upload } = await supabase.storage.from("documents-employes").upload(path, buffer, { contentType: "image/png", upsert: false });
@@ -342,7 +342,7 @@ export async function supprimerSignatureEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();
   await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
-  const { data: employe } = await supabase.from("employes").select("signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: employe } = await supabase.from("employes_fiche").select("signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (employe?.signature_storage_path) await supabase.storage.from("documents-employes").remove([employe.signature_storage_path]);
   await supabase.from("employes").update({ signature_storage_path: null, signature_at: null }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
   revalidatePath(`/employes/${employeId}`);

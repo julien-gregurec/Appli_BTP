@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .eq("id", documentSignatureId).eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
     path = signature?.signature_storage_path ?? null;
   } else {
-    const { data: employe } = await supabase.from("employes").select("signature_storage_path")
+    const { data: employe } = await supabase.from("employes_fiche").select("signature_storage_path")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
     path = employe?.signature_storage_path ?? null;
   }
