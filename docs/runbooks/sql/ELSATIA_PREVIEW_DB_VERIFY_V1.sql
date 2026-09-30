@@ -34,7 +34,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (359, '20260928000701')),
+attendu_train(nb, derniere) as (values (371, '20260928000812')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -113,22 +113,33 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          (select count(*) from tables_publiques where not relrowsecurity) = 0, true
   union all
   -- Seuls les catalogues de référence lus par les pages publiques (tarifs) sont lisibles par anon,
-  -- en lecture seule ; toute autre table exposée à anon est un NO-GO.
-  select 4, 'anon : aucun droit hors 4 catalogues publics (lecture seule)', '0 table hors liste, 0 écriture',
+  -- en lecture seule ; toute autre table exposée à anon est un NO-GO. Train V8 : + les deux tables
+  -- d'état PUBLIC du mode sûr (…0928 807 : incident_controles, incident_statuts_services), lues en
+  -- lecture seule par la page de statut et le proxy avant connexion ; leurs colonnes sensibles
+  -- (motif, auteur) restent fermées à anon (contrôle 34).
+  select 4, 'anon : aucun droit hors 4 catalogues publics et 2 états publics du mode sûr (lecture seule)', '0 table hors liste, 0 écriture',
          coalesce((select string_agg(relname, ', ') from tables_publiques t
                    where has_any_column_privilege('anon', t.oid, 'select,insert,update')
-                     and (relname not in ('plans_abonnement', 'catalogue_options_abonnement', 'catalogue_services_mise_en_service', 'modeles_roles_predefinis')
+                     and (relname not in ('plans_abonnement', 'catalogue_options_abonnement', 'catalogue_services_mise_en_service', 'modeles_roles_predefinis',
+                                 'incident_controles', 'incident_statuts_services')
                           or has_any_column_privilege('anon', t.oid, 'insert,update'))), 'aucune'),
          not exists (select 1 from tables_publiques t
                      where has_any_column_privilege('anon', t.oid, 'select,insert,update')
-                       and (relname not in ('plans_abonnement', 'catalogue_options_abonnement', 'catalogue_services_mise_en_service', 'modeles_roles_predefinis')
+                       and (relname not in ('plans_abonnement', 'catalogue_options_abonnement', 'catalogue_services_mise_en_service', 'modeles_roles_predefinis',
+                                 'incident_controles', 'incident_statuts_services')
                             or has_any_column_privilege('anon', t.oid, 'insert,update'))), true
   union all
-  select 5, 'authenticated : droits explicites sur les tables cœur', 'select sur chantiers, clients, devis, factures, employes',
+  -- Train V8 (…0928 806) : `employes` n'a plus de SELECT de TABLE pour authenticated mais des SELECT
+  -- de COLONNES d'identité (colonnes sensibles fermées, contrôle 33) : le droit est vérifié par
+  -- has_any_column_privilege pour elle, par table pour les quatre autres.
+  select 5, 'authenticated : droits explicites sur les tables cœur', 'select sur chantiers, clients, devis, factures ; employes : colonnes d''identité',
          coalesce('manquant : ' || (select string_agg(x, ', ') from unnest(array['chantiers', 'clients', 'devis', 'factures', 'employes']) x
-           where not has_table_privilege('authenticated', format('public.%I', x), 'select')), 'tous accordés'),
+           where not (case when x = 'employes' then has_any_column_privilege('authenticated', 'public.employes', 'select')
+                           else has_table_privilege('authenticated', format('public.%I', x), 'select') end)), 'tous accordés'),
          (select count(*) from unnest(array['chantiers', 'clients', 'devis', 'factures', 'employes']) x
-           where not has_table_privilege('authenticated', format('public.%I', x), 'select')) = 0, true
+           where not (case when x = 'employes' then has_any_column_privilege('authenticated', 'public.employes', 'select')
+                           else has_table_privilege('authenticated', format('public.%I', x), 'select') end)) = 0
+           and has_column_privilege('authenticated', 'public.employes', 'nom', 'select'), true
   union all
   select 6, 'EXECUTE authenticated sur est_membre_actif / entreprise_sans_membres (régression 078, corrigée 187)', 'true / true',
          coalesce((select string_agg(proname || '=' || exec_auth, ', ' order by proname) from fonction_exec), 'fonctions absentes'),
@@ -258,7 +269,9 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
             'reserves_intervenants_garde_integration_gp', 'reserves_plans_garde_integration_gp')) = 4
            and to_regclass('public.reserves_contacts') is not null, true
   union all
-  select 22, 'Tools Relevé & Métré (601-801) : non commercial', 'Relevé Pro de référence (inclut Tools Pro), garde d''entitlement, 11 tables RLS',
+  -- Train V8 : + 4 tables sous RLS (Lot 8 …0928 809 : métré, ajustements ; Lot 9 …0928 810 : ouvrages,
+  -- bibliothèque, ajustements de quantitatif) → 15.
+  select 22, 'Tools Relevé & Métré (601-801) : non commercial', 'Relevé Pro de référence (inclut Tools Pro), garde d''entitlement, 15 tables RLS',
          concat_ws(', ',
            coalesce((select etat from releve_pro), 'releve_pro ABSENTE'),
            case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
@@ -268,7 +281,7 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select etat = 'releve_pro:reference:inclut tools_pro' from releve_pro), false)
            and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
            and (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
-                 and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity) = 11, true
+                 and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity) = 15, true
   union all
   select 23, 'Identité Studio (20260927100000) : fermée, inerte (Studio OFF)', 'tables RLS sans droit d''API ; 0 sujet émis',
          concat_ws(', ',
@@ -479,7 +492,7 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
   -- AAL2 vérifiés dans la fonction), chemin opérateur fermé à tout rôle d'API. Lecture dynamique :
   -- sur une base au train V7 → échec propre, sans erreur.
   select 34, 'Mode sûr : gardes partout, aucun contrôle actif, bascules fermées (20260928000807-811)',
-         '0 table sans garde, 0 contrôle actif, bascule fermée à anon, opérateur fermé aux rôles d''API',
+         '0 table sans garde, 0 contrôle actif, bascule et motifs fermés à anon, opérateur fermé aux rôles d''API',
          case when to_regprocedure('public.incident_table_exemptee(text)') is null or to_regclass('public.incident_controles') is null
                 then 'mode sûr ABSENT'
               else concat_ws(', ',
@@ -498,6 +511,9 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and (case when to_regclass('public.incident_controles') is not null then
                  (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.incident_controles where actif and (expire_at is null or expire_at > now())', false, true, '')))[1]::text end) = '0'
            and not has_function_privilege('anon', 'public.plateforme_incident_basculer(text,text,boolean,text,text,integer)', 'execute')
+           and not has_column_privilege('anon', 'public.incident_controles', 'motif', 'select')
+           and not has_column_privilege('anon', 'public.incident_controles', 'maj_par', 'select')
+           and not has_any_column_privilege('anon', 'public.incident_controles', 'insert,update')
            and not has_function_privilege('authenticated', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute')
            and not has_function_privilege('service_role', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute'), true
   union all
