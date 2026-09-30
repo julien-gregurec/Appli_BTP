@@ -22,6 +22,7 @@
  * | `plan` / `plan-memory` | Lot 5 : plan 2D par étage (états, murs, ouvertures, contours), enregistrement par différence, gel, ancres photo, contrat d'export |
  * | `units` / `metre` | Lot 8 : unités exactes, métré (miroir du calcul serveur), cotes, revêtements, ajustements, synthèse, CSV, contrat GP |
  * | `quantitatif` | Lot 9 : ouvrages, bibliothèque, moteur de quantités déterministe (miroir SQL), ajustements, anomalies, synthèse, CSV, contrat GP 1.0.0 |
+ * | `estimation` | Lot 10 : estimation simplifiée HT (prix structurés, moteur miroir SQL, corrections auditées, sous-totaux, comparaison, CSV, contrat GP estimation 1.0.0) |
  * | `gp-sync` | contrat v1 de transmission vers Gestion Pro (non branché) |
  * | `repository` / `service` | port de persistance et cas d'usage |
  */
@@ -50,3 +51,4 @@ export * from "./plan-memory";
 export * from "./units";
 export * from "./metre";
 export * from "./quantitatif";
+export * from "./estimation";

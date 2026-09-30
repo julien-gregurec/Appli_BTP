@@ -870,7 +870,10 @@ export type QuantitatifTotal = {
 export type QuantitatifGroupe = { readonly cle: string; readonly libelle: string; readonly chemin: readonly string[]; readonly totaux: QuantitatifTotal[]; lignes: number };
 
 /** Clé et libellé d'une ligne pour un niveau d'agrégation (l'étage porte les éléments partagés). */
-function niveauCle(detail: QuantitatifLigneDetail, niveau: QuantitatifNiveau): { cle: string; libelle: string; chemin: string[] } {
+/** Détail minimal pour situer une ligne dans un niveau d'agrégation (quantitatif, estimation — Lot 10). */
+export type NiveauDetail = Pick<QuantitatifLigneDetail, "chantier" | "batiment" | "etage" | "zone" | "piece" | "lot" | "cle"> & { readonly ouvrage: Pick<OuvrageDonnees, "nom" | "unite"> };
+
+export function niveauCle(detail: NiveauDetail, niveau: QuantitatifNiveau): { cle: string; libelle: string; chemin: string[] } {
   const c = detail.chantier?.nom ?? "—"; const b = detail.batiment?.nom ?? "—"; const e = detail.etage?.nom ?? "—";
   switch (niveau) {
     case "chantier": return { cle: detail.chantier?.id ?? "-", libelle: c, chemin: [c] };
