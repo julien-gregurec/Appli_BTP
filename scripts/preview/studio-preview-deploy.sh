@@ -36,6 +36,16 @@ guard() {
 }
 supa() { (cd "$ROOT" && npx --yes supabase "$@" --workdir apps/studio); }
 vercel() { npx --yes vercel "$@" --cwd "$APP"; }
+# Déploiement : toujours --target=preview (la CLI ≥ 62 cible la PRODUCTION par défaut sur un projet
+# sans dépôt Git connecté), depuis un export PROPRE du commit courant (git archive : seuls les fichiers
+# suivis partent, jamais un .env local), racine du monorepo (Root Directory du projet = apps/studio).
+deploy_preview() {
+  local tmp; tmp="$(mktemp -d)"
+  git -C "$ROOT" archive HEAD | tar -x -C "$tmp"
+  mkdir -p "$tmp/.vercel"; cp "$APP/.vercel/project.json" "$tmp/.vercel/project.json"
+  npx --yes vercel deploy --yes --target=preview --cwd "$tmp"
+  rm -rf "$tmp"
+}
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
@@ -75,7 +85,8 @@ case "$cmd" in
     ;;
   deploy)
     guard
-    url="$(vercel deploy --yes)"
+    [ -z "$(git -C "$ROOT" status --porcelain)" ] || die "arbre de travail non propre : committer avant de déployer"
+    url="$(deploy_preview)"
     echo "Déploiement Preview : $url"
     ;;
   alias)
@@ -92,7 +103,7 @@ case "$cmd" in
     guard
     vercel env rm STUDIO_ENABLED preview --yes >/dev/null 2>&1 || true
     printf '0' | vercel env add STUDIO_ENABLED preview >/dev/null
-    url="$(vercel deploy --yes)"
+    url="$(deploy_preview)"
     vercel alias set "$url" "$DOMAIN"
     echo "Studio Preview désactivée (503) : $url"
     ;;
