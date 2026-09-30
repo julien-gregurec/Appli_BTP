@@ -232,7 +232,7 @@ compléter `url_preview` des apps :
 update public.applications_elsatia set url_preview = '<origine>' where code = '<gestion_pro|colors|tools|reserves>';
 ```
 
-(ou via `/plateforme/applications`). Relancer `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` : <!--train:controles-->30<!--/train:controles-->/<!--train:controles-->30<!--/train:controles--> `ok = t`.
+(ou via `/plateforme/applications`). Relancer `ELSATIA_PREVIEW_DB_VERIFY_V1.sql` : <!--train:controles-->31<!--/train:controles-->/<!--train:controles-->31<!--/train:controles--> `ok = t`.
 
 ## STEP 11 — Preflight en direct (J)
 

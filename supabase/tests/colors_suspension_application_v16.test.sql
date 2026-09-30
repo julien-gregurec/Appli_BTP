@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(92);
+select plan(94);  -- 92 + 2 (Per-App Commercial Suspension V1 : GP seul ne coupe pas Colors)
 
 -- COLORS V16 — Suspension d'application.
 --
@@ -8,7 +8,9 @@ select plan(92);
 --   A. entitlement entreprise `autorise = false`
 --   B. entitlement entreprise `valide_jusqu_au` expiré / `valide_du` futur
 --   C. entitlement entreprise absent (ligne supprimée)
---   D. tenant suspendu (`abonnement_statut` suspendu / annulé, `suspension_prevue_at` échue)
+--   D. tenant suspendu. Per-App Commercial Suspension V1 (20260929000801) : l'état
+--      commercial COLORS (statut_commercial suspended / cancelled) ou une suspension
+--      GLOBALE explicite ; un incident de facturation Gestion Pro seul ne coupe plus Colors.
 --   E. suspension au niveau utilisateur (habilitation, appartenance) et application globale
 --   F. tentatives d'auto-réactivation par l'utilisateur suspendu
 --
@@ -190,6 +192,12 @@ select ok(public.a_acces_application('e5000000-0000-0000-0000-000000000001','col
 select pg_temp.en_service();
 update public.entreprises set abonnement_statut='suspendu' where id='e5000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
+select ok(public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · GP suspendu seul (Colors payé) : accès Colors maintenu');
+select is((select count(*) from public.colors_seaux),1::bigint,'D · GP suspendu seul : seaux visibles');
+select pg_temp.en_service();
+update public.entreprises set abonnement_statut='actif' where id='e5000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial='suspended' where entreprise_id='e5000000-0000-0000-0000-000000000001' and application_code='colors';
+select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
 select ok(not public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · tenant suspendu : accès faux (entitlement pourtant autorisé)');
 select is(public.colors_role_courant('e5000000-0000-0000-0000-000000000001'),null,'D · tenant suspendu : rôle retiré');
 select is((select count(*) from public.colors_seaux),0::bigint,'D · tenant suspendu : RLS seaux 0');
@@ -201,18 +209,20 @@ select pg_temp.en_tant_que('16000000-0000-0000-0000-000000000001');
 select is((select count(*) from public.colors_seaux),1::bigint,'D · témoin T non affecté');
 
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut='annule' where id='e5000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial='cancelled' where entreprise_id='e5000000-0000-0000-0000-000000000001' and application_code='colors';
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
 select ok(not public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · tenant annulé : accès faux');
 select is((select count(*) from public.colors_seaux),0::bigint,'D · tenant annulé : RLS seaux 0');
 
 select pg_temp.en_service();
-update public.entreprises set abonnement_statut='actif', suspension_prevue_at=now()-interval '1 minute' where id='e5000000-0000-0000-0000-000000000001';
+update public.acces_applications_entreprises set statut_commercial='active' where entreprise_id='e5000000-0000-0000-0000-000000000001' and application_code='colors';
+update public.entreprises set suspension_globale_at=now()-interval '1 minute', suspension_globale_motif='test' where id='e5000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
-select ok(not public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · suspension programmée échue : accès faux');
-select is((select count(*) from public.colors_seaux),0::bigint,'D · suspension programmée échue : RLS seaux 0');
+select ok(not public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · suspension globale échue : accès faux');
+select is((select count(*) from public.colors_seaux),0::bigint,'D · suspension globale échue : RLS seaux 0');
 
 select pg_temp.en_service();
+update public.entreprises set suspension_globale_at=null, suspension_globale_motif=null where id='e5000000-0000-0000-0000-000000000001';
 update public.entreprises set suspension_prevue_at=now()+interval '7 days', impaye_signale_at=now(), impaye_message='Règlement non reçu' where id='e5000000-0000-0000-0000-000000000001';
 select pg_temp.en_tant_que('15000000-0000-0000-0000-000000000002');
 select ok(public.a_acces_application('e5000000-0000-0000-0000-000000000001','colors'),'D · suspension programmée future : accès maintenu');

@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AccesApplicationRefuseError,
   CODES_APPLICATIONS_ELSATIA,
+  diagnostiquerRefusApplication,
+  LIBELLES_STATUT_COMMERCIAL,
+  STATUTS_COMMERCIAUX,
+  STATUTS_COMMERCIAUX_OUVERTS,
   creerControleAccesApplications,
   estCodeApplicationElsatia,
   estRoleColors,
@@ -92,5 +96,43 @@ describe("application-access", () => {
     await expect(
       controle.verifierAccesApplication({ entrepriseId: null }, "colors"),
     ).rejects.not.toThrow("sensitive database detail");
+  });
+});
+
+describe("diagnostiquerRefusApplication (per-app commercial suspension)", () => {
+  const maintenant = Date.parse("2026-10-01T12:00:00Z");
+  const ouvert = { autorise: true, valide_du: null, valide_jusqu_au: null };
+
+  it("droit absent, retiré ou hors fenêtre : abonnement requis", () => {
+    expect(diagnostiquerRefusApplication(null, maintenant)).toBe("abonnement_requis");
+    expect(diagnostiquerRefusApplication({ ...ouvert, autorise: false }, maintenant)).toBe("abonnement_requis");
+    expect(diagnostiquerRefusApplication({ ...ouvert, valide_jusqu_au: "2026-10-01T11:59:59Z" }, maintenant)).toBe("abonnement_requis");
+    expect(diagnostiquerRefusApplication({ ...ouvert, valide_du: "2026-10-02T00:00:00Z" }, maintenant)).toBe("abonnement_requis");
+  });
+
+  it("statuts fermés : abonnement requis", () => {
+    for (const statut of ["past_due", "unpaid", "cancelled", "suspended", "inconnu"]) {
+      expect(diagnostiquerRefusApplication({ ...ouvert, statut_commercial: statut }, maintenant)).toBe("abonnement_requis");
+    }
+  });
+
+  it("statuts ouverts : il manque l'habilitation personnelle", () => {
+    for (const statut of ["entitled", "active"]) {
+      expect(diagnostiquerRefusApplication({ ...ouvert, statut_commercial: statut }, maintenant)).toBe("habilitation_requise");
+    }
+    // Base antérieure à la migration : pas de colonne, droit accordé tel quel.
+    expect(diagnostiquerRefusApplication(ouvert, maintenant)).toBe("habilitation_requise");
+  });
+
+  it("essai : ouvert jusqu'à sa fin exclue, fermé sans date", () => {
+    expect(diagnostiquerRefusApplication({ ...ouvert, statut_commercial: "trial", essai_fin: "2026-10-01T12:00:01Z" }, maintenant)).toBe("habilitation_requise");
+    expect(diagnostiquerRefusApplication({ ...ouvert, statut_commercial: "trial", essai_fin: "2026-10-01T12:00:00Z" }, maintenant)).toBe("abonnement_requis");
+    expect(diagnostiquerRefusApplication({ ...ouvert, statut_commercial: "trial", essai_fin: null }, maintenant)).toBe("abonnement_requis");
+  });
+
+  it("les statuts ouverts sont exactement ceux de la base", () => {
+    expect([...STATUTS_COMMERCIAUX_OUVERTS]).toEqual(["entitled", "trial", "active"]);
+    expect(STATUTS_COMMERCIAUX).toHaveLength(7);
+    expect(Object.keys(LIBELLES_STATUT_COMMERCIAL).sort()).toEqual([...STATUTS_COMMERCIAUX].sort());
   });
 });

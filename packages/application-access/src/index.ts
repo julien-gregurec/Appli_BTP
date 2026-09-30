@@ -145,3 +145,66 @@ export function creerControleAccesApplications(
     listerApplicationsAutorisees,
   };
 }
+
+// ── Per-App Commercial Suspension V1 (migration 20260929000801) ──────────────
+// État commercial d'une application pour une organisation. La décision d'accès reste
+// en base (`a_acces_application`) ; ce qui suit ne sert qu'à EXPLIQUER un refus.
+export const STATUTS_COMMERCIAUX = [
+  "entitled",
+  "trial",
+  "active",
+  "past_due",
+  "unpaid",
+  "cancelled",
+  "suspended",
+] as const;
+export type StatutCommercial = (typeof STATUTS_COMMERCIAUX)[number];
+
+export const STATUTS_COMMERCIAUX_OUVERTS: readonly StatutCommercial[] = ["entitled", "trial", "active"];
+
+export function estStatutCommercial(value: unknown): value is StatutCommercial {
+  return typeof value === "string" && STATUTS_COMMERCIAUX.includes(value as StatutCommercial);
+}
+
+/** Ligne `acces_applications_entreprises` telle que lue par l'application (RLS). */
+export type LigneDroitApplication = {
+  autorise?: boolean | null;
+  valide_du?: string | null;
+  valide_jusqu_au?: string | null;
+  statut_commercial?: string | null;
+  essai_fin?: string | null;
+} | null | undefined;
+
+export type DiagnosticRefusApplication = "abonnement_requis" | "habilitation_requise";
+
+/**
+ * Explique un refus d'accès : le droit de l'organisation est-il commercialement ouvert
+ * (alors il manque une habilitation personnelle) ou non (abonnement requis) ?
+ * Ne peut jamais autoriser : l'appelant ne l'utilise qu'après un refus de la base.
+ * Même règle que `statut_commercial_application` : essai échu = fermé ; statut absent
+ * (base antérieure à la migration) = droit accordé tel quel.
+ */
+export function diagnostiquerRefusApplication(
+  ligne: LigneDroitApplication,
+  maintenant: number = Date.now(),
+): DiagnosticRefusApplication {
+  if (!ligne || ligne.autorise !== true) return "abonnement_requis";
+  if (ligne.valide_du && new Date(ligne.valide_du).getTime() > maintenant) return "abonnement_requis";
+  if (ligne.valide_jusqu_au && new Date(ligne.valide_jusqu_au).getTime() <= maintenant) return "abonnement_requis";
+  const statut = ligne.statut_commercial ?? "entitled";
+  if (!estStatutCommercial(statut) || !STATUTS_COMMERCIAUX_OUVERTS.includes(statut)) return "abonnement_requis";
+  if (statut === "trial" && (!ligne.essai_fin || new Date(ligne.essai_fin).getTime() <= maintenant)) {
+    return "abonnement_requis";
+  }
+  return "habilitation_requise";
+}
+
+export const LIBELLES_STATUT_COMMERCIAL: Record<StatutCommercial, string> = {
+  entitled: "Accès accordé",
+  trial: "Essai en cours",
+  active: "Abonnement actif",
+  past_due: "Paiement en retard",
+  unpaid: "Impayé",
+  cancelled: "Abonnement résilié",
+  suspended: "Suspendu",
+};
