@@ -63,6 +63,18 @@ describe("permissions d'une entreprise masquée par la RLS", () => {
     expect(droits).toEqual([...PERMISSIONS_REPRISE_ABONNEMENT]);
   });
 
+  it("essai expiré sans abonnement (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, B-4) : même périmètre", async () => {
+    const droits = await permissionsUtilisateur(contexte({ abonnementStatut: "essai", essaiExpireSansOffre: true }));
+    expect(droits).toEqual([...PERMISSIONS_REPRISE_ABONNEMENT]);
+    expect(droits).not.toContain("acces_chantiers");
+  });
+
+  it("essai en cours : permissions de poste, aucune lecture de l'état de reprise", async () => {
+    const droits = await permissionsUtilisateur(contexte({ abonnementStatut: "essai", essaiExpireSansOffre: false }));
+    expect(droits).toEqual(expect.arrayContaining(["acces_chantiers"]));
+    expect(mocks.appelsEtat).toBe(0);
+  });
+
   it("annulée, droit refusé en base (ou lecture impossible) : aucune permission", async () => {
     mocks.peutGerer = false;
     expect(await permissionsUtilisateur(contexte({ abonnementStatut: "annule" }))).toEqual([]);

@@ -22,6 +22,8 @@
 -- Contrôles 27-29 (train canonique V6) : Relevé Lot 6 (…0928 401), RGPD contrats V2 (…0928 501),
 -- surface de la pièce (…0928 601). Contrôle 30 (train canonique V7) : Relevé & Métré Lot 7, objets
 -- de plan et calques (…0928 701).
+-- Contrôle 31 (train canonique V8) : cycle commercial (…0928 701-703,
+-- ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -397,6 +399,27 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and coalesce((select prosecdef from pg_proc where oid = to_regprocedure('public.tools_releve_plan_equipements_supprimes(uuid)')), false)
            and to_regprocedure('public.tools_releve_plan_equipement_anomalie(jsonb)') is not null
            and not has_function_privilege('anon', 'public.tools_releve_plan_equipement_anomalie(jsonb)', 'execute'), true
+  union all
+  -- 31 : cycle commercial (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, …0928 701-703) : une facture
+  -- ne lève jamais « annule », catalogue actif = grille canonique 79/249/449/599 ×10, essai expiré
+  -- refusé en base (est_membre_actif).
+  select 31, 'Cycle commercial : facture sans effet sur annulé, grille canonique, essai expiré (20260928000701-703)',
+         'garde annule présente, mini/pro/business/entreprise = 79/249/449/599 (annuel ×10), essai expiré refusé',
+         concat_ws(', ',
+           case when position('abonnement_termine' in coalesce((select prosrc from pg_proc where oid = to_regprocedure(
+                  'public.appliquer_evenement_facture_abonnement_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text)')), '')) > 0
+                then 'garde annule' else 'garde annule ABSENTE' end,
+           coalesce((select string_agg(code || ' ' || prix_mensuel_ht::int || '/' || prix_annuel_ht::int, ' · ' order by code)
+                     from public.plans_abonnement where actif and code in ('mini', 'pro', 'business', 'entreprise')), 'catalogue ABSENT'),
+           case when position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif(uuid)')), '')) > 0
+                then 'essai expiré refusé' else 'essai expiré OUVERT' end),
+         position('abonnement_termine' in coalesce((select prosrc from pg_proc where oid = to_regprocedure(
+             'public.appliquer_evenement_facture_abonnement_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text)')), '')) > 0
+           and (select count(*) from public.plans_abonnement p
+                join (values ('mini', 79), ('pro', 249), ('business', 449), ('entreprise', 599)) g(code, mensuel)
+                  on g.code = p.code and p.actif and p.prix_mensuel_ht = g.mensuel and p.prix_annuel_ht = 10 * g.mensuel) = 4
+           and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif(uuid)')), '')) > 0
+           and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif_reel(uuid)')), '')) > 0, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

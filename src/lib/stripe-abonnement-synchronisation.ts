@@ -12,7 +12,7 @@
 // Le comportement est repris à l'identique : même ordre d'appels, mêmes RPC,
 // mêmes erreurs propagées.
 import { createAdminClient } from "@/lib/supabase/admin";
-import { recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
+import { offreFactureeDepuisSubscription, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { empreinteEvenementStripe } from "@/lib/stripe-webhook-environment";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou, VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
@@ -128,8 +128,19 @@ async function journaliserSubscriptionIgnoree(admin: SupabaseAdmin, entrepriseId
 }
 
 async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription, evenement: EvenementOrdonne) {
-  const offre = abonnement.metadata?.offre;
-  const periodicite = abonnement.metadata?.periodicite;
+  // Offre FACTURÉE : le Price de forfait courant fait autorité sur la metadata
+  // du Checkout, que le Portail ne met pas à jour lors d'un changement d'offre
+  // (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, B-3).
+  const facturee = offreFactureeDepuisSubscription(abonnement);
+  if (facturee.divergence) {
+    console.warn("Offre Stripe : metadata divergente du Price facturé, Price retenu", {
+      categorie: "offre_metadata_divergente",
+      type_evenement: evenement.type,
+      empreinte_evenement: empreinteEvenementStripe(evenement.id),
+    });
+  }
+  const offre = facturee.offre;
+  const periodicite = facturee.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);
   // ACL canonique (migration 255) : `service_role` n'a plus d'écriture directe sur
   // `entreprises` (hors colonnes abonnement/stripe), `plans_abonnement`,

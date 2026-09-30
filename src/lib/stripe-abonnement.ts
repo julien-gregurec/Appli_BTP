@@ -189,6 +189,60 @@ export function prixStripePour(
   return variable ? environnement[variable] || null : null;
 }
 
+export type OffreFacturee = {
+  offre: OffreAbonnement | null;
+  periodicite: PeriodiciteAbonnement | null;
+  /** `prix` : Price de forfait courant reconnu ; `metadata` : repli sur la metadata de la subscription. */
+  source: "prix" | "metadata" | "inconnue";
+  /** Vrai si la metadata annonce une autre offre/périodicité que le Price réellement facturé. */
+  divergence: boolean;
+};
+
+/**
+ * Offre et périodicité réellement FACTURÉES par une subscription
+ * (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, finding B-3).
+ *
+ * Le Portail Stripe autorise le changement de Price (`subscription_update`,
+ * scripts/configurer-portail-stripe.mjs) sans toucher à la metadata posée au
+ * Checkout : se fier à `metadata.offre` laissait les droits sur l'ancienne
+ * offre (montée : payée sans droits ; descente : droits supérieurs non payés).
+ * Le Price de forfait courant reconnu (variables `STRIPE_PRICE_<OFFRE>_<PÉRIODICITÉ>`)
+ * fait donc autorité. Repli sur la metadata seulement si aucun Price de forfait
+ * courant n'est reconnu (génération précédente encore souscrite) ou si la
+ * reconnaissance est ambiguë (deux forfaits distincts : configuration anormale).
+ */
+export function offreFactureeDepuisSubscription(
+  abonnement: Pick<StripeSubscription, "items" | "metadata">,
+  environnement: Record<string, string | undefined> = process.env,
+): OffreFacturee {
+  const offreMeta = abonnement.metadata?.offre ?? "";
+  const periodiciteMeta = abonnement.metadata?.periodicite ?? "";
+  const meta = {
+    offre: estOffreAbonnement(offreMeta) ? offreMeta : null,
+    periodicite: estPeriodiciteAbonnement(periodiciteMeta) ? periodiciteMeta : null,
+  };
+  const prixFactures = new Set(
+    (abonnement.items?.data ?? []).map((ligne) => ligne.price?.id).filter((id): id is string => Boolean(id)),
+  );
+  const reconnus = new Map<string, { offre: OffreAbonnement; periodicite: PeriodiciteAbonnement }>();
+  for (const [offre, parPeriode] of Object.entries(VARIABLES_PRIX) as Array<[OffreAbonnement, Record<PeriodiciteAbonnement, string>]>) {
+    for (const [periodicite, variable] of Object.entries(parPeriode) as Array<[PeriodiciteAbonnement, string]>) {
+      const prix = environnement[variable];
+      if (prix && prixFactures.has(prix)) reconnus.set(`${offre}:${periodicite}`, { offre, periodicite });
+    }
+  }
+  if (reconnus.size === 1) {
+    const [facture] = reconnus.values();
+    return {
+      ...facture,
+      source: "prix",
+      divergence: (meta.offre !== null && meta.offre !== facture.offre)
+        || (meta.periodicite !== null && meta.periodicite !== facture.periodicite),
+    };
+  }
+  return { ...meta, source: meta.offre ? "metadata" : "inconnue", divergence: false };
+}
+
 /**
  * Ensemble des Price IDs de forfait de base *connus du serveur* : la génération
  * courante (toutes offres × périodicités) plus celles des générations

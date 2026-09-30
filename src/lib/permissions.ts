@@ -18,8 +18,11 @@ import { etatReabonnementEntreprise } from "@/lib/acces-support-abonnement";
  */
 export const PERMISSIONS_REPRISE_ABONNEMENT = ["acces_parametres", "gerer_parametres"] as const;
 
+// Essai expiré sans abonnement : même masquage RLS depuis
+// ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1 (B-4, `est_membre_actif`).
 function entrepriseMasqueeParRls(ctx: ContexteEntreprise) {
-  return ctx.abonnementStatut === "suspendu" || ctx.abonnementStatut === "annule"
+  return ctx.essaiExpireSansOffre
+    || ctx.abonnementStatut === "suspendu" || ctx.abonnementStatut === "annule"
     || (ctx.suspensionPrevueAt !== null && new Date(ctx.suspensionPrevueAt).getTime() <= Date.now());
 }
 

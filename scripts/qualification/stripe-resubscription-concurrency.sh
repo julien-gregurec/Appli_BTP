@@ -93,7 +93,14 @@ verifier "R3 tous les événements de l'ancienne journalisés sans effet" \
   "$(echo "select count(*) from public.stripe_evenements_ordre where entreprise_id = '${E[2]}' and stripe_event_id like 'evt_cr3_old%' and motif = 'subscription_remplacee';" | q)" "$(( N / 2 ))"
 
 # R4 : N re-livraisons simultanées du même invoice.paid (nouvelle subscription).
-echo "select public.relier_subscription_reabonnement_service('${E[3]}', 'sub_cr_new_3', 'cus_cr_3', 'active', 'sub_cr_old_3', 'canceled');" | q >/dev/null
+# Chemin applicatif réel (synchroniserAbonnementCoordonne) : le rattachement est TOUJOURS suivi
+# de la synchronisation relue — ici `incomplete` (Checkout, premier paiement en attente) →
+# suspendu. Depuis ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1 (B-1), une facture ne lève jamais
+# `annule` : un rattachement laissé sans synchronisation (état transitoire d'une synchro
+# échouée, re-livrée par Stripe) n'est plus rouvert par une facture.
+echo "select public.relier_subscription_reabonnement_service('${E[3]}', 'sub_cr_new_3', 'cus_cr_3', 'incomplete', 'sub_cr_old_3', 'canceled');" | q >/dev/null
+echo "select public.synchroniser_abonnement_stripe_ordonne_service('${E[3]}', 'sub_cr_new_3', 'cus_cr_3', 'suspendu', 'pro', 'mensuel',
+  current_date + 30, null, null, null, null, 'evt_cr4_created', 'customer.subscription.created', timestamptz '2026-11-01' + interval '250 seconds', 'subscription', 'sub_cr_new_3');" | q >/dev/null
 for k in $(seq 1 "$N"); do
   ( fac "${E[3]}" evt_cr4_paid invoice.paid in_cr4 sub_cr_new_3 300 | q > "$OUT/r4_$k.txt" 2>&1 ) &
 done
