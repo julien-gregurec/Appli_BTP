@@ -19,7 +19,7 @@ for STEP in ${STEPS[@]}; do case "$STEP" in
       rm -rf "$ROOT/pdf"; QUICK=1 LOAD_S=90 SCENARIO=pdf LOADGEN_EXTRA="--accounts heavy --pdf-ids $HEAVY" "$RUN" "$ROOT/pdf" 0 1 5 10; } ;;
   stress)
     [ -e "$ROOT/stress/phases.jsonl" ] && grep -q stop "$ROOT/stress/phases.jsonl" || {
-      rm -rf "$ROOT/stress"; LOAD_S=180 COOL_MIN=15 SNAP=1 "$RUN" "$ROOT/stress" 500 10 25 50; } ;;
+      rm -rf "$ROOT/stress"; LOAD_S=180 COOL_MIN=5 "$RUN" "$ROOT/stress" 500 10 25 50; } ;;
   limits)
     for L in 2048 1024 512; do for V in defaut borne; do
       D="$ROOT/limit-$L-$V"

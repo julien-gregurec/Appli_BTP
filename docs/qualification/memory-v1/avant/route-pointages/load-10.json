@@ -1,0 +1,38 @@
+{
+  "users": 10,
+  "scenario": "pointages",
+  "think": 1000,
+  "durationS": 125.868,
+  "erreursVU": [],
+  "routes": {
+    "/pointage": {
+      "n": 72,
+      "p50": 909,
+      "p95": 4000,
+      "p99": 4735,
+      "max": 4735,
+      "status": {
+        "200": 72
+      },
+      "kbMoyen": 60
+    },
+    "/pointage/gestion": {
+      "n": 104,
+      "p50": 7648,
+      "p95": 9253,
+      "p99": 9644,
+      "max": 9686,
+      "status": {
+        "200": 104
+      },
+      "kbMoyen": 5296
+    }
+  },
+  "total": {
+    "n": 176,
+    "rps": 1.4,
+    "p50": 5662,
+    "p95": 9129,
+    "p99": 9644
+  }
+}
