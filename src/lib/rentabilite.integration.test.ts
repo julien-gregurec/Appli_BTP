@@ -15,10 +15,11 @@
  */
 import { createHmac } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { PostgrestClient } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { lireHeuresChantier, lireRentabiliteChantier, lireRentabilitePage, lireRentabiliteTotaux, lireToutesRentabilitesChantiers } from "@/lib/rentabilite";
+import { lireHeuresChantier, lirePagePointagesValidesChantier, lireRentabiliteChantier, lireRentabilitePage, lireRentabiliteTotaux, lireToutesRentabilitesChantiers } from "@/lib/rentabilite";
 
 const VOLUMES = (process.env.GP_RENTABILITE_VOLUMES ?? "")
   .split(",")
@@ -214,6 +215,16 @@ describe.skipIf(VOLUMES.length === 0)("rentabilité et fiche chantier : exact au
       expect(centimes(heures.heuresPlanifiees)).toBe(centimes(attendu.chantierCharge.heuresPlanifiees));
       expect(heures.nbPointagesValides).toBe(attendu.chantierCharge.nbValides);
 
+      // Fiche chantier : dernière page de la liste (la plus coûteuse), relue sous RLS.
+      const derniere = Math.max(0, Math.ceil(heures.nbPointagesValides / 50) - 1) * 50;
+      const t2 = performance.now();
+      const ids = await lirePagePointagesValidesChantier(apres.supabase, ENTREPRISE, attendu.chantierCharge.id, { limite: 50, decalage: derniere });
+      const { data: lignesPage } = await apres.supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,tache,verification_statut,employe:employes(prenom,nom)").eq("chantier_id", attendu.chantierCharge.id).eq("entreprise_id", ENTREPRISE).eq("verification_statut", "valide").in("id", ids);
+      const msDernierePage = performance.now() - t2;
+      const idsVerite = psql(volume.db, `select id from public.pointages where chantier_id = '${attendu.chantierCharge.id}' and verification_statut = 'valide' order by date desc, id limit 50 offset ${derniere};`).split("\n").filter(Boolean);
+      expect(ids).toEqual(idsVerite);
+      expect(lignesPage).toHaveLength(idsVerite.length);
+
       mesures.push({
         n: volume.n,
         veriteMarge: attendu.totaux.marge.toFixed(2), veriteHeures: attendu.totaux.heures.toFixed(2),
@@ -221,6 +232,7 @@ describe.skipIf(VOLUMES.length === 0)("rentabilité et fiche chantier : exact au
         avantMs: Math.round(msAvant), avantOctets: avant.mesure.octets, avantTronquees: avant.mesure.lignesTronquees.length,
         apresMarge: totaux.marge.toFixed(2), apresHeures: totaux.heures.toFixed(2), apresMs: Math.round(msApres), apresOctets: apres.mesure.octets,
         ficheAvant: `${ficheAvant.heuresValidees.toFixed(2)} h validées / ${ficheAvant.heuresPlanifiees.toFixed(2)} h planifiées (${ficheAvant.nbValides})`,
+        ficheDernierePageMs: Math.round(msDernierePage),
         ficheVerite: `${attendu.chantierCharge.heuresValidees.toFixed(2)} / ${attendu.chantierCharge.heuresPlanifiees.toFixed(2)} (${attendu.chantierCharge.nbValides})`,
       });
     }, 120_000);
@@ -228,5 +240,6 @@ describe.skipIf(VOLUMES.length === 0)("rentabilité et fiche chantier : exact au
 
   it.runIf(VOLUMES.length > 0)("mesures", () => {
     console.table(mesures);
+    if (process.env.GP_RENTABILITE_MESURES) writeFileSync(process.env.GP_RENTABILITE_MESURES, JSON.stringify(mesures, null, 2));
   });
 });

@@ -26,7 +26,7 @@ jwt-secret = "$SECRET"
 server-port = $PORT
 db-pool = 10
 CONF
-pkill -f "postgrest-$PORT.conf" >/dev/null 2>&1 || true
+for pid in $(pgrep -x postgrest); do grep -q "postgrest-$PORT.conf" /proc/$pid/cmdline 2>/dev/null && kill "$pid"; done; sleep 0.5
 nohup "$DIR/postgrest" "$DIR/postgrest-$PORT.conf" > "$DIR/postgrest-$PORT.log" 2>&1 &
 for _ in $(seq 1 50); do curl -s -o /dev/null "http://localhost:$PORT/" && break; sleep 0.2; done
 curl -s -o /dev/null -w "PostgREST :$PORT -> $DB (HTTP %{http_code})\n" "http://localhost:$PORT/"

@@ -15,7 +15,7 @@
 -- paramètres invalides.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(52);
+select plan(60);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -153,10 +153,12 @@ select has_function('public', 'chantier_heures_synthese', array['uuid', 'uuid'],
 select is(
   (select array_agg(f || ':' || r order by f, r) from unnest(array[
       'public.rentabilite_chantiers_totaux(uuid)', 'public.rentabilite_chantiers_page(uuid, text, integer, integer, boolean)',
-      'public.rentabilite_chantier(uuid, uuid)', 'public.chantier_heures_synthese(uuid, uuid)']) f,
+      'public.rentabilite_chantier(uuid, uuid)', 'public.chantier_heures_synthese(uuid, uuid)',
+      'public.chantier_pointages_valides_page(uuid, uuid, integer, integer)']) f,
     unnest(array['anon', 'authenticated', 'service_role']) r
    where has_function_privilege(r, f, 'execute')),
-  array['public.chantier_heures_synthese(uuid, uuid):authenticated', 'public.rentabilite_chantier(uuid, uuid):authenticated',
+  array['public.chantier_heures_synthese(uuid, uuid):authenticated', 'public.chantier_pointages_valides_page(uuid, uuid, integer, integer):authenticated',
+        'public.rentabilite_chantier(uuid, uuid):authenticated',
         'public.rentabilite_chantiers_page(uuid, text, integer, integer, boolean):authenticated', 'public.rentabilite_chantiers_totaux(uuid):authenticated'],
   '5. EXECUTE : authenticated seul (ni anon, ni service_role)');
 select is(
@@ -164,7 +166,7 @@ select is(
   false, '6. calcul interne rentabilite_chantiers_calcul : aucun rôle applicatif');
 select ok(
   (select bool_and(p.prosecdef and 'search_path=public' = any(p.proconfig)) from pg_proc p
-    where p.pronamespace = 'public'::regnamespace and p.proname in ('rentabilite_chantiers_calcul', 'rentabilite_chantiers_totaux', 'rentabilite_chantiers_page', 'rentabilite_chantier', 'chantier_heures_synthese')),
+    where p.pronamespace = 'public'::regnamespace and p.proname in ('rentabilite_chantiers_calcul', 'rentabilite_chantiers_totaux', 'rentabilite_chantiers_page', 'rentabilite_chantier', 'chantier_heures_synthese', 'chantier_pointages_valides_page')),
   '7. SECURITY DEFINER et search_path figé');
 select cmp_ok((select count(*)::int from public.pointages where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and verification_statut = 'valide'), '>', 1000,
   '8. jeu de test : plus de 1 000 pointages validés pour A');
@@ -238,9 +240,9 @@ select results_eq(
 select is(
   (select array_agg(chantier_id::text) from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false)),
   array['a4000000-0000-0000-0000-000000000001'], '22. ouvrier A : seul son chantier assigné');
-select is(
-  (select row(facture_ht, budget_ht, cout_main_oeuvre, cout_achats)::text from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false)),
-  '(0,0,0,0)', '23. ouvrier A : ni CA, ni devis, ni coût MO, ni achats');
+select ok(
+  (select facture_ht = 0 and budget_ht = 0 and cout_main_oeuvre = 0 and cout_achats = 0 from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false)),
+  '23. ouvrier A : ni CA, ni devis, ni coût MO, ni achats');
 select is(
   (select heures from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false)),
   (select sum(heures_normales + heures_supplementaires) from public.pointages
@@ -261,9 +263,10 @@ select results_eq(
     from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false) order by chantier_id$$,
   $$select * from pg_temp.parite_rentabilite('a0000000-0000-0000-0000-000000000001') order by chantier_id$$,
   '28. parité RLS : chef d''équipe A');
-select is(
-  (select row(heures, cout_main_oeuvre, cout_horaire_manquant)::text from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false)),
-  (select row(heures, 0, true)::text from verite where chantier_id = 'a4000000-0000-0000-0000-000000000001'),
+select ok(
+  (select r.heures = v.heures and r.cout_main_oeuvre = 0 and r.cout_horaire_manquant
+     from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 500, 0, false) r
+     join verite v on v.chantier_id = r.chantier_id),
   '29. chef d''équipe A : toutes les heures de l''équipe, coût invisible (0) et signalé');
 select results_eq($$select * from public.chantier_heures_synthese('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001')$$,
   $$select * from pg_temp.parite_heures('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001')$$, '30. parité RLS heures chantier : chef d''équipe A');
@@ -324,6 +327,41 @@ select throws_ok($$select * from public.rentabilite_chantiers_page('a0000000-000
   '22023', 'RENTABILITE_PARAMETRES_INVALIDES', '42. tri inconnu refusé');
 select throws_ok($$select * from public.rentabilite_chantiers_page('a0000000-0000-0000-0000-000000000001', 'recent', 10, -1, false)$$,
   '22023', 'RENTABILITE_PARAMETRES_INVALIDES', '43. décalage négatif refusé');
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 4 bis. Fiche chantier : identifiants de pages de pointages validés.
+-- ───────────────────────────────────────────────────────────────────────────
+select results_eq(
+  $$select pointage_id from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 50, 0)$$,
+  $$select id from public.pointages where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and chantier_id = 'a4000000-0000-0000-0000-000000000001'
+      and verification_statut = 'valide' order by date desc, id limit 50$$,
+  '53. 1re page = 50 pointages validés les plus récents, visibles sous RLS');
+select results_eq(
+  $$select pointage_id from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 50, 800)$$,
+  $$select id from public.pointages where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and chantier_id = 'a4000000-0000-0000-0000-000000000001'
+      and verification_statut = 'valide' order by date desc, id limit 50 offset 800$$,
+  '54. page profonde (décalage 800) = même ordre que la RLS');
+select is(
+  (select count(distinct x.pointage_id)::int from generate_series(0, 1000, 200) d,
+     lateral public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 200, d) x),
+  (select nb_pointages_valides from public.chantier_heures_synthese('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001')),
+  '55. pages de 200 : chaque pointage validé une fois, nombre = synthèse');
+select throws_ok($$select * from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 201, 0)$$,
+  '22023', 'RENTABILITE_PARAMETRES_INVALIDES', '56. page > 200 refusée');
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+select results_eq(
+  $$select pointage_id from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 200, 0)$$,
+  $$select id from public.pointages where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and chantier_id = 'a4000000-0000-0000-0000-000000000001'
+      and verification_statut = 'valide' order by date desc, id limit 200$$,
+  '57. parité RLS : ouvrier A ne reçoit que ses pointages');
+select throws_ok($$select * from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002', 50, 0)$$,
+  '42501', 'RENTABILITE_ACCES_REFUSE', '58. ouvrier A : pointages d''un chantier non assigné refusés');
+select set_config('request.jwt.claims', '{"sub":"20000000-0000-0000-0000-000000000006","role":"authenticated"}', true);
+select throws_ok($$select * from public.chantier_pointages_valides_page('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 50, 0)$$,
+  '42501', 'RENTABILITE_ACCES_REFUSE', '59. dirigeant B : pointages d''un chantier de A refusés');
+select throws_ok($$select * from public.chantier_pointages_valides_page('b0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 50, 0)$$,
+  '42501', 'RENTABILITE_ACCES_REFUSE', '60. dirigeant B : chantier de A demandé sous B refusé');
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000006","role":"authenticated"}', true);
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 5. Refus.

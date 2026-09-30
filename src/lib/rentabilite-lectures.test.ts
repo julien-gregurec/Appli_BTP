@@ -44,8 +44,9 @@ describe("lectures de rentabilité : plus d'agrégat sur des lignes plafonnées"
     const code = source("src/app/(app)/chantiers/[id]/page.tsx");
     expect(code).toContain("lireHeuresChantier(");
     expect(code).not.toMatch(/from\("affectations"\)\.select\("heures"\)/);
+    expect(code).toContain("lirePagePointagesValidesChantier(");
     const lecturePointages = code.match(/from\("pointages"\)[^\n]*/)?.[0] ?? "";
-    expect(lecturePointages).toContain(".range(");
+    expect(lecturePointages).toContain('.in("id",idsPointages)');
     expect(lecturePointages).toContain('.eq("verification_statut","valide")');
   });
 });

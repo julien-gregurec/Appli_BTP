@@ -22,8 +22,11 @@ import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { BlocReservesChantier } from "@/components/BlocReservesChantier";
 import { lireEtatReserves } from "@/lib/reserves-gp";
 import { urlReservesPourUtilisateur } from "@/lib/multi-app-server";
+import { lireHeuresChantier, lirePagePointagesValidesChantier, type HeuresChantier } from "@/lib/rentabilite";
 
-export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
+const TAILLE_PAGE_POINTAGES = 50;
+
+export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string; page_pointages?: string }> }) {
   const { id } = await params;
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
@@ -73,11 +76,28 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     .eq("chantier_id", id)
     .order("created_at");
 
-  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}, {data:sousTraitants}] = await Promise.all([
+  // Heures planifiées / validées calculées en base (chantier_heures_synthese,
+  // 20260930000301) : un chantier peut dépasser 1 000 affectations ou pointages,
+  // que PostgREST tronquerait sans erreur. Liste détaillée des pointages validés
+  // paginée. En cas d'erreur : « indisponible », jamais un total partiel.
+  const pagePointages = Math.max(1, Math.floor(Number(messages.page_pointages)) || 1);
+  const debutPointages = (pagePointages - 1) * TAILLE_PAGE_POINTAGES;
+  const [heuresChantier, idsPointages] = await Promise.all([
+    lireHeuresChantier(supabase, ctx.entrepriseId, id).catch((err): HeuresChantier | null => {
+      console.error("[chantier] heures indisponibles", err instanceof Error ? err.message : err);
+      return null;
+    }),
+    peutVoirHeures
+      ? lirePagePointagesValidesChantier(supabase, ctx.entrepriseId, id, { limite: TAILLE_PAGE_POINTAGES, decalage: debutPointages }).catch((err): string[] => {
+          console.error("[chantier] pointages indisponibles", err instanceof Error ? err.message : err);
+          return [];
+        })
+      : Promise.resolve([] as string[]),
+  ]);
+  const [{ data: devis }, { data: factures }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}, {data:sousTraitants}] = await Promise.all([
     supabase.from("devis").select("id, numero, statut, montant_ttc").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("id, numero, statut, montant_ttc, montant_paye").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("affectations").select("heures").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
-    peutVoirHeures?supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,tache,verification_statut,employe:employes(prenom,nom)").eq("chantier_id",id).eq("entreprise_id",ctx.entrepriseId).order("date",{ascending:false}):Promise.resolve({data:[]}),
+    idsPointages.length?supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,tache,verification_statut,employe:employes(prenom,nom)").eq("chantier_id",id).eq("entreprise_id",ctx.entrepriseId).eq("verification_statut","valide").in("id",idsPointages):Promise.resolve({data:[]}),
     supabase.from("documents_chantier").select("id,nom,categorie,note,mime_type,audience,created_at").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at",{ascending:false}),
     supabase.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","chantier").eq("ressource_id",id).eq("actif",true).maybeSingle(),
     supabase.from("equipes_chantiers").select("id,role_chantier,date_debut,date_fin,note,employe:employes(id,prenom,nom,poste,statut)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_fin",{ascending:true}).order("role_chantier"),
@@ -98,8 +118,13 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const totalDevisAccepte = (devis ?? []).filter((item) => item.statut === "accepte").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalFacture = (factures ?? []).filter((item) => item.statut !== "annulee").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalPaye = (factures ?? []).reduce((total, item) => total + Number(item.montant_paye ?? 0), 0);
-  const totalHeures = (affectations ?? []).reduce((total, item) => total + Number(item.heures ?? 0), 0);
-  const pointagesValides=(pointages??[]).filter(p=>p.verification_statut==="valide");const totalHeuresRealisees=pointagesValides.reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);const relation=<T,>(v:T|T[]|null)=>Array.isArray(v)?v[0]??null:v;
+  const arrondiHeures = (valeur: number) => Math.round(valeur * 100) / 100;
+  const totalHeures = heuresChantier ? arrondiHeures(heuresChantier.heuresPlanifiees) : null;
+  const rangPointage=new Map(idsPointages.map((pointageId,rang)=>[pointageId,rang]));
+  const pointagesValides=[...(pointages??[])].sort((a,b)=>(rangPointage.get(a.id)??0)-(rangPointage.get(b.id)??0));const totalHeuresRealisees=heuresChantier&&peutVoirHeures?arrondiHeures(heuresChantier.heuresValidees):heuresChantier?0:null;
+  const nbPagesPointages=Math.max(1,Math.ceil((heuresChantier&&peutVoirHeures?heuresChantier.nbPointagesValides:0)/TAILLE_PAGE_POINTAGES));
+  const lienPagePointages=(p:number)=>p>1?`/chantiers/${id}?page_pointages=${p}#heures-realisees`:`/chantiers/${id}#heures-realisees`;
+  const heuresAffichees=(valeur:number|null)=>valeur===null?"indisponible":`${valeur} h`;const relation=<T,>(v:T|T[]|null)=>Array.isArray(v)?v[0]??null:v;
   const totalFacturesFournisseurs=(facturesFournisseurs??[]).filter(item=>item.statut!=="annulee").reduce((total,item)=>total+Number(item.montant_ttc??0),0);
   const totalRegleFournisseurs=(facturesFournisseurs??[]).reduce((total,item)=>total+Number(item.montant_regle??0),0);
   const statutsNotesValidees = new Set(["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]);
@@ -173,7 +198,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
 
         <ChantierProgressCharts
           finances={peutVoirFinances ? { budget: budgetPrevisionnel, devis: totalDevisAccepte, facture: totalFacture, paye: totalPaye, depenses: peutVoirAchats || peutVoirNotesEquipe ? totalDepensesValidees : null } : null}
-          heures={peutVoirHeures ? { planifiees: totalHeures, validees: totalHeuresRealisees } : null}
+          heures={peutVoirHeures && totalHeures !== null && totalHeuresRealisees !== null ? { planifiees: totalHeures, validees: totalHeuresRealisees } : null}
           taches={{ total: taches?.length ?? 0, faites: (taches ?? []).filter((tache) => tache.statut === "fait").length }}
         />
 
@@ -197,7 +222,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Devis acceptés</div><div className="mt-1 font-mono font-semibold">{euros(totalDevisAccepte)}</div></div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Facturé</div><div className="mt-1 font-mono font-semibold">{euros(totalFacture)}</div></div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono font-semibold text-green-700 dark:text-green-400">{euros(totalPaye)}</div></div>
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Heures planifiées / validées</div><div className="mt-1 font-mono font-semibold">{totalHeures} h / {totalHeuresRealisees} h</div></div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Heures planifiées / validées</div><div className="mt-1 font-mono font-semibold">{heuresAffichees(totalHeures)} / {heuresAffichees(totalHeuresRealisees)}</div></div>
             {(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Dépenses chantier validées</div><div className="mt-1 font-mono font-semibold text-amber-700 dark:text-amber-400">{euros(totalDepensesValidees)}</div></div>}
             {budgetPrevisionnel>0&&(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Budget restant après dépenses</div><div className={`mt-1 font-mono font-semibold ${budgetPrevisionnel-totalDepensesValidees<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(budgetPrevisionnel-totalDepensesValidees)}</div></div>}
           </div>
@@ -217,8 +242,8 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           <div className="divide-y dark:divide-neutral-800">{(facturesFournisseurs??[]).map(item=>{const fournisseur=relation(item.fournisseur as {nom:string}|{nom:string}[]|null);const statut=DEPENSE_STATUTS[item.statut];return <Link key={item.id} href={`/depenses/${item.id}`} className="grid gap-1 py-3 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4"><div><strong>{item.numero_piece}</strong><p className="text-xs text-neutral-500">{fournisseur?.nom??"Fournisseur"} · {DEPENSE_CATEGORIES[item.categorie]??item.categorie} · {item.date_piece}</p></div><span className="text-xs" style={{color:statut?.couleur}}>{statut?.label??item.statut}</span><span className="font-mono font-semibold">{euros(item.montant_ttc)}</span></Link>})}{!(facturesFournisseurs??[]).length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune facture fournisseur classée dans ce chantier.</p>}</div>
           {peutGererAchats&&(facturesSansChantier??[]).length>0&&<form action={classerFactureDepuisChantierAction.bind(null,id)} className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-neutral-500">Classer une facture sans chantier<select name="depense_id" required className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"><option value="">— Choisir une facture fournisseur —</option>{(facturesSansChantier??[]).map(item=>{const fournisseur=relation(item.fournisseur as {nom:string}|{nom:string}[]|null);return <option key={item.id} value={item.id}>{item.numero_piece} · {fournisseur?.nom??"Fournisseur"} · {euros(item.montant_ttc)}</option>})}</select></label><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Classer ici</button></form>}
         </section>}
-        {!peutVoirFinances&&peutVoirHeures&&<section className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border p-4"><p className="text-xs text-neutral-500">Heures planifiées</p><strong>{totalHeures} h</strong></div><div className="rounded-md border p-4"><p className="text-xs text-neutral-500">Heures pointées validées</p><strong>{totalHeuresRealisees} h</strong></div></section>}
-        {peutVoirHeures&&<section><h2 className="mb-3 text-sm font-semibold">Intervenants et heures réalisées</h2><div className="space-y-2">{pointagesValides.map(p=>{const e=relation(p.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null);return <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"><div><strong>{e?`${e.prenom} ${e.nom}`:"Employé"}</strong><p className="text-xs text-neutral-500">{p.date}{p.tache?` · ${p.tache}`:""}</p></div><span className="font-mono font-semibold">{Number(p.heures_normales)+Number(p.heures_supplementaires)} h</span></div>})}{!pointagesValides.length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune heure validée pour ce chantier.</p>}</div></section>}
+        {!peutVoirFinances&&peutVoirHeures&&<section className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border p-4"><p className="text-xs text-neutral-500">Heures planifiées</p><strong>{heuresAffichees(totalHeures)}</strong></div><div className="rounded-md border p-4"><p className="text-xs text-neutral-500">Heures pointées validées</p><strong>{heuresAffichees(totalHeuresRealisees)}</strong></div></section>}
+        {peutVoirHeures&&<section id="heures-realisees"><h2 className="mb-3 text-sm font-semibold">Intervenants et heures réalisées</h2>{heuresChantier&&heuresChantier.nbPointagesValides>0&&<p className="mb-2 text-xs text-neutral-500">{heuresChantier.nbPointagesValides} pointage(s) validé(s), {heuresAffichees(totalHeuresRealisees)} au total{nbPagesPointages>1?` — page ${pagePointages}/${nbPagesPointages}`:""}.</p>}<div className="space-y-2">{pointagesValides.map(p=>{const e=relation(p.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null);return <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"><div><strong>{e?`${e.prenom} ${e.nom}`:"Employé"}</strong><p className="text-xs text-neutral-500">{p.date}{p.tache?` · ${p.tache}`:""}</p></div><span className="font-mono font-semibold">{Number(p.heures_normales)+Number(p.heures_supplementaires)} h</span></div>})}{!pointagesValides.length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune heure validée pour ce chantier.</p>}</div>{nbPagesPointages>1&&<nav aria-label="Pagination des pointages" className="mt-3 flex items-center justify-between text-sm">{pagePointages>1?<Link href={lienPagePointages(pagePointages-1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">← Plus récents</Link>:<span/>}<span className="text-neutral-500">Page {pagePointages} sur {nbPagesPointages}</span>{pagePointages<nbPagesPointages?<Link href={lienPagePointages(pagePointages+1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">Plus anciens →</Link>:<span/>}</nav>}</section>}
 
         <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="text-sm font-semibold">Tâches</h2>
