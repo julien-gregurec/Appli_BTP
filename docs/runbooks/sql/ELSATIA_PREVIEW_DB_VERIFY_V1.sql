@@ -25,7 +25,9 @@
 -- Contrôle 31 (train canonique V8) : cycle commercial (…0928 801-803,
 -- ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1). Contrôle 32 (train canonique V8) : suspension commerciale
 -- par application (…0928 804). Contrôle 33 (train canonique V8) : données personnelles des salariés
--- (…0928 806, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1).
+-- (…0928 806, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1). Contrôles 34-37 (train canonique V8) :
+-- mode sûr et convergence (…0928 807-808, 811), Relevé Lots 8-9 (…0928 809-810), red team V2
+-- (…0928 805), recalcul des devis par instruction (…0928 812).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -469,6 +471,99 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and to_regclass('public.employes_fiche') is not null
            and not has_table_privilege('anon', 'public.employes_fiche', 'select')
            and to_regprocedure('public.export_rgpd_section_autorisee(uuid,text)') is not null, true
+  union all
+  -- 34 (train V8) : mode sûr (ELSATIA_PRODUCTION_INCIDENT_RESPONSE_SAFE_MODE_V1, …0928 807-808) et
+  -- convergence V8 (…0928 811). Garde d'écriture sur TOUTE table public non exemptée (tables des
+  -- Lots 8-9 comprises), aucun contrôle actif au moment du GO (un verrou de réconciliation
+  -- Stripe actif après restauration = NO-GO), bascule réservée aux authentifiés (rôle `total` +
+  -- AAL2 vérifiés dans la fonction), chemin opérateur fermé à tout rôle d'API. Lecture dynamique :
+  -- sur une base au train V7 → échec propre, sans erreur.
+  select 34, 'Mode sûr : gardes partout, aucun contrôle actif, bascules fermées (20260928000807-811)',
+         '0 table sans garde, 0 contrôle actif, bascule fermée à anon, opérateur fermé aux rôles d''API',
+         case when to_regprocedure('public.incident_table_exemptee(text)') is null or to_regclass('public.incident_controles') is null
+                then 'mode sûr ABSENT'
+              else concat_ws(', ',
+                (xpath('/row/n/text()', query_to_xml('select count(*) as n from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = ''public'' and c.relkind in (''r'', ''p'') and not public.incident_table_exemptee(c.relname) and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = ''incident_garde_ecriture'' and t.tgenabled <> ''D'')', false, true, '')))[1]::text || ' table(s) sans garde',
+                (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.incident_controles where actif and (expire_at is null or expire_at > now())', false, true, '')))[1]::text || ' contrôle(s) actif(s)',
+                case when has_function_privilege('anon', 'public.plateforme_incident_basculer(text,text,boolean,text,text,integer)', 'execute')
+                     then 'bascule OUVERTE à anon' else 'bascule fermée à anon' end,
+                case when has_function_privilege('authenticated', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute')
+                       or has_function_privilege('service_role', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute')
+                     then 'opérateur OUVERT' else 'opérateur fermé' end)
+         end,
+         to_regprocedure('public.incident_table_exemptee(text)') is not null
+           and to_regclass('public.incident_controles') is not null
+           and (case when to_regprocedure('public.incident_table_exemptee(text)') is not null then
+                 (xpath('/row/n/text()', query_to_xml('select count(*) as n from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = ''public'' and c.relkind in (''r'', ''p'') and not public.incident_table_exemptee(c.relname) and not exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = ''incident_garde_ecriture'' and t.tgenabled <> ''D'')', false, true, '')))[1]::text end) = '0'
+           and (case when to_regclass('public.incident_controles') is not null then
+                 (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.incident_controles where actif and (expire_at is null or expire_at > now())', false, true, '')))[1]::text end) = '0'
+           and not has_function_privilege('anon', 'public.plateforme_incident_basculer(text,text,boolean,text,text,integer)', 'execute')
+           and not has_function_privilege('authenticated', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute')
+           and not has_function_privilege('service_role', 'public.incident_basculer_operateur(text,text,text,boolean,text,text,integer)', 'execute'), true
+  union all
+  -- 35 (train V8) : Relevé & Métré Lots 8-9 (…0928 809-810). Métré et quantitatif par RPC SECURITY
+  -- DEFINER authentifiés seuls ; moteurs de calcul internes jamais exécutables par l'API ; tables
+  -- d'ajustements et d'ouvrages sous RLS.
+  select 35, 'Tools Relevé & Métré : métré et quantitatifs (20260928000809-810)',
+         'RPC métré/quantitatif authentifiés seuls, moteurs internes fermés, 4 tables sous RLS',
+         concat_ws(', ',
+           case when to_regprocedure('public.tools_releve_plan_metre(uuid)') is null or to_regprocedure('public.tools_releve_plan_quantitatif(uuid)') is null
+                  then 'RPC ABSENTES'
+                when has_function_privilege('anon', 'public.tools_releve_plan_metre(uuid)', 'execute')
+                  or has_function_privilege('anon', 'public.tools_releve_plan_quantitatif(uuid)', 'execute') then 'RPC OUVERTES à anon'
+                else 'RPC authentifiés' end,
+           case when to_regprocedure('public.tools_releve_plan_metre_calcul(uuid)') is null
+                  or to_regprocedure('public.tools_releve_plan_quantitatif_calcul(uuid,jsonb)') is null then 'moteurs ABSENTS'
+                when has_function_privilege('authenticated', 'public.tools_releve_plan_metre_calcul(uuid)', 'execute')
+                  or has_function_privilege('authenticated', 'public.tools_releve_plan_quantitatif_calcul(uuid,jsonb)', 'execute') then 'moteurs OUVERTS'
+                else 'moteurs internes' end,
+           (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relrowsecurity
+              and c.relname in ('tools_releves_metre_ajustements', 'tools_releves_ouvrages', 'tools_releves_ouvrages_bibliotheque',
+                                'tools_releves_quantitatif_ajustements'))::text || '/4 tables sous RLS'),
+         to_regprocedure('public.tools_releve_plan_metre(uuid)') is not null
+           and to_regprocedure('public.tools_releve_plan_quantitatif(uuid)') is not null
+           and not has_function_privilege('anon', 'public.tools_releve_plan_metre(uuid)', 'execute')
+           and not has_function_privilege('anon', 'public.tools_releve_plan_quantitatif(uuid)', 'execute')
+           and to_regprocedure('public.tools_releve_plan_metre_calcul(uuid)') is not null
+           and to_regprocedure('public.tools_releve_plan_quantitatif_calcul(uuid,jsonb)') is not null
+           and not has_function_privilege('authenticated', 'public.tools_releve_plan_metre_calcul(uuid)', 'execute')
+           and not has_function_privilege('authenticated', 'public.tools_releve_plan_quantitatif_calcul(uuid,jsonb)', 'execute')
+           and (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relrowsecurity
+                  and c.relname in ('tools_releves_metre_ajustements', 'tools_releves_ouvrages', 'tools_releves_ouvrages_bibliotheque',
+                                    'tools_releves_quantitatif_ajustements')) = 4, true
+  union all
+  -- 36 (train V8) : red team V2 (ELSATIA_MULTI_APP_SECURITY_RED_TEAM_V2, …0928 805). Cohérence
+  -- tenant ↔ chantier Réserves imposée en base, deux SECURITY DEFINER inter-tenant retirées à
+  -- authenticated (le service les garde).
+  select 36, 'Red team V2 : garde tenant ↔ chantier Réserves, fonctions inter-tenant fermées (20260928000805)',
+         'gardes intervenants et plans actives, snapshot client et capacité Stripe fermés à authenticated',
+         concat_ws(', ',
+           (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D'
+              and tgname in ('reserves_intervenants_meme_tenant', 'reserves_plans_meme_tenant'))::text || '/2 gardes tenant',
+           case when has_function_privilege('authenticated', 'public.construire_client_snapshot(uuid,uuid,text)', 'execute')
+                  or has_function_privilege('authenticated', 'public.capacite_stripe_operations_a_reprendre(integer)', 'execute')
+                then 'fonctions inter-tenant OUVERTES' else 'fonctions inter-tenant fermées' end),
+         (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D'
+            and tgname in ('reserves_intervenants_meme_tenant', 'reserves_plans_meme_tenant')) = 2
+           and not has_function_privilege('authenticated', 'public.construire_client_snapshot(uuid,uuid,text)', 'execute')
+           and not has_function_privilege('authenticated', 'public.capacite_stripe_operations_a_reprendre(integer)', 'execute')
+           and has_function_privilege('service_role', 'public.capacite_stripe_operations_a_reprendre(integer)', 'execute'), true
+  union all
+  -- 37 (train V8) : correctif Performance C2 (ELSATIA_PERFORMANCE_CAPACITY_BASELINE_V1, …0928 812).
+  -- Totaux de devis recalculés une fois par instruction : trois triggers FOR EACH STATEMENT,
+  -- plus de trigger par ligne, fonction de trigger fermée à l'API.
+  select 37, 'Devis : totaux recalculés par instruction (20260928000812)',
+         '3 triggers par instruction, aucun trigger par ligne, fonction fermée à l''API',
+         concat_ws(', ',
+           (select count(*) from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and not tgisinternal and tgenabled <> 'D'
+              and (tgtype & 1) = 0 and tgname like 'recalc_devis_apres_%_lignes')::text || '/3 triggers par instruction',
+           case when exists (select 1 from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and tgname = 'recalc_devis_apres_ligne')
+                then 'trigger par ligne PRÉSENT' else 'trigger par ligne retiré' end),
+         (select count(*) from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and not tgisinternal and tgenabled <> 'D'
+            and (tgtype & 1) = 0 and tgname like 'recalc_devis_apres_%_lignes') = 3
+           and not exists (select 1 from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and tgname = 'recalc_devis_apres_ligne')
+           and to_regprocedure('public.trg_recalc_devis_instruction()') is not null
+           and not has_function_privilege('authenticated', 'public.trg_recalc_devis_instruction()', 'execute'), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

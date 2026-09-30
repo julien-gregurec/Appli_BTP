@@ -155,7 +155,7 @@ test("db : sonde RLS — UUID strict (aucune injection), transaction en lecture 
 });
 
 test("db : RPC service-role only — accord à authenticated, absence, service_role manquant", () => {
-  assert.equal(RPC_SERVICE_SEULEMENT.length, 37); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201) + 2 (V6 : RGPD contrats V2, …0928 501) ; V7 : inchangé (Relevé Lot 7 : aucune RPC service-role only)
+  assert.equal(RPC_SERVICE_SEULEMENT.length, 39); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201) + 2 (V6 : RGPD contrats V2, …0928 501) ; V7 : inchangé (Relevé Lot 7 : aucune RPC service-role only) ; + 2 (V8 : webhook d'application Per-App …0928 804, fin de webhook Stripe …0928 808)
   assert.match(sqlServiceSeulement(), /unnest\(array\['reserver_evenement_abonnement_service'/);
   const r = evaluerServiceSeulement("a|f|f|t|1\nb|f|t|t|1\nc|f|f|f|0\nd|f|f|f|1\n");
   assert.deepEqual(r.map((x) => x.ok), [true, false, false, false]);
@@ -352,6 +352,21 @@ test("train : chiffres historiques V6 jamais réécrits (train V7)", async () =>
   assert.match(v6, /DB verify\s+\*\*29 contrôles, GO local\*\*/);
   assert.doesNotMatch(v6, /<!--train:(nb|derniere|controles)-->/);
   // Le générateur ne réécrit aucun rapport de train, même s'il portait un marqueur.
+  const { changes } = te.synchroniser({ ecrire: false });
+  assert.ok(!changes.some((f) => te.RAPPORTS_HISTORIQUES.test(f)));
+});
+
+test("train : chiffres historiques V7 jamais réécrits (train V8)", async () => {
+  const te = await import("./train-expectations.mjs");
+  const racine = resolve(import.meta.dirname, "../..");
+  assert.ok(te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_CANONICAL_TRAIN_V7_CONVERGENCE_V1.md"));
+  assert.ok(te.RAPPORTS_HISTORIQUES.test("docs/qualification/ELSATIA_CANONICAL_TRAIN_V8_CONVERGENCE_V1.md"));
+  const v7 = readFileSync(resolve(racine, "docs/qualification/ELSATIA_CANONICAL_TRAIN_V7_CONVERGENCE_V1.md"), "utf8");
+  assert.match(v7, /\*\*359\*\*, dernière \*\*`20260928000701`\*\*/);
+  assert.match(v7, /Base neuve \*\*359\/359\*\*/);
+  assert.match(v7, /DB verify\*\* : \*\*30 contrôles, GO local\*\*/);
+  assert.match(v7, /Fonctions service-role only \| 37 \| \*\*37\*\*/);
+  assert.doesNotMatch(v7, /<!--train:(nb|derniere|controles)-->/);
   const { changes } = te.synchroniser({ ecrire: false });
   assert.ok(!changes.some((f) => te.RAPPORTS_HISTORIQUES.test(f)));
 });

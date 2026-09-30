@@ -6207,6 +6207,72 @@
       "example_required": false
     },
     {
+      "name": "ROUTEUR_PORT",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port du routeur de la recette locale « données personnelles des salariés » (tests/e2e/employes-pile-locale, défaut 54321).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "POSTGREST_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL du PostgREST local de la recette « données personnelles des salariés » (tests/e2e/employes-pile-locale, défaut http://127.0.0.1:3001). Banc local uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PASSERELLE_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de la passerelle Auth/Storage locale de la recette « données personnelles des salariés » (tests/e2e/employes-pile-locale, défaut http://127.0.0.1:54322). Banc local uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "PASSERELLE_HOTE",
       "applications": [
         "e2e"

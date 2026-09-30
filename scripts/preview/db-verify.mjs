@@ -115,6 +115,9 @@ export const RPC_SERVICE_SEULEMENT = [
   // Train canonique V6 : paramétrage RGPD des contrats V2 (…0928 501) — purge des échus et rapport,
   // exploitation seule (la purge reste refusée tant que la politique n'est pas active).
   "purger_contrats_conserves_echus", "rapport_echeances_contrats_conserves",
+  // Train canonique V8 : webhook d'application Per-App (…0928 804) et fin de traitement des
+  // webhooks Stripe (reprise des réservations orphelines, …0928 808), appelés côté serveur seulement.
+  "synchroniser_statut_commercial_application_service", "finaliser_evenement_webhook_stripe_service",
 ];
 
 export function sqlServiceSeulement() {

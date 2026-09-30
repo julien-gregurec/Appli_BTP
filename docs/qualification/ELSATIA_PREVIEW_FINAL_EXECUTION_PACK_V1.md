@@ -1,14 +1,17 @@
 # ELSATIA — Preview : pack d'exécution final (V1)
 
-> **Train canonique V7 (2026-09-28)** — ce pack s'exécute désormais sur
-> `integration/elsatia-canonical-train-v7` : **<!--train:nb-->359<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->`**, DB verify
+> **Train canonique V8 (2026-09-30)** — ce pack s'exécute désormais sur la ref V8
+> `claude/sleepy-cannon-6je2vo` (à publier en `integration/elsatia-canonical-train-v8`, même commit) : **<!--train:nb-->359<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->`**, DB verify
 > **<!--train:controles-->30<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet ; 18 : Stripe ordre + essai borné ; 19-23 : garde-fous V4 —
 > commandes fournisseurs RGPD, dette RGPD résiduelle, GP ↔ Réserves, Relevé & Métré non commercial,
 > identité Studio inerte ; 24-26 : garde-fous V5 — réabonnement Stripe, Réserves hôte suspendu en
 > lecture seule (D-01), Relevé & Métré plan 2D ; 27-29 : garde-fous V6 — Relevé & Métré ouvertures et
 > géométrie (Lot 6), paramétrage RGPD des contrats V2 sans aucune valeur activée, surface de la pièce
-> synchronisée par le serveur ; 30 : garde-fou V7 — Relevé & Métré objets de plan et calques (Lot 7)).
+> synchronisée par le serveur ; 30 : garde-fou V7 — Relevé & Métré objets de plan et calques (Lot 7) ;
+> 31-37 : garde-fous V8 — cycle commercial, suspension commerciale par application, données personnelles
+> des salariés, mode sûr (gardes et contrôles), Relevé & Métré métré et quantitatifs (Lots 8-9), red team
+> V2, recalcul des devis par instruction).
 > Ces trois valeurs sont **générées** depuis
 > `supabase/migrations` (`npm run sync:train-expectations`) et vérifiées en CI
 > (`npm run verify:train-expectations`). Les mentions « 335 » ci-dessous décrivent les preuves
@@ -21,7 +24,9 @@
 > V5 → V6, même périmètre ; Studio reste OFF) dans
 > `docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md`, celle sur V7 (358 → 359, upgrade
 > V6 → V7, même périmètre ; Studio reste OFF) dans
-> `docs/qualification/ELSATIA_CANONICAL_TRAIN_V7_CONVERGENCE_V1.md`.
+> `docs/qualification/ELSATIA_CANONICAL_TRAIN_V7_CONVERGENCE_V1.md`, celle sur V8 (359 → 371, upgrade
+> V7 → V8, même périmètre ; Studio reste OFF, mode sûr inerte) dans
+> `docs/qualification/ELSATIA_CANONICAL_TRAIN_V8_CONVERGENCE_V1.md`.
 
 
 Date : 2026-09-26. Base : `integration/elsatia-canonical-train-v2` @ `819ebe5`
@@ -73,11 +78,12 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 
 | | |
 |---|---|
-| Ref à déployer | **`integration/elsatia-canonical-train-v7`** (V7). Historique : `integration/elsatia-canonical-train-v6` (358 → `20260928000601`), `integration/elsatia-canonical-train-v5` (355 → `20260928000301`), `integration/elsatia-canonical-train-v4` (352 → `20260927100000`), `integration/elsatia-canonical-train-v3` (340 → `20260926000505`), `integration/elsatia-canonical-train-v2` |
+| Ref à déployer | **`claude/sleepy-cannon-6je2vo`** (V8 ; à publier en `integration/elsatia-canonical-train-v8`, même commit — rapport V8 §17). Historique : `integration/elsatia-canonical-train-v7` (359 → `20260928000701`), `integration/elsatia-canonical-train-v6` (358 → `20260928000601`), `integration/elsatia-canonical-train-v5` (355 → `20260928000301`), `integration/elsatia-canonical-train-v4` (352 → `20260927100000`), `integration/elsatia-canonical-train-v3` (340 → `20260926000505`), `integration/elsatia-canonical-train-v2` |
 | Migrations | **<!--train:nb-->359<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260928000701<!--/train:derniere-->`** ; `verify:migrations` ✅ (V3 : 340 → `20260926000505` ; V2 : 335 → `20260923000400`) |
-| Rejeu à froid (ce pack) | `rebuild_db.sh pack_preview` : **335/335**, 0 erreur (V2) ; train V4 : **352/352**, 0 erreur (rapport V4 §10) ; train V5 : **355/355**, 0 erreur (rapport V5 §9) ; train V6 : **358/358**, 0 erreur (rapport V6 §9) ; train V7 : **359/359**, 0 erreur (rapport V7 §9) |
-| Applications | Gestion Pro (racine), Colors, Tools, Réserves, Studio (`apps/*`), worker `workers/studio-video` — **première Preview V4/V5/V6/V7 : IN = Gestion Pro, Tools, Colors, Réserves ; OUT = Studio, worker Studio, Boutique, Stripe Connect** |
-| Lot Studio post-H | **intégré au train V7 dans le seul projet Studio dédié** (`apps/studio/supabase/migrations`, aucune migration partagée) ; Studio reste **OFF** pour la première Preview (rapport V7 §7) |
+| Rejeu à froid (ce pack) | `rebuild_db.sh pack_preview` : **335/335**, 0 erreur (V2) ; train V4 : **352/352**, 0 erreur (rapport V4 §10) ; train V5 : **355/355**, 0 erreur (rapport V5 §9) ; train V6 : **358/358**, 0 erreur (rapport V6 §9) ; train V7 : **359/359**, 0 erreur (rapport V7 §9) ; train V8 : **371/371**, 0 erreur (rapport V8 §6) |
+| Applications | Gestion Pro (racine), Colors, Tools, Réserves, Studio (`apps/*`), worker `workers/studio-video` — **première Preview V4/V5/V6/V7/V8 : IN = Gestion Pro, Tools, Colors, Réserves ; OUT = Studio, worker Studio, Boutique, Stripe Connect** |
+| Lot Studio post-H | **intégré au train V7 dans le seul projet Studio dédié** (`apps/studio/supabase/migrations`, aucune migration partagée) ; V8 y ajoute 2 migrations dédiées (garde de séquence d'identité, mode sûr Studio) ; Studio reste **OFF** pour la première Preview (rapport V8 §13) |
+| Mode sûr (V8) | migrations `…0807`/`…0811` : gardes d'écriture **inertes** tant qu'aucun contrôle n'est actif ; DB verify 34 exige 0 contrôle actif au GO ; bascule réservée au rôle plateforme `total` + AAL2 (runbooks `docs/runbooks/incident/`) |
 | Planificateur de purge RGPD | **OFF** (variables vides = `mode: off`) |
 
 ---
@@ -224,7 +230,7 @@ npm run preview:db-verify -- --before-owner               # juste après push
 (`administrateur_total_actif_absent`, `cle_attestation_active_absente`) ; toute autre anomalie =
 NO-GO. **Prouvé localement** sur les 335 migrations (§10) : 11/11 contrôles bloquants OK, 2 non
 bloquants en attente (`url_preview`, propriétaire), 0 table `public` sans RLS, 0 droit d'écriture
-anon, 19 buckets dont 1 public (V4 : + `tools-releves` ; V5, V6, V7 : inchangé), 37/37 RPC service-role only (V4 : + 13 ; V5 : + 2, réabonnement Stripe ; V6 : + 2, purge et rapport des contrats conservés RGPD V2 ; V7 : inchangé).
+anon, 19 buckets dont 1 public (V4 : + `tools-releves` ; V5, V6, V7, V8 : inchangé), 39/39 RPC service-role only (V4 : + 13 ; V5 : + 2, réabonnement Stripe ; V6 : + 2, purge et rapport des contrats conservés RGPD V2 ; V7 : inchangé ; V8 : + 2, webhook d'application Per-App et fin de webhook Stripe).
 
 ### 4.3 Auth URLs et redirections (Dashboard → Authentication → URL Configuration)
 
@@ -294,7 +300,7 @@ refusent l'accès — comportement voulu.
 
 | Contrôle | Où | Attendu |
 |---|---|---|
-| 37 RPC techniques (journal et synchro abonnement, facture d'abonnement, suspensions, Boutique, Connect, Tools, Réserves notifications, Studio render ; V4 : ordre Stripe, identité Studio ; V5 : réabonnement Stripe ; V6 : contrats conservés RGPD V2) : EXECUTE **refusé** à `anon` et `authenticated`, **accordé** à `service_role` | `db-verify` (`DB-SERVICE-ONLY`) | 37/37 (V7 : inchangé ; V5 : 35/35 ; V4 : 33/33 ; V3 : 20/20) ; prouvé + contre-épreuve (`grant … to authenticated` détecté) |
+| 39 RPC techniques (journal et synchro abonnement, facture d'abonnement, suspensions, Boutique, Connect, Tools, Réserves notifications, Studio render ; V4 : ordre Stripe, identité Studio ; V5 : réabonnement Stripe ; V6 : contrats conservés RGPD V2 ; V8 : webhook d'application Per-App, fin de webhook Stripe) : EXECUTE **refusé** à `anon` et `authenticated`, **accordé** à `service_role` | `db-verify` (`DB-SERVICE-ONLY`) | 39/39 (V8 ; V7 : 37/37 ; V5 : 35/35 ; V4 : 33/33 ; V3 : 20/20) ; prouvé + contre-épreuve (`grant … to authenticated` détecté) |
 | Liste des buckets | `storage-smoke` (clé de service) vs anonyme | 18 vs rien |
 | Webhooks Stripe (seuls appelants des RPC `*_service`) | §5 | 200 ; 400 sans signature |
 | Crons (bearer `CRON_SECRET`) | §8 | 401 sans bearer (Réserves) / 404 (GP, crons OFF) |
@@ -627,7 +633,7 @@ détection de fuite, détection du rate-limiter).
 | « aucun code ne lit `STRIPE_PORTAL_CONFIGURATION_ID` » | lu par `src/lib/stripe-abonnement.ts:389` (optionnel) |
 | « `configurer-portail-stripe.mjs` n'existe que sur l'orpheline Billing V3 » | présent : `scripts/configurer-portail-stripe.mjs` |
 | « 3-D Secure suspend immédiatement » | `invoice.payment_action_required` ne touche **pas** l'accès (`statut_resultant = action_requise`) |
-| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V7, <!--train:nb-->359<!--/train:nb-->, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->` |
+| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V8, <!--train:nb-->359<!--/train:nb-->, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->` |
 | STEP 14 : crons GP « → 200 » avec bearer | **404** tant que `FEATURE_CRONS_ENABLED=false` (valeur Preview imposée) |
 | STEP 12 : « 27 prix V4 vérifiés » suffisent à la capacité | les prix `COMPTE_SUP_<OFFRE>` lus par le runtime ne sont pas dans la table vérifiée |
 

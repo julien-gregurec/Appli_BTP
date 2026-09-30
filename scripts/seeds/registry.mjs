@@ -425,6 +425,16 @@ export const SEEDS = [
     coveredBy: "upgrade-harness",
   },
   {
+    id: "upgrade-complement-v8",
+    path: "scripts/local-postgres-bootstrap/upgrade_v7_v8_seed_complement.sql",
+    classification: "CI_ONLY",
+    // Écrit l'état d'une base V7 (contrat au prix 69 €, GP suspendu avec Colors payé, données
+    // personnelles des salariés, objets Lot 7 sur plan V6) : ne se charge que sur une base au train
+    // V7 construite depuis V3 par upgrade-v7-v8.sh, jamais sur une base fraîche V8.
+    target: "qualification d'upgrade V7 → V8 (base V7 avec historique V3 → V4 → V5 → V6 → V7, jamais une base fraîche V8)",
+    coveredBy: "upgrade-harness",
+  },
+  {
     id: "upgrade-complement-v4",
     path: "scripts/local-postgres-bootstrap/upgrade_v3_v4_seed_complement.sql",
     classification: "CI_ONLY",
@@ -450,6 +460,20 @@ export const SEEDS = [
       capacite_personnes_bypass: "Fixture pgTAP : `set local` dans la transaction du test, superutilisateur uniquement.",
     },
     note: "Squelette d'isolation volontairement minimal (devis accepté et facture émise sans lignes, totaux de commande saisis, stock initial sans mouvement) : le harnais signale ces écarts comme hérités des prérequis, sans les imputer aux seeds construits dessus.",
+  },
+  {
+    id: "pgtap-employes-donnees-personnelles",
+    path: "supabase/tests/fixtures/employes_donnees_personnelles.inc",
+    classification: "CI_ONLY",
+    // Décor du lot « données personnelles des salariés » (train V8, …0928 806) : inclus par la suite
+    // pgTAP employes_donnees_personnelles_acces_v1 (transaction annulée), par la preuve PostgREST
+    // scripts/qualification/employes-donnees-personnelles-http.sh et par la recette
+    // tests/e2e/employes-pile-locale (bases jetables).
+    target: "suite pgTAP et recettes locales « données personnelles des salariés »",
+    coveredBy: "pgtap",
+    bypass: {
+      capacite_personnes_bypass: "Fixture : `set local` dans la transaction du décor (pgTAP annulée, bases de recette jetables), superutilisateur uniquement.",
+    },
   },
   { id: "pgtap-rgpd-driver", path: "supabase/tests/fixtures/rgpd_purge_driver.inc", classification: "CI_ONLY", target: "pilote de purge des suites pgTAP RGPD", coveredBy: "pgtap" },
   {
