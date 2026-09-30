@@ -20,6 +20,7 @@
  * | `media-service` / `upload-queue` | Lot 4 : cas d'usage photo, file locale « à synchroniser » |
  * | `equipement` | Lot 7 : objets du plan (catalogue, calques, règles miroir SQL, fiche pièce) |
  * | `plan` / `plan-memory` | Lot 5 : plan 2D par étage (états, murs, ouvertures, contours), enregistrement par différence, gel, ancres photo, contrat d'export |
+ * | `units` / `metre` | Lot 8 : unités exactes, métré (miroir du calcul serveur), cotes, revêtements, ajustements, synthèse, CSV, contrat GP |
  * | `gp-sync` | contrat v1 de transmission vers Gestion Pro (non branché) |
  * | `repository` / `service` | port de persistance et cas d'usage |
  */
@@ -45,3 +46,5 @@ export * from "./upload-queue";
 export * from "./equipement";
 export * from "./plan";
 export * from "./plan-memory";
+export * from "./units";
+export * from "./metre";

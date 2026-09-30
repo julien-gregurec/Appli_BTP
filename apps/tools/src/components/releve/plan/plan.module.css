@@ -105,3 +105,15 @@
   .toolbar button, .toggle { padding: 0 10px; font-size: 13px; }
   .stage [role="application"] { height: clamp(320px, 56vh, 640px); }
 }
+
+/* ---- Lot 8 : cotations ---------------------------------------------------- */
+.cotes line, .cotes path { stroke: #2a6f97; stroke-width: 1; fill: none; }
+.cotes .coteAttache { stroke: #8fb4c9; stroke-dasharray: 3 3; }
+.cotes text { fill: #1d4f6d; font-size: 11px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+.cotes g[data-kind="interieure"] line, .cotes g[data-kind="interieure"] path { stroke: #6b8fd6; }
+.cotes g[data-kind="implantation"] line, .cotes g[data-kind="implantation"] path { stroke: #7a5200; }
+.cotes g[data-cote] line, .cotes g[data-cote] path { stroke: #b0421f; }
+.cotes g[data-cote] text { fill: #8d3417; }
+.cotes g[data-selected="true"] line, .cotes g[data-selected="true"] path { stroke-width: 2.5; }
+.cotes g[data-testid="plan-hauteur"] path { fill: #b0421f; stroke: #fff; }
+.cotes g[data-testid="plan-hauteur"] text { text-anchor: start; }

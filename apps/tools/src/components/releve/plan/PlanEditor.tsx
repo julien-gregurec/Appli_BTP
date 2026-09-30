@@ -12,6 +12,11 @@
  * - géométrie : Engine B via `lib/releve/plan/{geometry,snap,editor}` ;
  * - sauvegarde automatique : `useAutosave` du Lot 3 (révision, conflit, réessai).
  *
+ * Lot 8 — cotations : cotes automatiques (intérieures, extérieures, partielles, cumulées, d'ouverture,
+ * d'implantation, largeur / longueur / diagonale de pièce, distance entre murs) calculées à la volée ;
+ * cotes MANUELLES (outil Cote : deux points, valeur calculée ou relevée) et hauteurs ponctuelles,
+ * enregistrées avec le plan ; état projeté des murs et ouvertures sur un plan projeté.
+ *
  * Lot 6 — géométrie bâtiment : murs raccordés à l'épaisseur réelle (`wall-geometry`, Engine B
  * `thick-strips`), ouvertures posées au clic / au toucher sur un mur, glissées le long du mur,
  * redimensionnées par leurs tableaux, attributs de menuiserie ; toute modification qui
@@ -22,7 +27,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CALQUE_DES_CATEGORIES, calquesEffectifs, catalogueEntry, EMPTY_PLAN_DOCUMENT, EQUIPEMENT_CATALOGUE, diffPlan, EQUIPEMENT_CATEGORIE_LABELS, isPlanEditable, isPlanOperationsEmpty, MUR_TYPES,
   newUuid, OUVERTURE_MODELE_LABELS, OUVERTURE_MODELES, OUVERTURE_POUSSEE_LABELS, ouvertureModele, PLAN_CALQUE_LABELS, PLAN_ETAT_LABELS, planCreationRule,
-  photoMarkersOnPlan, validatePlanSave,
+  photoMarkersOnPlan, validatePlanSave, COTE_SOURCE_LABELS, COTE_TYPE_LABELS, COTE_TYPES, coteEcartMm, coteLongueurMm, ETAT_PROJET_LABELS, ETATS_PROJET, newPlanCote,
+  type CoteSource, type CoteType, type EtatProjet, type PlanCote,
   type DeletedPlanEquipement, type EquipementCategorie, type PlanCalque, type PlanCalques, type PlanEquipement,
   type Etage, type LoadedPlan, type MurType, type OuvertureModele, type OuverturePoussee, type PhotoLibrary, type Plan, type PlanDocument,
   type PlanEtat, type PlanOuverture, type ReleveMediaService, type RelevePlanRepository, type ReleveStructure,
@@ -37,6 +43,11 @@ import {
   pointAtLength, setWallAngle, setWallLength, splitWall, splitWallAtJunctions, straightenWall, unassignRoom, updateWall, withRefreshedContours,
   type WallDefaults,
 } from "@/lib/releve/plan/editor";
+import { pointInPolygon } from "@/lib/geometry/engine/planar-faces";
+import {
+  addCote, deleteCote, facingWallDistances, hitTestCote, implantationDimensions, manualDimension, openingDimension, roomExtents, roomInteriorDimensions,
+  updateCote, wallChainDimensions, wallFaceDimensions, type DimensionLine,
+} from "@/lib/releve/plan/dimensions";
 import { planToDxf } from "@/lib/releve/plan/export-dxf";
 import { planToPrintSvg, planToSvg } from "@/lib/releve/plan/export-svg";
 import { EQUIPMENT_SNAP_LABELS, resolveEquipmentSnap, type EquipmentSnap, type EquipmentSnapKind } from "@/lib/releve/plan/equipment-snap";
@@ -66,7 +77,7 @@ import { EquipmentPalette, LayersPanel, ObjectPanel } from "./EquipmentPanels";
 import releveStyles from "../releve.module.css";
 import styles from "./plan.module.css";
 
-type Tool = "select" | "mur" | "ouverture" | "objet" | "piece";
+type Tool = "select" | "mur" | "ouverture" | "objet" | "piece" | "cote";
 type Drag =
   | { kind: "vertex"; from: Point2D; base: PlanDocument; origin: Point2D | null; exclude: Set<string> }
   | { kind: "wall"; murId: string; grab: Point2D; base: PlanDocument; a: Point2D }
@@ -131,6 +142,12 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   const [showLayers, setShowLayers] = useState(false);
   const [localCalques, setLocalCalques] = useState<PlanCalques | null>(null);
   const [trash, setTrash] = useState<DeletedPlanEquipement[]>([]);
+  // Lot 8 : cotes.
+  const [coteMode, setCoteMode] = useState<"longueur" | "hauteur">("longueur");
+  const [coteStart, setCoteStart] = useState<Point2D | null>(null);
+  const [coteHauteur, setCoteHauteur] = useState("");
+  const [coteId, setCoteId] = useState<string | null>(null);
+  const [roomCotes, setRoomCotes] = useState(false);
   const [surfaces, setSurfaces] = useState<Record<string, number>>(() => Object.fromEntries(loaded.document.contours.filter((c) => c.surfaceMm2 != null).map((c) => [c.pieceId, c.surfaceMm2!])));
   const drag = useRef<Drag | null>(null);
   const savedRef = useRef<PlanDocument>(loaded.document);
@@ -151,7 +168,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     revision: plan.revision,
     save: async (patch, revision) => {
       const target = patch.document as PlanDocument;
-      const operations = diffPlan(savedRef.current, target);
+      const operations = diffPlan(savedRef.current, target, { etageId: etage.id });
       if (isPlanOperationsEmpty(operations)) return { revision };
       const issues = validatePlanSave(target, operations);
       if (issues.length) throw new Error(`Plan non enregistré : ${issues[0].message}`);
@@ -328,6 +345,10 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     if (marker && calques.photos.visible) { setPhotoAnchorId(marker.anchorId); return; }
     const tolerance = toleranceWorldFor(selectionTolerancePx(precision), view);
     setPhotoAnchorId(null);
+    // Lot 8 : cotes manuelles (calque Cotations visible et non verrouillé).
+    const cote = calques.cotations.visible && !calques.cotations.verrouille ? hitTestCote(doc.cotes ?? [], world, tolerance) : null;
+    if (cote) { setCoteId(cote.id); setObjetIds([]); setSelection(EMPTY_SELECTION); setOpeningId(null); return; }
+    setCoteId(null);
     // Lot 7 : objets d'abord (ils sont posés sur le plan), hors calques masqués ou verrouillés.
     const objet = hitTestEquipment(doc.equipements, world, tolerance, objetSelectable);
     if (objet) {
@@ -346,7 +367,10 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     });
     setOpeningId(opening?.id ?? null);
     setSelection((current) => (additive ? toggleSelection(current, hit.murId) : selectSingle(current, hit.murId)));
-  }, [calques.photos.visible, doc, markers, objetSelectable, openingsSelectable, size, toWorld, view, wallsSelectable]);
+  }, [calques.photos.visible, calques.cotations, doc, markers, objetSelectable, openingsSelectable, size, toWorld, view, wallsSelectable]);
+
+  /** Lot 8 : pièce (contour) qui contient un point — rattachement des cotes. */
+  const pieceAt = useCallback((point: Point2D) => committed.contours.find((contour) => contour.points.length >= 3 && pointInPolygon(point, { points: contour.points }))?.pieceId ?? null, [committed.contours]);
 
   /** Lot 7 — outil Objet : objet du catalogue au point visé, accroché (face, coin, objet, axe, grille). */
   const objectPlacement = useCallback((local: ScreenPoint, precision: PointerPrecision): EquipmentSnap & { largeurMm: number; profondeurMm: number } => {
@@ -396,6 +420,27 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       setMessage(`${entry.libelle} posé${where}.`);
       return;
     }
+    if (tool === "cote" && editable) {
+      if (calques.cotations.verrouille || !calques.cotations.visible) { setMessage("Calque « Cotations » masqué ou verrouillé : affichez-le et déverrouillez-le pour coter."); return; }
+      const point = snapAt(toWorld(local), precision, coteStart).point;
+      if (coteMode === "hauteur") {
+        const parsed = parseLongueurCm(coteHauteur);
+        if (!parsed.ok || parsed.value === null || parsed.value > 20_000) { setMessage("Saisissez d'abord la hauteur relevée (cm), puis touchez le point du plan."); return; }
+        const cote = newPlanCote(newUuid(), point, null, { typeCote: "hauteur", source: "manuel", valeurMm: parsed.value, pieceId: pieceAt(point) });
+        commit(addCote(committed, cote), "Hauteur ponctuelle", { guardWalls: false });
+        setCoteId(cote.id);
+        setMessage(`Hauteur ponctuelle ${formatLongueurM(parsed.value)} posée${cote.pieceId ? ` (${pieceName(cote.pieceId)})` : ""}.`);
+        return;
+      }
+      if (!coteStart) { setCoteStart(point); setMessage("Premier point de la cote posé : touchez le second point."); return; }
+      if (distance(coteStart, point) < 1) { setCoteStart(null); setMessage("Cote annulée (points confondus)."); return; }
+      const middle = { x: (coteStart.x + point.x) / 2, y: (coteStart.y + point.y) / 2 };
+      const cote = newPlanCote(newUuid(), coteStart, point, { pieceId: pieceAt(middle) });
+      commit(addCote(committed, cote), "Cote manuelle", { guardWalls: false });
+      setCoteStart(null); setCoteId(cote.id);
+      setMessage(`Cote de ${formatLongueurM(cote.valeurMm)} posée.`);
+      return;
+    }
     if (tool === "piece" && editable) {
       if (!pieceToAssign) { setMessage("Choisissez d'abord la pièce à associer."); return; }
       const result = assignRoom(committed, toWorld(local), pieceToAssign);
@@ -405,7 +450,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       return;
     }
     selectAt(local, precision, modifiers.additive);
-  }, [calques, commit, commitOpening, committed, committedNetwork, draftStart, editable, objectPlacement, objetKind, openingKind, openingTarget, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
+  }, [calques, commit, commitOpening, committed, committedNetwork, coteHauteur, coteMode, coteStart, draftStart, editable, objectPlacement, objetKind, openingKind, openingTarget, pieceAt, pieceName, pieceToAssign, placePoint, selectAt, snapAt, tool, toWorld]);
 
   const onCanvasHover = useCallback((local: ScreenPoint | null, precision: PointerPrecision) => {
     if (tool === "objet") {
@@ -426,21 +471,22 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
         : { murId: target.mur.id, decalageMm: Math.max(0, target.centre - target.draft.largeurMm / 2), largeurMm: Math.min(target.draft.largeurMm, wallLength(target.mur)), valid: false });
       return;
     }
-    if (!local || tool !== "mur") { setHover(null); return; }
-    setHover(snapAt(toWorld(local), precision, draftStart));
-  }, [committed, committedNetwork, draftStart, objectPlacement, openingTarget, snapAt, tool, toWorld]);
+    if (!local || (tool !== "mur" && tool !== "cote")) { setHover(null); return; }
+    setHover(snapAt(toWorld(local), precision, tool === "cote" ? coteStart : draftStart));
+  }, [committed, committedNetwork, coteStart, draftStart, objectPlacement, openingTarget, snapAt, tool, toWorld]);
 
   const deleteSelection = useCallback(() => {
+    if (coteId) { commit(deleteCote(committed, coteId), "Suppression de cote", { guardWalls: false }); setCoteId(null); return; }
     if (objetIds.length) { removeObjets(objetIds, objetIds.length > 1 ? "Suppression d'objets" : "Suppression d'objet"); return; }
     if (openingId) { commit(deleteOpening(committed, openingId), "Suppression d'ouverture"); setOpeningId(null); return; }
     if (selection.length === 0) return;
     commit(deleteWalls(committed, selection), selection.length > 1 ? "Suppression de murs" : "Suppression de mur", { refresh: true });
     setSelection(EMPTY_SELECTION);
     setMessage(`${selection.length} mur(s) supprimé(s).`);
-  }, [commit, committed, objetIds, openingId, removeObjets, selection]);
+  }, [commit, committed, coteId, objetIds, openingId, removeObjets, selection]);
 
   const onCanvasKeyDown = useCallback((key: string) => {
-    if (key === "Escape") { endChain(); setSelection(EMPTY_SELECTION); setOpeningId(null); setPhotoAnchorId(null); setObjetIds([]); return true; }
+    if (key === "Escape") { endChain(); setCoteStart(null); setCoteId(null); setSelection(EMPTY_SELECTION); setOpeningId(null); setPhotoAnchorId(null); setObjetIds([]); return true; }
     if ((key === "r" || key === "R") && editable && objetIds.length) { commitObjet(turnEquipment(committed, objetIds, key === "r" ? Math.PI / 2 : -Math.PI / 2), "Rotation d'objet"); return true; }
     if (key === "Enter" && draftStart) { endChain(); setMessage("Tracé terminé."); return true; }
     if ((key === "Delete" || key === "Backspace") && editable) { deleteSelection(); return true; }
@@ -590,7 +636,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
   const single = selectedMurs.length === 1 ? selectedMurs[0] : null;
   const rooms = useMemo(() => (showRooms ? detectRooms(committed.murs) : []), [showRooms, committed.murs]);
 
-  const changeTool = (next: Tool) => { setTool(next); endChain(); setGhost(null); setObjectGhost(null); setObjectSnap(null); setMessage(""); };
+  const changeTool = (next: Tool) => { setTool(next); endChain(); setCoteStart(null); setGhost(null); setObjectGhost(null); setObjectSnap(null); setMessage(""); };
   const selectedObjets = doc.equipements.filter((objet) => objetIds.includes(objet.id));
   const singleObjet = selectedObjets.length === 1 ? selectedObjets[0] : null;
 
@@ -636,6 +682,27 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     return counts;
   }, [committed.equipements]);
   const selectedOpening = openingId ? doc.ouvertures.find((o) => o.id === openingId) ?? null : null;
+  const selectedCote = coteId ? (doc.cotes ?? []).find((cote) => cote.id === coteId) ?? null : null;
+
+  // Lot 8 : cotes affichées (calque Cotations) — manuelles, puis automatiques de la sélection et des pièces.
+  const gapMm = 26 / Math.max(viewport.view.scale, 1e-6);
+  const dimensions = useMemo<DimensionLine[]>(() => {
+    if (!calques.cotations.visible) return [];
+    const out: DimensionLine[] = [];
+    for (const cote of doc.cotes ?? []) { const dim = manualDimension(cote); if (dim) out.push(dim); }
+    if (single && !selectedOpening) out.push(...wallChainDimensions(single, doc.ouvertures, gapMm), ...wallFaceDimensions(single, network, gapMm * 3.4), ...facingWallDistances(single, doc.murs));
+    if (selectedOpening) { const host = doc.murs.find((mur) => mur.id === selectedOpening.murId); if (host) out.push(openingDimension(host, selectedOpening, gapMm)); }
+    if (singleObjet) out.push(...implantationDimensions(singleObjet, doc.murs));
+    if (roomCotes) {
+      for (const contour of doc.contours) {
+        if (scopePieceIds && !scopePieceIds.has(contour.pieceId)) continue;
+        out.push(...roomInteriorDimensions(contour, gapMm));
+        out.push(...(roomExtents(contour)?.dimensions ?? []));
+      }
+    }
+    return out;
+  }, [calques.cotations.visible, doc.cotes, doc.ouvertures, doc.murs, doc.contours, single, selectedOpening, singleObjet, network, gapMm, roomCotes, scopePieceIds]);
+  const hauteurs = useMemo(() => (calques.cotations.visible ? (doc.cotes ?? []).filter((cote) => !cote.b) : []), [calques.cotations.visible, doc.cotes]);
 
   // ── Plans (états, gel) ──────────────────────────────────────────────────────
   const [busy, setBusy] = useState(false);
@@ -702,6 +769,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
       {editable && <button type="button" aria-pressed={tool === "ouverture"} onClick={() => changeTool("ouverture")}>Ouverture</button>}
       {editable && <button type="button" aria-pressed={tool === "objet"} data-testid="plan-outil-objet" onClick={() => changeTool("objet")}>Objet</button>}
       {editable && <button type="button" aria-pressed={tool === "piece"} onClick={() => changeTool("piece")}>Pièce</button>}
+      {editable && <button type="button" aria-pressed={tool === "cote"} data-testid="plan-outil-cote" onClick={() => changeTool("cote")}>Cote</button>}
       {editable && <button type="button" disabled={!canUndo(history)} onClick={() => stepHistory("undo")} aria-label="Annuler">↶ Annuler</button>}
       {editable && <button type="button" disabled={!canRedo(history)} onClick={() => stepHistory("redo")} aria-label="Rétablir">↷ Rétablir</button>}
       {editable && <button type="button" disabled={selection.length === 0 && !openingId && objetIds.length === 0} onClick={deleteSelection}>Supprimer</button>}
@@ -715,8 +783,15 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
         setMessage(`Jonctions nettoyées : ${result.report.fusionnes} extrémité(s) fusionnée(s), ${result.report.raccordes} raccord(s) en T, ${result.report.recoupes} dépassement(s) recoupé(s).`);
       }}>Nettoyer les jonctions</button>}
       {editable && <label className={styles.toggle}><input type="checkbox" checked={snapOn} onChange={(event) => setSnapOn(event.target.checked)} /> Accrochage</label>}
+      <label className={styles.toggle}><input type="checkbox" data-testid="plan-cotes-pieces" checked={roomCotes} onChange={(event) => setRoomCotes(event.target.checked)} /> Cotes des pièces</label>
       <button type="button" onClick={viewport.recenter}>Recentrer</button>
     </div>
+
+    {tool === "cote" && editable && <div className={styles.toolbar} role="toolbar" aria-label="Cotation">
+      <button type="button" aria-pressed={coteMode === "longueur"} data-testid="plan-cote-mode-longueur" onClick={() => { setCoteMode("longueur"); setCoteStart(null); }}>Cote (2 points)</button>
+      <button type="button" aria-pressed={coteMode === "hauteur"} data-testid="plan-cote-mode-hauteur" onClick={() => { setCoteMode("hauteur"); setCoteStart(null); }}>Hauteur ponctuelle</button>
+      {coteMode === "hauteur" && <label className={styles.toggle}>Hauteur relevée (cm) <input data-testid="plan-cote-hauteur" inputMode="decimal" size={6} value={coteHauteur} onChange={(event) => setCoteHauteur(event.target.value)} /></label>}
+    </div>}
 
     {tool === "ouverture" && editable && <div className={styles.toolbar} role="toolbar" aria-label="Menuiseries">
       {OPENING_KINDS.map((kind) => <button key={kind} type="button" aria-pressed={openingKind === kind} data-testid={`plan-menuiserie-${kind}`}
@@ -730,6 +805,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
     <p className={releveStyles.feedback} role="status" aria-live="polite" data-testid="plan-message">
       {message || (tool === "mur" ? (draftStart ? "Touchez l'extrémité du mur (Entrée ou même point : terminer)." : "Touchez le point de départ du mur.")
         : tool === "piece" ? "Choisissez une pièce puis touchez l'intérieur d'une pièce fermée."
+          : tool === "cote" ? (coteMode === "hauteur" ? "Saisissez la hauteur relevée puis touchez le point du plan." : coteStart ? "Touchez le second point de la cote." : "Touchez le premier point de la cote (accroché aux murs).")
           : tool === "ouverture" ? `Touchez un mur pour y poser : ${OPENING_KIND_LABELS[openingKind]}.`
             : tool === "objet" ? `Touchez le plan pour poser : ${catalogueEntry(objetKind).libelle} (contre un mur : il s'y accroche).` : "")}
       {ouverts.length > 0 && ` Contour ouvert : ${ouverts.map(pieceName).join(", ")}.`}
@@ -742,7 +818,8 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
           onCanvasKeyDown={onCanvasKeyDown} status={status}>
           {({ view: v, size: s }) => <PlanLayers document={doc} view={v} size={s} selection={selection} openingId={openingId} scopePieceIds={scopePieceIds}
             pieceName={pieceName} surfaces={surfaces} markers={markers} photoAnchorId={photoAnchorId} rooms={rooms}
-            draft={tool === "mur" && draftStart ? { start: draftStart, end: hover?.point ?? null } : null} snap={hover} showHandles={editable && tool === "select" && !openingId}
+            draft={tool === "mur" && draftStart ? { start: draftStart, end: hover?.point ?? null } : tool === "cote" && coteStart ? { start: coteStart, end: hover?.point ?? null } : null} snap={hover}
+            dimensions={dimensions} hauteurs={hauteurs} coteId={coteId} showHandles={editable && tool === "select" && !openingId}
             network={network} invalidOpenings={invalidOpenings} openingGhost={tool === "ouverture" ? ghost : null} showOpeningHandles={editable && tool === "select"}
             calques={calques} objetIds={objetIds} showObjectHandles={editable && tool === "select"} objectGhost={tool === "objet" ? objectGhost : null} />}
         </PlanViewport>
@@ -784,6 +861,7 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
             }
             commit(next, "Propriétés du mur", { refresh: patch.epaisseurMm !== undefined });
           }}
+          projete={plan.etatDocumente === "projete"}
           onStraighten={() => commit(straightenWall(committed, single.id), "Redresser le mur", { refresh: true })}
           onSplit={() => { const result = splitWall(committed, single.id, wallLength(single) / 2, newUuid()); if (result.error) setMessage(result.error); else { commit(result.document, "Scinder le mur", { refresh: true }); setSelection(EMPTY_SELECTION); } }}
           onSplitAtJunctions={() => { const result = splitWallAtJunctions(committed, committedNetwork, single.id, newUuid); if (result.error) setMessage(result.error); else { commit(result.document, "Scinder aux jonctions", { refresh: true }); setSelection(EMPTY_SELECTION); setMessage("Mur scindé à ses jonctions."); } }}
@@ -792,13 +870,19 @@ export function PlanEditor({ repository, media, structure, etage, plans, loaded,
             if (commitOpening(placeOpening(committed, committedNetwork, single.id, null, OPENING_KIND_PRESETS[kind], id), `Ajout d'ouverture (${OPENING_KIND_LABELS[kind]})`)) setOpeningId(id);
           }} />}
 
-        {tool === "select" && selectedOpening && <OpeningPanel key={`${selectedOpening.id}:${JSON.stringify(selectedOpening)}`} ouverture={selectedOpening} editable={editable}
+        {tool === "select" && selectedOpening && <OpeningPanel key={`${selectedOpening.id}:${JSON.stringify(selectedOpening)}`} ouverture={selectedOpening} editable={editable} projete={plan.etatDocumente === "projete"}
           mur={doc.murs.find((mur) => mur.id === selectedOpening.murId) ?? null} issues={issues.filter((issue) => issue.ouvertureId === selectedOpening.id).map((issue) => issue.message)}
           onPatch={(patch, label) => commitOpening(patchChecked(committed, committedNetwork, selectedOpening.id, patch), label)}
           onKind={(kind) => commitOpening(changeOpeningKind(committed, committedNetwork, selectedOpening.id, kind), `Menuiserie : ${OPENING_KIND_LABELS[kind]}`)}
           onMove={(start) => commitOpening(moveOpening(committed, committedNetwork, selectedOpening.id, start), "Position de l'ouverture")}
           onPosition={(start) => commitOpening(patchChecked(committed, committedNetwork, selectedOpening.id, { decalageMm: start }), "Position de l'ouverture")}
           onDelete={() => { commit(deleteOpening(committed, selectedOpening.id), "Suppression d'ouverture"); setOpeningId(null); }} />}
+
+        {selectedCote && <CotePanel key={`${selectedCote.id}:${JSON.stringify(selectedCote)}`} cote={selectedCote} editable={editable && !calques.cotations.verrouille}
+          projete={plan.etatDocumente === "projete"} pieceLabel={selectedCote.pieceId ? pieceName(selectedCote.pieceId) : null}
+          onPatch={(patch, label) => commit(updateCote(committed, selectedCote.id, patch), label, { guardWalls: false })}
+          onDelete={() => { commit(deleteCote(committed, selectedCote.id), "Suppression de cote", { guardWalls: false }); setCoteId(null); }}
+          onClose={() => setCoteId(null)} />}
 
         {tool === "select" && singleObjet && <ObjectPanel key={`${singleObjet.id}:${JSON.stringify(singleObjet)}`} objet={singleObjet}
           editable={editable && !calques[CALQUE_DES_CATEGORIES[singleObjet.categorie]].verrouille}
@@ -921,8 +1005,8 @@ function NumberField({ label, value, testId, parse, format, onCommit, disabled }
   </label>;
 }
 
-function WallPanel({ mur, editable, document, openingId, network, onSelectOpening, onLength, onAngle, onPatch, onStraighten, onSplit, onSplitAtJunctions, onAddOpening }: {
-  mur: PlanDocument["murs"][number]; editable: boolean; document: PlanDocument; openingId: string | null; network: WallNetwork; onSelectOpening(id: string | null): void;
+function WallPanel({ mur, editable, document, openingId, network, projete, onSelectOpening, onLength, onAngle, onPatch, onStraighten, onSplit, onSplitAtJunctions, onAddOpening }: {
+  mur: PlanDocument["murs"][number]; editable: boolean; document: PlanDocument; openingId: string | null; network: WallNetwork; projete: boolean; onSelectOpening(id: string | null): void;
   onLength(mm: number): void; onAngle(deg: number): void; onPatch(patch: Parameters<typeof updateWall>[2]): void; onStraighten(): void; onSplit(): void;
   onSplitAtJunctions(): void; onAddOpening(kind: OpeningKind): void;
 }) {
@@ -950,6 +1034,7 @@ function WallPanel({ mur, editable, document, openingId, network, onSelectOpenin
           {MUR_TYPES.map((type) => <option key={type} value={type}>{MUR_TYPE_LABELS[type]}</option>)}
         </select>
       </label>
+      {(projete || mur.etatProjet) && <EtatProjetSelect testId="plan-wall-etat" value={mur.etatProjet} disabled={!editable} onChange={(etatProjet) => onPatch({ etatProjet })} />}
     </div>
     {editable && <div className={releveStyles.toolbar}>
       <button type="button" className={releveStyles.secondary} onClick={onStraighten}>Redresser</button>
@@ -969,8 +1054,8 @@ function WallPanel({ mur, editable, document, openingId, network, onSelectOpenin
 }
 
 /** Lot 6 — attributs d'une ouverture : menuiserie, dimensions, allège, sens, poussée, vantaux, modèle. */
-function OpeningPanel({ ouverture, mur, editable, issues, onPatch, onKind, onMove, onPosition, onDelete }: {
-  ouverture: PlanOuverture; mur: PlanDocument["murs"][number] | null; editable: boolean; issues: readonly string[];
+function OpeningPanel({ ouverture, mur, editable, projete, issues, onPatch, onKind, onMove, onPosition, onDelete }: {
+  ouverture: PlanOuverture; mur: PlanDocument["murs"][number] | null; editable: boolean; projete: boolean; issues: readonly string[];
   onPatch(patch: OpeningPatch, label: string): void; onKind(kind: OpeningKind): void;
   /** Déplacement ramené dans l'emplacement libre (bouton « Centrer ») ; `onPosition` : valeur saisie, refusée si invalide. */
   onMove(startMm: number): void; onPosition(startMm: number): void; onDelete(): void;
@@ -1014,11 +1099,63 @@ function OpeningPanel({ ouverture, mur, editable, issues, onPatch, onKind, onMov
           {(["tirant", "poussant"] as const).map((item) => <option key={item} value={item}>{OUVERTURE_POUSSEE_LABELS[item]}</option>)}
         </select>
       </label>}
+      {(projete || ouverture.etatProjet) && <EtatProjetSelect testId="plan-ouverture-etat" value={ouverture.etatProjet} disabled={!editable} onChange={(etatProjet) => onPatch({ etatProjet }, "État projeté de l'ouverture")} />}
     </div>
     <small className={releveStyles.feedback}>Poussée vue depuis la face de référence du mur (à gauche en allant de A vers B). Faites glisser l&apos;ouverture le long du mur ou ses bords pour la redimensionner.</small>
     {editable && mur && <div className={releveStyles.toolbar}>
       <button type="button" className={releveStyles.secondary} onClick={() => onMove(Math.round((wallLength(mur) - ouverture.largeurMm) / 2 * 10) / 10)}>Centrer sur le mur</button>
       <button type="button" className={releveStyles.danger} onClick={onDelete}>Supprimer l&apos;ouverture</button>
     </div>}
+  </section>;
+}
+
+/** Lot 8 — état projeté d'un mur / d'une ouverture (EXISTING / TO_REMOVE / NEW / MOVED). */
+function EtatProjetSelect({ value, disabled, testId, onChange }: { value: EtatProjet | undefined; disabled: boolean; testId: string; onChange(value: EtatProjet): void }) {
+  return <label className={releveStyles.field}><span>État projeté</span>
+    <select data-testid={testId} value={value ?? "existant"} disabled={disabled} onChange={(event) => onChange(event.target.value as EtatProjet)}>
+      {ETATS_PROJET.map((item) => <option key={item} value={item}>{ETAT_PROJET_LABELS[item]}</option>)}
+    </select>
+  </label>;
+}
+
+/** Lot 8 — cote manuelle : type, valeur calculée ou relevée (écart au plan), décalage, libellé ; hauteur ponctuelle. */
+function CotePanel({ cote, editable, projete, pieceLabel, onPatch, onDelete, onClose }: {
+  cote: PlanCote; editable: boolean; projete: boolean; pieceLabel: string | null;
+  onPatch(patch: Partial<Omit<PlanCote, "id">>, label: string): void; onDelete(): void; onClose(): void;
+}) {
+  const cm = (input: string) => parseLongueurCm(input);
+  const hauteur = !cote.b;
+  const ecart = coteEcartMm(cote);
+  return <section className={styles.section} aria-label="Cote sélectionnée" data-testid="plan-cote-panel">
+    <h2>{hauteur ? "Hauteur ponctuelle" : COTE_TYPE_LABELS[cote.typeCote]} · {formatLongueurM(cote.valeurMm)}</h2>
+    {!hauteur && <p className={releveStyles.feedback} data-testid="plan-cote-ecart">
+      {cote.source === "calcule" ? "Valeur calculée sur le plan (suit les points)." : `Valeur relevée au ${cote.source === "laser" ? "laser" : "mètre"} ; plan : ${formatLongueurM(coteLongueurMm(cote))}${ecart !== null ? ` — écart ${ecart > 0 ? "+" : ""}${String(Math.round(ecart) / 10).replace(".", ",")} cm` : ""}.`}
+    </p>}
+    {pieceLabel && <p className={releveStyles.feedback}>Pièce : {pieceLabel}</p>}
+    <div className={styles.grid}>
+      {!hauteur && <label className={releveStyles.field}><span>Type de cote</span>
+        <select data-testid="plan-cote-type" value={cote.typeCote} disabled={!editable} onChange={(event) => onPatch({ typeCote: event.target.value as CoteType }, "Type de cote")}>
+          {COTE_TYPES.filter((item) => item !== "hauteur").map((item) => <option key={item} value={item}>{COTE_TYPE_LABELS[item]}</option>)}
+        </select>
+      </label>}
+      {!hauteur && <NumberField label="Valeur relevée (cm, vide = plan)" testId="plan-cote-valeur" value={cote.source === "calcule" ? null : cote.valeurMm} disabled={!editable}
+        parse={(input) => (input.trim() ? cm(input) : { ok: true, value: null })} format={(v) => formatLongueurCm(v)}
+        onCommit={(v) => onPatch(v === null ? { source: "calcule" } : { source: cote.source === "calcule" ? "manuel" : cote.source, valeurMm: v }, v === null ? "Cote calculée" : "Valeur relevée")} />}
+      {!hauteur && cote.source !== "calcule" && <label className={releveStyles.field}><span>Relevée au</span>
+        <select data-testid="plan-cote-source" value={cote.source} disabled={!editable} onChange={(event) => onPatch({ source: event.target.value as CoteSource }, "Source de la cote")}>
+          <option value="manuel">{COTE_SOURCE_LABELS.manuel}</option><option value="laser">{COTE_SOURCE_LABELS.laser}</option>
+        </select>
+      </label>}
+      {!hauteur && <NumberField label="Décalage de la ligne (cm)" testId="plan-cote-decalage" value={cote.decalageMm} disabled={!editable}
+        parse={(input) => { const trimmed = input.trim(); const negative = trimmed.startsWith("-"); const parsed = cm(negative ? trimmed.slice(1) : trimmed); return parsed.ok && parsed.value !== null && negative ? { ok: true, value: -parsed.value } : parsed; }}
+        format={(v) => formatLongueurCm(v)} onCommit={(v) => onPatch({ decalageMm: v ?? 0 }, "Décalage de la cote")} />}
+      {hauteur && <NumberField label="Hauteur (cm)" testId="plan-cote-hauteur-valeur" value={cote.valeurMm} disabled={!editable} parse={cm} format={(v) => formatLongueurCm(v)}
+        onCommit={(v) => v !== null && onPatch({ valeurMm: v }, "Hauteur ponctuelle")} />}
+      {projete && <EtatProjetSelect testId="plan-cote-etat" value={cote.etatProjet} disabled={!editable} onChange={(etatProjet) => onPatch({ etatProjet }, "État projeté de la cote")} />}
+    </div>
+    <div className={releveStyles.toolbar}>
+      {editable && <button type="button" className={releveStyles.danger} data-testid="plan-cote-supprimer" onClick={onDelete}>Supprimer la cote</button>}
+      <button type="button" className={releveStyles.secondary} onClick={onClose}>Fermer</button>
+    </div>
   </section>;
 }

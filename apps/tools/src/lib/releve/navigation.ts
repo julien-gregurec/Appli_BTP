@@ -12,6 +12,7 @@
  * | Fiche pièce (Lot 3) | `/releves/piece?id=&piece=` |
  * | Photos terrain (Lot 4) | `/releves/photos?id=&portee=&cible=&ajout=` (galerie du relevé ou d'un nœud) |
  * | Plan 2D (Lot 5) | `/releves/plan?id=&etage=&zone=&piece=&plan=` (plan de l'étage, cadré sur une zone ou une pièce) |
+ * | Métré (Lot 8) | `/releves/metre?id=&etat=&piece=` (synthèse chantier → pièce, revêtements, ajustements, exports) |
  */
 import { GALLERY_SCOPE_KINDS, isUuid, type GalleryScope, type SearchHit } from "@elsatia/releve-domain";
 
@@ -127,4 +128,24 @@ export function readPlanSelection(search: string): PlanSelection | null {
   const pick = (key: string) => { const value = params.get(key); return isUuid(value) ? value : null; };
   const pieceId = pick("piece");
   return { releveId, etageId, pieceId, zoneId: pieceId ? null : pick("zone"), planId: pick("plan") };
+}
+
+/** Lot 8 — vue Métré d'un relevé : état documenté (existant / projeté / tel que construit), pièce ouverte facultative. */
+export const RELEVE_METRE_PATH = "/releves/metre";
+export type MetreSelection = { releveId: string; etat: "existant" | "projete" | "as_built"; pieceId: string | null };
+
+export function metreHref(selection: { releveId: string; etat?: MetreSelection["etat"] | null; pieceId?: string | null }): string {
+  const params = new URLSearchParams({ id: selection.releveId });
+  if (selection.etat && selection.etat !== "existant") params.set("etat", selection.etat);
+  if (selection.pieceId) params.set("piece", selection.pieceId);
+  return `${RELEVE_METRE_PATH}?${params.toString()}`;
+}
+
+export function readMetreSelection(search: string): MetreSelection | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id");
+  if (!isUuid(releveId)) return null;
+  const etat = params.get("etat");
+  const pieceId = params.get("piece");
+  return { releveId, etat: etat === "projete" || etat === "as_built" ? etat : "existant", pieceId: isUuid(pieceId) ? pieceId : null };
 }

@@ -15,6 +15,7 @@ import { ReleveConflictError } from "./repository";
 import { equipementAnomalie, equipementFromElement, EQUIPMENT_ISSUE_MESSAGES, type PlanEquipement } from "./equipement";
 import type { DeletedPlanEquipement } from "./plan";
 import type { VersionType } from "./model";
+import { coteAnomalie, coteFromElement, COTE_ISSUE_MESSAGES, type PlanCote } from "./metre";
 
 export class PlanRuleError extends Error {
   constructor(message: string, public readonly code: "forbidden" | "invalid" | "conflict_state") { super(message); this.name = "PlanRuleError"; }
@@ -41,6 +42,8 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
   murs = new Map<string, StoredMur & { planId: string }>();
   ouvertures = new Map<string, StoredOuverture & { planId: string }>();
   equipements = new Map<string, StoredEquipement & { planId: string }>();
+  /** Lot 8 : cotes manuelles. */
+  cotes = new Map<string, PlanCote & { planId: string; deleted: boolean }>();
   versions: { id: string; typeVersion: VersionType }[] = [];
   /** Pièces actives par étage (contrôle des contours). */
   piecesParEtage = new Map<string, Set<string>>();
@@ -70,6 +73,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
         murs: [...this.murs.values()].filter((mur) => mur.planId === planId && !mur.deleted).map(strip).map((mur) => murFromElement({ id: mur.id as never, pieceId: mur.pieceId as never, donnees: { ...mur } as never })),
         ouvertures: [...this.ouvertures.values()].filter((o) => o.planId === planId && !o.deleted).map(strip).map((o) => ouvertureFromElement({ id: o.id as never, parentElementId: o.murId as never, donnees: { ...o } as never })),
         equipements: [...this.equipements.values()].filter((e) => e.planId === planId && !e.deleted).map(storedToObjet),
+        cotes: [...this.cotes.values()].filter((c) => c.planId === planId && !c.deleted).sort((a, b) => (a.id < b.id ? -1 : 1)).map(strip),
         contours: plan.contours, cadre: plan.cadre, reglages: plan.reglages,
       },
     };
@@ -102,6 +106,10 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
         const id = this.uuid();
         const murId = e.murId ? map.get(e.murId) ?? null : null;
         this.equipements.set(id, { ...e, id, planId: plan.id, origineId: e.id, murId, face: murId ? e.face : null, decalageMm: murId ? e.decalageMm : null });
+      }
+      for (const c of [...this.cotes.values()].filter((x) => x.planId === base.id && !x.deleted)) {
+        const id = this.uuid();
+        this.cotes.set(id, { ...c, id, planId: plan.id, origineId: c.id });
       }
       const contours: PlanContour[] = base.contours.map((contour) => ({ ...contour, murIds: contour.murIds.filter((id) => map.has(id)).map((id) => map.get(id)!) }));
       this.plans.set(plan.id, { ...plan, contours, revision: 2 });
@@ -143,6 +151,19 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       if (existing && !existing.deleted && existing.verrouille && objet.verrouille) throw new PlanRuleError(EQUIPMENT_ISSUE_MESSAGES.verrouille, "invalid");
       nextEquipements.set(item.id, { ...objet, planId, deleted: false, deletedAt: null });
     }
+    const nextCotes = new Map(this.cotes);
+    for (const item of operations.cotes ?? []) {
+      const existing = nextCotes.get(item.id);
+      if (existing && existing.planId !== planId) throw new PlanRuleError("Élément étranger au plan.", "forbidden");
+      const cote = coteFromElement({ id: item.id, pieceId: item.pieceId, donnees: item.donnees });
+      const code = coteAnomalie(cote);
+      if (code) throw new PlanRuleError(COTE_ISSUE_MESSAGES[code], "invalid");
+      nextCotes.set(item.id, { ...cote, planId, deleted: false });
+    }
+    for (const id of operations.supprimes) {
+      const cote = nextCotes.get(id);
+      if (cote && cote.planId === planId) nextCotes.set(id, { ...cote, deleted: true });
+    }
     for (const id of operations.supprimes) {
       const objet = nextEquipements.get(id);
       if (objet && objet.planId === planId && !objet.deleted) {
@@ -174,7 +195,7 @@ export class InMemoryPlanRepository implements RelevePlanRepository {
       }
       contours = operations.contours.map((contour) => ({ ...contour, surfaceMm2: shoelace(contour.points) }));
     }
-    this.murs = nextMurs; this.ouvertures = nextOuvertures; this.equipements = nextEquipements;
+    this.murs = nextMurs; this.ouvertures = nextOuvertures; this.equipements = nextEquipements; this.cotes = nextCotes;
     const next: Plan = {
       ...plan, contours, cadre: operations.cadre ?? plan.cadre, reglages: operations.reglages ?? plan.reglages,
       revision: plan.revision + 1, updatedAt: this.now(),

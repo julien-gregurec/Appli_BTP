@@ -307,9 +307,9 @@ select throws_ok(format($$ insert into public.tools_releves_elements(releve_id, 
    '{"a":{"x":0,"y":0},"b":{"x":1,"y":0},"epaisseurMm":100,"typeMur":"cloison"}') $$, (select id from _r1)),
   '42501', null, 'M1. un mur est sur l''étage de son plan');
 select throws_ok(format($$ insert into public.tools_releves_elements(releve_id, type, etage_id, plan_id, donnees) values
-  ('d5000000-0000-0000-0000-000000000001', 'materiau', 'd5300000-0000-0000-0000-000000000002', %L,
-   '{"libelle":"Plâtre","categorie":"mur","unite":"m2"}') $$, (select id from _r1)),
-  '23514', null, 'M2. seuls murs, ouvertures (et, depuis le Lot 7, équipements) appartiennent à un plan');
+  ('d5000000-0000-0000-0000-000000000001', 'quantite', 'd5300000-0000-0000-0000-000000000002', %L,
+   '{"cle":"sol","formule":"surface","valeur":1,"unite":"m2","qualite":"exacte"}') $$, (select id from _r1)),
+  '23514', null, 'M2. seuls murs, ouvertures (et, depuis les Lots 7 / 8, équipements, cotes, revêtements) appartiennent à un plan');
 select lives_ok(format($$ select public.tools_releve_plan_enregistrer(%L, 1, jsonb_build_object('murs', jsonb_build_array(pg_temp.mur('d5600000-0000-0000-0000-0000000000b1', 0, 0, 3000, 0)))) $$, (select id from _r1)),
   'M3. étage R+1 : mur du plan initial');
 select throws_ok(format($$ select public.tools_releve_plan_enregistrer(%L, 2, jsonb_build_object('ouvertures', jsonb_build_array(pg_temp.porte('d5700000-0000-0000-0000-0000000000b1', 'd5600000-0000-0000-0000-000000000002', 0, 900)))) $$, (select id from _r1)),
