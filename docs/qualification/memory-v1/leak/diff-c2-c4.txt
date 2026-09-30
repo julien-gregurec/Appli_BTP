@@ -1,0 +1,38 @@
+A: heap-c2-664.heapsnapshot
+   2832387 objets, 333.53 MB
+B: heap-c4-664.heapsnapshot
+   2835683 objets, 334.84 MB  (Δ 1.30 MB, Δ objets 3296)
+
+Plus fortes croissances (taille propre) :
+    1.06 MB     2350 obj  (B: 275577 / 28.94 MB)  code	(code)
+    0.19 MB      468 obj  (B: 2637 / 0.62 MB)  hidden	system / WeakArrayList
+    0.04 MB        0 obj  (B: 39488 / 69.02 MB)  array	
+    0.01 MB       95 obj  (B: 358148 / 92.14 MB)  string	(string)
+    0.00 MB      247 obj  (B: 8220 / 0.13 MB)  hidden	system / CodeWrapper
+    0.00 MB       55 obj  (B: 338 / 0.02 MB)  object	LRUNode
+    0.00 MB        0 obj  (B: 111 / 0.02 MB)  object shape	system / WeakArrayList
+    0.00 MB       27 obj  (B: 379793 / 19.33 MB)  object	Object
+    0.00 MB       33 obj  (B: 88548 / 2.70 MB)  concatenated string	(string)
+    0.00 MB       10 obj  (B: 233884 / 7.14 MB)  object	Array
+    0.00 MB        4 obj  (B: 4655 / 0.11 MB)  hidden	system / BytecodeWrapper
+    0.00 MB        3 obj  (B: 209319 / 3.19 MB)  number	heap number
+    0.00 MB        0 obj  (B: 3 / 0.00 MB)  closure	closure sync
+    0.00 MB        0 obj  (B: 1 / 0.00 MB)  closure	closure projectGetSourceMapSync
+    0.00 MB        0 obj  (B: 5 / 0.00 MB)  closure	closure applyDebugMeta
+
+Plus fortes croissances (nombre d'objets) :
+    2350 obj     1.06 MB  (B: 275577)  code	(code)
+     468 obj     0.19 MB  (B: 2637)  hidden	system / WeakArrayList
+     247 obj     0.00 MB  (B: 8220)  hidden	system / CodeWrapper
+      95 obj     0.01 MB  (B: 358148)  string	(string)
+      55 obj     0.00 MB  (B: 338)  object	LRUNode
+      33 obj     0.00 MB  (B: 88548)  concatenated string	(string)
+      27 obj     0.00 MB  (B: 379793)  object	Object
+      10 obj    -0.01 MB  (B: 138283)  array	(object elements)
+      10 obj     0.00 MB  (B: 233884)  object	Array
+       4 obj     0.00 MB  (B: 4655)  hidden	system / BytecodeWrapper
+       3 obj     0.00 MB  (B: 209319)  number	heap number
+       0 obj     0.00 MB  (B: 3)  closure	closure sync
+       0 obj     0.00 MB  (B: 1)  closure	closure projectGetSourceMapSync
+       0 obj     0.00 MB  (B: 5)  closure	closure applyDebugMeta
+       0 obj     0.00 MB  (B: 1)  closure	closure arrayClone

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ELSATIA_NEXT_MEMORY_CAPACITY_V1 — campagne complémentaire : routes isolées, PDF,
 # charge intense, limites de conteneur. Chaque mesure démarre un `next start` neuf.
-# Usage : campaign.sh <racine-sortie> [étapes...]  (étapes : routes pdf stress limits alloc)
+# Usage : campaign.sh <racine-sortie> [étapes...]  (étapes : routes pdf stress leak limits alloc)
 set -uo pipefail
 ROOT="$1"; shift
 STEPS=("${@:-routes pdf stress limits}")
@@ -27,12 +27,18 @@ for STEP in ${STEPS[@]}; do case "$STEP" in
       EXTRA=""; [ "$V" = borne ] && EXTRA="--max-old-space-size=$(( L * 60 / 100 ))"
       rm -rf "$D"; QUICK=1 LOAD_S=180 LIMIT_MB=$L NODE_EXTRA="$EXTRA" "$RUN" "$D" 500 25
     done; done ;;
+  leak)
+    # Critère de fuite : 4 cycles identiques (50 VU, 120 s, think 500 ms), GC forcé +
+    # heap snapshot après chacun ; comparer c2 -> c3 -> c4 (c1 inclut l'échauffement JIT).
+    [ -e "$ROOT/leak/phases.jsonl" ] && grep -q stop "$ROOT/leak/phases.jsonl" || {
+      rm -rf "$ROOT/leak"; LOAD_S=120 COOL_MIN=1 CYCLES=4 SNAP=1 "$RUN" "$ROOT/leak" 500 50; } ;;
   alloc)
     # A/B allocateur natif, même charge que « stress » palier 25 puis refroidissement court.
-    for V in glibc arena2 jemalloc; do
+    for V in glibc arena2 jemalloc identity; do
       D="$ROOT/alloc-$V"
       [ -e "$D/phases.jsonl" ] && grep -q stop "$D/phases.jsonl" && continue
-      case $V in glibc) E="";; arena2) E="MALLOC_ARENA_MAX=2";; jemalloc) E="LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2";; esac
-      rm -rf "$D"; QUICK=1 LOAD_S=180 SERVER_ENV="$E" "$RUN" "$D" 500 25
+      X=""
+      case $V in glibc) E="";; arena2) E="MALLOC_ARENA_MAX=2";; jemalloc) E="LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2";; identity) E=""; X="--identity";; esac
+      rm -rf "$D"; QUICK=1 LOAD_S=180 SERVER_ENV="$E" LOADGEN_EXTRA="$X" "$RUN" "$D" 500 25
     done ;;
 esac; done

@@ -1,0 +1,8 @@
+11248 objets object:_Response
+
+[1x] object:Array.[2] <- object:Array.[0] <- object:Object.v <- array:.50 <- object:Map.table <- object:Object.p <- closure:.61 / part of key ( @476351) -> value (Object @2410341) pair in WeakMap (table @2409987) <- object:system / Context.e <- closure:.context <- object:system / Context.c <- object:system / Context.previous <- closure:.context <- closure:d.__nextGetStaticStore <- object:global.fetch <- synthetic:.2
+
+[1x] object:Promise.reactions_or_result <- object:Array.[1] <- object:Array.[0] <- object:Object.v <- array:.51 <- object:Map.table <- object:Object.p <- closure:.276 / part of key ( @476351) -> value (Object @4533327) pair in WeakMap (table @4546823) <- object:system / Context.e <- closure:.context <- object:system / Context.c <- object:system / Context.previous <- closure:.context <- closure:d.__nextGetStaticStore <- object:global.fetch <- synthetic:.2
+
+[1x] object:Array.[2] <- object:Array.[0] <- object:Object.v <- array:.8 <- object:Map.table <- object:Object.p <- closure:.269 / part of key ( @476351) -> value (Object @4418037) pair in WeakMap (table @4418041) <- object:system / Context.e <- closure:.context <- object:system / Context.c <- object:system / Context.previous <- closure:.context <- closure:d.__nextGetStaticStore <- object:global.fetch <- synthetic:.2
+

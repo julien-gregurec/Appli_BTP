@@ -1,0 +1,48 @@
+A: heap-idle-664.heapsnapshot
+   746469 objets, 88.78 MB
+B: heap-c1-664.heapsnapshot
+   2829578 objets, 332.60 MB  (Δ 243.82 MB, Δ objets 2083109)
+
+Plus fortes croissances (taille propre) :
+   67.77 MB    34742 obj  (B: 39471 / 68.95 MB)  array	
+   50.55 MB   262632 obj  (B: 357996 / 92.12 MB)  string	(string)
+   24.52 MB     6628 obj  (B: 6833 / 25.73 MB)  native	system / JSArrayBufferData
+   17.59 MB   344085 obj  (B: 379660 / 19.33 MB)  object	Object
+   13.86 MB    37191 obj  (B: 44507 / 17.66 MB)  array	(object properties)
+   10.02 MB   154724 obj  (B: 164917 / 10.62 MB)  hidden	system / PropertyArray
+    6.74 MB   122533 obj  (B: 138250 / 8.60 MB)  array	(object elements)
+    6.26 MB   205089 obj  (B: 233830 / 7.14 MB)  object	Array
+    5.38 MB    -5110 obj  (B: 271391 / 27.13 MB)  code	(code)
+    5.05 MB    93931 obj  (B: 118234 / 6.40 MB)  closure	closure 
+    4.49 MB    71442 obj  (B: 83376 / 5.31 MB)  object	system / Context
+    3.76 MB    82215 obj  (B: 98822 / 4.52 MB)  closure	closure native_bind
+    3.19 MB   208781 obj  (B: 209290 / 3.19 MB)  number	heap number
+    2.84 MB    79943 obj  (B: 80000 / 2.84 MB)  array	(bound arguments)
+    2.07 MB    45220 obj  (B: 45259 / 2.07 MB)  object	Promise
+    1.56 MB    13595 obj  (B: 13595 / 1.56 MB)  object	Immediate
+    1.47 MB     9375 obj  (B: 9415 / 1.48 MB)  object	e
+    0.79 MB    25853 obj  (B: 25944 / 0.79 MB)  object	WeakRef
+    0.78 MB    11391 obj  (B: 11448 / 0.79 MB)  hidden	system / WeakCell
+    0.70 MB    22991 obj  (B: 23215 / 0.71 MB)  object	Map
+
+Plus fortes croissances (nombre d'objets) :
+  344085 obj    17.59 MB  (B: 379660)  object	Object
+  262632 obj    50.55 MB  (B: 357996)  string	(string)
+  208781 obj     3.19 MB  (B: 209290)  number	heap number
+  205089 obj     6.26 MB  (B: 233830)  object	Array
+  154724 obj    10.02 MB  (B: 164917)  hidden	system / PropertyArray
+  122533 obj     6.74 MB  (B: 138250)  array	(object elements)
+   93931 obj     5.05 MB  (B: 118234)  closure	closure 
+   82215 obj     3.76 MB  (B: 98822)  closure	closure native_bind
+   79943 obj     2.84 MB  (B: 80000)  array	(bound arguments)
+   71442 obj     4.49 MB  (B: 83376)  object	system / Context
+   45220 obj     2.07 MB  (B: 45259)  object	Promise
+   37191 obj    13.86 MB  (B: 44507)  array	(object properties)
+   34742 obj    67.77 MB  (B: 39471)  array	
+   25853 obj     0.79 MB  (B: 25944)  object	WeakRef
+   22991 obj     0.70 MB  (B: 23215)  object	Map
+   16750 obj     0.64 MB  (B: 16751)  object	ReadableByteStreamController
+   15465 obj     0.47 MB  (B: 88536)  concatenated string	(string)
+   13595 obj     1.56 MB  (B: 13595)  object	Immediate
+   11832 obj     0.54 MB  (B: 11832)  object	_HeadersList
+   11392 obj     0.52 MB  (B: 11392)  object	_Headers

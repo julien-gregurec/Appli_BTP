@@ -2,7 +2,7 @@
 # ELSATIA_NEXT_MEMORY_CAPACITY_V1 — protocole de mesure mémoire sur `next start`.
 #
 # Usage : run-protocol.sh <out-dir> <think-ms> [palier1 palier2 ...]
-#   Variables : LOAD_S (durée d'un palier, défaut 180), COOL_MIN (défaut 15),
+#   Variables : LOAD_S (durée d'un palier, défaut 180), COOL_MIN (défaut 15 ; 1 = T+1 seulement),
 #   SCENARIO (défaut mix), NODE_EXTRA (options node, ex. --max-old-space-size=512),
 #   SNAP=1 (heap snapshots), CYCLES (répétitions du dernier palier + refroidissement),
 #   LOADGEN_EXTRA (options supplémentaires de loadgen.mjs),
@@ -52,8 +52,8 @@ done
 if [ "${QUICK:-0}" = 1 ]; then mark "cool-T0"; sleep 60; mark "gc"; cmd "gc"; [ "${SNAP:-0}" = 1 ] && { mark "snap-end"; cmd "snap:end"; }; CYCLES=0; fi
 for C in $(seq 1 "$CYCLES"); do
   [ "$C" -gt 1 ] && { P="${PALIERS[-1]}"; mark "load-$P-cycle$C"; node "$HERE/loadgen.mjs" --users "$P" --duration "$LOAD_S" --think "$THINK" --scenario "$SCENARIO" ${LOADGEN_EXTRA:-} --out "$OUT/load-$P-c$C.json" | tee -a "$OUT/load.log"; mark "end-load-$P-cycle$C"; }
-  mark "cool-T0-c$C"; sleep 60; mark "cool-T1-c$C"; sleep 240; mark "cool-T5-c$C"
-  sleep $(( (COOL_MIN - 5) * 60 )); mark "cool-T${COOL_MIN}-c$C"
+  mark "cool-T0-c$C"; sleep 60; mark "cool-T1-c$C"
+  if [ "$COOL_MIN" -ge 5 ]; then sleep 240; mark "cool-T5-c$C"; sleep $(( (COOL_MIN - 5) * 60 )); mark "cool-T${COOL_MIN}-c$C"; fi
   mark "gc-c$C"; cmd "gc"
   [ "${SNAP:-0}" = 1 ] && { mark "snap-c$C"; cmd "snap:c$C"; }
 done

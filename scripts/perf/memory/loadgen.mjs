@@ -25,6 +25,9 @@ const SCENARIO = args.scenario ?? "mix";
 const PASSWORD = args.password ?? "PiloteTest!2026";
 // --pdf-ids id1,id2 : devis ciblés par le scénario pdf (ex. devis lourds 500/1000 lignes).
 const PDF_IDS = (args["pdf-ids"] ?? "").split(",").filter(Boolean);
+// --identity : demande une réponse non compressée (Accept-Encoding: identity), pour
+// isoler le coût de la compression gzip de `next start`.
+const ENCODAGE = args.identity ? { "accept-encoding": "identity" } : {};
 const REF = new URL(SUPA).hostname.split(".")[0];
 const COOKIE = `sb-${REF}-auth-token`;
 
@@ -106,7 +109,7 @@ async function vu(i, fin) {
     const t0 = performance.now();
     let status = 0, bytes = 0;
     try {
-      const r = await fetch(BASE + route, { headers: { cookie }, redirect: "manual" });
+      const r = await fetch(BASE + route, { headers: { cookie, ...ENCODAGE }, redirect: "manual" });
       status = r.status;
       bytes = (await r.arrayBuffer()).byteLength;
     } catch (e) { status = "ERR"; }
