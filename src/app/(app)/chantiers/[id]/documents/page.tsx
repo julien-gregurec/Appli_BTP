@@ -32,7 +32,7 @@ export default async function DocumentsChantierPage({
       .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
       .order("created_at", { ascending: false }),
     supabase.from("pieces_jointes_messages")
-      .select("id,nom_original,mime_type,type_media,taille_octets,created_at")
+      .select("id,nom_original,mime_type,type_media,taille_octets,storage_path,created_at")
       .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
       .order("created_at", { ascending: false }),
   ]);
@@ -52,6 +52,19 @@ export default async function DocumentsChantierPage({
     ...document,
     previewUrl: document.mime_type.startsWith("image/") ? urlParChemin.get(document.storage_path) ?? null : null,
   }));
+  // Même principe pour les médias de la conversation : une URL signée par média, obtenue en UN
+  // appel groupé, sous la session de l'utilisateur (policies Storage de messagerie-medias). Avant,
+  // chaque vignette appelait /api/messagerie/pieces-jointes/[id], soumis à la limite « téléchargements
+  // signés » (60 / min / utilisateur) : au-delà de ~60 photos, les suivantes s'affichaient cassées
+  // (429 mesurés, docs/qualification/ELSATIA_PERFORMANCE_CAPACITY_BASELINE_V1.md). La route reste
+  // utilisée pour le téléchargement explicite, et en repli si une signature manque.
+  const cheminsMedias = (mediasConversation ?? []).map((media) => media.storage_path).filter(Boolean);
+  const { data: urlsMedias } = cheminsMedias.length
+    ? await supabase.storage.from("messagerie-medias").createSignedUrls(cheminsMedias, 300)
+    : { data: [] as { path: string | null; signedUrl: string | null }[] };
+  const urlParCheminMedia = new Map((urlsMedias ?? []).map((entry) => [entry.path, entry.signedUrl]));
+  const sourceMedia = (media: { id: string; storage_path: string }) =>
+    urlParCheminMedia.get(media.storage_path) ?? `/api/messagerie/pieces-jointes/${media.id}`;
   const ajouter = ajouterDocumentChantierAction.bind(null, id);
 
   return (
@@ -109,9 +122,9 @@ export default async function DocumentsChantierPage({
                 <article key={media.id} className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
                   {media.type_media === "image" ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`/api/messagerie/pieces-jointes/${media.id}`} alt={media.nom_original} className="h-44 w-full bg-neutral-100 object-cover dark:bg-neutral-900" />
+                    <img src={sourceMedia(media)} alt={media.nom_original} className="h-44 w-full bg-neutral-100 object-cover dark:bg-neutral-900" />
                   ) : (
-                    <video src={`/api/messagerie/pieces-jointes/${media.id}`} controls preload="metadata" playsInline className="h-44 w-full bg-black object-contain" />
+                    <video src={sourceMedia(media)} controls preload="metadata" playsInline className="h-44 w-full bg-black object-contain" />
                   )}
                   <div className="space-y-2 p-3">
                     <p className="truncate text-sm font-medium" title={media.nom_original}>{media.nom_original}</p>
