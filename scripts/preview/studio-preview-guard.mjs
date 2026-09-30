@@ -145,6 +145,13 @@ export function verifierEnvStudioPreview(env, { refStudio } = {}) {
   if (service.nature !== "service") add(false, "SP-SERVICE-KEY", "STUDIO_AUTH_SERVICE_KEY", service.nature ? "n'est pas une clé de service" : "absente");
   else if (service.ref && service.ref !== ref) add(false, "SP-SERVICE-KEY", "STUDIO_AUTH_SERVICE_KEY", "clé d'un AUTRE projet Supabase");
   else add(true, "SP-SERVICE-KEY", "STUDIO_AUTH_SERVICE_KEY", "clé de service (serveur)");
+  // Forme complète : `supabase projects api-keys` sans --reveal renvoie la clé secrète MASQUÉE
+  // (préfixe + « … ») — le préfixe seul ne prouve rien (constaté au premier déploiement V2).
+  const formeIncomplete = ["STUDIO_AUTH_SERVICE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"].filter((k) => {
+    const v = env[k]?.trim() ?? "";
+    return /^sb_(secret|publishable)_/.test(v) && !/^sb_(secret|publishable)_[A-Za-z0-9_-]{20,}$/.test(v);
+  });
+  add(formeIncomplete.length === 0, "SP-KEY-FORME", "clés sb_*", formeIncomplete.length ? `clé masquée ou tronquée : ${formeIncomplete.join(", ")} (api-keys --reveal)` : "forme complète");
   add(env.STUDIO_STORAGE_SERVICE_KEY === env.STUDIO_AUTH_SERVICE_KEY, "SP-SERVICE-KEY-PAIRE", "STUDIO_STORAGE_SERVICE_KEY", env.STUDIO_STORAGE_SERVICE_KEY === env.STUDIO_AUTH_SERVICE_KEY ? "identique à STUDIO_AUTH_SERVICE_KEY" : "différente : deux projets mêlés");
   const publique = natureCleSupabase(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
   if (publique.nature !== "publique") add(false, "SP-PUBLIC-KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", publique.nature === "service" ? "CLÉ DE SERVICE exposée au navigateur" : "absente ou non reconnue");

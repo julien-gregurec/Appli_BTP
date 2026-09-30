@@ -133,6 +133,14 @@ test("aucune valeur secrète dans les messages", () => {
   assert.ok(!texte.includes("s3cr3t-valeur"));
 });
 
+test("clé sb_* masquée (api-keys sans --reveal) ou tronquée → STOP", () => {
+  const complete = "sb_secret_" + "A1b2C3d4E5f6G7h8I9j0K1";
+  assert.deepEqual(echecs(verifierEnvStudioPreview({ ...envOk(), STUDIO_AUTH_SERVICE_KEY: complete, STUDIO_STORAGE_SERVICE_KEY: complete, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_" + "Z9y8X7w6V5u4T3s2R1q0P9" }, { refStudio: REF })), []);
+  for (const masquee of ["sb_secret_FW\u2022\u2022\u2022\u2022", "sb_secret_FWabc\u2026", "sb_secret_abc"]) {
+    assert.ok(echecs(verifierEnvStudioPreview({ ...envOk(), STUDIO_AUTH_SERVICE_KEY: masquee, STUDIO_STORAGE_SERVICE_KEY: masquee }, { refStudio: REF })).includes("SP-KEY-FORME"));
+  }
+});
+
 test("natureCleSupabase : formats nouveaux et JWT", () => {
   assert.equal(natureCleSupabase("sb_secret_x").nature, "service");
   assert.equal(natureCleSupabase("sb_publishable_x").nature, "publique");
