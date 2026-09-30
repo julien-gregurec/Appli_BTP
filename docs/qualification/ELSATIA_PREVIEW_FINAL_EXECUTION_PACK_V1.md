@@ -1,7 +1,7 @@
 # ELSATIA — Preview : pack d'exécution final (V1)
 
 > **Train canonique V7 (2026-09-28)** — ce pack s'exécute désormais sur
-> `integration/elsatia-canonical-train-v7` : **<!--train:nb-->359<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->`**, DB verify
+> `integration/elsatia-canonical-train-v7` : **<!--train:nb-->360<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260930000301<!--/train:derniere-->`**, DB verify
 > **<!--train:controles-->30<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet ; 18 : Stripe ordre + essai borné ; 19-23 : garde-fous V4 —
 > commandes fournisseurs RGPD, dette RGPD résiduelle, GP ↔ Réserves, Relevé & Métré non commercial,
@@ -74,7 +74,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | | |
 |---|---|
 | Ref à déployer | **`integration/elsatia-canonical-train-v7`** (V7). Historique : `integration/elsatia-canonical-train-v6` (358 → `20260928000601`), `integration/elsatia-canonical-train-v5` (355 → `20260928000301`), `integration/elsatia-canonical-train-v4` (352 → `20260927100000`), `integration/elsatia-canonical-train-v3` (340 → `20260926000505`), `integration/elsatia-canonical-train-v2` |
-| Migrations | **<!--train:nb-->359<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260928000701<!--/train:derniere-->`** ; `verify:migrations` ✅ (V3 : 340 → `20260926000505` ; V2 : 335 → `20260923000400`) |
+| Migrations | **<!--train:nb-->360<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260930000301<!--/train:derniere-->`** ; `verify:migrations` ✅ (V3 : 340 → `20260926000505` ; V2 : 335 → `20260923000400`) |
 | Rejeu à froid (ce pack) | `rebuild_db.sh pack_preview` : **335/335**, 0 erreur (V2) ; train V4 : **352/352**, 0 erreur (rapport V4 §10) ; train V5 : **355/355**, 0 erreur (rapport V5 §9) ; train V6 : **358/358**, 0 erreur (rapport V6 §9) ; train V7 : **359/359**, 0 erreur (rapport V7 §9) |
 | Applications | Gestion Pro (racine), Colors, Tools, Réserves, Studio (`apps/*`), worker `workers/studio-video` — **première Preview V4/V5/V6/V7 : IN = Gestion Pro, Tools, Colors, Réserves ; OUT = Studio, worker Studio, Boutique, Stripe Connect** |
 | Lot Studio post-H | **intégré au train V7 dans le seul projet Studio dédié** (`apps/studio/supabase/migrations`, aucune migration partagée) ; Studio reste **OFF** pour la première Preview (rapport V7 §7) |
@@ -209,14 +209,14 @@ Branches de décision **pré-écrites** (sortie de `db-verify --allow-pending`) 
 | Constat | Action |
 |---|---|
 | `DB-MIGRATIONS-FOREIGN` (version distante absente du dépôt : autre lignée, p. ex. une orpheline `…184`) | **Arrêt.** `db push` refusera. Défaut conservateur : `supabase migration repair --status reverted <v>` **uniquement** si le schéma de cette version est prouvé identique à une migration du train ; sinon réinitialiser le projet (données de recette seulement, sauvegarde faite) |
-| `DB-MIGRATIONS-PENDING` = <!--train:nb-->359<!--/train:nb--> − N | Normal avant push. **Si N = 335 (base V2), les 5 migrations V3 (`2026092600050[1-5]`) sont toutes > `20260923000400` : upgrade monotone prouvé (rapport V3 §8).** Si N = 328 (base V1), les 7 migrations V2 sont **toutes > `…346`** : upgrade monotone prouvé (V2 §9 : 0 écart de lignes, 34/34 checksums, RLS identique) |
+| `DB-MIGRATIONS-PENDING` = <!--train:nb-->360<!--/train:nb--> − N | Normal avant push. **Si N = 335 (base V2), les 5 migrations V3 (`2026092600050[1-5]`) sont toutes > `20260923000400` : upgrade monotone prouvé (rapport V3 §8).** Si N = 328 (base V1), les 7 migrations V2 sont **toutes > `…346`** : upgrade monotone prouvé (V2 §9 : 0 écart de lignes, 34/34 checksums, RLS identique) |
 | `pgsodium` indisponible | NO-GO (la `20260828000244` l'installe ; 245→400 bloquées) |
 
 ### 4.2 Migration push et vérification
 
 ```bash
 npx supabase db push --linked
-npx supabase migration list --linked                      # <!--train:nb-->359<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260928000701<!--/train:derniere-->
+npx supabase migration list --linked                      # <!--train:nb-->360<!--/train:nb--> des deux côtés, dernière <!--train:derniere-->20260930000301<!--/train:derniere-->
 npm run preview:db-verify -- --before-owner               # juste après push
 ```
 
@@ -627,7 +627,7 @@ détection de fuite, détection du rate-limiter).
 | « aucun code ne lit `STRIPE_PORTAL_CONFIGURATION_ID` » | lu par `src/lib/stripe-abonnement.ts:389` (optionnel) |
 | « `configurer-portail-stripe.mjs` n'existe que sur l'orpheline Billing V3 » | présent : `scripts/configurer-portail-stripe.mjs` |
 | « 3-D Secure suspend immédiatement » | `invoice.payment_action_required` ne touche **pas** l'accès (`statut_resultant = action_requise`) |
-| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V7, <!--train:nb-->359<!--/train:nb-->, dernière `<!--train:derniere-->20260928000701<!--/train:derniere-->` |
+| STEP 0 / D1 : ref de préparation 321 migrations | ref = train canonique V7, <!--train:nb-->360<!--/train:nb-->, dernière `<!--train:derniere-->20260930000301<!--/train:derniere-->` |
 | STEP 14 : crons GP « → 200 » avec bearer | **404** tant que `FEATURE_CRONS_ENABLED=false` (valeur Preview imposée) |
 | STEP 12 : « 27 prix V4 vérifiés » suffisent à la capacité | les prix `COMPTE_SUP_<OFFRE>` lus par le runtime ne sont pas dans la table vérifiée |
 

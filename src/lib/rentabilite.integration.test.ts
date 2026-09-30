@@ -187,6 +187,7 @@ describe.skipIf(VOLUMES.length === 0)("rentabilité et fiche chantier : exact au
         lireRentabilitePage(apres.supabase, ENTREPRISE, { tri: "marge_desc", limite: 8, decalage: 0, avecActivite: true }),
       ]);
       const msApres = performance.now() - t1;
+      const octetsApres = apres.mesure.octets;
       expect(apres.mesure.lignesTronquees).toEqual([]);
       const corrige: Totaux = { facture: totaux.factureHt, heures: totaux.heures, coutMo: totaux.coutMainOeuvre, achats: totaux.coutAchats, sousTraitance: totaux.coutSousTraitance, stock: totaux.coutStock, notes: totaux.coutNotesFrais, indemnites: totaux.coutIndemnitesPaie, marge: totaux.marge };
       expect(ecartTotaux(corrige, attendu.totaux)).toEqual([]);
@@ -230,7 +231,7 @@ describe.skipIf(VOLUMES.length === 0)("rentabilité et fiche chantier : exact au
         veriteMarge: attendu.totaux.marge.toFixed(2), veriteHeures: attendu.totaux.heures.toFixed(2),
         avantMarge: historique.totaux.marge.toFixed(2), avantHeures: historique.totaux.heures.toFixed(2), avantChantiersFaux: `${chantiersFauxAvant}/${attendu.parChantier.size}`,
         avantMs: Math.round(msAvant), avantOctets: avant.mesure.octets, avantTronquees: avant.mesure.lignesTronquees.length,
-        apresMarge: totaux.marge.toFixed(2), apresHeures: totaux.heures.toFixed(2), apresMs: Math.round(msApres), apresOctets: apres.mesure.octets,
+        apresMarge: totaux.marge.toFixed(2), apresHeures: totaux.heures.toFixed(2), apresMs: Math.round(msApres), apresOctets: octetsApres,
         ficheAvant: `${ficheAvant.heuresValidees.toFixed(2)} h validées / ${ficheAvant.heuresPlanifiees.toFixed(2)} h planifiées (${ficheAvant.nbValides})`,
         ficheDernierePageMs: Math.round(msDernierePage),
         ficheVerite: `${attendu.chantierCharge.heuresValidees.toFixed(2)} / ${attendu.chantierCharge.heuresPlanifiees.toFixed(2)} (${attendu.chantierCharge.nbValides})`,
