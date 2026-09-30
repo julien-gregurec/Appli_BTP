@@ -20,6 +20,7 @@ Produit, pour la base donnée (accès `su postgres`, peer auth, comme rebuild_db
 Aucune écriture : chaque sonde RLS s'exécute dans une transaction annulée.
 """
 import json
+import os
 import subprocess
 import sys
 
@@ -76,6 +77,24 @@ TABLES_SONDE_RLS = [
     # Train V6.
     "tools_releves_plans", "tools_releves_pieces", "tools_releves_versions",
 ]
+# Train V8 (ELSATIA_CANONICAL_TRAIN_V8_CONVERGENCE_V1 §7) : ajoutés seulement quand
+# UPGRADE_SNAPSHOT_V8=1 (harnais upgrade-v7-v8.sh), pour que les harnais historiques V3 → V7
+# rejouent exactement leurs chiffres publiés.
+if os.environ.get("UPGRADE_SNAPSHOT_V8") == "1":
+    TABLES_METIER += [
+        # Cycle commercial et droits par application.
+        "plans_abonnement", "abonnements_entreprises", "historique_acces_applications",
+        "roles_applications_elsatia", "applications_elsatia",
+        # Relevé & Métré (plans, objets Lot 7 : éléments déjà suivis) ; Réserves (annuaire).
+        "reserves_annuaire_publication", "reserves_evenements_notifications",
+        # Mode sûr : tables d'infrastructure exemptées existantes.
+        "sessions_revoquees", "journal_abus_securite", "rate_limits_applicatifs",
+    ]
+    TABLES_SONDE_RLS += [
+        "reserves_intervenants", "reserves_chantiers", "colors_emplacements", "colors_mouvements",
+        "plans_abonnement",
+        "reserves_annuaire_publication", "reserves_evenements_notifications",
+    ]
 
 
 def psql(db, sql):
