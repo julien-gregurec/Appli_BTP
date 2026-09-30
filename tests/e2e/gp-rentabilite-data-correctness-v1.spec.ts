@@ -186,6 +186,7 @@ test.describe(`${N} pointages — /rentabilite et fiche chantier`, () => {
     const reponse = await page.goto(`/chantiers/${chantierCharge()}`);
     expect(reponse?.status()).toBe(404);
     await page.goto("/rentabilite");
+    console.log(`TENANT_B_RENTABILITE_URL ${new URL(page.url()).pathname}${new URL(page.url()).search}`);
     if (page.url().includes("/rentabilite")) {
       await expect(page.getByRole("heading", { name: "Rentabilité des chantiers" })).toBeVisible();
       await expect(page.getByRole("link", { name: CHANTIER_CHARGE })).toHaveCount(0);
