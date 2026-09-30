@@ -1,0 +1,7 @@
+229 cibles, 229 atteignables
+
+[1x] object:system / Context .q <- object:system / Context .previous <- closure:onClose .context <- object:f .onClose <- object:Object .afterContext <- object:Promise .<symbol kResourceStore> <- array: .24 / part of key (Object @2358353) -> value (Promise @2358355) pair in WeakMap (table @1542809) <- object:WeakMap .table <- object:system / Context .Z <- object:system / Context .previous <- closure: .context <- closure:d ._nextOriginalFetch <- object:global .fetch <- synthetic: .2
+
+[1x] object:system / Context .q <- object:system / Context .previous <- closure:onClose .context <- object:f .onClose <- object:Object .afterContext <- object:Promise .<symbol kResourceStore> <- array: .492 / part of key (Object @2160801) -> value (Promise @2358703) pair in WeakMap (table @1542809) <- object:WeakMap .table <- object:system / Context .Z <- object:system / Context .previous <- closure: .context <- closure:d ._nextOriginalFetch <- object:global .fetch <- synthetic: .2
+
+[1x] object:system / Context .q <- object:system / Context .previous <- closure:onClose .context <- object:f .onClose <- object:Object .afterContext <- object:Promise .<symbol kResourceStore> <- array: .84 / part of key (Object @1882087) -> value (Promise @2358403) pair in WeakMap (table @1542809) <- object:WeakMap .table <- object:system / Context .Z <- object:system / Context .previous <- closure: .context <- closure:d ._nextOriginalFetch <- object:global .fetch <- synthetic: .2

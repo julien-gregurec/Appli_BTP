@@ -67,9 +67,10 @@ async function ids(session, table, n = 200) {
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 function routesFor(ctx) {
-  const d = () => `/devis/${pick(ctx.devis)}`;
-  const f = () => `/factures/${pick(ctx.factures)}`;
-  const c = () => `/chantiers/${pick(ctx.chantiers)}`;
+  // Compte sans accès (liste vide) : on retombe sur la page liste plutôt que /devis/undefined.
+  const d = () => (ctx.devis.length ? `/devis/${pick(ctx.devis)}` : "/devis");
+  const f = () => (ctx.factures.length ? `/factures/${pick(ctx.factures)}` : "/factures");
+  const c = () => (ctx.chantiers.length ? `/chantiers/${pick(ctx.chantiers)}` : "/chantiers");
   const S = {
     dashboard: [["/dashboard", 1]],
     planning: [["/planning", 1]],

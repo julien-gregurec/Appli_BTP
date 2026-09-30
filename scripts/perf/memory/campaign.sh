@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ELSATIA_NEXT_MEMORY_CAPACITY_V1 — campagne complémentaire : routes isolées, PDF,
 # charge intense, limites de conteneur. Chaque mesure démarre un `next start` neuf.
-# Usage : campaign.sh <racine-sortie> [étapes...]  (étapes : routes pdf stress leak limits alloc)
+# Usage : campaign.sh <racine-sortie> [étapes...]  (étapes : routes pdf stress leak cold limits alloc)
 set -uo pipefail
 ROOT="$1"; shift
 STEPS=("${@:-routes pdf stress limits}")
@@ -32,6 +32,14 @@ for STEP in ${STEPS[@]}; do case "$STEP" in
     # heap snapshot après chacun ; comparer c2 -> c3 -> c4 (c1 inclut l'échauffement JIT).
     [ -e "$ROOT/leak/phases.jsonl" ] && grep -q stop "$ROOT/leak/phases.jsonl" || {
       rm -rf "$ROOT/leak"; LOAD_S=120 COOL_MIN=1 CYCLES=4 SNAP=1 "$RUN" "$ROOT/leak" 500 50; } ;;
+  cold)
+    # Rétention figée observée après une rafale de 50 VU sur serveur froid : froid vs réchauffé.
+    for V in froid rechauffe; do
+      D="$ROOT/cold-$V"
+      [ -e "$D/phases.jsonl" ] && grep -q stop "$D/phases.jsonl" && continue
+      P="50"; [ "$V" = rechauffe ] && P="1 50"
+      rm -rf "$D"; QUICK=1 SNAP=1 LOAD_S=90 "$RUN" "$D" 500 $P
+    done ;;
   alloc)
     # A/B allocateur natif, même charge que « stress » palier 25 puis refroidissement court.
     for V in glibc arena2 jemalloc identity; do
