@@ -50,7 +50,7 @@ filtres, même boucle d'addition) contre le vrai PostgREST, comparé à la véri
 
 Même constat dans le navigateur réel (page V7, gérant pilote, 1 477 pointages dont 15 de la
 fixture) : « Salarié Charge 0025 : 140,74999999999997 h » affiché pour 199,73 h en base
-(`/home/user/work/pw_red_pointages.log`, reproduit en § 7.3).
+(spec Playwright de § 5 exécutée sur la page V7 ; volumes en § 7.2).
 
 ### 1.2 Cause racine
 
