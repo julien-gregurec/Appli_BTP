@@ -14,6 +14,7 @@ import {
 import { envoyerInvitation } from "@/lib/emails-reserves";
 import { deposerLienInvitation } from "@/lib/invitation-relais";
 import { estCleIdempotence } from "@/lib/offline/contrat";
+import { cheminInterneSur } from "@/lib/redirection-sure";
 import { deposerObjet } from "@/lib/depot-photo";
 
 const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
@@ -46,9 +47,11 @@ function texteOuNull(formData: FormData, cle: string) {
 }
 
 function cheminSur(valeur: string, defaut: string) {
-  // Même validateur que le callback d'authentification : refuse `//`, `/\`, les
-  // caractères de contrôle et leurs formes encodées.
-  return cheminInterneStrict(valeur) ? valeur : defaut;
+  // Double validation (convergence V8) : le validateur commun `cheminInterneStrict`
+  // (@elsatia/email, V7) ET le validateur durci REDTEAM-V2, qui renvoie la forme
+  // normalisée (`/.//evil.com` → écarté). Une destination n'est retenue que si les deux
+  // l'acceptent.
+  return cheminInterneStrict(valeur) ? cheminInterneSur(valeur, defaut) : defaut;
 }
 
 export async function connexionAction(formData: FormData) {

@@ -12,9 +12,16 @@ export function nomJustificatifExport(date: string, fournisseur: string | null, 
   return nomFichierSur(`${date}_${fournisseur || "Sans-fournisseur"}_${montantTtc.toFixed(2).replace(".", "-")}EUR_${reference}.${extension}`);
 }
 
+// Caractères qui, en tête d'une cellule, déclenchent une formule dans Excel /
+// LibreOffice (injection CSV). Un justificatif de note de frais porte des champs
+// saisis par le salarié (fournisseur, chantier) : ils sont neutralisés par un
+// apostrophe de tête (REDTEAM-V2 D5).
+const CARACTERES_FORMULE_CSV = new Set(["=", "+", "-", "@", "\t", "\r"]);
+
 export function celluleCsv(value: unknown): string {
   const texte = value === null || value === undefined ? "" : String(value);
-  return `"${texte.replace(/"/g, '""')}"`;
+  const sur = texte.length > 0 && CARACTERES_FORMULE_CSV.has(texte.charAt(0)) ? `'${texte}` : texte;
+  return `"${sur.replace(/"/g, '""')}"`;
 }
 
 export function creerCsv(entetes: string[], lignes: unknown[][]): string {

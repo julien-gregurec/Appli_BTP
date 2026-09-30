@@ -73,8 +73,14 @@ export async function anonymiserEmployeAction(formData: FormData) {
   });
   if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("anonymiserEmployeAction", error, "Impossible d’anonymiser cet employé."))}`);
 
+  // Les colonnes *_storage_path sont librement modifiables par un membre ayant
+  // `gerer_employes` : on ne supprime avec le service_role que les chemins sous le
+  // préfixe tenant/employé attendu, pour qu'une ligne détournée ne puisse pas
+  // faire effacer le fichier d'un autre employé ou tenant (REDTEAM-V2).
+  const prefixeAttendu = `${entrepriseId}/${employeId}/`;
   const cheminsFichiers = [employe?.photo_storage_path, employe?.signature_storage_path, employe?.carte_btp_storage_path].filter(
-    (chemin): chemin is string => typeof chemin === "string" && chemin.length > 0,
+    (chemin): chemin is string =>
+      typeof chemin === "string" && chemin.startsWith(prefixeAttendu),
   );
   if (cheminsFichiers.length > 0) {
     // L'anonymisation en base a déjà réussi à ce stade : un échec de

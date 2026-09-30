@@ -93,6 +93,15 @@ export async function signerDocumentMetierAction(typeBrut: string, documentId: s
     .eq("document_id", documentId).eq("employe_id", employe.id).maybeSingle();
   if (existante) redirect(`${retour}?success=${encodeURIComponent("Ce document est déjà signé en votre nom")}`);
 
+  // Le chemin de signature est une colonne librement modifiable par tout membre
+  // ayant `gerer_employes` : on refuse de lire avec le service_role un chemin qui
+  // ne serait pas sous le préfixe tenant/employé attendu, sinon un membre pourrait
+  // pointer sa ligne vers le fichier d'un autre employé — voire d'un autre tenant
+  // dont il connaîtrait le chemin (REDTEAM-V2, confused deputy Storage).
+  const prefixeAttendu = `${ctx.entrepriseId}/${employe.id}/`;
+  if (!employe.signature_storage_path?.startsWith(prefixeAttendu)) {
+    redirect(`${retour}?error=${encodeURIComponent("La signature enregistrée est indisponible")}`);
+  }
   const { data: fichier, error: lectureErreur } = await admin.storage
     .from("documents-employes").download(employe.signature_storage_path);
   if (lectureErreur || !fichier) {

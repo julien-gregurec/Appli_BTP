@@ -31,6 +31,23 @@ describe("corpsHtmlEmailDocument", () => {
     const html = corpsHtmlEmailDocument("Bonjour,", null);
     expect(html).not.toContain("Consulter le document");
   });
+
+  it("échappe le HTML des valeurs utilisateur (REDTEAM-V2 D2)", () => {
+    const html = corpsHtmlEmailDocument(
+      'Bonjour <img src=x onerror=alert(1)> & <a href="//evil">clic</a>,',
+      null,
+    );
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<a href=\"//evil\"");
+    expect(html).toContain("&lt;img");
+    expect(html).toContain("&amp;");
+  });
+
+  it("rejette un lien non http(s) (javascript:)", () => {
+    const html = corpsHtmlEmailDocument("Bonjour,", "javascript:alert(1)");
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("Consulter le document");
+  });
 });
 
 describe("contenuEmailDocument — ELSATIA-EMAILS-METIER-P1-CLOSURE-V1", () => {

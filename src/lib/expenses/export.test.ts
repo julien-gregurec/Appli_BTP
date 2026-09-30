@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { creerCsv, creerManifeste, nomJustificatifExport } from "./export";
+import { celluleCsv, creerCsv, creerManifeste, nomJustificatifExport } from "./export";
 
 describe("export comptable", () => {
+  it("neutralise les formules CSV en tête de cellule (REDTEAM-V2 D5)", () => {
+    expect(celluleCsv("=HYPERLINK(\"http://x\")")).toBe('"\'=HYPERLINK(""http://x"")"');
+    expect(celluleCsv("+1+2")).toBe("\"'+1+2\"");
+    expect(celluleCsv("-cmd")).toBe("\"'-cmd\"");
+    expect(celluleCsv("@SUM(A1)")).toBe("\"'@SUM(A1)\"");
+    expect(celluleCsv("\tTab")).toBe("\"'\tTab\"");
+    // Une valeur bénigne n'est pas préfixée.
+    expect(celluleCsv("Fournisseur SARL")).toBe('"Fournisseur SARL"');
+  });
+
   it("neutralise les caractères interdits dans les noms", () => {
     const nom = nomJustificatifExport("2026-07-12", "Fournisseur / test", 125.5, "EXP-000123", "pdf");
     expect(nom).toBe("2026-07-12_Fournisseur-test_125-50EUR_EXP-000123.pdf");
