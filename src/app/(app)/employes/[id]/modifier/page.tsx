@@ -24,7 +24,7 @@ export default async function ModifierEmployePage({
   const supabase = await createClient();
 
   const [{ data: employe }, { data: postes }, { data: coutHoraireLigne }, { data: tauxFactureLigne }] = await Promise.all([
-    // employes_fiche : seule lecture complète (notes comprises) pour gerer_employes (20260928000701).
+    // employes_fiche : seule lecture complète (notes comprises) pour gerer_employes (20260928000806).
     supabase.from("employes_fiche").select("*").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
     peutVoirCoutInterne

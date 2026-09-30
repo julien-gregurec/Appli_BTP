@@ -1,5 +1,5 @@
 -- ELSATIA — INCIDENT RESPONSE V1 : reprise des réservations de webhook Stripe orphelines
--- (migration 20260928000702). Scénario : la base tombe entre la réservation d'un
+-- (migration 20260928000808). Scénario : la base tombe entre la réservation d'un
 -- événement et sa finalisation ; la libération échoue aussi. Avant : chaque
 -- re-livraison Stripe était avalée comme doublon (événement perdu en silence).
 begin;

@@ -3,7 +3,7 @@ create extension if not exists pgtap with schema extensions;
 select no_plan();
 
 -- ELSATIA — Per-App Commercial Suspension & Entitlement Enforcement V1
--- (docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md, migration 20260929000801)
+-- (docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md, migration 20260928000804)
 --
 --   §X  matrice : état global × état GP × état Tools × état Colors × état Réserves
 --       → accès attendu (GP métier, Tools, palier Tools, Colors, Réserves, facturation)

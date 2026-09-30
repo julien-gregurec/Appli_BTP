@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928000701 (C. Security Red Team V2 (claude/elsatia-v6-security-redteam-v2)), renuméroté 20260928000805
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA — Security Red Team V2 : correctifs base prouvés localement.
 -- Rapport : docs/qualification/ELSATIA_MULTI_APP_SECURITY_RED_TEAM_V2.md
 --

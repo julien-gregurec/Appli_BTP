@@ -8,7 +8,7 @@ select plan(94);  -- 92 + 2 (Per-App Commercial Suspension V1 : GP seul ne coupe
 --   A. entitlement entreprise `autorise = false`
 --   B. entitlement entreprise `valide_jusqu_au` expiré / `valide_du` futur
 --   C. entitlement entreprise absent (ligne supprimée)
---   D. tenant suspendu. Per-App Commercial Suspension V1 (20260929000801) : l'état
+--   D. tenant suspendu. Per-App Commercial Suspension V1 (20260928000804) : l'état
 --      commercial COLORS (statut_commercial suspended / cancelled) ou une suspension
 --      GLOBALE explicite ; un incident de facturation Gestion Pro seul ne coupe plus Colors.
 --   E. suspension au niveau utilisateur (habilitation, appartenance) et application globale

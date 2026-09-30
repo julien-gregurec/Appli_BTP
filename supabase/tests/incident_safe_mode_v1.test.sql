@@ -1,5 +1,5 @@
 -- ELSATIA — PRODUCTION INCIDENT RESPONSE & SAFE MODE V1
--- Migration 20260928000701_incident_safe_mode_v1.sql.
+-- Migration 20260928000807_incident_safe_mode_v1.sql.
 --
 -- Couvre : structure et ACL, couverture des gardes sur TOUTES les tables,
 -- instantané public sans secret, RBAC (admin client, rôles plateforme non

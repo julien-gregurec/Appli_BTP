@@ -2,7 +2,7 @@
 -- (docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md §11)
 --
 -- À exécuter en LECTURE SEULE sur la base cible AVANT d'appliquer
--- 20260929000801_per_app_commercial_suspension_v1.sql. Liste les comptes dont le
+-- 20260928000804_per_app_commercial_suspension_v1.sql. Liste les comptes dont le
 -- comportement CHANGERA. Par construction, la migration ne retire aucun droit :
 --   - toutes les lignes existantes reçoivent statut_commercial = 'entitled' ;
 --   - aucune suspension globale n'est posée ;

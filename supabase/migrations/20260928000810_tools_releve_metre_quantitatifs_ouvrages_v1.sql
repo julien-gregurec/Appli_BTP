@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260929001301 (G. Relevé Lot 9 (claude/compassionate-volta-cnbzjs)), renuméroté 20260928000810
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 9 — QUANTITATIFS, OUVRAGES & TAKEOFF AUTOMATIQUE V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT9_QUANTITATIFS_OUVRAGES_V1.md
 --

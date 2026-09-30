@@ -17,7 +17,7 @@
 -- Décor : A = hôte (fixture multitenant) ; C, D = entreprises intervenantes (comptes
 -- gratuits) ; B = tenant témoin sans lien.
 --
--- Per-App Commercial Suspension V1 (20260929000801) : « l'hôte perd Réserves » est
+-- Per-App Commercial Suspension V1 (20260928000804) : « l'hôte perd Réserves » est
 -- désormais l'état commercial RÉSERVES de l'hôte (acces_applications_entreprises.
 -- statut_commercial) ou une suspension GLOBALE explicite du compte — plus un incident de
 -- facturation Gestion Pro. La règle D-01 et toutes les assertions sont conservées ; seuls

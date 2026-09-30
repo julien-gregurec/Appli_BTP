@@ -32,7 +32,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe");
   const peutGererRib = !ctx.accesSupportPlateforme && (permissions === null || permissions.includes("gerer_coordonnees_bancaires"));
 
-  // Lecture via employes_fiche (20260928000701) : les colonnes sensibles de
+  // Lecture via employes_fiche (20260928000806) : les colonnes sensibles de
   // `employes` ne sont plus lisibles directement ; la vue masque la note RH,
   // le numéro d'inscription et les fichiers selon gerer_employes / soi-même.
   const { data: employe } = await supabase

@@ -1,5 +1,5 @@
 /**
- * Lot 9 — Quantitatifs, ouvrages & takeoff automatique (miroir de la migration 20260929001301).
+ * Lot 9 — Quantitatifs, ouvrages & takeoff automatique (miroir de la migration 20260928000810).
  *
  * Un OUVRAGE technique décrit une prestation (nom, catégorie, lot, unité) et sa RÈGLE DE QUANTITÉ :
  * une source dérivée du métré du Lot 8 (surfaces, périmètres, murs, ouvertures, objets, revêtements…)

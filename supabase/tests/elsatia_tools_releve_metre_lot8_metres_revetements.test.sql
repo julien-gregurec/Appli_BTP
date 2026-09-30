@@ -1,4 +1,4 @@
--- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 8 — DIMENSIONS, SURFACES, VOLUMES & REVÊTEMENTS (migration 20260928001201)
+-- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 8 — DIMENSIONS, SURFACES, VOLUMES & REVÊTEMENTS (migration 20260928000809)
 --
 -- Qualifie sous RLS réelle, avec des VALEURS EXACTES (les mêmes que la parité Vitest `metre.test.ts`) :
 --   S1–S6   schéma et droits : table des ajustements (lecture seule), RPC, calcul interne non exécutable, anonyme ;

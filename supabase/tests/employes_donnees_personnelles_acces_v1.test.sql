@@ -10,7 +10,7 @@
 -- gardé par gerer_parametres seul, livre la paie (NIR), le RIB et les notes à
 -- un poste qui ne peut pas les lire à l'écran.
 --
--- Correctif : 20260928000701_employes_donnees_personnelles_acces_v1.sql.
+-- Correctif : 20260928000806_employes_donnees_personnelles_acces_v1.sql.
 -- Ce fichier est ROUGE sur V6 et VERT après le correctif. Chaque assertion
 -- passe par edp_val() (voir le fixture) : aucune erreur n'interrompt le fichier.
 --

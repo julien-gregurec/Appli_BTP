@@ -1,7 +1,7 @@
 /**
  * ELSATIA — mode sûr (incident) : logique PURE partagée par les proxys des applications.
  *
- * L'AUTORITÉ EST LA BASE (migration `20260928000701_incident_safe_mode_v1`) : ses gardes refusent
+ * L'AUTORITÉ EST LA BASE (migration `20260928000807_incident_safe_mode_v1`) : ses gardes refusent
  * les écritures quel que soit le chemin. Ce module ne fait que :
  *   • lire l'instantané public `incident_etat_public()` (drapeaux + statuts, jamais de motif) avec
  *     un cache court, sans dépendre d'un client Supabase ;

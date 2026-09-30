@@ -1,5 +1,5 @@
 -- ELSATIA-SECURITY-REDTEAM-V2-HARDENING-V1 — preuve d'exécution réelle.
--- Migration : 20260928000701_security_redteam_v2_hardening_v1.sql
+-- Migration : 20260928000805_security_redteam_v2_hardening_v1.sql
 -- Rapport : docs/qualification/ELSATIA_MULTI_APP_SECURITY_RED_TEAM_V2.md
 --
 --   §1 fonctions sur-exposées : révoquées à authenticated, gardées à service_role

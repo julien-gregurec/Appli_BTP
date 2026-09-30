@@ -1,4 +1,4 @@
--- ELSATIA Studio — mode sûr du projet DÉDIÉ (migration 20260928130000_studio_incident_control).
+-- ELSATIA Studio — mode sûr du projet DÉDIÉ (migration 20260929180000_studio_incident_control).
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();

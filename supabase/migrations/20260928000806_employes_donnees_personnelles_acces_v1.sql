@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928000701 (E. Employee Data Access (claude/magical-ritchie-36kz4o)), renuméroté 20260928000806
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA-EMPLOYEE-PERSONAL-DATA-ACCESS-HARDENING-V1
 --
 -- Clôt le point laissé OUVERT par 20260922000312_gp_pilot_employes_annuaire_vue_restreinte.sql :

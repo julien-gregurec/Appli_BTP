@@ -4,7 +4,7 @@ import { creerGardeProxy, type ControleSante } from "@elsatia/incident-control";
 
 /**
  * Mode sûr (incident) de Studio — projet Supabase DÉDIÉ. L'état vient de
- * `public.incident_etat_public()` (migration dédiée 20260928130000), qui traduit
+ * `public.incident_etat_public()` (migration dédiée 20260929180000), qui traduit
  * `studio_guard.control.mode` : 'off' → application coupée (503), 'read_only' → lecture seule.
  * La base reste l'autorité (studio_guard.assert_write). `STUDIO_ENABLED` demeure une coupure de
  * dernier recours, indépendante de la base (voir proxy.ts).

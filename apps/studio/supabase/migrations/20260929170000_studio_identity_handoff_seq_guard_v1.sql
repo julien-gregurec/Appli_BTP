@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928130000 (C. Security Red Team V2 (projet Studio dédié)), renuméroté 20260929170000
+-- (bloc V8 strictement après la dernière migration de V7, 20260929160000, projet Studio dédié (chaîne indépendante)) ; corps inchangé.
 -- ELSATIA Studio (projet DÉDIÉ) — REDTEAM-V2 : garde de séquence sur l'acceptation
 -- d'un jeton de passage (handoff).
 --

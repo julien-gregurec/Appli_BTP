@@ -33,7 +33,7 @@ notifiée au décideur **avant** exécution, sauf urgence sécurité (confiner d
 
 ## Le mode sûr en une page
 
-Les contrôles vivent **en base** (`public.incident_controles`, migration `20260928000701`) : aucune
+Les contrôles vivent **en base** (`public.incident_controles`, migration `20260928000807`) : aucune
 variable d'environnement, aucun redéploiement. Propagation ≤ 10 s (cache des proxys) ; la base
 applique ses gardes **immédiatement**, quel que soit le chemin (proxy, PostgREST direct, Tools natif,
 worker). Rien n'est jamais supprimé.

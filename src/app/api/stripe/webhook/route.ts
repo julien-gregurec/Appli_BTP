@@ -44,7 +44,7 @@ export async function POST(request:Request){
   const{error}=await admin.rpc("stripe_connect_maj_compte_service",{p_stripe_account_id:objet.id,p_onboarding_complete:objet.charges_enabled===true&&objet.details_submitted===true,p_stripe_event_id:evenement.id,p_stripe_event_created:new Date(evenement.created*1000).toISOString()});
   if(error)return echec("Échec de mise à jour du compte Stripe Connect",error.code);
  }
- // Fin de traitement : la réservation n'est plus reprenable (voir migration 20260928000702). Un échec ici
+ // Fin de traitement : la réservation n'est plus reprenable (voir migration 20260928000808). Un échec ici
  // n'annule rien : la réservation non finalisée sera reprise à la prochaine livraison (traitements idempotents).
  await admin.rpc("finaliser_evenement_webhook_stripe_service",{p_stripe_event_id:evenement.id});
  return NextResponse.json({received:true});

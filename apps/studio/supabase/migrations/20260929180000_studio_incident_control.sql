@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928130000 (D. Incident Response (projet Studio dédié)), renuméroté 20260929180000
+-- (bloc V8 strictement après la dernière migration de V7, 20260929160000, projet Studio dédié (chaîne indépendante)) ; corps inchangé.
 -- ELSATIA Studio — mode sûr (incident) du projet Supabase DÉDIÉ Studio.
 --
 -- PROJET STUDIO DÉDIÉ UNIQUEMENT (apps/studio/supabase/migrations). Ne jamais copier dans

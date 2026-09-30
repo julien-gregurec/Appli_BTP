@@ -4,7 +4,7 @@ import { expect, test, type BrowserContext, type Page, type APIRequestContext } 
 /*
  * ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1 — cycle commercial dans un vrai navigateur ET par l'API.
  *
- * Pile : PostgreSQL 16 portant le train complet (…0928 701-703), passerelle locale Supabase
+ * Pile : PostgreSQL 16 portant le train complet (…0928 701-703 sur la branche du lot, …0928 801-803 dans le train V8), passerelle locale Supabase
  * (tests/e2e/colors-pile-locale/passerelle.mjs : RLS réelle sous le rôle du JWT), Gestion Pro.
  * L'état Stripe est projeté en base par les RPC de service réelles (celles du webhook) ; aucun
  * appel Stripe. Chaque droit est vérifié deux fois : dans l'application (redirections,

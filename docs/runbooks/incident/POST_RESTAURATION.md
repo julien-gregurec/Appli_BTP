@@ -52,7 +52,7 @@ modifiés après `T0` revenus à l'ancien, sessions révoquées après `T0` rede
    `stripe events list --created[gte]=<T0 unix>` puis `stripe events resend <evt> --webhook-endpoint=<we_…>`
    (ou Dashboard → Webhooks → événements → Resend). L'ordre importe peu : les événements anciens
    sont journalisés « périmés » sans effet (`stripe_event_ordering_v1`), les doublons sont
-   ignorés, une réservation interrompue est reprise (migration `20260928000702`).
+   ignorés, une réservation interrompue est reprise (migration `20260928000808`).
 2. Tools : rejouer les notifications Stripe du compte Tools ; Apple/Google : relancer la
    vérification des achats (`/api/tools/monetization/{apple,google}/verify`) pour les comptes
    concernés (l'historique Apple se relit par API ; Google RTDN n'est pas rejouable — voir rapport §14).

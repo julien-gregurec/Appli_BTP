@@ -1,30 +1,35 @@
 #!/usr/bin/env bash
-# ELSATIA — Per-App Commercial Suspension V1 : qualification d'UPGRADE 361 → 362.
+# ELSATIA — Per-App Commercial Suspension V1 : qualification d'UPGRADE 361 → 362 (branche du lot).
+# Train canonique V8 : la migration est renumérotée 20260928000804 ; la base « avant » est le train
+# jusqu'à Billing inclus (…0803, 362 migrations : V7 359 + Billing 3) et la base neuve de
+# comparaison doit être rejouée jusqu'à …0804 inclus (363 migrations).
 # Rapport : docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md §11.
 #
-#   1. base au train Billing (361 migrations, <= 20260928000703) + comptes représentatifs
+#   1. base au train Billing (<= 20260928000803 dans le train V8) + comptes représentatifs
 #      des états existants (GP suspendu / annulé / essai expiré / impayé échu / actif,
 #      droits retirés ou échus, intervenant Réserves actif) ;
 #   2. rapport d'impact AVANT migration (docs/runbooks/sql/ELSATIA_PER_APP_SUSPENSION_IMPACT_V1.sql) ;
 #   3. accès réel de chaque utilisateur habilité, AVANT (fonctions V6 + Billing) ;
-#   4. migration 20260929000801 ;
+#   4. migration 20260928000804 ;
 #   5. accès APRÈS ; contrôles : aucune perte, gains = rapport d'impact = rapport écrit par
 #      la migration ; schéma upgradé identique au neuf (pg_dump -s).
 #
-# Usage : scripts/qualification/per-app-suspension-upgrade.sh <base-upgrade> <base-fresh-362>
+# Usage : scripts/qualification/per-app-suspension-upgrade.sh <base-upgrade> <base-fresh-jusqu-a-0804>
 set -uo pipefail
 DB="${1:-upg_perapp}"
-FRESH="${2:?base neuve à 362 migrations (rebuild_db.sh)}"
+FRESH="${2:?base neuve arrêtée à 20260928000804 inclus (rebuild_db.sh sur un dossier de migrations borné)}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 BOOT="$REPO/scripts/local-postgres-bootstrap"
-DERNIERE="20260928000703"
+DERNIERE="20260928000803"
+PERAPP="20260928000804"
+N_AVANT="$(for f in "$REPO"/supabase/migrations/*.sql; do v="$(basename "$f" | cut -d_ -f1)"; [[ "$v" > "$DERNIERE" ]] || echo x; done | wc -l)"
 OUT="$(mktemp -d)"; chmod 777 "$OUT"
 q() { su postgres -c "psql -X -q -At -v ON_ERROR_STOP=1 -d $DB"; }
 pass=0; fail=0
 verifier() { if [ "$2" = "$3" ]; then echo "ok   - $1 ($2)"; pass=$((pass+1)); else echo "FAIL - $1"; echo "       obtenu : $2"; echo "       attendu: $3"; fail=$((fail+1)); fi; }
 
-echo "== 1. base $DERNIERE (361) =="
+echo "== 1. base $DERNIERE ($N_AVANT) =="
 su postgres -c "psql -X -q -c 'drop database if exists \"$DB\";' -c 'create database \"$DB\";'"
 su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -v dbname=$DB -d $DB -f $BOOT/pg_bootstrap.sql" >/dev/null
 n=0
@@ -33,7 +38,7 @@ for f in "$REPO"/supabase/migrations/*.sql; do
   sed -E 's/^create extension if not exists pgsodium;?/-- (stubbed by pg_bootstrap.sql) &/I' "$f" | q >/dev/null 2>"$OUT/err" || { echo "FAIL $f"; cat "$OUT/err"; exit 1; }
   n=$((n+1))
 done
-verifier "361 migrations avant la mise à niveau" "$n" "361"
+verifier "$N_AVANT migrations avant la mise à niveau" "$n" "$N_AVANT"
 
 # U1..U8 : un admin habilité à tout ce que l'entreprise possède.
 q >/dev/null 2>"$OUT/decor_err" <<'SQL'
@@ -100,9 +105,9 @@ echo "== 3. accès AVANT =="
 acces > "$OUT/avant.txt"; cat "$OUT/avant.txt" | sed 's/^/  /'
 avant_d01=$(guest_ecriture)
 
-echo "== 4. migration 20260929000801 =="
-q < "$REPO/supabase/migrations/20260929000801_per_app_commercial_suspension_v1.sql" >/dev/null 2>"$OUT/err" || { echo "FAIL migration"; cat "$OUT/err"; exit 1; }
-verifier "362 migrations" "$(ls "$REPO"/supabase/migrations/*.sql | wc -l)" "362"
+echo "== 4. migration 20260928000804 =="
+q < "$REPO/supabase/migrations/20260928000804_per_app_commercial_suspension_v1.sql" >/dev/null 2>"$OUT/err" || { echo "FAIL migration"; cat "$OUT/err"; exit 1; }
+verifier "migration $PERAPP juste après $DERNIERE" "$(ls "$REPO"/supabase/migrations/ | sort | grep -A1 "^$DERNIERE" | tail -1 | cut -d_ -f1)" "$PERAPP"
 
 echo "== 5. accès APRÈS et contrôles =="
 acces > "$OUT/apres.txt"; cat "$OUT/apres.txt" | sed 's/^/  /'
@@ -118,7 +123,7 @@ verifier "D-01 : l'intervenant de U2 (GP annulé, Réserves autorisé) repasse e
 verifier "toutes les lignes existantes : statut entitled" "$(echo "select count(*) filter (where statut_commercial <> 'entitled') from public.acces_applications_entreprises;" | q)" "0"
 verifier "aucune suspension globale posée" "$(echo "select count(*) from public.entreprises where suspension_globale_at is not null;" | q)" "0"
 verifier "migration rejouée : refusée proprement (colonne existante), sans effet partiel" \
-  "$(q < "$REPO/supabase/migrations/20260929000801_per_app_commercial_suspension_v1.sql" >/dev/null 2>&1; echo $?)" "3"
+  "$(q < "$REPO/supabase/migrations/20260928000804_per_app_commercial_suspension_v1.sql" >/dev/null 2>&1; echo $?)" "3"
 dump() { su postgres -c "pg_dump -s --no-owner -d $1" | grep -v '^--' | grep -v '^SET \|^SELECT pg_catalog\|^\\restrict\|^\\unrestrict' | sed '/^$/d'; }
 dump "$DB" > "$OUT/upg.sql"; dump "$FRESH" > "$OUT/fresh.sql"
 verifier "schéma upgradé identique au neuf (pg_dump -s, ACL comprises)" "$(diff "$OUT/upg.sql" "$OUT/fresh.sql" | wc -l)" "0"

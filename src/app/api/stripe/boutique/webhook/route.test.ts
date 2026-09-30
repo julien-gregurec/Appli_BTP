@@ -130,7 +130,7 @@ describe("webhook boutique — rejeu après échec (D3)", () => {
     expect(deps.finaliser).not.toHaveBeenCalledWith("liberer_evenement_webhook_stripe_service", expect.anything());
   });
 
-  // INCIDENT RESPONSE V1 (migration 20260928000702) : une réservation finalisée n'est plus
+  // INCIDENT RESPONSE V1 (migration 20260928000808) : une réservation finalisée n'est plus
   // reprenable ; une réservation dont le traitement a échoué n'est jamais finalisée.
   it("finalise la réservation après succès, jamais après échec", async () => {
     vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");

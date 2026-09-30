@@ -1,5 +1,5 @@
 -- ELSATIA-STUDIO-IDENTITY-HANDOFF-SEQ-GUARD (projet dédié) — REDTEAM-V2.
--- Migration : 20260928130000_studio_identity_handoff_seq_guard_v1.sql
+-- Migration : 20260929170000_studio_identity_handoff_seq_guard_v1.sql
 --
 -- Prouve qu'un jeton de passage PÉRIMÉ (seq inférieure à l'état local) ne peut
 -- plus rétablir le droit d'écriture après une révocation d'entitlement, tout en

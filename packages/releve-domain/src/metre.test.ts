@@ -12,7 +12,7 @@ import { EMPTY_PLAN_DOCUMENT, diffPlan, isPlanOperationsEmpty, murDonnees, murFr
 import { InMemoryPlanRepository } from "./plan-memory";
 
 const lot8Raw = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/20260928001201_tools_releve_metre_metres_revetements_v1.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/20260928000809_tools_releve_metre_metres_revetements_v1.sql", import.meta.url)),
   "utf8",
 ).replace(/\s+/g, " ");
 const lot8 = lot8Raw.replace(/, /g, ",").replace(/\( /g, "(").replace(/ \)/g, ")");

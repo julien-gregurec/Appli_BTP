@@ -10,7 +10,7 @@ import { expect, test, type Page } from "@playwright/test";
  * rôles canoniques (ouvrier, chef de chantier, RH, administration, gérant), entreprises A et B.
  *
  * Deux modes :
- *   - EDP_ATTENDU=corrige (défaut) : base avec 20260928000701 ;
+ *   - EDP_ATTENDU=corrige (défaut) : base avec 20260928000806 ;
  *   - EDP_ATTENDU=v6 : base V6 (préparée avec --sans-701), seuls les tests marqués @avant
  *     tournent et prouvent la fuite d'origine au niveau de l'API.
  */

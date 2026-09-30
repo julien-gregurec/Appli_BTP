@@ -7,7 +7,8 @@
 # entreprises A et B), COMMITÉ, puis adaptation Auth locale et abonnement actif.
 #
 # Usage : PASSERELLE_MDP_DB=… tests/e2e/employes-pile-locale/preparer-base.sh [base] [--sans-701]
-#   --sans-701 : rejoue le train SANS 20260928000701 (état V6) pour la preuve « avant ».
+#   --sans-701 : rejoue le train SANS la migration du lot (20260928000806 dans le train V8, numéro
+#               d'origine 20260928000701) pour la preuve « avant ». Nom d'option conservé.
 set -euo pipefail
 
 BASE="${1:-edp_e2e}"
@@ -20,7 +21,7 @@ psql_base() { su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d $BASE"; }
 
 if [ "$SANS_701" = "--sans-701" ]; then
   MIGR=$(mktemp -d); cp -r "$DEPOT/scripts" "$MIGR/"; mkdir -p "$MIGR/supabase"
-  cp -r "$DEPOT/supabase/migrations" "$MIGR/supabase/"; rm -f "$MIGR/supabase/migrations/20260928000701_"*.sql
+  cp -r "$DEPOT/supabase/migrations" "$MIGR/supabase/"; rm -f "$MIGR/supabase/migrations/20260928000806_employes_donnees_personnelles_acces_v1.sql"
   chmod -R a+rX "$MIGR"
   bash "$MIGR/scripts/local-postgres-bootstrap/rebuild_db.sh" "$BASE"
   rm -rf "$MIGR"

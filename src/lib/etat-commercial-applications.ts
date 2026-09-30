@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Per-App Commercial Suspension V1 (migration 20260929000801,
+// Per-App Commercial Suspension V1 (migration 20260928000804,
 // docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md).
 //
 // Chemin minimal de facturation : l'état commercial de CHAQUE application de

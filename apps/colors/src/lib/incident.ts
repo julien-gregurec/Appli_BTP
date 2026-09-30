@@ -4,7 +4,7 @@ import { clePubliqueSupabaseConfiguree, urlSupabaseConfiguree } from "@/lib/supa
 
 /**
  * Mode sûr (incident) pour Colors — voir `packages/incident-control` et la migration
- * `20260928000701_incident_safe_mode_v1`. La base reste l'autorité (gardes d'écriture sur les
+ * `20260928000807_incident_safe_mode_v1`. La base reste l'autorité (gardes d'écriture sur les
  * tables `colors_*`, politique restrictive sur le bucket `colors-seaux`).
  */
 const garde = creerGardeProxy({

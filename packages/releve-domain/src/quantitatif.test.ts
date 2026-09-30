@@ -11,7 +11,7 @@ import {
 } from "./quantitatif";
 
 const B = (value: number | string) => BigInt(value);
-const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260929001301_tools_releve_metre_quantitatifs_ouvrages_v1.sql", import.meta.url)), "utf8").replace(/\s+/g, " ");
+const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260928000810_tools_releve_metre_quantitatifs_ouvrages_v1.sql", import.meta.url)), "utf8").replace(/\s+/g, " ");
 const parite = JSON.parse(readFileSync(fileURLToPath(new URL("./quantitatif-parite.fixture.json", import.meta.url)), "utf8")) as { cas: { entree: QuantitatifEntree; attendu: unknown }[] };
 const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`).join(",");
 
@@ -20,7 +20,7 @@ const base = (extra: Partial<OuvrageDonnees> = {}): OuvrageDonnees => ({
   etatTravaux: "nouveau", etats: ["existant", "nouveau"], ...extra,
 });
 
-describe("parité domaine ↔ migration 20260929001301", () => {
+describe("parité domaine ↔ migration 20260928000810", () => {
   it("énumérations identiques (catégories, unités, sources, opérations, arrondis, états d'anomalie)", () => {
     const flat = sql.replace(/, /g, ",");
     expect(flat).toContain(`not in (${quoted(OUVRAGE_CATEGORIES)})`);

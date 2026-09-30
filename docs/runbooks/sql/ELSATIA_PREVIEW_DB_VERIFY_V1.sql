@@ -22,10 +22,10 @@
 -- Contrôles 27-29 (train canonique V6) : Relevé Lot 6 (…0928 401), RGPD contrats V2 (…0928 501),
 -- surface de la pièce (…0928 601). Contrôle 30 (train canonique V7) : Relevé & Métré Lot 7, objets
 -- de plan et calques (…0928 701).
--- Contrôle 31 (train canonique V8) : cycle commercial (…0928 701-703,
+-- Contrôle 31 (train canonique V8) : cycle commercial (…0928 801-803,
 -- ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1). Contrôle 32 (train canonique V8) : suspension commerciale
--- par application (…0929 801). Contrôle 33 (train canonique V8) : données personnelles des salariés
--- (…0928 701, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1).
+-- par application (…0928 804). Contrôle 33 (train canonique V8) : données personnelles des salariés
+-- (…0928 806, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -402,10 +402,10 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and to_regprocedure('public.tools_releve_plan_equipement_anomalie(jsonb)') is not null
            and not has_function_privilege('anon', 'public.tools_releve_plan_equipement_anomalie(jsonb)', 'execute'), true
   union all
-  -- 31 : cycle commercial (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, …0928 701-703) : une facture
+  -- 31 : cycle commercial (ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1, …0928 801-803) : une facture
   -- ne lève jamais « annule », catalogue actif = grille canonique 79/249/449/599 ×10, essai expiré
   -- refusé en base (est_membre_actif).
-  select 31, 'Cycle commercial : facture sans effet sur annulé, grille canonique, essai expiré (20260928000701-703)',
+  select 31, 'Cycle commercial : facture sans effet sur annulé, grille canonique, essai expiré (20260928000801-803)',
          'garde annule présente, mini/pro/business/entreprise = 79/249/449/599 (annuel ×10), essai expiré refusé',
          concat_ws(', ',
            case when position('abonnement_termine' in coalesce((select prosrc from pg_proc where oid = to_regprocedure(
@@ -423,12 +423,12 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif(uuid)')), '')) > 0
            and position('abonnement_essai_fin' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.est_membre_actif_reel(uuid)')), '')) > 0, true
   union all
-  -- 32 : suspension commerciale PAR APPLICATION (ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1, …0929 801) :
+  -- 32 : suspension commerciale PAR APPLICATION (ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1, …0928 804) :
   -- a_acces_application ne dépend plus de l'état commercial GP (est_membre_actif) mais de
   -- l'appartenance plateforme + l'état commercial de l'application ; suspension globale sur
   -- colonnes dédiées, jamais posée sans motif ; webhook d'application réservé au service ;
   -- prédicats internes non exposés ; aucune perte de droit à la migration.
-  select 32, 'Suspension commerciale par application (20260929000801)',
+  select 32, 'Suspension commerciale par application (20260928000804)',
          'a_acces_application sans est_membre_actif, statut_commercial présent, suspensions globales motivées, webhook service seul, 0 perte',
          concat_ws(', ',
            case when position('est_membre_actif(' in coalesce((select prosrc from pg_proc where oid = to_regprocedure('public.a_acces_application(uuid,text)')), '')) = 0
@@ -447,10 +447,10 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from information_schema.column_privileges where table_schema = ''public'' and table_name = ''entreprises'' and column_name = ''suspension_globale_at'' and grantee = ''authenticated'' and privilege_type = ''UPDATE''', false, true, '')))[1]::text end) = '0'
            and (case when to_regclass('public.rapport_migration_suspension_par_app_v1') is not null then (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.rapport_migration_suspension_par_app_v1 where changement = ''perte_acces''', false, true, '')))[1]::text end) = '0', true
   union all
-  -- 33 : données personnelles des salariés (20260928000701) : colonnes sensibles de `employes`
+  -- 33 : données personnelles des salariés (20260928000806) : colonnes sensibles de `employes`
   -- non lisibles directement par authenticated/anon, fiche détaillée via employes_fiche
   -- (authenticated seulement), export RGPD filtré par section.
-  select 33, 'Employés : colonnes personnelles fermées à la lecture directe (20260928000701)',
+  select 33, 'Employés : colonnes personnelles fermées à la lecture directe (20260928000806)',
          '0 colonne sensible lisible, employes_fiche authentifiés seuls, export filtré',
          concat_ws(', ',
            (select count(*) from unnest(array['email','telephone','notes','numero_inscription','identifiant_interne',

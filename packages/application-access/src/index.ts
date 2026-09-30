@@ -146,7 +146,7 @@ export function creerControleAccesApplications(
   };
 }
 
-// ── Per-App Commercial Suspension V1 (migration 20260929000801) ──────────────
+// ── Per-App Commercial Suspension V1 (migration 20260928000804) ──────────────
 // État commercial d'une application pour une organisation. La décision d'accès reste
 // en base (`a_acces_application`) ; ce qui suit ne sert qu'à EXPLIQUER un refus.
 export const STATUTS_COMMERCIAUX = [

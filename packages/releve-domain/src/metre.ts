@@ -1,5 +1,5 @@
 /**
- * Lot 8 — Métré : dimensions, surfaces, volumes et revêtements (miroir de la migration 20260928001201).
+ * Lot 8 — Métré : dimensions, surfaces, volumes et revêtements (miroir de la migration 20260928000809).
  *
  * Le métré de référence est calculé par le SERVEUR (`tools_releve_plan_metre_calcul`) à partir de la
  * géométrie enregistrée du plan : aucune surface envoyée par le client n'est jamais crue. Ce module en est

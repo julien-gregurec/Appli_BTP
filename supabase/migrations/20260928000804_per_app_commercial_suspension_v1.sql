@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260929000801 (B. Per-App Suspension (claude/kind-tesla-0i0818)), renuméroté 20260928000804
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA — Per-App Commercial Suspension & Entitlement Enforcement V1
 -- (docs/qualification/ELSATIA_PER_APP_COMMERCIAL_SUSPENSION_V1.md)
 --

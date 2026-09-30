@@ -2,7 +2,7 @@
 # ELSATIA — Billing & Subscription Lifecycle Qualification V1 : concurrence RÉELLE du cycle commercial.
 # Rapport : docs/qualification/ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1.md
 #
-# N sessions PostgreSQL parallèles sur la vraie base (train V6 + …0928 701-703) :
+# N sessions PostgreSQL parallèles sur la vraie base (train V6 + …0928 701-703 ; train V8 : …0928 801-803) :
 #   C1  premier Checkout complété livré N fois en parallèle (double clic, 2 onglets,
 #       re-livraison Stripe) → une seule liaison, un seul contrat, prix canonique 79 € ;
 #   C2  deux Checkout complétés pour deux subscriptions DIFFÉRENTES (2 onglets) →

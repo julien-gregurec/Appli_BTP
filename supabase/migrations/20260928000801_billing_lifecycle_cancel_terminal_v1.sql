@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928000701 (A. Billing (claude/busy-darwin-tlpi3p)), renuméroté 20260928000801
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA — Billing & Subscription Lifecycle Qualification V1
 -- (docs/qualification/ELSATIA_BILLING_SUBSCRIPTION_LIFECYCLE_V1.md, finding B-1)
 --

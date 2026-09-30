@@ -14,7 +14,7 @@ Preuve locale : drill S6 (arrêt de Postgres). Référence DR : `ELSATIA_DISASTE
   (projet distinct). Ne pas redéployer GP pour « couper » : les pages de connexion restent servies.
 - **Stripe** : ne rien faire. Les webhooks échoués (5xx) sont rejoués automatiquement par Stripe
   pendant 3 jours (mode live) ; aucun événement n'est accepté à moitié (réservation + reprise des
-  orphelines, migration `20260928000702`).
+  orphelines, migration `20260928000808`).
 - Statut public : impossible en base → communication manuelle (e-mail / réseaux) si > 15 min.
 
 ## 3. Diagnostic

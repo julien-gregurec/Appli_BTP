@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928001201 (F. Relevé Lot 8 (claude/great-mendel-w9qt6c)), renuméroté 20260928000809
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 8 — DIMENSIONS, SURFACES, VOLUMES & REVÊTEMENTS V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT8_DIMENSIONS_SURFACES_REVETEMENTS_V1.md
 --

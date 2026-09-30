@@ -105,7 +105,7 @@ describe("webhook Stripe Connect des factures clients", () => {
   it("ignore un identifiant de facture qui n'est pas un UUID, comme auparavant", async () => {
     const reponse = await POST(requete(paiementReussi({ facture_id: "pas-un-uuid", entreprise_id: ENTREPRISE })));
     expect(reponse.status).toBe(200);
-    // Aucune RPC métier : seule la finalisation de la réservation (migration 20260928000702).
+    // Aucune RPC métier : seule la finalisation de la réservation (migration 20260928000808).
     expect(deps.rpc.mock.calls.map((c) => c[0])).toEqual(["finaliser_evenement_webhook_stripe_service"]);
   });
 

@@ -3,8 +3,8 @@
 #
 # Construit deux bases à partir d'une base de référence déjà rejouée par
 # scripts/local-postgres-bootstrap/rebuild_db.sh :
-#   <ref>_edp_v6      : la base de référence SANS la migration 20260928000701 (état V6)
-#   <ref>_edp_corrige : la même + 20260928000701
+#   <ref>_edp_v6      : la base de référence SANS la migration 20260928000806 (état antérieur au lot E)
+#   <ref>_edp_corrige : la même + 20260928000806
 # y charge le décor supabase/tests/fixtures/employes_donnees_personnelles.inc (committé, pas
 # de rollback), lance un PostgREST réel sur chacune et rejoue
 # employes-donnees-personnelles-http.mjs (attendu « v6 » puis « corrige »).
@@ -27,7 +27,7 @@ for variante in v6 corrige; do
   su postgres -c "psql -X -q -c 'create database \"$DB\" template \"$REF\"'" || exit 1
   su postgres -c "psql -X -q -c 'alter database \"$DB\" set search_path = public, extensions'" >/dev/null
   if [ "$variante" = corrige ]; then
-    psql_db "$DB" < "$REPO/supabase/migrations/20260928000701_employes_donnees_personnelles_acces_v1.sql" 2>&1 | grep -v NOTICE
+    psql_db "$DB" < "$REPO/supabase/migrations/20260928000806_employes_donnees_personnelles_acces_v1.sql" 2>&1 | grep -v NOTICE
   fi
   { echo "begin;"; cat "$REPO/supabase/tests/fixtures/employes_donnees_personnelles.inc"; echo "commit;"; } | psql_db "$DB" >/dev/null || exit 1
   su postgres -c "psql -X -q -d \"$DB\" -c \"alter role authenticator with password 'root';\"" >/dev/null

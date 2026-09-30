@@ -1,3 +1,5 @@
+-- Train canonique V8 : numéro d'origine 20260928000702 (D. Incident Response (claude/serene-franklin-rgu054)), renuméroté 20260928000808
+-- (bloc V8 strictement après la dernière migration de V7, 20260928000701, projet partagé) ; corps inchangé.
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ELSATIA — PRODUCTION INCIDENT RESPONSE & SAFE MODE V1 — reprise des
 -- réservations de webhook Stripe ORPHELINES.

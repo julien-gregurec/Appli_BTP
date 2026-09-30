@@ -193,7 +193,7 @@ select is(r.metier_admin, m.metier, 'M' || m.k || ' ' || m.libelle || ' : accès
 select is(r.metier_membre, m.metier, 'M' || m.k || ' ' || m.libelle || ' : accès métier GP (membre)') from matrice m join resultats_matrice r using (k) order by k;
 select is(r.chantiers_rls, m.metier, 'M' || m.k || ' ' || m.libelle || ' : permission métier (a_permission)') from matrice m join resultats_matrice r using (k) order by k;
 select is(r.entreprise_visible, m.metier, 'M' || m.k || ' ' || m.libelle || ' : fiche entreprise visible par RLS') from matrice m join resultats_matrice r using (k) order by k;
--- Per-App Commercial Suspension V1 (20260929000801) : l'état commercial GP ne décide plus
+-- Per-App Commercial Suspension V1 (20260928000804) : l'état commercial GP ne décide plus
 -- que Gestion Pro. Tools, Colors et Réserves (droits autorisés, non suspendus pour leur
 -- propre compte, aucune suspension globale) restent ouverts dans les 10 états GP.
 select is(r.tools, true, 'M' || m.k || ' ' || m.libelle || ' : Tools (a_acces_application) indépendant de GP') from matrice m join resultats_matrice r using (k) order by k;
