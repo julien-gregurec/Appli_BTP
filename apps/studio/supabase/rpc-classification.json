@@ -1,6 +1,8 @@
 {
   "description": "Classification BLOQUANTE de toute fonction du schéma public du projet Supabase DÉDIÉ Studio exécutable par anon/authenticated/service_role. Contrôlée sur base réelle par apps/studio/e2e-dedicated/verify-dedicated-chain.mjs (C5) : une fonction non classée, classée mais absente, ou exécutable par un rôle hors de sa classe fait échouer la CI. Cohérente avec apps/studio/tests/read-only-policy.test.ts.",
-  "anon_allowed": [],
+  "anon_allowed": [
+    "incident_etat_public"
+  ],
   "classes": {
     "user_write": {
       "caller": "authenticated",
@@ -129,6 +131,20 @@
         "studio_erasure_prepare",
         "studio_erasure_storage_batch",
         "studio_erasure_storage_done"
+      ]
+    },
+    "incident_public_state": {
+      "caller": "public",
+      "description": "Mode sûr Studio (migration dédiée 20260929180000, train V8) : état public du mode sûr (STABLE, aucun secret, aucune donnée utilisateur) lu par le proxy et /api/health, y compris avant connexion — seule fonction ouverte à anon (anon_allowed).",
+      "functions": [
+        "incident_etat_public"
+      ]
+    },
+    "incident_health_system": {
+      "caller": "service_role",
+      "description": "Mode sûr Studio (migration dédiée 20260929180000, train V8) : compteurs de santé du worker (STABLE, compteurs seulement), clé service de /api/health.",
+      "functions": [
+        "incident_worker_sante"
       ]
     }
   }

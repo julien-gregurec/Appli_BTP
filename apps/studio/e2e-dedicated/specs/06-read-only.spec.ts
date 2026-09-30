@@ -9,6 +9,7 @@ import {
   closeAll,
   createProject,
   mediaFixtures,
+  projectInput,
   quote,
   rpcAsUser,
   studioAccessToken,
@@ -132,5 +133,11 @@ test("interrupteur opérateur global read_only : écritures refusées pour tous,
   }
   const ok = await rpcAsUser(token, "studio_create_project", { p_workspace: u.workspace, p_name: "Retour", p_type: "free" });
   expect(ok.status).toBe(200);
+  // Train V8 : l'application lit le mode sûr avec un cache court (≤ 10 s, @elsatia/incident-control) ;
+  // le retour read_write doit s'y propager dans ce délai (les specs suivantes écrivent par l'application).
+  await expect
+    .poll(async () => (await api(u.page, "POST", "/api/projects", { workspace: u.workspace, project: projectInput("Retour application") })).status,
+      { timeout: 20_000, intervals: [1_000] })
+    .toBeLessThan(300);
   await closeAll(u.context);
 });
