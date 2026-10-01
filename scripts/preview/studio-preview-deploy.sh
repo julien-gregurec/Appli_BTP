@@ -20,7 +20,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP="$ROOT/apps/studio"
-DOMAIN="studio-preview.elsatia.fr"
+# Domaine servi : studio-preview.elsatia.fr (DNS requis) ou, en attendant, l'alias Preview stable
+# studio-preview-elsatia.vercel.app (STUDIO_PREVIEW_DOMAIN). Jamais studio.elsatia.fr.
+DOMAIN="${STUDIO_PREVIEW_DOMAIN:-studio-preview.elsatia.fr}"
+case "$DOMAIN" in studio-preview.elsatia.fr|*.vercel.app) ;; *) echo "REFUS : domaine $DOMAIN non admis" >&2; exit 2;; esac
 PROJECT="elsatia-studio-preview"
 BACKUP_DIR="${STUDIO_PREVIEW_BACKUP_DIR:-$HOME/elsatia-studio-preview/backups}"
 die() { echo "REFUS : $*" >&2; exit 2; }
@@ -96,7 +99,7 @@ case "$cmd" in
     ;;
   smoke)
     [ -n "${1:-}" ] || die "smoke <url>"
-    extra=(); [[ "$1" == *"$DOMAIN"* ]] && extra=(--allow-custom-domain)
+    extra=(); [[ "$1" == *"studio-preview.elsatia.fr"* ]] && extra=(--allow-custom-domain)
     node "$ROOT/scripts/preview/studio-preview-smoke.mjs" --studio "$1" --supabase-url "https://$STUDIO_PREVIEW_REF.supabase.co" --env-file "$STUDIO_PREVIEW_ENV_FILE" ${extra[@]+"${extra[@]}"}
     ;;
   disable)
