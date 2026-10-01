@@ -218,7 +218,9 @@ export async function chargerFicheEntreprise(entrepriseId: string): Promise<Fich
         .eq("cible_id", entrepriseId)
         .order("created_at", { ascending: false })
         .limit(LIMITE_HISTORIQUE),
-      supabase.rpc("plateforme_postes_tarifs"),
+      // Postes de CE tenant seulement : plateforme_postes_tarifs() renvoyait ceux
+      // de toute la plateforme, plafonnés à 1 000 lignes avant le filtre.
+      supabase.rpc("plateforme_postes_tarifs_entreprise", { p_entreprise_id: entrepriseId }),
     ]);
 
   const nomsApplications = new Map<string, { nom: string; statut_produit: string }>(
@@ -272,7 +274,7 @@ export async function chargerFicheEntreprise(entrepriseId: string): Promise<Fich
       ? indisponible(`Postes illisibles : ${postes.error.message}`)
       : disponible((postes.data ?? []) as PosteEntreprise[]),
 
-    // `plateforme_postes_tarifs` exige la permission `consulter_facturation` :
+    // `plateforme_postes_tarifs_entreprise` exige la permission `consulter_facturation` :
     // un rôle support reçoit ici une erreur, qui est affichée telle quelle.
     tarifsPostes: tarifs.error
       ? indisponible(`Tarifs par poste illisibles : ${tarifs.error.message}`)
