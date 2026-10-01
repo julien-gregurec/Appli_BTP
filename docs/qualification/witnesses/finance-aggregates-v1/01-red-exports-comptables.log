@@ -1,0 +1,346 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts (27 tests | 19 failed) 673986ms
+       × TVA collectée : détail par facture et synthèse par taux exacts 154ms
+       × TVA collectée : détail par facture et synthèse par taux exacts 141ms
+       × journal des ventes : toutes les factures, totaux exacts 2668ms
+       × règlements clients : tous les paiements, avoirs en négatif 76704ms
+       × journal des achats : toutes les pièces non annulées 2440ms
+       × TVA déductible : synthèse par taux exacte 2459ms
+       × TVA collectée : détail par facture et synthèse par taux exacts 140ms
+       × journal des ventes : toutes les factures, totaux exacts 9508ms
+       × règlements clients : tous les paiements, avoirs en négatif 97543ms
+       × journal des achats : toutes les pièces non annulées 7844ms
+       × TVA déductible : synthèse par taux exacte 8743ms
+       × TVA collectée : détail par facture et synthèse par taux exacts 193ms
+       × journal des ventes : toutes les factures, totaux exacts 2296ms
+       × règlements clients : tous les paiements, avoirs en négatif 185274ms
+       × journal des achats : toutes les pièces non annulées 1999ms
+       × TVA déductible : synthèse par taux exacte 2080ms
+       × TVA collectée : détail par facture et synthèse par taux exacts 218ms
+       × un administrateur ne lit rien d'une autre entreprise, même en forçant son identifiant 71211ms
+       × un ouvrier sans accès factures / dépenses ne lit aucune donnée comptable 36147ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 19 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts
+AssertionError: expected { code: 'PGRST201', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "PGRST201",
+  "details": [
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_entreprise_id_fkey using lignes_factures(facture_id, entreprise_id) and factures(id, entreprise_id)",
+    },
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_fkey using lignes_factures(facture_id) and factures(id)",
+    },
+  ],
+  "hint": "Try changing 'factures' to one of the following: 'factures!lignes_factures_facture_id_entreprise_id_fkey', 'factures!lignes_factures_facture_id_fkey'. Find the desired relationship in the 'details' key.",
+  "message": "Could not embed because more than one relationship was found for 'lignes_factures' and 'factures'",
+}
+
+ ❯ exporter src/lib/exports-comptables.postgrest.test.ts:13:17
+     11| async function exporter(prefixe: string, type: TypeExportComptable, en…
+     12|   const { data, error } = await construireExportComptable(clientBanc(p…
+     13|   expect(error).toBeNull();
+       |                 ^
+     14|   const lignes = data!.lignes.slice(1);
+     15|   const fin = lignes.findIndex((l) => l.length === 0);
+ ❯ src/lib/exports-comptables.postgrest.test.ts:61:36
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > journal des ventes : toutes les factures, totaux exacts
+AssertionError: expected [ [ '2026-01-01', …(11) ], …(999) ] to have a length of 1462 but got 1000
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:30:22
+     28|       expect(verite.n).toBe(volume);
+     29|       const { detail } = await exporter(prefixe, "ventes");
+     30|       expect(detail).toHaveLength(verite.n);
+       |                      ^
+     31|       expect(new Set(detail.map((l) => l[1])).size).toBe(verite.n);
+     32|       expect([6, 7, 8, 9, 10].map((c) => centimes(somme(detail, c)))).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > règlements clients : tous les paiements, avoirs en négatif
+AssertionError: expected [ …(1000) ] to have a length of 1462 but got 1000
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:38:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > journal des achats : toutes les pièces non annulées
+AssertionError: expected [ [ '2026-01-01', …(12) ], …(999) ] to have a length of 1412 but got 1000
+
+- Expected
++ Received
+
+- 1412
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:45:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > TVA déductible : synthèse par taux exacte
+AssertionError: expected [ [ '2026-01-01', …(6) ], …(999) ] to have a length of 1412 but got 1000
+
+- Expected
++ Received
+
+- 1412
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:53:22
+     51|       const n = veritePg<number>(`select count(*) from depenses_fourni…
+     52|       const { detail, synthese } = await exporter(prefixe, "tva-achats…
+     53|       expect(detail).toHaveLength(n);
+       |                      ^
+     54|       expect(parTaux(synthese, 3, [4, 5, 6])).toEqual(verite);
+     55|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > journal des ventes : toutes les factures, totaux exacts
+AssertionError: expected [ [ '2026-01-01', …(11) ], …(999) ] to have a length of 5000 but got 1000
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:30:22
+     28|       expect(verite.n).toBe(volume);
+     29|       const { detail } = await exporter(prefixe, "ventes");
+     30|       expect(detail).toHaveLength(verite.n);
+       |                      ^
+     31|       expect(new Set(detail.map((l) => l[1])).size).toBe(verite.n);
+     32|       expect([6, 7, 8, 9, 10].map((c) => centimes(somme(detail, c)))).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > règlements clients : tous les paiements, avoirs en négatif
+AssertionError: expected [ …(1000) ] to have a length of 5000 but got 1000
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:38:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > journal des achats : toutes les pièces non annulées
+AssertionError: expected [ [ '2026-01-01', …(12) ], …(999) ] to have a length of 4828 but got 1000
+
+- Expected
++ Received
+
+- 4828
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:45:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > TVA déductible : synthèse par taux exacte
+AssertionError: expected [ [ '2026-01-01', …(6) ], …(999) ] to have a length of 4828 but got 1000
+
+- Expected
++ Received
+
+- 4828
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:53:22
+     51|       const n = veritePg<number>(`select count(*) from depenses_fourni…
+     52|       const { detail, synthese } = await exporter(prefixe, "tva-achats…
+     53|       expect(detail).toHaveLength(n);
+       |                      ^
+     54|       expect(parTaux(synthese, 3, [4, 5, 6])).toEqual(verite);
+     55|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > journal des ventes : toutes les factures, totaux exacts
+AssertionError: expected [ [ '2026-01-01', …(11) ], …(999) ] to have a length of 20000 but got 1000
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:30:22
+     28|       expect(verite.n).toBe(volume);
+     29|       const { detail } = await exporter(prefixe, "ventes");
+     30|       expect(detail).toHaveLength(verite.n);
+       |                      ^
+     31|       expect(new Set(detail.map((l) => l[1])).size).toBe(verite.n);
+     32|       expect([6, 7, 8, 9, 10].map((c) => centimes(somme(detail, c)))).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > règlements clients : tous les paiements, avoirs en négatif
+AssertionError: expected [ …(1000) ] to have a length of 20000 but got 1000
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:38:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > journal des achats : toutes les pièces non annulées
+AssertionError: expected [ [ '2026-01-01', …(12) ], …(999) ] to have a length of 19311 but got 1000
+
+- Expected
++ Received
+
+- 19311
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:45:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > TVA déductible : synthèse par taux exacte
+AssertionError: expected [ [ '2026-01-01', …(6) ], …(999) ] to have a length of 19311 but got 1000
+
+- Expected
++ Received
+
+- 19311
++ 1000
+
+ ❯ src/lib/exports-comptables.postgrest.test.ts:53:22
+     51|       const n = veritePg<number>(`select count(*) from depenses_fourni…
+     52|       const { detail, synthese } = await exporter(prefixe, "tva-achats…
+     53|       expect(detail).toHaveLength(n);
+       |                      ^
+     54|       expect(parTaux(synthese, 3, [4, 5, 6])).toEqual(verite);
+     55|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > sécurité > un administrateur ne lit rien d'une autre entreprise, même en forçant son identifiant
+AssertionError: expected { code: 'PGRST201', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "PGRST201",
+  "details": [
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_entreprise_id_fkey using lignes_factures(facture_id, entreprise_id) and factures(id, entreprise_id)",
+    },
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_fkey using lignes_factures(facture_id) and factures(id)",
+    },
+  ],
+  "hint": "Try changing 'factures' to one of the following: 'factures!lignes_factures_facture_id_entreprise_id_fkey', 'factures!lignes_factures_facture_id_fkey'. Find the desired relationship in the 'details' key.",
+  "message": "Could not embed because more than one relationship was found for 'lignes_factures' and 'factures'",
+}
+
+ ❯ exporter src/lib/exports-comptables.postgrest.test.ts:13:17
+     11| async function exporter(prefixe: string, type: TypeExportComptable, en…
+     12|   const { data, error } = await construireExportComptable(clientBanc(p…
+     13|   expect(error).toBeNull();
+       |                 ^
+     14|   const lignes = data!.lignes.slice(1);
+     15|   const fin = lignes.findIndex((l) => l.length === 0);
+ ❯ src/lib/exports-comptables.postgrest.test.ts:70:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/19]⎯
+
+ FAIL  src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > sécurité > un ouvrier sans accès factures / dépenses ne lit aucune donnée comptable
+AssertionError: expected { code: 'PGRST201', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "PGRST201",
+  "details": [
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_entreprise_id_fkey using lignes_factures(facture_id, entreprise_id) and factures(id, entreprise_id)",
+    },
+    {
+      "cardinality": "many-to-one",
+      "embedding": "lignes_factures with factures",
+      "relationship": "lignes_factures_facture_id_fkey using lignes_factures(facture_id) and factures(id)",
+    },
+  ],
+  "hint": "Try changing 'factures' to one of the following: 'factures!lignes_factures_facture_id_entreprise_id_fkey', 'factures!lignes_factures_facture_id_fkey'. Find the desired relationship in the 'details' key.",
+  "message": "Could not embed because more than one relationship was found for 'lignes_factures' and 'factures'",
+}
+
+ ❯ exporter src/lib/exports-comptables.postgrest.test.ts:13:17
+     11| async function exporter(prefixe: string, type: TypeExportComptable, en…
+     12|   const { data, error } = await construireExportComptable(clientBanc(p…
+     13|   expect(error).toBeNull();
+       |                 ^
+     14|   const lignes = data!.lignes.slice(1);
+     15|   const fin = lignes.findIndex((l) => l.length === 0);
+ ❯ src/lib/exports-comptables.postgrest.test.ts:76:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/19]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  19 failed | 8 passed (27)
+   Start at  00:04:47
+   Duration  675.50s (transform 640ms, setup 0ms, import 853ms, tests 673.99s, environment 0ms)
+
+
+real	11m17.921s
+user	0m4.147s
+sys	0m1.160s
