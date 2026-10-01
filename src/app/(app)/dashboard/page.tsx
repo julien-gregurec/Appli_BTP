@@ -15,7 +15,7 @@ import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type Employe
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
-import { lireAlertesStock, lireDashboardChantiers, type AlertesStock, type DashboardChantiers } from "@/lib/pilotage-agregats";
+import { lireAlertesParc, lireAlertesStock, lireDashboardChantiers, type AlertesParc, type AlertesStock, type DashboardChantiers } from "@/lib/pilotage-agregats";
 import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 // Alertes d’échéances (outillage, livraisons) : filtrées par date en base et
@@ -100,30 +100,31 @@ export default async function DashboardPage() {
     factures_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; montant_paye: number; date_echeance: string; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
     factures_mois?: Array<{ cle: string; total: number }> | null;
   };
-  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
+  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, parcResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
     voir.devis || voir.factures ? supabase.rpc("dashboard_indicateurs", { p_entreprise_id: ctx.entrepriseId, p_aujourdhui: aujourdhui }) : null,
     // Chantiers, alertes de stock : calculés en base (gp_dashboard_chantiers,
     // gp_alertes_stock) — PostgREST tronquait ces lectures à 1 000 lignes.
     voir.chantiers ? lireDashboardChantiers(supabase, ctx.entrepriseId, aujourdhui).catch((err): DashboardChantiers | null => { console.error("[dashboard] chantiers indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? lireAlertesStock(supabase, ctx.entrepriseId, 50).catch((err): AlertesStock | null => { console.error("[dashboard] alertes stock indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
-    voir.flotte ? supabase.from("vehicules").select("id, immatriculation, marque, modele, kilometrage, controle_technique_echeance, assurance_echeance, prochain_entretien_date, prochain_entretien_km").eq("entreprise_id", ctx.entrepriseId).in("statut", ["actif", "maintenance"]) : null,
-    // Seules les échéances à 30 jours produisent une alerte : filtrées en base.
-    voir.outillage ? supabase.from("outils").select("id, reference, designation, prochaine_verification").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu)").lte("prochaine_verification", dansJours(30)).order("prochaine_verification").order("id").limit(LIMITE_ALERTES) : null,
+    // Alertes du parc filtrées en base (gp_alertes_parc) : les véhicules étaient
+    // lus sans borne et les outils triés sous RLS.
+    voir.flotte || voir.outillage ? lireAlertesParc(supabase, ctx.entrepriseId, aujourdhui, 30, LIMITE_ALERTES).catch((err): AlertesParc | null => { console.error("[dashboard] alertes du parc indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
     voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]).lte("date_livraison_prevue", dansJours(3)).order("date_livraison_prevue").order("id").limit(LIMITE_ALERTES) : null,
     peutPointer && employeCompte ? lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})) : null,
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
-    peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
+    // Effectif compté en base (gp_effectif_actif) : la lecture était plafonnée à 1 000.
+    peutVoirBriefing ? supabase.rpc("gp_effectif_actif", { p_entreprise_id: ctx.entrepriseId }) : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
     voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
   ]);
   const indicateurs = (dashboardIndicateursResult?.data ?? {}) as DashboardIndicateurs;
   const syntheseChantiers = chantiersResult ?? null;
-  const affectations = affectationsResult?.data ?? [], alertesStock = articlesResult ?? null, vehicules = vehiculesResult?.data ?? [];
-  const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
+  const affectations = affectationsResult?.data ?? [], alertesStock = articlesResult ?? null, alertesParc = parcResult ?? null, vehicules = voir.flotte ? alertesParc?.vehicules ?? [] : [];
+  const outils = voir.outillage ? alertesParc?.outils ?? [] : [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
-  const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
+  const effectifActif = Number(employesActifsResult?.data ?? 0), congesAujourdhui = congesAujourdhuiResult?.data ?? [];
   const notifications = notificationsResult?.data ?? [];
   const relancesEnEchec = relancesEchecResult?.data ?? [];
 
@@ -178,6 +179,8 @@ export default async function DashboardPage() {
   for (const outil of outils ?? []) {
     if (outil.prochaine_verification) ajouterEcheance({ id: `outil-${outil.id}`, domaine: "Outillage", titre: `Vérification · ${outil.reference}`, detail: outil.designation, href: `/outillage/${outil.id}` }, outil.prochaine_verification);
   }
+  if (voir.flotte && alertesParc && alertesParc.nbVehicules > alertesParc.vehicules.length) alertes.push({ id: "flotte-autres", domaine: "Flotte", niveau: "attention", titre: `${alertesParc.nbVehicules - alertesParc.vehicules.length} autres véhicules à échéance`, detail: `${alertesParc.nbVehicules} véhicules concernés au total`, href: "/flotte" });
+  if (voir.outillage && alertesParc && alertesParc.nbOutils > alertesParc.outils.length) alertes.push({ id: "outillage-autres", domaine: "Outillage", niveau: "attention", titre: `${alertesParc.nbOutils - alertesParc.outils.length} autres vérifications d’outils`, detail: `${alertesParc.nbOutils} outils concernés au total`, href: "/outillage" });
   for (const commande of commandes ?? []) {
     if (commande.date_livraison_prevue) {
       const fournisseur = un(commande.fournisseur);
@@ -245,8 +248,8 @@ export default async function DashboardPage() {
   const lignesBriefing: LigneBriefing[] = [];
   if (peutVoirBriefing) {
     const absentsAujourdhui = new Set(congesAujourdhui.map((c) => c.employe_id)).size;
-    const presentsAujourdhui = Math.max(0, employesActifs.length - absentsAujourdhui);
-    if (employesActifs.length > 0) {
+    const presentsAujourdhui = Math.max(0, effectifActif - absentsAujourdhui);
+    if (effectifActif > 0) {
       lignesBriefing.push({
         niveau: absentsAujourdhui > 0 ? "attention" : "bon",
         texte: `${presentsAujourdhui} salarié${presentsAujourdhui > 1 ? "s" : ""} présent${presentsAujourdhui > 1 ? "s" : ""}${absentsAujourdhui > 0 ? `, ${absentsAujourdhui} absent${absentsAujourdhui > 1 ? "s" : ""}` : ""}`,

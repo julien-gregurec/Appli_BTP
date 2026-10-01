@@ -238,3 +238,67 @@ grant execute on function public.gp_parc_synthese(uuid, date) to authenticated;
 
 -- Annuaires /fournisseurs et /sous-traitants paginés par curseur (nom, id).
 create index if not exists fournisseurs_annuaire_curseur_idx on public.fournisseurs (entreprise_id, type_tiers, nom, id);
+
+-- Tableau de bord : effectif actif compté en base (le briefing « N salariés
+-- présents » comptait une lecture plafonnée à 1 000). employes → est_membre_actif.
+create or replace function public.gp_effectif_actif(p_entreprise_id uuid)
+returns bigint
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.gp_exiger_membre(p_entreprise_id);
+  return (select count(*) from public.employes where entreprise_id = p_entreprise_id and statut = 'actif');
+end;
+$$;
+
+revoke all on function public.gp_effectif_actif(uuid) from public, anon;
+grant execute on function public.gp_effectif_actif(uuid) to authenticated;
+
+-- Tableau de bord : alertes du parc filtrées en base. Les véhicules actifs
+-- étaient lus sans borne (alertes manquées au-delà de 1 000 véhicules) et les
+-- outils triés sous RLS (8 s à 20 000). Seuls les éléments qui produisent une
+-- alerte sont rendus : échéance à `p_horizon_jours` jours ou kilométrage
+-- d'entretien atteint, échéance la plus proche d'abord, avec le nombre exact.
+-- Visibilité : vehicules et outils → est_membre_actif.
+create or replace function public.gp_alertes_parc(p_entreprise_id uuid, p_aujourdhui date, p_horizon_jours integer default 30, p_limite integer default 200)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_limite date := p_aujourdhui + coalesce(p_horizon_jours, 30);
+  v_n integer := least(greatest(coalesce(p_limite, 200), 1), 1000);
+begin
+  perform public.gp_exiger_membre(p_entreprise_id);
+  return (
+    with vehicules as materialized (
+      select v.id, v.immatriculation, v.marque, v.modele, v.kilometrage, v.controle_technique_echeance, v.assurance_echeance,
+             v.prochain_entretien_date, v.prochain_entretien_km,
+             least(case when v.controle_technique_echeance <= v_limite then v.controle_technique_echeance end,
+                   case when v.assurance_echeance <= v_limite then v.assurance_echeance end,
+                   case when v.prochain_entretien_date <= v_limite then v.prochain_entretien_date end) as premiere
+      from public.vehicules v
+      where v.entreprise_id = p_entreprise_id and v.statut in ('actif', 'maintenance')
+        and (v.controle_technique_echeance <= v_limite or v.assurance_echeance <= v_limite or v.prochain_entretien_date <= v_limite
+             or (v.prochain_entretien_km is not null and v.kilometrage >= v.prochain_entretien_km))
+    ), outils as materialized (
+      select o.id, o.reference, o.designation, o.prochaine_verification
+      from public.outils o
+      where o.entreprise_id = p_entreprise_id and o.statut not in ('hors_service', 'perdu') and o.prochaine_verification <= v_limite
+    )
+    select jsonb_build_object(
+      'nb_vehicules', (select count(*) from vehicules),
+      'vehicules', coalesce((select jsonb_agg(to_jsonb(x) - 'premiere' order by x.premiere nulls first, x.id) from (select * from vehicules order by premiere nulls first, id limit v_n) x), '[]'::jsonb),
+      'nb_outils', (select count(*) from outils),
+      'outils', coalesce((select jsonb_agg(to_jsonb(x) order by x.prochaine_verification, x.id) from (select * from outils order by prochaine_verification, id limit v_n) x), '[]'::jsonb))
+  );
+end;
+$$;
+
+revoke all on function public.gp_alertes_parc(uuid, date, integer, integer) from public, anon;
+grant execute on function public.gp_alertes_parc(uuid, date, integer, integer) to authenticated;

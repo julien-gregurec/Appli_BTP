@@ -92,3 +92,13 @@ export type AnomaliePaie = { id: string; dossier_id: string | null; niveau: stri
 export async function lireAnomaliesPaie(supabase: SupabaseClient, entrepriseId: string, periodeId: string, dossierId: string | null, limite: number): Promise<AnomaliePaie[]> {
   return rpc<AnomaliePaie[]>(supabase, "paie_anomalies_page", { p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_dossier_id: dossierId, p_limite: limite });
 }
+
+export type VehiculeAlerte = { id: string; immatriculation: string; marque: string; modele: string; kilometrage: number; controle_technique_echeance: string | null; assurance_echeance: string | null; prochain_entretien_date: string | null; prochain_entretien_km: number | null };
+export type OutilAlerte = { id: string; reference: string; designation: string; prochaine_verification: string | null };
+export type AlertesParc = { nbVehicules: number; vehicules: VehiculeAlerte[]; nbOutils: number; outils: OutilAlerte[] };
+
+/** Véhicules et outils qui produisent une alerte (échéance à `horizon` jours, km d'entretien atteint), nombre exact. */
+export async function lireAlertesParc(supabase: SupabaseClient, entrepriseId: string, aujourdhui: string, horizon = 30, limite = 200): Promise<AlertesParc> {
+  const d = await rpc<{ nb_vehicules: number; vehicules: VehiculeAlerte[]; nb_outils: number; outils: OutilAlerte[] }>(supabase, "gp_alertes_parc", { p_entreprise_id: entrepriseId, p_aujourdhui: aujourdhui, p_horizon_jours: horizon, p_limite: limite });
+  return { nbVehicules: nombre(d.nb_vehicules), vehicules: d.vehicules, nbOutils: nombre(d.nb_outils), outils: d.outils };
+}

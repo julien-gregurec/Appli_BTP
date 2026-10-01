@@ -1,49 +1,55 @@
-passed    13372 ms  fiches client, sous-traitant, véhicule et outil exactes (1462)
-     TTFB /clients/a1462c00-0000-0000-0000-000000000001 343 ms
-     TTFB /sous-traitants/a1462d00-0000-0000-0000-000000000001 665 ms
-     TTFB /flotte/a1462f00-0000-0000-0000-000000000001 2660 ms
-     TTFB /outillage/a1462f00-0000-0000-0000-000000000002 2919 ms
-passed    12043 ms  fiche chantier, documents et DOE complets (1462)
-     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001 5440 ms
-     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001/documents 192 ms
-     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001/doe 511 ms
-passed    11242 ms  paie, notes de frais, CRM et tableau de bord exacts (1462)
-     TTFB /paie/a1462e50-0000-0000-0000-000000000001 390 ms
-     TTFB /notes-frais 369 ms
-     TTFB /crm 2988 ms
-     TTFB /dashboard 859 ms
-passed     2260 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (1462)
-     TTFB /flotte/a1462f00-0000-0000-0000-000000000001 248 ms
-passed    12827 ms  fiches client, sous-traitant, véhicule et outil exactes (5000)
-     TTFB /clients/a5000c00-0000-0000-0000-000000000001 198 ms
-     TTFB /sous-traitants/a5000d00-0000-0000-0000-000000000001 636 ms
-     TTFB /flotte/a5000f00-0000-0000-0000-000000000001 491 ms
-     TTFB /outillage/a5000f00-0000-0000-0000-000000000002 585 ms
-passed    14534 ms  fiche chantier, documents et DOE complets (5000)
-     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001 955 ms
-     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001/documents 198 ms
-     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001/doe 1423 ms
-passed    12739 ms  paie, notes de frais, CRM et tableau de bord exacts (5000)
-     TTFB /paie/a5000e50-0000-0000-0000-000000000001 484 ms
-     TTFB /notes-frais 396 ms
-     TTFB /crm 343 ms
-     TTFB /dashboard 1152 ms
-passed     2678 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (5000)
-     TTFB /flotte/a5000f00-0000-0000-0000-000000000001 275 ms
-passed    33557 ms  fiches client, sous-traitant, véhicule et outil exactes (20000)
-     TTFB /clients/a2000c00-0000-0000-0000-000000000001 160 ms
-     TTFB /sous-traitants/a2000d00-0000-0000-0000-000000000001 999 ms
-     TTFB /flotte/a2000f00-0000-0000-0000-000000000001 979 ms
-     TTFB /outillage/a2000f00-0000-0000-0000-000000000002 1542 ms
-passed    45735 ms  fiche chantier, documents et DOE complets (20000)
-     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001 1656 ms
-     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001/documents 243 ms
-     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001/doe 6984 ms
-passed    36627 ms  paie, notes de frais, CRM et tableau de bord exacts (20000)
-     TTFB /paie/a2000e50-0000-0000-0000-000000000001 571 ms
-     TTFB /notes-frais 611 ms
-     TTFB /crm 291 ms
-     TTFB /dashboard 2550 ms
-passed     6356 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (20000)
-     TTFB /flotte/a2000f00-0000-0000-0000-000000000001 992 ms
-{'startTime': '2026-10-01T16:09:26.020Z', 'duration': 205710.976, 'expected': 12, 'skipped': 0, 'unexpected': 0, 'flaky': 0}
+passed    16813 ms  fiches client, sous-traitant, véhicule et outil exactes (1462)
+     TTFB /clients/a1462c00-0000-0000-0000-000000000001 257 ms
+     TTFB /sous-traitants/a1462d00-0000-0000-0000-000000000001 805 ms
+     TTFB /flotte/a1462f00-0000-0000-0000-000000000001 2776 ms
+     TTFB /outillage 373 ms
+     TTFB /flotte 328 ms
+     TTFB /outillage/a1462f00-0000-0000-0000-000000000002 2803 ms
+passed    13996 ms  fiche chantier, documents et DOE complets (1462)
+     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001 6044 ms
+     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001/documents 237 ms
+     TTFB /chantiers/a1462ca0-0000-0000-0000-000000000001/doe 566 ms
+passed    13488 ms  paie, notes de frais, CRM et tableau de bord exacts (1462)
+     TTFB /paie/a1462e50-0000-0000-0000-000000000001 501 ms
+     TTFB /notes-frais 429 ms
+     TTFB /crm 3064 ms
+     TTFB /dashboard 1002 ms
+passed     3512 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (1462)
+     TTFB /flotte/a1462f00-0000-0000-0000-000000000001 318 ms
+passed    17134 ms  fiches client, sous-traitant, véhicule et outil exactes (5000)
+     TTFB /clients/a5000c00-0000-0000-0000-000000000001 268 ms
+     TTFB /sous-traitants/a5000d00-0000-0000-0000-000000000001 748 ms
+     TTFB /flotte/a5000f00-0000-0000-0000-000000000001 501 ms
+     TTFB /outillage 314 ms
+     TTFB /flotte 318 ms
+     TTFB /outillage/a5000f00-0000-0000-0000-000000000002 531 ms
+passed    15102 ms  fiche chantier, documents et DOE complets (5000)
+     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001 1021 ms
+     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001/documents 184 ms
+     TTFB /chantiers/a5000ca0-0000-0000-0000-000000000001/doe 1305 ms
+passed    16727 ms  paie, notes de frais, CRM et tableau de bord exacts (5000)
+     TTFB /paie/a5000e50-0000-0000-0000-000000000001 566 ms
+     TTFB /notes-frais 419 ms
+     TTFB /crm 335 ms
+     TTFB /dashboard 2139 ms
+passed     4793 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (5000)
+     TTFB /flotte/a5000f00-0000-0000-0000-000000000001 333 ms
+passed    41458 ms  fiches client, sous-traitant, véhicule et outil exactes (20000)
+     TTFB /clients/a2000c00-0000-0000-0000-000000000001 202 ms
+     TTFB /sous-traitants/a2000d00-0000-0000-0000-000000000001 1081 ms
+     TTFB /flotte/a2000f00-0000-0000-0000-000000000001 997 ms
+     TTFB /outillage 493 ms
+     TTFB /flotte 260 ms
+     TTFB /outillage/a2000f00-0000-0000-0000-000000000002 1211 ms
+passed    54814 ms  fiche chantier, documents et DOE complets (20000)
+     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001 1551 ms
+     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001/documents 314 ms
+     TTFB /chantiers/a2000ca0-0000-0000-0000-000000000001/doe 8246 ms
+passed    48621 ms  paie, notes de frais, CRM et tableau de bord exacts (20000)
+     TTFB /paie/a2000e50-0000-0000-0000-000000000001 589 ms
+     TTFB /notes-frais 702 ms
+     TTFB /crm 311 ms
+     TTFB /dashboard 8236 ms
+passed    13836 ms  profil ouvrier : rien de plus que sa RLS, sans balayage (20000)
+     TTFB /flotte/a2000f00-0000-0000-0000-000000000001 1267 ms
+{'startTime': '2026-10-01T17:04:39.141Z', 'duration': 262102.50499999998, 'expected': 12, 'skipped': 0, 'unexpected': 0, 'flaky': 0}

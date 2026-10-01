@@ -46,6 +46,8 @@ FONCTIONS = [
     ("paie_export_contenu", "uuid, uuid, boolean"),
     ("paie_anomalies_page", "uuid, uuid, uuid, integer"),
     ("gp_parc_synthese", "uuid, date"),
+    ("gp_effectif_actif", "uuid"),
+    ("gp_alertes_parc", "uuid, date, integer, integer"),
     ("gp_options_chantiers", "uuid, text[], uuid, text"),
     ("gp_options_employes", "uuid, boolean"),
     ("gp_options_clients", "uuid, text, text, text"),
@@ -200,6 +202,13 @@ for libelle, uid in PROFILS:
     'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = '{A}'),
     'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = '{A}')),
   'parité RLS compteurs du parc : {L}');""")
+    t(f"""select is(
+  (select jsonb_build_object('v', p->'nb_vehicules', 'o', p->'nb_outils') from (select public.gp_alertes_parc('{A}', current_date) p) x),
+  jsonb_build_object(
+    'v', (select count(*) from public.vehicules where entreprise_id = '{A}' and statut in ('actif','maintenance') and (controle_technique_echeance <= current_date + 30 or assurance_echeance <= current_date + 30 or prochain_entretien_date <= current_date + 30 or (prochain_entretien_km is not null and kilometrage >= prochain_entretien_km))),
+    'o', (select count(*) from public.outils where entreprise_id = '{A}' and statut not in ('hors_service','perdu') and prochaine_verification <= current_date + 30)),
+  'parité RLS alertes du parc : {L}');""")
+    t(f"""select is(public.gp_effectif_actif('{A}'), (select count(*) from public.employes where entreprise_id = '{A}' and statut = 'actif'), 'parité RLS effectif actif : {L}');""")
     # Tenant B : refus pour un profil de A.
     t(f"select throws_ok($$select public.gp_client_synthese('{B}', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : {L}');")
     t(f"select throws_ok($$select public.plateforme_postes_tarifs_entreprise('{A}')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : {L}');")

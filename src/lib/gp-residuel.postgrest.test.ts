@@ -23,7 +23,7 @@ import { PostgrestClient } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import { lireChantiersClient, lireContenuDoe, lireCurseur, lireDocumentsChantier, lirePageCurseur, lireSyntheseChantier, lireSyntheseClient, lireSyntheseDepenses, lireSyntheseMissionsSousTraitant, lireSyntheseParc, type Curseur } from "@/lib/fiches-agregats";
-import { lireAlertesStock, lireContenuExportPaie, lireDashboardChantiers, lirePageDossiersPaie, lireSyntheseCrm, lireSyntheseNotesFraisParEmploye, lireSynthesePaie } from "@/lib/pilotage-agregats";
+import { lireAlertesParc, lireAlertesStock, lireContenuExportPaie, lireDashboardChantiers, lirePageDossiersPaie, lireSyntheseCrm, lireSyntheseNotesFraisParEmploye, lireSynthesePaie } from "@/lib/pilotage-agregats";
 import { lireToutesLesLignes } from "@/lib/supabase/lecture-complete";
 
 const URL_BANC = process.env.GP_RESIDUEL_URL;
@@ -278,6 +278,16 @@ describe.skipIf(!URL_BANC)("GP résiduel : exactitude au-delà de 1 000 lignes (
       expect(d.r[0].parStatut.reduce((s, x) => s + x.nb, 0)).toBe(n + 1);
       expect(d.r[0].nbActifs).toBe(actifs);
       expect(d.r[1].nb).toBe(alertesStock);
+      const [outilsAlerte, vehiculesAlerte] = verite(`select (select count(*) from outils where entreprise_id = '${id.e}' and statut not in ('hors_service','perdu') and prochaine_verification <= current_date + 30), (select count(*) from vehicules where entreprise_id = '${id.e}' and statut in ('actif','maintenance') and (controle_technique_echeance <= current_date + 30 or assurance_echeance <= current_date + 30 or prochain_entretien_date <= current_date + 30 or (prochain_entretien_km is not null and kilometrage >= prochain_entretien_km)))`);
+      const jour = execFileSync("su", ["postgres", "-c", `psql -X -At -d ${DB}`], { input: "select current_date", encoding: "utf8" }).trim();
+      const parc = await lireAlertesParc(sb, id.e, jour);
+      expect(parc.nbOutils).toBe(outilsAlerte);
+      expect(parc.nbVehicules).toBe(vehiculesAlerte);
+      expect(parc.outils.length).toBe(Math.min(200, outilsAlerte));
+      const [effectif] = verite(`select count(*) from employes where entreprise_id = '${id.e}' and statut = 'actif'`);
+      const hEffectif = (await sb.from("employes").select("id").eq("entreprise_id", id.e).eq("statut", "actif")).data ?? [];
+      attendreHistorique(n, hEffectif.length, effectif);
+      expect(Number((await sb.rpc("gp_effectif_actif", { p_entreprise_id: id.e })).data)).toBe(effectif);
       noter("crm/dashboard", n, { crm_avant_ms: h.ms, crm_apres_ms: c.ms, dashboard_chantiers_avant_ms: hd.ms, dashboard_apres_ms: d.ms, verite_reste: reste, historique_reste: hReste });
     }, 180_000);
 
