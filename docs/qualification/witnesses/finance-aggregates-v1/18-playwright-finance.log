@@ -1,0 +1,16 @@
+
+Running 11 tests using 1 worker
+
+  ✓   1 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:66:9 › exports comptables et TVA — jamais tronqués › journal des ventes et TVA collectée (1462 factures) (3.9s)
+  ✓   2 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:66:9 › exports comptables et TVA — jamais tronqués › journal des ventes et TVA collectée (5000 factures) (5.2s)
+  ✓   3 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:66:9 › exports comptables et TVA — jamais tronqués › journal des ventes et TVA collectée (20000 factures) (18.3s)
+  ✓   4 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:81:7 › exports comptables et TVA — jamais tronqués › règlements, achats et TVA déductible complets (1 462 lignes) (3.2s)
+  ✓   5 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:95:7 › exports comptables et TVA — jamais tronqués › un ouvrier n'obtient aucun export comptable (1.1s)
+  ✓   6 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:103:7 › exports comptables et TVA — jamais tronqués › export des notes de frais : refus explicite au-delà de 500, jamais tronqué (3.6s)
+  ✓   7 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:114:7 › écrans financiers — totaux exacts au-delà de 1 000 lignes › trésorerie : total à encaisser et à payer (5 000 pièces) (10.5s)
+  ✓   8 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:125:7 › écrans financiers — totaux exacts au-delà de 1 000 lignes › factures fournisseurs : totaux sur 20 000 pièces, liste bornée annoncée (17.3s)
+  ✓   9 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:135:7 › écrans financiers — totaux exacts au-delà de 1 000 lignes › stock : valeur et nombre d'articles (5 000 articles) (16.2s)
+  ✓  10 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:144:7 › écrans financiers — totaux exacts au-delà de 1 000 lignes › pointage d'équipe : heures par salarié sur le mois (5 000 pointages) (1.4m)
+  ✓  11 [desktop-chromium] › tests/e2e/finance-agregats-exactitude.spec.ts:153:7 › écrans financiers — totaux exacts au-delà de 1 000 lignes › planning : heures planifiées de la semaine (1 462 affectations) (10.1s)
+
+  11 passed (2.9m)

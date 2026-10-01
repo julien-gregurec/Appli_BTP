@@ -22,6 +22,7 @@ describe("contrôle IA par entreprise", () => {
           ia_plafond_cout_mensuel_ht: null,
         } : []);
       },
+      rpc: async () => ({ data: { operations: 0, cout_estime_ht: 0, lignes: 0 }, error: null }),
     } as unknown as SupabaseClient;
 
     await expect(verifierPlafondIA(supabase, "entreprise-test")).resolves.toMatch(/désactivées par un administrateur/);
@@ -39,10 +40,13 @@ describe("verifierPlafondIA — quota mensuel (PRE-LIVE-CLEANUP-V1 §13)", () =>
     return {
       from(table: string) {
         if (table === "entreprises") return requeteResolue(entreprise);
-        // journal_ia : simule `operationsDejaUtilisees` lignes "succes" déjà journalisées ce mois-ci.
-        const lignes = Array.from({ length: operationsDejaUtilisees }, () => ({ operations_decomptees: 1, cout_estime_ht: 0.01 }));
-        return requeteResolue(lignes);
+        return requeteResolue([]);
       },
+      // journal_ia_consommation : simule `operationsDejaUtilisees` lignes "succes"
+      // déjà journalisées ce mois-ci, sommées en base (1 opération, 0,01 € chacune).
+      rpc: async (fonction: string) => fonction === "journal_ia_consommation"
+        ? { data: { operations: operationsDejaUtilisees, cout_estime_ht: operationsDejaUtilisees * 0.01, lignes: operationsDejaUtilisees }, error: null }
+        : { data: null, error: { message: "inattendu" } },
     } as unknown as SupabaseClient;
   }
 

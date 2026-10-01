@@ -1,0 +1,22 @@
+== f5000 ==
+ventes        avant 7.955118s 105483o  après 0.175124s 1690834o
+règlements    avant 78.185123s 131892o  après 0.166047s 1595438o
+achats        avant 7.149844s 120723o  après 0.227508s 1546694o
+tva collectée avant (PGRST201, toujours en erreur)  après 0.116383s 704464o
+trésorerie    avant(factures, PGRST201) 0.001097s 684o  après 0.415198s 2031687o
+dépenses tot. avant 1.515696s 69224o  après 0.010204s 62o
+pointage mois avant(pointages seuls) 8.652762s 273136o  après(3 listes) 0.797342s 8408225o
+planning sem. avant(affectations) 8.673804s 264145o  après 0.342598s 1978923o
+fiche chantier avant(pointages) 4.331813s 147824o  après(5 listes) 0.294427s 2089088o
+quota IA      avant 0.007742s 56998o  après 0.014501s 66o
+== f2000 ==
+ventes        avant 1.767794s 105482o  après 0.516368s 6763373o
+règlements    avant 136.485838s 131892o  après 0.608240s 6395094o
+achats        avant 1.666962s 120719o  après 0.582265s 6186441o
+tva collectée avant (PGRST201, toujours en erreur)  après 0.380380s 2815869o
+trésorerie    avant(factures, PGRST201) 0.001146s 684o  après 0.852577s 8125952o
+dépenses tot. avant 1.471423s 69220o  après 0.019951s 65o
+pointage mois avant(pointages seuls) 1.694478s 273145o  après(3 listes) 2.540349s 33632892o
+planning sem. avant(affectations) 1.888881s 264149o  après 0.793079s 7924626o
+fiche chantier avant(pointages) 17.554626s 147822o  après(5 listes) 0.730539s 8355855o
+quota IA      avant 0.006831s 56998o  après 0.047324s 68o

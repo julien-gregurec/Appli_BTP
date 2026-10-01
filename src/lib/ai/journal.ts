@@ -40,31 +40,25 @@ export async function consommationIAMensuelle(
 ): Promise<ConsommationIAMensuelle> {
   const debut = debutMoisUTC();
   const fin = debutMoisSuivantUTC();
-  const [{ data: entreprise }, { data: lignes }] = await Promise.all([
+  // Consommation du mois sommée en base (RPC SECURITY INVOKER, même policy) :
+  // la lecture des lignes était plafonnée à 1 000 par PostgREST et le quota
+  // cessait de bloquer au-delà (ELSATIA-FINANCE-AGGREGATES-DATA-CORRECTNESS-V1).
+  const [{ data: entreprise }, { data: usage }] = await Promise.all([
     supabase
       .from("entreprises")
       .select("abonnement_offre,option_ia_statut,option_ia_palier,ia_active,ia_politique_quota,ia_credits_achetes,ia_plafond_cout_mensuel_ht")
       .eq("id", entrepriseId)
       .maybeSingle(),
-    supabase
-      .from("journal_ia")
-      .select("operations_decomptees,cout_estime_ht")
-      .eq("entreprise_id", entrepriseId)
-      .eq("statut", "succes")
-      .is("annule_at", null)
-      .gte("created_at", debut.toISOString())
-      .lt("created_at", fin.toISOString()),
+    supabase.rpc("journal_ia_consommation", { p_entreprise_id: entrepriseId, p_debut: debut.toISOString(), p_fin: fin.toISOString() }),
   ]);
+  const consommation = (usage ?? null) as { operations?: number; cout_estime_ht?: number } | null;
   const code = String(entreprise?.abonnement_offre ?? "");
   const quotaBase = ["mini", "pro", "business", "entreprise", "sur_mesure"].includes(code)
     ? offreTarifaireParCle(code).operationsIAIncluses
     : quotaHistorique(entreprise?.option_ia_palier, entreprise?.option_ia_statut);
   const creditsAchetes = Math.max(0, Number(entreprise?.ia_credits_achetes ?? 0));
   const quota = quotaBase + creditsAchetes;
-  const utilise = (lignes ?? []).reduce(
-    (total, ligne) => total + Math.max(0, Number(ligne.operations_decomptees ?? 1)),
-    0,
-  );
+  const utilise = Math.max(0, Number(consommation?.operations ?? 0));
   const pourcentage = quota > 0 ? Math.min(100, Math.round((utilise / quota) * 100)) : 100;
   const seuilAlerte: ConsommationIAMensuelle["seuilAlerte"] =
     pourcentage >= 100 ? 100 : pourcentage >= 90 ? 90 : pourcentage >= 70 ? 70 : 0;
@@ -82,7 +76,7 @@ export async function consommationIAMensuelle(
     active: entreprise?.ia_active !== false,
     politique,
     creditsAchetes,
-    coutEstimeHT: (lignes ?? []).reduce((total, ligne) => total + Math.max(0, Number(ligne.cout_estime_ht ?? 0)), 0),
+    coutEstimeHT: Math.max(0, Number(consommation?.cout_estime_ht ?? 0)),
     plafondCoutMensuelHT,
     debut: debut.toISOString(),
     fin: fin.toISOString(),

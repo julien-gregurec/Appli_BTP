@@ -1,0 +1,6 @@
+# Rentabilité (hors périmètre de cette mission) — lectures de src/app/(app)/rentabilite/page.tsx rejouées sur PostgREST réel max_rows=1000, tenant f5000
+pointages  Content-Range: 0-999/4000
+factures  Content-Range: 0-999/5000
+depenses_fournisseurs  Content-Range: 0-999/5000
+mouvements_stock  Content-Range: 0-999/5000
+notes_frais  Content-Range: 0-999/5000

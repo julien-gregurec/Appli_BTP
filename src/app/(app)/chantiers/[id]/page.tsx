@@ -22,6 +22,7 @@ import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { BlocReservesChantier } from "@/components/BlocReservesChantier";
 import { lireEtatReserves } from "@/lib/reserves-gp";
 import { urlReservesPourUtilisateur } from "@/lib/multi-app-server";
+import { chargerDonneesChiffreesChantier, totauxChantier } from "@/lib/chantier-donnees";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -73,20 +74,19 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     .eq("chantier_id", id)
     .order("created_at");
 
-  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}, {data:sousTraitants}] = await Promise.all([
+  // Listes chiffrées (factures, heures, dépenses, notes de frais) lues en entier
+  // par la RPC chantier_donnees_chiffrees : PostgREST les plafonnait à 1 000.
+  const [{ data: devis }, chiffres, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesSansChantier}, {data:sousTraitants}] = await Promise.all([
     supabase.from("devis").select("id, numero, statut, montant_ttc").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("factures").select("id, numero, statut, montant_ttc, montant_paye").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("affectations").select("heures").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
-    peutVoirHeures?supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,tache,verification_statut,employe:employes(prenom,nom)").eq("chantier_id",id).eq("entreprise_id",ctx.entrepriseId).order("date",{ascending:false}):Promise.resolve({data:[]}),
+    chargerDonneesChiffreesChantier(supabase, ctx.entrepriseId, id, { heures: peutVoirHeures, achats: peutVoirAchats, notes: peutVoirNotesEquipe }),
     supabase.from("documents_chantier").select("id,nom,categorie,note,mime_type,audience,created_at").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at",{ascending:false}),
     supabase.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","chantier").eq("ressource_id",id).eq("actif",true).maybeSingle(),
     supabase.from("equipes_chantiers").select("id,role_chantier,date_debut,date_fin,note,employe:employes(id,prenom,nom,poste,statut)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_fin",{ascending:true}).order("role_chantier"),
     peutGerer?supabase.from("employes").select("id,prenom,nom,poste").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(sorti,suspendu)').order("nom"):Promise.resolve({data:[]}),
-    peutVoirAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,categorie,date_piece,statut,montant_ttc,montant_regle,justificatif_storage_path,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_piece",{ascending:false}):Promise.resolve({data:[]}),
     peutGererAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).is("chantier_id",null).neq("statut","annulee").order("date_piece",{ascending:false}).limit(100):Promise.resolve({data:[]}),
-    peutVoirNotesEquipe?supabase.from("notes_frais").select("id,reference,date_frais,fournisseur,categorie,statut,montant_ttc,employe:employes(prenom,nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_frais",{ascending:false}):Promise.resolve({data:[]}),
     peutVoirSousTraitants?supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,fournisseur:fournisseurs(id,nom,specialite)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("created_at",{ascending:false}):Promise.resolve({data:[]}),
   ]);
+  const { factures, facturesFournisseurs, notesFrais } = chiffres;
   // ELSATIA Réserves : la base décide si le bloc existe (abonnement, rôle Réserves,
   // chantier consultable) ; une erreur de lecture ne casse jamais la fiche chantier.
   const { data: etatReservesBrut } = await supabase.rpc("reserves_etat_chantier_gp", { p_chantier_gp_id: id });
@@ -96,17 +96,8 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
     : [];
   const totalDevisAccepte = (devis ?? []).filter((item) => item.statut === "accepte").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
-  const totalFacture = (factures ?? []).filter((item) => item.statut !== "annulee").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
-  const totalPaye = (factures ?? []).reduce((total, item) => total + Number(item.montant_paye ?? 0), 0);
-  const totalHeures = (affectations ?? []).reduce((total, item) => total + Number(item.heures ?? 0), 0);
-  const pointagesValides=(pointages??[]).filter(p=>p.verification_statut==="valide");const totalHeuresRealisees=pointagesValides.reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);const relation=<T,>(v:T|T[]|null)=>Array.isArray(v)?v[0]??null:v;
-  const totalFacturesFournisseurs=(facturesFournisseurs??[]).filter(item=>item.statut!=="annulee").reduce((total,item)=>total+Number(item.montant_ttc??0),0);
-  const totalRegleFournisseurs=(facturesFournisseurs??[]).reduce((total,item)=>total+Number(item.montant_regle??0),0);
-  const statutsNotesValidees = new Set(["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]);
-  const notesFraisValidees = (notesFrais ?? []).filter((note) => statutsNotesValidees.has(note.statut));
-  const notesFraisEnCours = (notesFrais ?? []).filter((note) => !statutsNotesValidees.has(note.statut) && !["refuse", "refusee"].includes(note.statut));
-  const totalNotesFraisValidees = notesFraisValidees.reduce((total, note) => total + Number(note.montant_ttc ?? 0), 0);
-  const totalNotesFraisEnCours = notesFraisEnCours.reduce((total, note) => total + Number(note.montant_ttc ?? 0), 0);
+  const { totalFacture, totalPaye, totalHeures, pointagesValides, totalHeuresRealisees, totalFacturesFournisseurs, totalRegleFournisseurs, totalNotesFraisValidees, totalNotesFraisEnCours } = totauxChantier(chiffres);
+  const relation=<T,>(v:T|T[]|null)=>Array.isArray(v)?v[0]??null:v;
   const totalDepensesValidees = totalFacturesFournisseurs + totalNotesFraisValidees;
   const budgetPrevisionnel = Number(chantier.budget_previsionnel ?? 0);
 
