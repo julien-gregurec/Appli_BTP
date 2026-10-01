@@ -7,6 +7,7 @@ import { euros } from "@/lib/devis";
 import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { STATUTS_VEHICULE } from "@/lib/flotte";
 import { lireCurseur, lirePageCurseur, lireSyntheseDepenses, type SyntheseDepenses } from "@/lib/fiches-agregats";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 const TAILLE_PAGE = 50;
 
@@ -18,15 +19,20 @@ export default async function VehiculePage({ params, searchParams }: { params: P
   // Coût du véhicule calculé en base (gp_depenses_synthese) : PostgREST
   // tronquait ses factures à 1 000 lignes sans erreur. Historiques paginés par
   // curseur (factures, relevés) ; affectations : 100 dernières, signalé.
+  // Factures du véhicule : seulement pour qui a accès aux achats (RLS de
+  // depenses_fournisseurs) — sinon la lecture ne renverrait rien après avoir
+  // évalué la policy de chaque facture du véhicule.
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutVoirAchats = permissions === null || permissions.includes("acces_achats");
   const curseurReleves = lireCurseur(messages.releves_apres), curseurDepenses = lireCurseur(messages.depenses_apres);
   const [pageReleves, { data: employes }, pageDepenses, { data: affectations }, { data: travaux }, { data: code }, synthese] = await Promise.all([
     lirePageCurseur(supabase.from("releves_kilometrage").select("*").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId), "date_releve", TAILLE_PAGE, curseurReleves),
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    lirePageCurseur(supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,statut,categorie,travaux_effectues,justificatif_storage_path,fournisseur:fournisseurs(nom),chantier:chantiers(id,nom)").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId), "date_piece", TAILLE_PAGE, curseurDepenses),
+    !peutVoirAchats ? Promise.resolve({ lignes: [], suivant: null }) : lirePageCurseur(supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,statut,categorie,travaux_effectues,justificatif_storage_path,fournisseur:fournisseurs(nom),chantier:chantiers(id,nom)").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId), "date_piece", TAILLE_PAGE, curseurDepenses),
     supabase.from("affectations_vehicules").select("id,date_debut,date_fin,note,employe:employes(prenom,nom)").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId).order("date_debut", { ascending: false }).limit(100),
     vehicule.employe_id ? supabase.from("pointages").select("id,date,tache,heures_normales,heures_supplementaires,chantier:chantiers(id,nom)").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", vehicule.employe_id).order("date", { ascending: false }).limit(12) : Promise.resolve({ data: [] }),
     supabase.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","vehicule").eq("ressource_id",id).eq("actif",true).maybeSingle(),
-    lireSyntheseDepenses(supabase, ctx.entrepriseId, { vehiculeId: id }).catch((err): SyntheseDepenses | null => { console.error("[flotte] coût indisponible", err instanceof Error ? err.message : err); return null; }),
+    !peutVoirAchats ? Promise.resolve({ nb: 0, nbActives: 0, totalHt: 0, totalTtc: 0, totalRegle: 0 } as SyntheseDepenses) : lireSyntheseDepenses(supabase, ctx.entrepriseId, { vehiculeId: id }).catch((err): SyntheseDepenses | null => { console.error("[flotte] coût indisponible", err instanceof Error ? err.message : err); return null; }),
   ]);
   const releves = pageReleves.lignes, depenses = pageDepenses.lignes;
   const lienPage = (cle: "releves_apres" | "depenses_apres", valeur: string | null) => { const q = new URLSearchParams(); const autre = cle === "releves_apres" ? "depenses_apres" : "releves_apres"; if (messages[autre]) q.set(autre, messages[autre]!); if (valeur) q.set(cle, valeur); const t = q.toString(); return `/flotte/${id}${t ? `?${t}` : ""}`; };

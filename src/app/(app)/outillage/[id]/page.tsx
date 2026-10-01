@@ -8,6 +8,7 @@ import { euros } from "@/lib/devis";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { lireCurseur, lirePageCurseur, lireSyntheseDepenses, type SyntheseDepenses } from "@/lib/fiches-agregats";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 const TAILLE_PAGE=50;
 
@@ -16,15 +17,17 @@ export default async function OutilPage({params,searchParams}:{params:Promise<{i
   const {id}=await params;const msg=await searchParams;const ctx=await getContexteEntreprise();const sb=await createClient();
   // Coût de l'outil calculé en base (gp_depenses_synthese) ; mouvements et
   // factures paginés par curseur (PostgREST les tronquait à 1 000 lignes).
+  // Factures de l'outil : seulement avec l'accès aux achats (RLS de depenses_fournisseurs).
+  const permissions=await permissionsUtilisateur(ctx);const peutVoirAchats=permissions===null||permissions.includes("acces_achats");
   const curseurMouvements=lireCurseur(msg.mouvements_apres),curseurDepenses=lireCurseur(msg.depenses_apres);
   const [{data:o},pageMouvements,{data:employes},{data:chantiers},pageDepenses,{data:code},synthese]=await Promise.all([
     sb.from("outils").select("*,employe:employes(prenom,nom),chantier:chantiers(nom)").eq("id",id).eq("entreprise_id",ctx.entrepriseId).maybeSingle(),
     lirePageCurseur(sb.from("mouvements_outillage").select("*,employe:employes(prenom,nom),chantier:chantiers(nom)").eq("outil_id",id).eq("entreprise_id",ctx.entrepriseId),"created_at",TAILLE_PAGE,curseurMouvements),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom"),
     sb.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom"),
-    lirePageCurseur(sb.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,statut,justificatif_storage_path,fournisseur:fournisseurs(nom)").eq("outil_id",id).eq("entreprise_id",ctx.entrepriseId),"date_piece",TAILLE_PAGE,curseurDepenses),
+    !peutVoirAchats?Promise.resolve({lignes:[],suivant:null}):lirePageCurseur(sb.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,statut,justificatif_storage_path,fournisseur:fournisseurs(nom)").eq("outil_id",id).eq("entreprise_id",ctx.entrepriseId),"date_piece",TAILLE_PAGE,curseurDepenses),
     sb.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","outil").eq("ressource_id",id).eq("actif",true).maybeSingle(),
-    lireSyntheseDepenses(sb,ctx.entrepriseId,{outilId:id}).catch((err):SyntheseDepenses|null=>{console.error("[outillage] coût indisponible",err instanceof Error?err.message:err);return null;}),
+    !peutVoirAchats?Promise.resolve({nb:0,nbActives:0,totalHt:0,totalTtc:0,totalRegle:0} as SyntheseDepenses):lireSyntheseDepenses(sb,ctx.entrepriseId,{outilId:id}).catch((err):SyntheseDepenses|null=>{console.error("[outillage] coût indisponible",err instanceof Error?err.message:err);return null;}),
   ]);
   const m=pageMouvements.lignes,depenses=pageDepenses.lignes;
   const lienPage=(cle:"mouvements_apres"|"depenses_apres",valeur:string|null)=>{const q=new URLSearchParams();const autre=cle==="mouvements_apres"?"depenses_apres":"mouvements_apres";if(msg[autre])q.set(autre,msg[autre]!);if(valeur)q.set(cle,valeur);const t=q.toString();return `/outillage/${id}${t?`?${t}`:""}`;};

@@ -19,17 +19,18 @@ export default async function SousTraitantDetailPage({params,searchParams}:{para
   const peutGerer=permissions===null||permissions.includes("gerer_sous_traitants");
   const peutGererRib=!ctx.accesSupportPlateforme&&(permissions===null||permissions.includes("gerer_coordonnees_bancaires"));
   const peutVoirFactures=permissions===null||permissions.includes("acces_achats");
+  const peutVoirMissions=permissions===null||permissions.includes("acces_sous_traitants");
   // Totaux en base (gp_sous_traitant_missions_synthese, gp_depenses_synthese) :
   // PostgREST tronquait missions et factures à 1 000 lignes sans erreur.
   // Listes paginées par curseur ; en cas d'erreur, « indisponible ».
   const curseurMissions=lireCurseur(messages.missions_apres),curseurFactures=lireCurseur(messages.factures_apres);
   const [{data:tiers},pageMissions,{data:chantiers},pageFactures,{data:rib},syntheseMissions,syntheseFactures]=await Promise.all([
     supabase.from("fournisseurs").select("*").eq("id",id).eq("entreprise_id",ctx.entrepriseId).eq("type_tiers","sous_traitant").maybeSingle(),
-    lirePageCurseur(supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,notes,created_at,chantier:chantiers(id,nom,reference_interne)").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id),"created_at",TAILLE_PAGE,curseurMissions),
+    !peutVoirMissions?Promise.resolve({lignes:[],suivant:null}):lirePageCurseur(supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,notes,created_at,chantier:chantiers(id,nom,reference_interne)").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id),"created_at",TAILLE_PAGE,curseurMissions),
     peutGerer?supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"):Promise.resolve({data:[]}),
     peutVoirFactures?lirePageCurseur(supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,date_echeance,montant_ht,montant_ttc,montant_regle,statut,chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id),"date_piece",TAILLE_PAGE,curseurFactures):Promise.resolve({lignes:[],suivant:null}),
     peutGererRib?supabase.from("coordonnees_bancaires").select("titulaire,iban_quatre_derniers,verification_statut,verification_message").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id).eq("actif",true).maybeSingle():Promise.resolve({data:null}),
-    lireSyntheseMissionsSousTraitant(supabase,ctx.entrepriseId,id).catch((err):SyntheseMissions|null=>{console.error("[sous-traitant] missions indisponibles",err instanceof Error?err.message:err);return null;}),
+    !peutVoirMissions?Promise.resolve({nb:0,nbActives:0,previsionnelHt:0} as SyntheseMissions):lireSyntheseMissionsSousTraitant(supabase,ctx.entrepriseId,id).catch((err):SyntheseMissions|null=>{console.error("[sous-traitant] missions indisponibles",err instanceof Error?err.message:err);return null;}),
     peutVoirFactures?lireSyntheseDepenses(supabase,ctx.entrepriseId,{fournisseurId:id}).catch((err):SyntheseDepenses|null=>{console.error("[sous-traitant] factures indisponibles",err instanceof Error?err.message:err);return null;}):Promise.resolve(null),
   ]);
   if(!tiers)notFound();
