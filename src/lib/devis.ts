@@ -33,7 +33,8 @@ export const LIGNE_TYPES = [
   { cle: "forfait", libelle: "Forfait" },
 ] as const;
 
-export const UNITES = ["u", "m²", "ml", "h", "forfait", "kg", "L"] as const;
+// « m³ » : volumes transmis par Tools Relevé & Métré (Lot 11, import Tools → GP).
+export const UNITES = ["u", "m²", "ml", "m³", "h", "forfait", "kg", "L"] as const;
 
 export const TAUX_TVA = [20, 10, 5.5, 0] as const;
 
