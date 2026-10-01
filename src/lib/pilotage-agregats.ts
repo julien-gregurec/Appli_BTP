@@ -59,3 +59,29 @@ export async function lireAlertesStock(supabase: SupabaseClient, entrepriseId: s
   const d = await rpc<{ nb: number; nb_ruptures: number; articles: ArticleAlerte[] }>(supabase, "gp_alertes_stock", { p_entreprise_id: entrepriseId, p_limite: limite });
   return { nb: nombre(d.nb), nbRuptures: nombre(d.nb_ruptures), articles: d.articles };
 }
+
+// Paie : page de dossiers et contenu d'export servis en base (visibilité
+// évaluée une fois, jsonb non plafonné).
+export async function lirePageDossiersPaie<T>(supabase: SupabaseClient, entrepriseId: string, periodeId: string, filtres: { statut?: string; recherche?: string; dossierId?: string | null }, limite: number, decalage: number): Promise<{ total: number; lignes: T[] }> {
+  const d = await rpc<{ total: number; lignes: T[] }>(supabase, "paie_periode_dossiers_page", {
+    p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_statut: filtres.statut || null,
+    p_recherche: filtres.recherche?.replace(/[,()]/g, "") || null, p_dossier_id: filtres.dossierId ?? null, p_limite: limite, p_decalage: decalage,
+  });
+  return { total: nombre(d.total), lignes: d.lignes };
+}
+
+export async function lireContenuExportPaie<D, P>(supabase: SupabaseClient, entrepriseId: string, periodeId: string, avecPieces: boolean): Promise<{ dossiers: D[]; pieces: P[] }> {
+  return rpc<{ dossiers: D[]; pieces: P[] }>(supabase, "paie_export_contenu", { p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_avec_pieces: avecPieces });
+}
+
+export type NoteFraisListe = { id: string; reference: string; date_frais: string | null; montant_ttc: number; devise: string | null; categorie: string | null; fournisseur: string | null; statut: string; statut_export: string | null; verrouille_at: string | null; lieu_hors_chantier: string | null; employe: { id: string; prenom: string; nom: string } | null; chantier: { nom: string } | null };
+
+/** Page de /notes-frais (curseur date_frais desc, id desc), visibilité RLS évaluée une fois. */
+export async function lirePageNotesFrais(supabase: SupabaseClient, entrepriseId: string, filtres: { statut?: string; categorie?: string; chantierId?: string; employeId?: string }, taille: number, curseur: { date: string | null; id: string } | null): Promise<{ lignes: NoteFraisListe[]; suivant: string | null }> {
+  const d = await rpc<{ lignes: NoteFraisListe[]; suite: boolean }>(supabase, "notes_frais_page", {
+    p_entreprise_id: entrepriseId, p_statut: filtres.statut || null, p_categorie: filtres.categorie || null, p_chantier_id: filtres.chantierId || null,
+    p_employe_id: filtres.employeId || null, p_limite: taille, p_avant_date: curseur?.date ?? null, p_avant_id: curseur?.id ?? null,
+  });
+  const derniere = d.lignes[d.lignes.length - 1];
+  return { lignes: d.lignes, suivant: d.suite && derniere ? `${derniere.date_frais ?? "null"}_${derniere.id}` : null };
+}

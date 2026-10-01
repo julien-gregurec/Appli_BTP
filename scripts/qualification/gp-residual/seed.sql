@@ -7,6 +7,8 @@
 --   fiche outil        : V factures, V mouvements
 --   fiche chantier     : V documents (chantier 1), plus les V factures
 --                        fournisseurs ci-dessus rattachées au chantier 1
+-- Partie 2 (plus bas) : paie, notes de frais, CRM, tableau de bord, DOE,
+-- messagerie, interventions, appels d'offres, commandes, droits par poste.
 -- Utilisateurs : administrateur (toutes permissions) r<V>…a1, ouvrier sans
 -- droit finance r<V>…a2.
 -- Chargement superutilisateur, triggers métier neutralisés
@@ -122,6 +124,106 @@ begin
       select pg_temp.u(pfx || 'e4', i), e, ch1, 'Photo ' || i || '.jpg', 'photo_pendant', 'companies/' || e || '/chantiers/' || ch1 || '/' || i || '.jpg',
              'image/jpeg', 1000 + i, 'tous_affectes', timestamptz '2025-01-01' + i * interval '1 minute'
       from generate_series(1, v) i;
+  end loop;
+end $$;
+
+-- Partie 2 : paie, notes de frais, CRM, tableau de bord, DOE, messagerie,
+-- interventions, appels d'offres, commandes, droits par poste.
+do $$
+declare
+  v int; e uuid; pfx text; adm uuid; ouv uuid; poste_adm uuid; cli uuid; frn uuid; ch1 uuid; per uuid; conv uuid;
+  volumes int[] := array[500, 1000, 1462, 5000, 20000, 300];
+  prefixes text[] := array['a0500', 'a1000', 'a1462', 'a5000', 'a2000', 'ae000'];
+begin
+  for k in 1 .. array_length(volumes, 1) loop
+    v := volumes[k]; pfx := prefixes[k];
+    e := pg_temp.u(pfx || 'e', 1); adm := pg_temp.u(pfx || 'a', 1); ouv := pg_temp.u(pfx || 'a', 2);
+    poste_adm := pg_temp.u(pfx || 'b', 1); cli := pg_temp.u(pfx || 'c', 1); frn := pg_temp.u(pfx || 'd', 2);
+    ch1 := pg_temp.u(pfx || 'ca', 1); per := pg_temp.u(pfx || 'e5', 1); conv := pg_temp.u(pfx || 'e6', 1);
+
+    -- V salariés ; l'administrateur et l'ouvrier ont chacun leur fiche.
+    insert into public.employes (id, entreprise_id, prenom, nom, numero_inscription, identifiant_interne, reference_interne, statut, utilisateur_id)
+      select pg_temp.u(pfx || '7e', i), e, 'Prénom' || i, 'Salarié' || lpad(i::text, 6, '0'), 'INS-' || pfx || '-' || i, pfx || '-' || i, 'EMP-' || i, 'actif',
+             case i when 1 then adm when 2 then ouv else null end
+      from generate_series(1, v) i;
+
+    -- Statuts et échéances de chantiers variés (tableau de bord).
+    update public.chantiers set
+      statut = (array['en_cours', 'accepte', 'termine', 'a_preparer', 'en_pause', 'archive', 'annule'])[1 + (('x' || substr(md5(id::text), 1, 8))::bit(32)::int & 2147483647) % 7],
+      date_fin_prevue = date '2026-01-01' + ((('x' || substr(md5(id::text), 9, 8))::bit(32)::int & 2147483647) % 730),
+      updated_at = created_at
+    where entreprise_id = e and id <> ch1;
+
+    -- Paie : une période de V dossiers (un par salarié), V anomalies, V pièces.
+    insert into public.periodes_paie (id, entreprise_id, mois, date_debut, date_fin, statut, cree_par)
+      values (per, e, date '2026-03-01', date '2026-03-01', date '2026-03-31', 'saisie_en_cours', adm);
+    insert into public.dossiers_paie_salaries (id, entreprise_id, periode_id, employe_id, statut, total_paniers, total_trajets, total_transports,
+                                               total_grands_deplacements, total_primes, total_acomptes, total_notes_frais)
+      select pg_temp.u(pfx || 'e7', i), e, per, pg_temp.u(pfx || '7e', i),
+             case when i % 3 = 0 then 'a_controler' else 'saisie_en_cours' end,
+             round((i % 23) * 10.5, 2), round((i % 7) * 3.25, 2), round((i % 5) * 7.1, 2), round((i % 11) * 31.3, 2),
+             round((i % 13) * 50.05, 2), round((i % 4) * 100, 2), round((i % 9) * 12.34, 2)
+      from generate_series(1, v) i;
+    insert into public.anomalies_paie (id, entreprise_id, periode_id, dossier_id, niveau, code, description)
+      select pg_temp.u(pfx || 'e8', i), e, per, pg_temp.u(pfx || 'e7', i), (array['information', 'attention', 'bloquant'])[1 + i % 3], 'CTRL', 'Contrôle ' || i
+      from generate_series(1, v) i;
+    insert into public.pieces_jointes_paie (id, entreprise_id, employe_id, dossier_id, type_document, nom_original, storage_path, mime_type, taille_octets, importe_par)
+      select pg_temp.u(pfx || 'e9', i), e, pg_temp.u(pfx || '7e', i), pg_temp.u(pfx || 'e7', i), 'justificatif', 'piece-' || i || '.pdf',
+             'companies/' || e || '/paie/' || i || '.pdf', 'application/pdf', 100 + i, adm
+      from generate_series(1, v) i;
+
+    -- Notes de frais : V sur le chantier 1, 60 salariés, statuts variés.
+    insert into public.notes_frais (id, entreprise_id, employe_id, reference, date_frais, montant_ttc, categorie, fournisseur, statut, chantier_id, cree_par_utilisateur_id)
+      select pg_temp.u(pfx || 'ea', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), 'NF-' || lpad(i::text, 6, '0'), date '2025-01-01' + (i % 500),
+             round(((i * 17) % 300) + 4.99, 2), 'repas', 'Restaurant ' || (i % 40),
+             (array['brouillon', 'soumis', 'en_verification', 'correction_demandee', 'valide', 'refuse', 'exporte_comptabilite', 'verrouille'])[1 + i % 8],
+             ch1, adm
+      from generate_series(1, v) i;
+
+    -- CRM : V communications dont 1 sur 3 avec rappel ouvert.
+    insert into public.appels_contacts (id, entreprise_id, client_id, type, sens, objet, a_rappeler_at, termine, created_at)
+      select pg_temp.u(pfx || 'eb', i), e, cli, 'appel', 'sortant', 'Appel ' || i,
+             case when i % 3 = 0 then now() + (i % 30) * interval '1 day' end, i % 6 = 0, timestamptz '2025-01-01' + i * interval '1 minute'
+      from generate_series(1, v) i;
+
+    -- Stock / DOE : V articles (1 sur 7 sous le seuil), V sorties vers le
+    -- chantier 1 (une par article), une fiche technique par article pair.
+    insert into public.articles_stock (id, entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, actif)
+      select pg_temp.u(pfx || 'ec', i), e, 'ART-' || lpad(i::text, 6, '0'), 'Article ' || lpad(i::text, 6, '0'), 'u',
+             case when i % 7 = 0 then i % 3 else 10 + i % 90 end, 5, true
+      from generate_series(1, v) i;
+    insert into public.mouvements_stock (id, entreprise_id, article_id, chantier_id, type, quantite, date)
+      select pg_temp.u(pfx || 'ed', i), e, pg_temp.u(pfx || 'ec', i), ch1, 'sortie', 1 + i % 4, date '2025-01-01' + (i % 500)
+      from generate_series(1, v) i;
+    insert into public.fiches_techniques_articles (id, entreprise_id, article_id, titre, type_document, storage_path, nom_original, mime_type, taille_octets, origine)
+      select pg_temp.u(pfx || 'ee', i), e, pg_temp.u(pfx || 'ec', i), 'Fiche ' || i, 'fiche_technique', 'companies/' || e || '/fiches/' || i || '.pdf',
+             'fiche-' || i || '.pdf', 'application/pdf', 100 + i, 'import_manuel'
+      from generate_series(1, v) i where i % 2 = 0;
+
+    -- Messagerie : une conversation de chantier de V messages.
+    insert into public.conversations_internes (id, entreprise_id, type, titre, chantier_id, cree_par_employe_id, derniere_activite_at)
+      values (conv, e, 'chantier', 'Chantier 1', ch1, pg_temp.u(pfx || '7e', 1), now());
+    insert into public.messages_internes (id, entreprise_id, conversation_id, auteur_employe_id, contenu, created_at)
+      select pg_temp.u(pfx || 'ef', i), e, conv, pg_temp.u(pfx || '7e', 1 + i % 2), 'Message ' || i, timestamptz '2025-01-01' + i * interval '1 minute'
+      from generate_series(1, v) i;
+
+    -- Interventions, appels d'offres, commandes : V chacun, statuts variés.
+    insert into public.interventions (id, entreprise_id, numero, client_id, statut, objet, date_prevue)
+      select pg_temp.u(pfx || 'f1', i), e, 'INT-' || lpad(i::text, 6, '0'), cli,
+             (array['a_planifier', 'planifiee', 'en_cours', 'terminee', 'facturee', 'annulee'])[1 + i % 6], 'Intervention ' || i, date '2024-01-01' + (i % 1200)
+      from generate_series(1, v) i;
+    insert into public.appels_offres (id, entreprise_id, reference, titre, statut, date_limite)
+      select pg_temp.u(pfx || 'f2', i), e, 'AO-' || lpad(i::text, 6, '0'), 'Appel ' || i,
+             (array['a_etudier', 'en_preparation', 'depose', 'gagne', 'perdu', 'abandonne'])[1 + i % 6], date '2024-01-01' + (i % 1200)
+      from generate_series(1, v) i;
+    insert into public.commandes_fournisseurs (id, entreprise_id, numero, fournisseur_id, statut, date_commande, montant_ht, montant_tva, montant_ttc)
+      select pg_temp.u(pfx || 'f3', i), e, 'CMD-' || lpad(i::text, 6, '0'), frn, 'brouillon', date '2024-01-01' + (i % 1200), 100, 20, 120
+      from generate_series(1, v) i;
+
+    -- Droits : 12 postes supplémentaires à 100 droits chacun (> 1 000 lignes).
+    insert into public.postes (id, entreprise_id, nom) select pg_temp.u(pfx || 'f4', i), e, 'Poste ' || i from generate_series(1, 12) i;
+    insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+      select e, pg_temp.u(pfx || 'f4', i), d.cle, true from generate_series(1, 12) i cross join public.permissions_disponibles d;
   end loop;
 end $$;
 

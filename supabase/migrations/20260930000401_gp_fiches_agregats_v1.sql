@@ -32,18 +32,19 @@
 -- droit voit des totaux nuls, exactement comme la RLS lui montrait 0 ligne.
 
 -- Index des listes bornées (pagination par curseur : coût par page constant,
--- quelle que soit sa profondeur).
+-- quelle que soit sa profondeur). Ordre `desc` natif (NULL en tête), celui des
+-- parcours arrière d'index et de src/lib/fiches-agregats.ts (lirePageCurseur).
 create index if not exists chantiers_client_created_idx on public.chantiers (client_id, created_at desc, id desc);
 create index if not exists factures_client_created_idx on public.factures (client_id, created_at desc, id desc);
 create index if not exists devis_client_created_idx on public.devis (client_id, created_at desc, id desc);
-create index if not exists depenses_fournisseurs_fournisseur_date_idx on public.depenses_fournisseurs (fournisseur_id, date_piece desc nulls last, id desc);
-create index if not exists depenses_fournisseurs_vehicule_date_idx on public.depenses_fournisseurs (vehicule_id, date_piece desc nulls last, id desc) where vehicule_id is not null;
-create index if not exists depenses_fournisseurs_outil_date_idx on public.depenses_fournisseurs (outil_id, date_piece desc nulls last, id desc) where outil_id is not null;
-create index if not exists depenses_fournisseurs_chantier_date_idx on public.depenses_fournisseurs (chantier_id, date_piece desc nulls last, id desc) where chantier_id is not null;
-create index if not exists sous_traitants_chantiers_fournisseur_created_idx on public.sous_traitants_chantiers (fournisseur_id, created_at desc nulls last, id desc);
-create index if not exists releves_kilometrage_vehicule_curseur_idx on public.releves_kilometrage (vehicule_id, date_releve desc nulls last, id desc);
-create index if not exists mouvements_outillage_outil_curseur_idx on public.mouvements_outillage (outil_id, created_at desc nulls last, id desc);
-create index if not exists documents_chantier_chantier_curseur_idx on public.documents_chantier (chantier_id, created_at desc nulls last, id desc);
+create index if not exists depenses_fournisseurs_fournisseur_date_idx on public.depenses_fournisseurs (fournisseur_id, date_piece desc, id desc);
+create index if not exists depenses_fournisseurs_vehicule_date_idx on public.depenses_fournisseurs (vehicule_id, date_piece desc, id desc) where vehicule_id is not null;
+create index if not exists depenses_fournisseurs_outil_date_idx on public.depenses_fournisseurs (outil_id, date_piece desc, id desc) where outil_id is not null;
+create index if not exists depenses_fournisseurs_chantier_date_idx on public.depenses_fournisseurs (chantier_id, date_piece desc, id desc) where chantier_id is not null;
+create index if not exists sous_traitants_chantiers_fournisseur_created_idx on public.sous_traitants_chantiers (fournisseur_id, created_at desc, id desc);
+create index if not exists releves_kilometrage_vehicule_curseur_idx on public.releves_kilometrage (vehicule_id, date_releve desc, id desc);
+create index if not exists mouvements_outillage_outil_curseur_idx on public.mouvements_outillage (outil_id, created_at desc, id desc);
+create index if not exists documents_chantier_chantier_curseur_idx on public.documents_chantier (chantier_id, created_at desc, id desc);
 
 -- Garde commune : appelant authentifié et membre actif de l'entreprise.
 create or replace function public.gp_exiger_membre(p_entreprise_id uuid)
@@ -190,7 +191,7 @@ begin
 
   select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'reference_interne', c.reference_interne, 'nom', c.nom,
                                                 'statut', c.statut, 'ville', c.ville, 'created_at', c.created_at)
-                            order by c.created_at desc nulls last, c.id desc), '[]'::jsonb)
+                            order by c.created_at desc, c.id desc), '[]'::jsonb)
     into v_lignes
   from (
     select c.*
@@ -198,9 +199,9 @@ begin
     where c.entreprise_id = p_entreprise_id and c.client_id = p_client_id
       and (v_tous or c.id = any(v_ids))
       and (p_avant_id is null
-           or (p_avant_created_at is not null and (c.created_at < p_avant_created_at or (c.created_at = p_avant_created_at and c.id < p_avant_id) or c.created_at is null))
-           or (p_avant_created_at is null and c.created_at is null and c.id < p_avant_id))
-    order by c.created_at desc nulls last, c.id desc
+           or (p_avant_created_at is not null and (c.created_at < p_avant_created_at or (c.created_at = p_avant_created_at and c.id < p_avant_id)))
+           or (p_avant_created_at is null and ((c.created_at is null and c.id < p_avant_id) or c.created_at is not null)))
+    order by c.created_at desc, c.id desc
     limit v_limite + 1
   ) c;
 
@@ -301,7 +302,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object('id', d.id, 'nom', d.nom, 'categorie', d.categorie, 'storage_path', d.storage_path,
                                                 'mime_type', d.mime_type, 'taille_octets', d.taille_octets, 'note', d.note,
                                                 'audience', d.audience, 'created_at', d.created_at)
-                            order by d.created_at desc nulls last, d.id desc), '[]'::jsonb)
+                            order by d.created_at desc, d.id desc), '[]'::jsonb)
     into v_lignes
   from (
     select d.*
@@ -309,9 +310,9 @@ begin
     where d.entreprise_id = p_entreprise_id and d.chantier_id = p_chantier_id
       and coalesce(d.audience, '__null__') = any(v_audiences)
       and (p_avant_id is null
-           or (p_avant_created_at is not null and (d.created_at < p_avant_created_at or (d.created_at = p_avant_created_at and d.id < p_avant_id) or d.created_at is null))
-           or (p_avant_created_at is null and d.created_at is null and d.id < p_avant_id))
-    order by d.created_at desc nulls last, d.id desc
+           or (p_avant_created_at is not null and (d.created_at < p_avant_created_at or (d.created_at = p_avant_created_at and d.id < p_avant_id)))
+           or (p_avant_created_at is null and ((d.created_at is null and d.id < p_avant_id) or d.created_at is not null)))
+    order by d.created_at desc, d.id desc
     limit v_limite + 1
   ) d;
 
@@ -376,10 +377,10 @@ begin
                    'id', x.id, 'numero_piece', x.numero_piece, 'categorie', x.categorie, 'date_piece', x.date_piece, 'statut', x.statut,
                    'montant_ttc', x.montant_ttc, 'montant_regle', x.montant_regle, 'justificatif_storage_path', x.justificatif_storage_path,
                    'fournisseur', case when fo.id is not null then jsonb_build_object('nom', fo.nom) end)
-                 order by x.date_piece desc nulls last, x.id desc) from (
+                 order by x.date_piece desc, x.id desc) from (
                  select d2.* from public.depenses_fournisseurs d2
                  where d2.entreprise_id = p_entreprise_id and d2.chantier_id = p_chantier_id
-                 order by d2.date_piece desc nulls last, d2.id desc limit v_limite) x
+                 order by d2.date_piece desc, d2.id desc limit v_limite) x
                  left join public.fournisseurs fo on fo.id = x.fournisseur_id and fo.entreprise_id = x.entreprise_id), '[]'::jsonb))
       into v_depenses
     from public.depenses_fournisseurs d
@@ -387,10 +388,11 @@ begin
   end if;
 
   if p_notes then
+    -- est_employe_du_compte exige utilisateur_id = auth.uid() : pré-filtre exact.
     select coalesce(array_agg(e.id) filter (where public.est_employe_du_compte(p_entreprise_id, e.id)), '{}')
       into v_emp_compte
     from public.employes e
-    where e.entreprise_id = p_entreprise_id;
+    where e.entreprise_id = p_entreprise_id and e.utilisateur_id = auth.uid();
     v_nf_gestion := public.a_permission(p_entreprise_id, 'verifier_notes_frais')
                  or public.a_permission(p_entreprise_id, 'gerer_notes_frais')
                  or public.a_permission(p_entreprise_id, 'comptabiliser_notes_frais')
@@ -415,8 +417,8 @@ begin
                    'id', x.id, 'reference', x.reference, 'date_frais', x.date_frais, 'fournisseur', x.fournisseur, 'categorie', x.categorie,
                    'statut', x.statut, 'montant_ttc', x.montant_ttc,
                    'employe', case when em.id is not null then jsonb_build_object('prenom', em.prenom, 'nom', em.nom) end)
-                 order by x.date_frais desc nulls last, x.id desc) from (
-                 select * from visibles order by date_frais desc nulls last, id desc limit v_limite) x
+                 order by x.date_frais desc, x.id desc) from (
+                 select * from visibles order by date_frais desc, id desc limit v_limite) x
                  left join public.employes em on em.id = x.employe_id and em.entreprise_id = x.entreprise_id), '[]'::jsonb))
       into v_notes;
   end if;
@@ -509,3 +511,17 @@ $$;
 
 revoke all on function public.gp_doe_contenu(uuid, uuid) from public, anon;
 grant execute on function public.gp_doe_contenu(uuid, uuid) to authenticated;
+
+-- 8. Index manquants des autres listes paginées ou bornées : sans eux, le tri
+--    se faisait sur toutes les lignes, RLS évaluée sur chacune (mesuré à 20 000
+--    lignes : notes de frais 70 s, messages 53 s, commandes 35 s, interventions
+--    17 s avant la première page).
+create index if not exists notes_frais_entreprise_date_curseur_idx on public.notes_frais (entreprise_id, date_frais desc, id desc);
+create index if not exists messages_internes_conversation_curseur_idx on public.messages_internes (conversation_id, created_at desc, id desc);
+create index if not exists interventions_entreprise_date_curseur_idx on public.interventions (entreprise_id, date_prevue desc, id desc);
+create index if not exists commandes_fournisseurs_entreprise_date_curseur_idx on public.commandes_fournisseurs (entreprise_id, date_commande desc, id desc);
+create index if not exists appels_offres_entreprise_date_curseur_idx on public.appels_offres (entreprise_id, date_limite desc, id desc);
+create index if not exists situations_travaux_entreprise_curseur_idx on public.situations_travaux (entreprise_id, created_at desc, id desc);
+create index if not exists contrats_entretien_entreprise_created_idx on public.contrats_entretien (entreprise_id, created_at desc, id);
+create index if not exists bons_livraison_entreprise_date_idx on public.bons_livraison (entreprise_id, date_livraison desc, id);
+create index if not exists pieces_jointes_messages_chantier_curseur_idx on public.pieces_jointes_messages (chantier_id, created_at desc, id desc) where chantier_id is not null;

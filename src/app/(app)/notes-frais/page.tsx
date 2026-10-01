@@ -9,8 +9,8 @@ import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { Lien as Link } from "@/components/Lien";
 import { LIEUX_HORS_CHANTIER, libelleAffectationDepense } from "@/lib/expenses/affectation";
-import { lireSyntheseNotesFraisParEmploye, type GroupeNotesFrais } from "@/lib/pilotage-agregats";
-import { lireCurseur, lirePageCurseur } from "@/lib/fiches-agregats";
+import { lirePageNotesFrais, lireSyntheseNotesFraisParEmploye, type GroupeNotesFrais } from "@/lib/pilotage-agregats";
+import { lireCurseur } from "@/lib/fiches-agregats";
 
 const TAILLE_PAGE = 300;
 
@@ -33,20 +33,15 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
     supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     supabase.from("grands_deplacements").select("id,destination,date_debut,date_fin").eq("entreprise_id", ctx.entrepriseId).in("statut", ["brouillon","soumis","valide"]).order("date_debut", { ascending: false }).limit(100),
   ]);
-  // Liste paginée par curseur (300 par page) ; groupes de validation par
-  // salarié calculés en base sur TOUTES les notes visibles et filtrées
-  // (notes_frais_synthese_employes) : ils ne portaient que sur les 300 notes
-  // les plus récentes de l'entreprise, et une note en attente plus ancienne
-  // disparaissait de la validation.
-  let requete = supabase.from("notes_frais").select("id,reference,date_frais,montant_ttc,devise,categorie,fournisseur,statut,statut_export,verrouille_at,lieu_hors_chantier,employe:employes(id,prenom,nom),chantier:chantiers!notes_frais_chantier_entreprise_fkey(nom)")
-    .eq("entreprise_id", ctx.entrepriseId);
-  if (filtres.statut) requete = requete.eq("statut", filtres.statut);
-  if (filtres.categorie) requete = requete.eq("categorie", filtres.categorie);
-  if (filtres.chantier) requete = requete.eq("chantier_id", filtres.chantier);
-  if (filtres.employe && peutGererEquipe) requete = requete.eq("employe_id", filtres.employe);
+  // Liste paginée par curseur (300 par page, notes_frais_page) ; groupes de
+  // validation par salarié calculés en base sur TOUTES les notes visibles et
+  // filtrées (notes_frais_synthese_employes) : ils ne portaient que sur les 300
+  // notes les plus récentes de l'entreprise, et une note en attente plus
+  // ancienne disparaissait de la validation. Visibilité RLS évaluée une fois.
   const curseur = lireCurseur(filtres.apres);
+  const filtresListe = { statut: filtres.statut, categorie: filtres.categorie, chantierId: filtres.chantier, employeId: peutGererEquipe ? filtres.employe : undefined };
   const [page, syntheses] = await Promise.all([
-    lirePageCurseur(requete, "date_frais", TAILLE_PAGE, curseur),
+    lirePageNotesFrais(supabase, ctx.entrepriseId, filtresListe, TAILLE_PAGE, curseur),
     peutGererEquipe
       ? lireSyntheseNotesFraisParEmploye(supabase, ctx.entrepriseId, { statut: filtres.statut, categorie: filtres.categorie, chantierId: filtres.chantier, employeId: filtres.employe }).catch((err): GroupeNotesFrais[] | null => { console.error("[notes-frais] synthèse indisponible", err instanceof Error ? err.message : err); return null; })
       : Promise.resolve([] as GroupeNotesFrais[]),

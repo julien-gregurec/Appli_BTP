@@ -49,9 +49,10 @@ export async function lireSyntheseMissionsSousTraitant(supabase: SupabaseClient,
 }
 
 // ---------------------------------------------------------------------------
-// Pagination par curseur (date décroissante, puis id décroissant). Le coût
-// d'une page est constant quelle que soit sa profondeur, contrairement à un
-// `offset` qui fait évaluer la RLS de toutes les lignes sautées.
+// Pagination par curseur (date décroissante — NULL en tête, ordre natif de
+// PostgreSQL pour DESC et des parcours arrière d'index —, puis id décroissant).
+// Le coût d'une page est constant quelle que soit sa profondeur, contrairement
+// à un `offset` qui fait évaluer la RLS de toutes les lignes sautées.
 
 export type Curseur = { date: string | null; id: string };
 
@@ -70,12 +71,12 @@ export function ecrireCurseur(date: string | null | undefined, id: string): stri
   return `${date ?? "null"}_${id}`;
 }
 
-/** Filtre PostgREST « strictement après le curseur » pour un ordre `colonne desc nullslast, id desc`. */
+/** Filtre PostgREST « strictement après le curseur » pour un ordre `colonne desc (NULL en tête), id desc`. */
 export function filtreApresCurseur(colonne: string, curseur: Curseur): string {
   const date = `"${curseur.date}"`;
   return curseur.date === null
-    ? `and(${colonne}.is.null,id.lt.${curseur.id})`
-    : `${colonne}.lt.${date},and(${colonne}.eq.${date},id.lt.${curseur.id}),${colonne}.is.null`;
+    ? `and(${colonne}.is.null,id.lt.${curseur.id}),${colonne}.not.is.null`
+    : `${colonne}.lt.${date},and(${colonne}.eq.${date},id.lt.${curseur.id})`;
 }
 
 type RequeteOrdonnable<T> = {
@@ -85,7 +86,7 @@ type RequeteOrdonnable<T> = {
 };
 
 /**
- * Lit une page de `taille` lignes après `curseur` (ordre `colonne desc nullslast, id desc`).
+ * Lit une page de `taille` lignes après `curseur` (ordre `colonne desc` NULL en tête, `id desc`).
  * `suivant` est le curseur de la page suivante, ou null s'il n'y en a pas.
  */
 export async function lirePageCurseur<T extends { id: string }>(
@@ -96,7 +97,7 @@ export async function lirePageCurseur<T extends { id: string }>(
 ): Promise<{ lignes: T[]; suivant: string | null }> {
   let q = requete;
   if (curseur) q = q.or(filtreApresCurseur(colonne, curseur));
-  const { data, error } = await q.order(colonne, { ascending: false, nullsFirst: false }).order("id", { ascending: false }).limit(taille + 1);
+  const { data, error } = await q.order(colonne, { ascending: false, nullsFirst: true }).order("id", { ascending: false }).limit(taille + 1);
   if (error) throw new Error(`Liste indisponible : ${error.message}`);
   const lignes = (data ?? []).slice(0, taille);
   const derniere = lignes[lignes.length - 1];

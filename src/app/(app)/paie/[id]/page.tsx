@@ -6,7 +6,9 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { formaterMois, statutPeriodePaie, STATUTS_DOSSIER_PAIE } from "@/lib/paie";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
-import { lireSynthesePaie, type SynthesePaie } from "@/lib/pilotage-agregats";
+import { lirePageDossiersPaie, lireSynthesePaie, type SynthesePaie } from "@/lib/pilotage-agregats";
+
+type DossierPage={id:string;employe_id:string;statut:string;heures_normales:number;heures_sup_25:number;heures_sup_50:number;heures_absence:number;jours_conges:number;total_paniers:number;total_trajets:number;total_transports:number;total_grands_deplacements:number;total_kilometres:number;total_primes:number;total_acomptes:number;total_notes_frais:number;employe:{prenom:string;nom:string;reference_interne:string|null;poste:string|null;statut:string}|null};
 
 const PAGE=25;
 const LIMITE_ANOMALIES=500;
@@ -30,15 +32,16 @@ export default async function PeriodePaiePage({params,searchParams}:{params:Prom
   monDossierId=monDossier?.id??null;
  }
  const anomaliesVisibles=peutVoirTousDossiers?(anomalies??[]):(anomalies??[]).filter(a=>a.dossier_id===monDossierId);
- const page=Math.max(1,Number(sp.page)||1);let requete=supabase.from("dossiers_paie_salaries").select("id,employe_id,statut,heures_normales,heures_sup_25,heures_sup_50,heures_absence,jours_conges,total_paniers,total_trajets,total_transports,total_grands_deplacements,total_kilometres,total_primes,total_acomptes,total_notes_frais,employe:employes!inner(prenom,nom,reference_interne,poste,statut)",{count:"exact"}).eq("periode_id",id).eq("entreprise_id",ctx.entrepriseId);
- if(!peutVoirTousDossiers)requete=requete.eq("id",monDossierId??"00000000-0000-0000-0000-000000000000");
- if(sp.statut)requete=requete.eq("statut",sp.statut);if(sp.q)requete=requete.or(`nom.ilike.%${sp.q.replace(/[,()]/g,"")}%,prenom.ilike.%${sp.q.replace(/[,()]/g,"")}%`,{referencedTable:"employes"});
- const {data:dossiers,count,error:listeErreur}=await requete.order("nom",{referencedTable:"employes"}).range((page-1)*PAGE,page*PAGE-1);
+ // Page de dossiers servie en base (paie_periode_dossiers_page) : le count
+ // exact et le tri par nom sous RLS évaluaient les policies de chaque dossier.
+ const page=Math.max(1,Number(sp.page)||1);const filtresDossiers={statut:sp.statut,recherche:sp.q,dossierId:peutVoirTousDossiers?null:(monDossierId??"00000000-0000-0000-0000-000000000000")};
+ const listeDossiers=await lirePageDossiersPaie<DossierPage>(supabase,ctx.entrepriseId,id,filtresDossiers,PAGE,(page-1)*PAGE).then((r)=>({...r,erreur:null as Error|null}),(erreur:Error)=>({total:0,lignes:[] as DossierPage[],erreur}));
+ const dossiers=listeDossiers.lignes,count=listeDossiers.total,listeErreur=listeDossiers.erreur;
  const totalPages=Math.max(1,Math.ceil((count??0)/PAGE));const estModifiable=["brouillon","saisie_en_cours","a_controler"].includes(periode.statut);
  // Indicateurs de la période sur TOUS les dossiers visibles et filtrés
  // (paie_periode_synthese) : ils additionnaient auparavant les 25 dossiers de
  // la page affichée, et « Contrôles (N) » comptait une liste plafonnée.
- const synthese=await lireSynthesePaie(supabase,ctx.entrepriseId,id,{statut:sp.statut,recherche:sp.q,dossierId:peutVoirTousDossiers?null:(monDossierId??"00000000-0000-0000-0000-000000000000")}).catch((err):SynthesePaie|null=>{console.error("[paie] synthèse indisponible",err instanceof Error?err.message:err);return null;});
+ const synthese=await lireSynthesePaie(supabase,ctx.entrepriseId,id,filtresDossiers).catch((err):SynthesePaie|null=>{console.error("[paie] synthèse indisponible",err instanceof Error?err.message:err);return null;});
  const montant=(v:number|undefined)=>v===undefined?"indisponible":euros(v);
  return <main className="p-4 sm:p-8"><div className="mx-auto max-w-[1500px] space-y-6"><header className="flex flex-wrap items-start justify-between gap-3"><div><Link href="/paie" className="text-sm text-neutral-500 hover:underline">← Périodes</Link><h1 className="mt-2 text-2xl font-semibold capitalize">Paie · {formaterMois(periode.mois)}</h1><p className="text-sm text-neutral-500">{periode.date_debut} → {periode.date_fin} · {statutPeriodePaie(periode.statut)}</p></div><div className="flex flex-wrap gap-2">{peutExporter&&<><a href={`/api/paie/periodes/${id}/export?format=xlsx`} className="rounded border px-3 py-2 text-sm">Excel</a><a href={`/api/paie/periodes/${id}/export?format=csv`} className="rounded border px-3 py-2 text-sm">CSV</a><a href={`/api/paie/periodes/${id}/export?format=zip`} className="rounded border px-3 py-2 text-sm">ZIP cabinet</a><Link href={`/imprimer/paie/${id}`} className="rounded border px-3 py-2 text-sm">PDF / Imprimer</Link></>}</div></header>
  {sp.error&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{sp.error}</p>}{sp.success&&<p className="rounded bg-green-50 p-3 text-sm text-green-700">{sp.success}</p>}{listeErreur&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{listeErreur.message}</p>}
