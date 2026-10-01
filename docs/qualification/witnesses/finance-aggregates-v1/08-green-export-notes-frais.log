@@ -1,0 +1,20 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 notes : jamais de sélection tronquée en silence 726ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : jamais de sélection tronquée en silence 1216ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : jamais de sélection tronquée en silence 1785ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : jamais de sélection tronquée en silence 5936ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : jamais de sélection tronquée en silence 22879ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 24482ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 23577ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 24379ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 23894ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 21688ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > aucune note d'une autre entreprise ni pour un ouvrier sans droit notes de frais 5099ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  00:50:31
+   Duration  156.11s (transform 163ms, setup 0ms, import 233ms, tests 155.67s, environment 0ms)
+

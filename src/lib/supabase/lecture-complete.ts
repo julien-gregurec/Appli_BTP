@@ -53,3 +53,24 @@ export async function lireToutesLesLignes<T>(
   }
   return { data: lignes, error: null };
 }
+
+// Filtre `.in()` sur une longue liste d'identifiants : la liste part dans
+// l'URL (≈ 37 caractères par UUID) et une requête de quelques centaines
+// d'identifiants dépasse la longueur admise par la passerelle. On découpe en
+// lots, chaque lot étant lui-même lu en entier page par page.
+export const TAILLE_LOT_IDENTIFIANTS = 100;
+
+export async function lireParLots<T>(
+  identifiants: readonly string[],
+  construire: (lot: string[], options: OptionsComptage) => RequetePaginable<T>,
+  { tailleLot = TAILLE_LOT_IDENTIFIANTS, ...options }: { tailleLot?: number; taillePage?: number; maxLignes?: number } = {},
+): Promise<{ data: T[]; error: null } | { data: null; error: ErreurLecture }> {
+  const lignes: T[] = [];
+  for (let i = 0; i < identifiants.length; i += tailleLot) {
+    const lot = identifiants.slice(i, i + tailleLot);
+    const resultat = await lireToutesLesLignes((o) => construire(lot, o), options);
+    if (resultat.error) return resultat;
+    lignes.push(...resultat.data);
+  }
+  return { data: lignes, error: null };
+}

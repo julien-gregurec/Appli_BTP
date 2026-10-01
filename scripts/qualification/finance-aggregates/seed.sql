@@ -83,6 +83,29 @@ begin
     insert into public.reglements_fournisseurs (id, entreprise_id, depense_id, montant, date, mode)
       select pg_temp.u(pfx || 'af', i), e, pg_temp.u(pfx || 'df', i), round(((i * 7) % 500) + 1.11, 2), date '2026-01-01' + (i % 181), 'virement'
       from generate_series(1, v) i;
+
+    -- Notes de frais validées (V), un justificatif par note, trois fichiers
+    -- par justificatif (original / consultation / archive figée), trois
+    -- validations par note : l'export ZIP lit 3 V versions et 3 V validations.
+    insert into public.notes_frais (id, entreprise_id, reference, date_frais, montant_ttc, montant_ht, montant_tva, taux_tva, categorie,
+                                    fournisseur, statut, chantier_id, valide_at)
+      select pg_temp.u(pfx || '0f', i), e, 'NF-' || lpad(i::text, 6, '0'), date '2026-01-01' + (i % 181),
+             round(((i * 17) % 300) + 4.99, 2), round((((i * 17) % 300) + 4.99) / 1.2, 2), round(((i * 17) % 300) + 4.99, 2) - round((((i * 17) % 300) + 4.99) / 1.2, 2), 20,
+             'repas', 'Restaurant ' || (i % 40), 'valide', pg_temp.u(pfx || 'ca', 1 + i % 20), now()
+      from generate_series(1, v) i;
+    insert into public.documents_notes_frais (id, entreprise_id, note_frais_id, type_document, nombre_pages)
+      select pg_temp.u(pfx || '0d', i), e, pg_temp.u(pfx || '0f', i), 'ticket_caisse', 1 from generate_series(1, v) i;
+    insert into public.versions_documents_notes_frais (id, entreprise_id, document_id, numero_version, numero_page, role_fichier, storage_path,
+                                                       nom_fichier_original, type_mime_detecte, taille_octets, empreinte_sha256)
+      select pg_temp.u(pfx || '0e' || r.n, i), e, pg_temp.u(pfx || '0d', i), 1, 1, r.role,
+             'companies/' || e || '/notes/' || i || '/' || r.role || '.jpg', 'ticket-' || i || '.jpg', 'image/jpeg', 1000 + i,
+             encode(extensions.digest(i::text || r.role, 'sha256'), 'hex')
+      from generate_series(1, v) i
+      cross join (values (1, 'original'), (2, 'consultation'), (3, 'archive_figee')) r(n, role);
+    insert into public.validations_notes_frais (id, entreprise_id, note_frais_id, action, ancien_statut, nouveau_statut, created_at)
+      select pg_temp.u(pfx || '0a' || a.n, i), e, pg_temp.u(pfx || '0f', i), a.action, a.ancien, a.nouveau, timestamptz '2026-01-01' + (i % 181) * interval '1 day' + a.n * interval '1 hour'
+      from generate_series(1, v) i
+      cross join (values (1, 'soumission', 'brouillon', 'soumis'), (2, 'prise_en_charge', 'soumis', 'en_verification'), (3, 'validation', 'en_verification', 'valide')) a(n, action, ancien, nouveau);
   end loop;
 end $$;
 
