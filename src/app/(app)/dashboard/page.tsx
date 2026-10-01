@@ -10,8 +10,12 @@ import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/Da
 import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
 import { iaEstActive } from "@/lib/preview-features";
-import { CentreAlertesOperationnelles, type AlerteOperationnelle } from "@/components/CentreAlertesOperationnelles";
-import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type EmployeDelegable } from "@/lib/alertes-delegation";
+import { CentreAlertesOperationnelles } from "@/components/CentreAlertesOperationnelles";
+import { DOMAINE_VERS_PERMISSION_DELEGATION, type EmployeDelegable } from "@/lib/alertes-delegation";
+import {
+  construireAlertes, lireEtatAlertes, pageAlertes, repartirAlertes, requeteArticles, requeteCommandes, requeteOutils,
+  requeteRelancesEnEchec, requeteVehicules, resumerAlertes, TAILLE_PAGE_ALERTES, type SourcesAlertes,
+} from "@/lib/alertes-operationnelles";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -97,16 +101,16 @@ export default async function DashboardPage() {
     voir.devis || voir.factures ? supabase.rpc("dashboard_indicateurs", { p_entreprise_id: ctx.entrepriseId, p_aujourdhui: aujourdhui }) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
-    voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
-    voir.flotte ? supabase.from("vehicules").select("id, immatriculation, marque, modele, kilometrage, controle_technique_echeance, assurance_echeance, prochain_entretien_date, prochain_entretien_km").eq("entreprise_id", ctx.entrepriseId).in("statut", ["actif", "maintenance"]) : null,
-    voir.outillage ? supabase.from("outils").select("id, reference, designation, prochaine_verification").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu)") : null,
-    voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]) : null,
+    voir.stock ? requeteArticles(supabase, ctx.entrepriseId) : null,
+    voir.flotte ? requeteVehicules(supabase, ctx.entrepriseId) : null,
+    voir.outillage ? requeteOutils(supabase, ctx.entrepriseId) : null,
+    voir.achats ? requeteCommandes(supabase, ctx.entrepriseId) : null,
     peutPointer && employeCompte ? supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom") : null,
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
     peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
-    voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
+    voir.devis || voir.factures ? requeteRelancesEnEchec(supabase, ctx.entrepriseId, septJoursAvantIso) : null,
   ]);
   const indicateurs = (dashboardIndicateursResult?.data ?? {}) as DashboardIndicateurs;
   const chantiers = chantiersResult?.data ?? [];
@@ -124,71 +128,23 @@ export default async function DashboardPage() {
   const statutsActifs = ["accepte", "a_preparer", "en_attente_validation", "en_commande_materiel", "en_cours", "en_pause"];
   const chantiersActifs = (chantiers ?? []).filter((c) => statutsActifs.includes(c.statut));
   const devisASuivre = indicateurs.devis_a_suivre ?? [];
-  type Alerte = { id: string; domaine: string; niveau: "critique" | "attention"; titre: string; detail: string; href: string; date?: string };
-  const alertes: Alerte[] = [];
-  const joursAvant = (date: string) => Math.round((Date.parse(`${date}T12:00:00`) - Date.parse(`${aujourdhui}T12:00:00`)) / 86_400_000);
-  const ajouterEcheance = (alerte: Omit<Alerte, "niveau">, date: string, anticipation = 30) => {
-    const jours = joursAvant(date);
-    if (jours <= anticipation) alertes.push({ ...alerte, date, niveau: jours <= 0 ? "critique" : "attention" });
-  };
-
-  for (const facture of indicateurs.factures_alertes ?? []) {
-    const client = un(facture.client);
-    ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
-  }
-  for (const itemDevis of indicateurs.devis_alertes ?? []) {
-    ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
-  }
-  // RELANCES-AUTO-V1 §51 : uniquement les échecs (7 derniers jours) — pas une alerte "à
-  // relancer" en doublon des échéances devis/facture déjà remontées ci-dessus.
-  for (const relance of relancesEnEchec) {
-    const estDevis = relance.type_document === "devis";
-    alertes.push({
-      id: `relance-echec-${relance.id}`,
-      domaine: estDevis ? "Commercial" : "Facturation",
-      niveau: "attention",
-      titre: `Échec d'envoi d'une relance ${estDevis ? "devis" : "facture"}`,
-      detail: relance.erreur_public_safe ?? "Vérifier la configuration d'envoi d'e-mail",
-      href: estDevis ? `/devis/${relance.document_id}` : `/factures/${relance.document_id}`,
-    });
-  }
-  for (const article of articles ?? []) {
-    const stock = Number(article.quantite_stock), seuil = Number(article.seuil_alerte);
-    if (stock <= seuil) alertes.push({ id: `stock-${article.id}`, domaine: "Stock", niveau: stock <= 0 ? "critique" : "attention", titre: `${article.reference} · ${article.designation}`, detail: `${stock} ${article.unite} disponible(s), seuil ${seuil}`, href: "/stock" });
-  }
-  for (const vehicule of vehicules ?? []) {
-    const nom = `${vehicule.immatriculation} · ${vehicule.marque} ${vehicule.modele}`;
-    if (vehicule.controle_technique_echeance) ajouterEcheance({ id: `ct-${vehicule.id}`, domaine: "Flotte", titre: `Contrôle technique · ${nom}`, detail: "Échéance réglementaire", href: `/flotte/${vehicule.id}` }, vehicule.controle_technique_echeance);
-    if (vehicule.assurance_echeance) ajouterEcheance({ id: `assurance-${vehicule.id}`, domaine: "Flotte", titre: `Assurance · ${nom}`, detail: "Renouvellement à vérifier", href: `/flotte/${vehicule.id}` }, vehicule.assurance_echeance);
-    if (vehicule.prochain_entretien_date) ajouterEcheance({ id: `entretien-date-${vehicule.id}`, domaine: "Flotte", titre: `Entretien · ${nom}`, detail: "Échéance calendrier", href: `/flotte/${vehicule.id}` }, vehicule.prochain_entretien_date);
-    if (vehicule.prochain_entretien_km && Number(vehicule.kilometrage) >= Number(vehicule.prochain_entretien_km)) alertes.push({ id: `entretien-km-${vehicule.id}`, domaine: "Flotte", niveau: "critique", titre: `Entretien kilométrique · ${nom}`, detail: `${Number(vehicule.kilometrage).toLocaleString("fr-FR")} km relevés pour ${Number(vehicule.prochain_entretien_km).toLocaleString("fr-FR")} km prévus`, href: `/flotte/${vehicule.id}` });
-  }
-  for (const outil of outils ?? []) {
-    if (outil.prochaine_verification) ajouterEcheance({ id: `outil-${outil.id}`, domaine: "Outillage", titre: `Vérification · ${outil.reference}`, detail: outil.designation, href: `/outillage/${outil.id}` }, outil.prochaine_verification);
-  }
-  for (const commande of commandes ?? []) {
-    if (commande.date_livraison_prevue) {
-      const fournisseur = un(commande.fournisseur);
-      ajouterEcheance({ id: `commande-${commande.id}`, domaine: "Achats", titre: `Livraison ${commande.numero}`, detail: fournisseur?.nom ?? "Fournisseur", href: `/commandes/${commande.id}` }, commande.date_livraison_prevue, 3);
-    }
-  }
-  const ordreNiveau = { critique: 0, attention: 1 };
-  alertes.sort((a, b) => ordreNiveau[a.niveau] - ordreNiveau[b.niveau] || (a.date ?? "9999").localeCompare(b.date ?? "9999"));
-  const alertesAvecSignature: AlerteOperationnelle[] = alertes.map((alerte) => ({
-    ...alerte,
-    signature: [alerte.niveau, alerte.date ?? "", alerte.titre, alerte.detail].join("|"),
-  }));
-  const { data: masquagesAlertes } = permissions !== null && alertesAvecSignature.length > 0
-    ? await supabase
-      .from("alertes_operationnelles_ignorees")
-      .select("alerte_cle,signature")
-      .eq("entreprise_id", ctx.entrepriseId)
-      .eq("utilisateur_id", ctx.userId)
-      .in("alerte_cle", alertesAvecSignature.map((alerte) => alerte.id))
-    : { data: [] as Array<{ alerte_cle: string; signature: string }> };
-  const signaturesIgnorees = new Map((masquagesAlertes ?? []).map((masquage) => [masquage.alerte_cle, masquage.signature]));
-  const alertesIgnorees = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) === alerte.signature);
-  const alertesActives = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) !== alerte.signature);
+  // Centre d'alertes (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1) : toutes les alertes sont calculées
+  // ici (compteurs, briefing, filtres exacts), mais seuls un résumé et une première page sont
+  // envoyés au navigateur ; la suite est chargée à la demande. Voir lib/alertes-operationnelles.
+  const toutesAlertes = construireAlertes({
+    facturesAlertes: indicateurs.factures_alertes ?? [],
+    devisAlertes: indicateurs.devis_alertes ?? [],
+    relancesEnEchec,
+    articles: articles as SourcesAlertes["articles"],
+    vehicules: vehicules as SourcesAlertes["vehicules"],
+    outils: outils as SourcesAlertes["outils"],
+    commandes: commandes as SourcesAlertes["commandes"],
+  }, aujourdhui, voirIndicateursFinanciers);
+  const etatAlertes = permissions !== null && toutesAlertes.length > 0
+    ? await lireEtatAlertes(supabase, ctx.entrepriseId, ctx.userId)
+    : { masquages: [], delegations: [] };
+  const centreAlertes = repartirAlertes(toutesAlertes, etatAlertes);
+  const alertesActives = centreAlertes.actives;
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
 
   // Délégation d'alertes (ALERTES-DELEGATION-V1) : le bouton n'est proposé
@@ -197,38 +153,20 @@ export default async function DashboardPage() {
   const domainesAlertesActives = [...new Set(alertesActives.map((alerte) => alerte.domaine))];
   const domainesDelegables = domainesAlertesActives.filter((domaine) => DOMAINE_VERS_PERMISSION_DELEGATION[domaine]);
   const domainesAutorisesDelegation = domainesDelegables.filter((domaine) => autorise(DOMAINE_VERS_PERMISSION_DELEGATION[domaine]));
-  const [{ data: employesDelegablesData }, { data: delegationsData }] = await Promise.all([
+  const [{ data: employesDelegablesData }, premierePageAlertes] = await Promise.all([
     permissions !== null && domainesAutorisesDelegation.length > 0
       ? supabase.rpc("employes_delegables_alertes", { p_entreprise_id: ctx.entrepriseId })
       : Promise.resolve({ data: [] as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }> }),
-    permissions !== null && alertesActives.length > 0
-      ? supabase
-        .from("alertes_operationnelles_delegations")
-        .select("alerte_cle,employe_id,delegue_par_user_id,delegue_at,commentaire,employe:employes(prenom,nom),delegue_par:utilisateurs!alertes_operationnelles_delegations_delegue_par_user_id_fkey(prenom,nom)")
-        .eq("entreprise_id", ctx.entrepriseId)
-        .in("alerte_cle", alertesActives.map((alerte) => alerte.id))
-      : Promise.resolve({ data: [] as Array<{ alerte_cle: string; employe_id: string; delegue_par_user_id: string; delegue_at: string; commentaire: string | null; employe: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null; delegue_par: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null }> }),
+    pageAlertes(supabase, ctx.entrepriseId, centreAlertes, {
+      filtre: "toutes", debut: 0, nombre: TAILLE_PAGE_ALERTES, employeCourantId: employeCompte?.id ?? null, utilisateurCourantId: ctx.userId,
+    }),
   ]);
+  const resumeAlertes = resumerAlertes(centreAlertes, employeCompte?.id ?? null, ctx.userId);
   const employesDelegables: EmployeDelegable[] = (
     (employesDelegablesData ?? []) as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }>
   ).map((employe) => ({
     employeId: employe.employe_id, prenom: employe.prenom, nom: employe.nom, permissions: employe.permissions,
   }));
-  const delegations: Record<string, DelegationAlerte> = Object.fromEntries(
-    (delegationsData ?? []).map((delegation) => {
-      const employe = un(delegation.employe);
-      const delegueParUtilisateur = un(delegation.delegue_par);
-      return [delegation.alerte_cle, {
-        employeId: delegation.employe_id,
-        employePrenom: employe?.prenom ?? "",
-        employeNom: employe?.nom ?? "",
-        deleguePar: delegueParUtilisateur ? `${delegueParUtilisateur.prenom ?? ""} ${delegueParUtilisateur.nom ?? ""}`.trim() : "",
-        delegueParUserId: delegation.delegue_par_user_id,
-        delegueAt: delegation.delegue_at,
-        commentaire: delegation.commentaire,
-      } satisfies DelegationAlerte];
-    }),
-  );
 
   const lignesBriefing: LigneBriefing[] = [];
   if (peutVoirBriefing) {
@@ -339,13 +277,10 @@ export default async function DashboardPage() {
         {(voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) && (
           <DashboardWidget id="alertes">
             <CentreAlertesOperationnelles
-              alertes={alertesActives}
-              alertesIgnorees={alertesIgnorees}
+              resume={resumeAlertes}
+              premierePage={premierePageAlertes}
               domainesAutorisesDelegation={domainesAutorisesDelegation}
               employesDelegables={employesDelegables}
-              delegations={delegations}
-              employeCourantId={employeCompte?.id ?? null}
-              utilisateurCourantId={ctx.userId}
             />
           </DashboardWidget>
         )}
