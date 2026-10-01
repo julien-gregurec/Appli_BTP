@@ -38,6 +38,19 @@ Résumé chiffré (détails et fichiers bruts aux §§ 2-12) :
 | Profil réaliste après 50 VU — RSS à T+15 après GC forcé | 615 Mo | 356 Mo |
 | Profil réaliste 50 VU — p50 · débit | 6,2 s · 3,42 req/s | 1,3 s · 5,83 req/s |
 
+Conditions attachées au verdict :
+1. **Le correctif `7ac78cd` doit monter dans le train.** Sans lui, le verdict sur V7 est
+   `ELSATIA MEMORY BLOCKER CONFIRMED`.
+2. **Le plafond du heap V8 doit être explicite** (`--max-old-space-size`). V8 ignore la limite du cgroup :
+   sous 512 Mo, on passe d'un OOM kill à 70 s à un pic de 292 Mo (§ 12).
+3. **Le budget mémoire du conteneur doit inclure les PDF** : +300 à 400 Mo par PDF concurrent, hors
+   processus Node (§ 9).
+
+Estimation locale (§ 14, pas un SLA) :
+- **1 Go** pour 25 utilisateurs réalistes ;
+- **2 Go** conseillés à 50 utilisateurs, ou sous charge intensive ;
+- avant cela, la limite CPU est atteinte.
+
 Les autres constats mesurés n'ont **pas** été corrigés : ce sont des amplificateurs, pas la cause de la
 rétention. Ils sont listés au § 13 avec leurs preuves :
 - payload HTML de 17 Mo sur `/planning` ;
@@ -311,7 +324,7 @@ d'avant le snapshot.
 
 ### 5.5 Inventaire demandé
 
-Résultat des snapshots et de l'inventaire du code (§ 7) :
+Résultat des snapshots et de l'inventaire du code (§ 5.6) :
 
 | Catégorie | Constat |
 |---|---|
@@ -324,6 +337,36 @@ Résultat des snapshots et de l'inventaire du code (§ 7) :
 | Grands tableaux | non retenus ; ce sont des pics par requête (§ 13) |
 | Données de requête | non retenues hors § 5.3 |
 | Timers | aucun `setInterval` côté serveur ; `handles` revenu à 1 au repos |
+
+### 5.6 Inventaire des caches applicatifs (mission § 7)
+
+Recherche exhaustive dans `src/` :
+- `new Map/Set/WeakMap` au niveau module ;
+- `unstable_cache`, `'use cache'`, `cacheLife`, `cacheTag`, `React.cache` ;
+- `globalThis`, LRU ;
+- timers au niveau module ;
+- singletons de clients.
+
+`next.config.ts` ne définit ni `cacheComponents`, ni `cacheHandler`, ni `cacheMaxMemorySize`, et le layout
+racine est `force-dynamic`.
+
+| Cache (fichier, dernière modif.) | Clé | Tenant dans la clé ? | TTL | Taille max | Éviction |
+|---|---|---|---|---|---|
+| `lib/elsatia-identity/config.ts` `let cache` (2026-09-27) | variables d'environnement (émetteur et clés) | non (aucune donnée tenant) | jusqu'à un changement d'environnement | **1 entrée** | remplacement |
+| `lib/push.ts` `configure` (2026-09-11) | aucune (booléen VAPID) | sans objet | processus | 1 booléen | — |
+| `getContexteEntreprise` = `React.cache` (`lib/entreprise.ts`, 2026-09-20) | arguments, **portée d'une requête** | contexte de la requête | fin de requête | une requête | GC |
+| `permissionsUtilisateur` = `React.cache` (`lib/permissions.ts`, 2026-09-27) | identité du contexte, portée d'une requête | oui (par contexte) | fin de requête | une requête | GC |
+| `activeFeaturesForCompany` = `React.cache` (`lib/feature-flags.ts`, 2026-07-28) | entreprise, portée d'une requête | oui | fin de requête | une requête | GC |
+| `lireEtatAssistance` = `React.cache` (`lib/assistance-server.ts`, 2026-09-08) | portée d'une requête | contexte | fin de requête | une requête | GC |
+| `api/referentiels/vehicules` `fetch(…, { next: { revalidate: 604800 } })` (2026-07-31) | URL NHTSA (marque validée) | non (donnée publique) | 7 jours | Data Cache Next par défaut (en mémoire, borné par le `cacheMaxMemorySize` par défaut) | LRU Next |
+| Cache de déduplication `fetch` de Next (`createDedupeFetch`, framework) | URL, par requête | portée de la requête | fin de requête | une requête | GC ; voir l'exception du § 5.3 |
+
+Les autres `Map`/`Set` de niveau module sont des **constantes** construites une fois à partir de littéraux
+(listes de permissions, tarifs, catégories) et ne croissent pas. Il n'y a aucun client Supabase, OpenAI ou
+Stripe singleton, ni de stockage mémoire pour le rate limit (RPC `consommer_rate_limit`).
+
+**Aucun cache récent ne présente de clé tenant manquante, de TTL absent sur une donnée tenant, ni de
+croissance sans borne.**
 
 ## 6. Routes testées séparément
 
@@ -415,7 +458,9 @@ tenants, car elles ne contiennent aucune donnée.
   1 462 tests OK ; `next build` OK.
 - **Hors correctif** : le patch « actions liées » de `/pointage/gestion` a été préparé, mais **n'est pas
   appliqué**. Il n'agit pas sur la rétention (§ 13). Il est conservé pour mémoire dans
-  `docs/qualification/memory-v1/pointage-gestion-actions-liees.patch.txt`.
+  `docs/qualification/memory-v1/pointage-gestion-actions-liees.patch.txt`. Ce fichier est un diff combiné :
+  ses parties `Intl` sont celles déjà livrées dans `7ac78cd` ; seules les parties `.bind` → champs cachés
+  restent non appliquées.
 
 ### 8.2 Avant / après (même build hormis le correctif, même protocole, serveur neuf)
 
@@ -476,7 +521,17 @@ par le CPU avant de l'être par la mémoire** : ELU 0,6 à 25 VU et 0,76 à 50 V
 - débit de 1 à 3,6 req/s ;
 - en partie à cause des pages de 3 à 17 Mo (§ 13).
 
-<!-- STRESS -->
+Charge intensive (réflexion 0,5 s) :
+
+| Run | Build | VU | req/s | p50 | p95 | RSS max | heapUsed après GC |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `leak` c1 | avant | 50 | 3,64 | 8,4 s | 18,2 s | 932 Mo avant snapshot | 306 Mo (rafale froide, § 5.3) |
+| `limit-2048-defaut` | après | 25 | 6,02 | 2,8 s | 5,0 s | 1 110 Mo | 112 Mo |
+| `alloc-glibc` | après | 25 | 6,58 | 2,7 s | 4,3 s | 1 038 Mo | 165 Mo |
+| `limit-1024-intense-50` | après | 50 | 6,55 | 5,4 s | 10,7 s | 965 Mo (cgroup au plafond de 1 Go) | 496 Mo (rafale froide) |
+
+Le débit plafonne à ~6,5 req/s : c'est la saturation CPU (4 vCPU partagés avec toute la pile). La mémoire,
+elle, ne croît plus au-delà de ~1,1 Go.
 
 ## 11. Critère de fuite (§ 10 de la mission)
 
@@ -494,7 +549,41 @@ Méthode : un cgroup v1 `memory` est dédié au seul serveur Next et à ses fils
 (`memory.limit_in_bytes = memsw`, swappiness 0). Le reste du conteneur n'est pas concerné, et l'OOM killer ne
 peut toucher que ce serveur. Charge : 25 VU, réflexion 0,5 s, scénario `mix`, 180 s, build **après correctif**.
 
-<!-- LIMITS -->
+Données : `apres/limit-*`, `apres/limites-allocateur-summary.md`.
+
+**Constat préalable : V8 ignore la limite du cgroup.** `heap_size_limit` reste à ~8,2 Go même sous 512 Mo
+(Node 22, cgroup v1). Sans `--max-old-space-size`, V8 laisse donc le heap grossir comme s'il disposait de la
+RAM de l'hôte, et ne collecte pas assez tôt.
+
+| Limite | Plafond heap V8 | Charge | Issue | Pic cgroup | RSS max | heapUsed max | req/s | p50 |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| 2 048 Mo | défaut (8,2 Go) | 25 VU intensifs | ✅ survit | 1 114 Mo | 1 110 | 708 | 6,02 | 2,8 s |
+| 1 024 Mo | défaut | 25 VU intensifs | ✅ survit | 943 Mo | 1 001 | 680 | 6,10 | 2,9 s |
+| 1 024 Mo | défaut | 50 VU intensifs | ✅ survit, **au plafond** (1 024 Mo) | 1 024 Mo | 965 | 645 | 6,55 | 5,4 s |
+| 512 Mo | défaut | 25 VU intensifs | ❌ **OOM kill** à 43 s | 512 Mo | 532 | 271 | — | — |
+| 512 Mo | 307 Mo | 25 VU intensifs | ❌ **V8 heap out of memory** à 124 s (live ≈ 292 Mo) | 512 Mo | 491 | 296 | — | — |
+| 512 Mo | défaut | 25 VU réalistes (5 s) | ❌ **OOM kill** à 47 s | 512 Mo | 546 | 316 | — | — |
+| 512 Mo | défaut | 10 VU réalistes (5 s) | ❌ **OOM kill** à 70 s | 512 Mo | 573 | 372 | — | — |
+| 512 Mo | **256 Mo** | 10 VU réalistes (5 s) | ✅ **survit** | **292 Mo** | 341 | 156 | 1,61 | 297 ms |
+
+« Intensifs » : réflexion 0,5 s, scénario `mix`. Les morts surviennent pendant l'échauffement (43 à 70 s
+après le début de la charge).
+
+Les compteurs `oom_kill` des fichiers `cgroup.json` sont cumulatifs par répertoire cgroup : le run
+« 512 / 307 Mo » réutilise le cgroup du run précédent. Sa propre mort est l'abandon V8
+(`server-fatal.txt`), pas un second OOM kill.
+
+**Allocateur natif** (25 VU intensifs, après correctif, serveur neuf, `apres/alloc-*`) :
+
+| Allocateur | RSS max | RSS après GC | heapUsed après GC |
+|---|---:|---:|---:|
+| glibc | 1 038 Mo | 501 Mo | 165 Mo |
+| `MALLOC_ARENA_MAX=2` | 1 108 Mo | 450 Mo | 119 Mo |
+| jemalloc 5.3 (`LD_PRELOAD`) | 1 118 Mo | 583 Mo | 339 Mo |
+
+Une fois le correctif appliqué, les écarts sont faibles et dominés par la rétention « rafale à froid »
+(§ 5.3), dont l'ampleur varie d'un run à l'autre (heapUsed après GC de 119 à 339 Mo). **Aucun changement
+d'allocateur n'est recommandé** sur ces données.
 
 ## 13. Autres constats mesurés (non corrigés) et recommandations
 
@@ -544,7 +633,8 @@ Recommandations :
 ### 13.5 Exploitation
 
 - Réchauffer chaque instance avant de lui envoyer du trafic (§ 5.3).
-- Fixer `--max-old-space-size` en cohérence avec la limite du conteneur (§ 12).
+- Fixer `--max-old-space-size` en cohérence avec la limite du conteneur (§ 12). Sous 512 Mo, ce réglage
+  fait la différence entre un OOM kill à 70 s et un pic à 292 Mo.
 - Ne pas prendre de heap snapshot en production (§ 5.4).
 - Allocateur : voir § 12.
 
@@ -553,7 +643,26 @@ Recommandations :
 Il s'agit d'une **estimation locale, pas d'un SLA hébergé**. Elle est mesurée sur 4 vCPU partagés avec la base
 et les services, avec une fixture d'environ 40 salariés.
 
-<!-- LIMITE -->
+Hypothèses :
+- une instance `next start` ;
+- build avec correctif ;
+- scénario mixte ;
+- 4 vCPU partagés avec la base et les services.
+
+| Charge | Mémoire de conteneur suffisante (mesurée) | Latence p50 (après) | Commentaire |
+|---|---|---|---|
+| 1 à 10 utilisateurs réalistes | **512 Mo avec `--max-old-space-size=256`** (pic 292 Mo) | ~250-300 ms | 512 Mo sans plafond de heap : OOM |
+| 25 utilisateurs réalistes | **1 Go** (RSS max 744 Mo, R3) | ~350 ms | |
+| 50 utilisateurs réalistes | **1 Go**, juste (RSS max 1 001 Mo, R3) ; **2 Go** conseillés | ~1,3 s | Limite CPU atteinte (ELU 0,67) |
+| 25-50 utilisateurs intensifs | 1 Go tient, au plafond ; **2 Go** conseillés | 2,8 à 5,4 s | Limité par le CPU |
+| PDF | **+300 à 400 Mo par PDF concurrent**, hors processus Node | | 10 PDF concurrents = 4,1 Go d'arbre. Plafonner (§ 13.4). |
+
+Sans le correctif, aucune de ces enveloppes n'est stable : la mémoire grimpe avec le nombre de rendus de
+`/planning` (2,7 Go retenus à 10 VU sur cette seule route, jusqu'à ~4 000 formateurs par rendu avec un vrai
+planning).
+
+**Réglage recommandé** : `NODE_OPTIONS=--max-old-space-size=<~50-60 % de la limite du conteneur>`, en plus du
+budget PDF. Raison : V8 ne lit pas la limite cgroup v1 (§ 12).
 
 ## 15. Reproduire
 

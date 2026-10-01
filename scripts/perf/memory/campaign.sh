@@ -21,7 +21,7 @@ for STEP in ${STEPS[@]}; do case "$STEP" in
     [ -e "$ROOT/stress/phases.jsonl" ] && grep -q stop "$ROOT/stress/phases.jsonl" || {
       rm -rf "$ROOT/stress"; LOAD_S=180 COOL_MIN=5 "$RUN" "$ROOT/stress" 500 10 25 50; } ;;
   limits)
-    for L in 2048 1024 512; do for V in defaut borne; do
+    for LV in 2048:defaut 1024:defaut 512:defaut 512:borne; do L=${LV%%:*}; V=${LV##*:}; for _ in 1; do
       D="$ROOT/limit-$L-$V"
       [ -e "$D/phases.jsonl" ] && grep -q stop "$D/phases.jsonl" && continue
       EXTRA=""; [ "$V" = borne ] && EXTRA="--max-old-space-size=$(( L * 60 / 100 ))"
@@ -42,7 +42,7 @@ for STEP in ${STEPS[@]}; do case "$STEP" in
     done ;;
   alloc)
     # A/B allocateur natif, même charge que « stress » palier 25 puis refroidissement court.
-    for V in glibc arena2 jemalloc identity; do
+    for V in glibc arena2 jemalloc; do
       D="$ROOT/alloc-$V"
       [ -e "$D/phases.jsonl" ] && grep -q stop "$D/phases.jsonl" && continue
       X=""
