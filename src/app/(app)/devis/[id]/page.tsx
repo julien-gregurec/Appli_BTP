@@ -16,6 +16,7 @@ import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -48,7 +49,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
   ]);
 
   const chantiersClient = peutGererDevis
-    ? (await supabase.from("chantiers").select("id,nom,ville,statut").eq("entreprise_id", ctx.entrepriseId).eq("client_id", devis.client_id).not("statut", "in", "(archive,annule)").order("nom")).data ?? []
+    ? await lireOptionsChantiers(supabase, ctx.entrepriseId, { clientId: devis.client_id })
     : [];
 
   const { data: chantierIssuDuDevis } = peutGererDevis && devis.statut === "accepte"

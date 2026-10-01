@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { lireCurseur, lirePageCurseur } from "@/lib/fiches-agregats";
+import { lireCurseur, lireOptionsChantiers, lirePageCurseur } from "@/lib/fiches-agregats";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
@@ -30,7 +30,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
   const [{ data: moi }, { data: employes }, { data: chantiers }, { data: conversations }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle(),
     supabase.rpc("contacts_messagerie",{p_entreprise_id:ctx.entrepriseId}),
-    supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),
     supabase.from("conversations_internes").select("id,type,titre,chantier:chantiers(id,nom),createur:employes!conversations_createur_fkey(id,prenom,nom),destinataire:employes!conversations_destinataire_fkey(id,prenom,nom),derniere_activite_at").eq("entreprise_id",ctx.entrepriseId).order("derniere_activite_at",{ascending:false}),
   ]);
   const conversationId = query.conversation && (conversations ?? []).some((c)=>c.id===query.conversation) ? query.conversation : conversations?.[0]?.id;

@@ -79,7 +79,7 @@ export default async function CommandesPage({ searchParams }: { searchParams: Pr
           </table>
         </div>
         {(curseur || page.suivant) && (
-          <nav aria-label="Pagination des commandes" className="flex items-center justify-between text-sm">
+          <nav aria-label="Pagination des commandes" className="mb-20 flex items-center justify-between text-sm">
             {curseur ? <Link href="/commandes" className="rounded-md border px-3 py-2">← Plus récentes</Link> : <span />}
             {page.suivant ? <Link href={`/commandes?${new URLSearchParams({ apres: page.suivant })}`} className="rounded-md border px-3 py-2">Plus anciennes →</Link> : <span />}
           </nav>

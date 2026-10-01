@@ -17,6 +17,7 @@ import {
   validerLotVirementsAction,
   validerRibAction,
 } from "@/app/actions/paiements-bancaires";
+import { lireOptionsEmployes } from "@/lib/fiches-agregats";
 
 const champ = "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
@@ -40,7 +41,7 @@ export default async function PaiementsBancairesPage({ searchParams }: { searchP
   const [{ data: connexion }, { data: ribs }, { data: employes }, { data: fournisseurs }, { data: bulletins }, { data: notes }, { data: depenses }, { data: lots }, { data: journal }] = await Promise.all([
     supabase.from("connexions_bancaires").select("provider,environnement,statut,dernier_message,dernier_lot_at").eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
     supabase.from("coordonnees_bancaires").select("id,type_beneficiaire,employe_id,fournisseur_id,titulaire,iban_quatre_derniers,verification_statut,verification_message,created_at,employe:employes(prenom,nom),fournisseur:fournisseurs(nom)").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("created_at", { ascending: false }),
-    supabase.from("employes").select("id,prenom,nom,statut").eq("entreprise_id", contexte.entrepriseId).not("statut", "in", "(sorti,suspendu)").order("nom"),
+    lireOptionsEmployes(supabase,contexte.entrepriseId,{inclureNonActifs:true}).then((data)=>({data})),
     supabase.from("fournisseurs").select("id,nom,siret,actif").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("nom"),
     supabase.from("bulletins_paie").select("id,employe_id,periode,version,montant_net_a_payer,date_paiement_prevue,statut,nom_fichier_original,storage_path,reference_expert_comptable,importe_at,employe:employes(prenom,nom)").eq("entreprise_id", contexte.entrepriseId).order("periode", { ascending: false }).order("id").limit(LIMITE_SOURCES + 1),
     supabase.from("notes_frais").select("id,employe_id,reference,date_frais,montant_ttc,statut,employe:employes(prenom,nom)").eq("entreprise_id", contexte.entrepriseId).in("statut", ["valide", "validee", "exporte_comptabilite"]).order("date_frais", { ascending: true }).order("id").limit(LIMITE_SOURCES + 1),

@@ -7,7 +7,7 @@ import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm"
 import { DELAIS_PAIEMENT_FOURNISSEUR, libelleDelaiPaiementFournisseur } from "@/lib/echeances-fournisseurs";
 import { affecterSousTraitantAction, modifierSousTraitantAction, retirerAffectationSousTraitantAction } from "@/app/actions/sous-traitants";
 import { euros } from "@/lib/devis";
-import { lireCurseur, lirePageCurseur, lireSyntheseDepenses, lireSyntheseMissionsSousTraitant, type SyntheseDepenses, type SyntheseMissions } from "@/lib/fiches-agregats";
+import { lireCurseur, lireOptionsChantiers, lirePageCurseur, lireSyntheseDepenses, lireSyntheseMissionsSousTraitant, type SyntheseDepenses, type SyntheseMissions } from "@/lib/fiches-agregats";
 
 const TAILLE_PAGE=50;
 
@@ -27,7 +27,7 @@ export default async function SousTraitantDetailPage({params,searchParams}:{para
   const [{data:tiers},pageMissions,{data:chantiers},pageFactures,{data:rib},syntheseMissions,syntheseFactures]=await Promise.all([
     supabase.from("fournisseurs").select("*").eq("id",id).eq("entreprise_id",ctx.entrepriseId).eq("type_tiers","sous_traitant").maybeSingle(),
     !peutVoirMissions?Promise.resolve({lignes:[],suivant:null}):lirePageCurseur(supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,notes,created_at,chantier:chantiers(id,nom,reference_interne)").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id),"created_at",TAILLE_PAGE,curseurMissions),
-    peutGerer?supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"):Promise.resolve({data:[]}),
+    peutGerer?lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})):Promise.resolve({data:[]}),
     peutVoirFactures?lirePageCurseur(supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,date_echeance,montant_ht,montant_ttc,montant_regle,statut,chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id),"date_piece",TAILLE_PAGE,curseurFactures):Promise.resolve({lignes:[],suivant:null}),
     peutGererRib?supabase.from("coordonnees_bancaires").select("titulaire,iban_quatre_derniers,verification_statut,verification_message").eq("entreprise_id",ctx.entrepriseId).eq("fournisseur_id",id).eq("actif",true).maybeSingle():Promise.resolve({data:null}),
     !peutVoirMissions?Promise.resolve({nb:0,nbActives:0,previsionnelHt:0} as SyntheseMissions):lireSyntheseMissionsSousTraitant(supabase,ctx.entrepriseId,id).catch((err):SyntheseMissions|null=>{console.error("[sous-traitant] missions indisponibles",err instanceof Error?err.message:err);return null;}),

@@ -5,6 +5,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DevisEditor } from "@/components/DevisEditor";
 import { nomClient } from "@/lib/chantier-statuts";
 import { iaEstActive } from "@/lib/preview-features";
+import { lireOptionsChantiers, lireOptionsClients } from "@/lib/fiches-agregats";
 
 export default async function NouveauDevisPage({
   searchParams,
@@ -16,17 +17,10 @@ export default async function NouveauDevisPage({
   const supabase = await createClient();
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, nom, prenom, societe")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
+  // Listes de choix complètes (gp_options_*) : tronquées à 1 000 par PostgREST.
+  const clients = await lireOptionsClients(supabase, ctx.entrepriseId);
 
-  const { data: chantiers } = await supabase
-    .from("chantiers")
-    .select("id, nom, client_id")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
+  const chantiers = await lireOptionsChantiers(supabase, ctx.entrepriseId, { statutsExclus: [], tri: "recent" });
 
   const { data: prestations } = await supabase
     .from("prestations_catalogue")

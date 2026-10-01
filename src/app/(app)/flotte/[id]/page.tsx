@@ -6,7 +6,7 @@ import { affecterVehiculeAction, ajouterReleveKilometrageAction } from "@/app/ac
 import { euros } from "@/lib/devis";
 import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { STATUTS_VEHICULE } from "@/lib/flotte";
-import { lireCurseur, lirePageCurseur, lireSyntheseDepenses, type SyntheseDepenses } from "@/lib/fiches-agregats";
+import { lireCurseur, lireOptionsEmployes, lirePageCurseur, lireSyntheseDepenses, type SyntheseDepenses } from "@/lib/fiches-agregats";
 import { permissionsUtilisateur } from "@/lib/permissions";
 
 const TAILLE_PAGE = 50;
@@ -27,7 +27,7 @@ export default async function VehiculePage({ params, searchParams }: { params: P
   const curseurReleves = lireCurseur(messages.releves_apres), curseurDepenses = lireCurseur(messages.depenses_apres);
   const [pageReleves, { data: employes }, pageDepenses, { data: affectations }, { data: travaux }, { data: code }, synthese] = await Promise.all([
     lirePageCurseur(supabase.from("releves_kilometrage").select("*").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId), "date_releve", TAILLE_PAGE, curseurReleves),
-    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+    lireOptionsEmployes(supabase,ctx.entrepriseId).then((data)=>({data})),
     !peutVoirAchats ? Promise.resolve({ lignes: [], suivant: null }) : lirePageCurseur(supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,statut,categorie,travaux_effectues,justificatif_storage_path,fournisseur:fournisseurs(nom),chantier:chantiers(id,nom)").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId), "date_piece", TAILLE_PAGE, curseurDepenses),
     supabase.from("affectations_vehicules").select("id,date_debut,date_fin,note,employe:employes(prenom,nom)").eq("vehicule_id", id).eq("entreprise_id", ctx.entrepriseId).order("date_debut", { ascending: false }).limit(100),
     vehicule.employe_id ? supabase.from("pointages").select("id,date,tache,heures_normales,heures_supplementaires,chantier:chantiers(id,nom)").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", vehicule.employe_id).order("date", { ascending: false }).limit(12) : Promise.resolve({ data: [] }),

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { creerContratEntretienAction, creerInterventionAction, changerStatutInterventionAction } from "@/app/actions/suite-metier";
 import { euros } from "@/lib/devis";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
-import { borner, lireCurseur, lirePageCurseur } from "@/lib/fiches-agregats";
+import { borner, lireCurseur, lireOptionsChantiers, lireOptionsClients, lireOptionsEmployes, lirePageCurseur } from "@/lib/fiches-agregats";
 
 const LIMITE=200,TAILLE_HISTORIQUE=50;
 const champ="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -21,9 +21,9 @@ export default async function InterventionsPage({searchParams}:{searchParams:Pro
  const curseurHistorique=lireCurseur(message.historique_apres);
  const colonnesIntervention="id,numero,type,statut,priorite,objet,date_prevue,heure_prevue,duree_prevue,client:clients(nom,prenom,societe),chantier:chantiers(nom),employe:employes(nom,prenom)";
  const [{data:clients},{data:chantiers},{data:employes},{data:contratsBruts},{data:ouvertesBrutes},historique,{data:bonsBruts}]=await Promise.all([
-  sb.from("clients").select("id,nom,prenom,societe").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("societe"),
-  sb.from("chantiers").select("id,nom,client_id").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
-  sb.from("employes").select("id,nom,prenom,poste").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom"),
+  lireOptionsClients(sb,ctx.entrepriseId,{statut:"actif",tri:"societe"}).then((data)=>({data})),
+  lireOptionsChantiers(sb,ctx.entrepriseId).then((data)=>({data})),
+  lireOptionsEmployes(sb,ctx.entrepriseId).then((data)=>({data})),
   sb.from("contrats_entretien").select("id,numero,libelle,statut,date_debut,date_fin,periodicite,prochaine_intervention,montant_ht,client:clients(nom,prenom,societe),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).order("id").limit(LIMITE+1),
   sb.from("interventions").select(colonnesIntervention).eq("entreprise_id",ctx.entrepriseId).in("statut",["a_planifier","planifiee","en_cours"]).order("date_prevue",{ascending:true,nullsFirst:false}).order("id").limit(LIMITE+1),
   lirePageCurseur(sb.from("interventions").select(colonnesIntervention).eq("entreprise_id",ctx.entrepriseId).in("statut",["terminee","facturee","annulee"]),"date_prevue",TAILLE_HISTORIQUE,curseurHistorique),

@@ -6,6 +6,7 @@ import { Lien as Link } from "@/components/Lien";
 import { DepenseFournisseurForm } from "@/components/DepenseFournisseurForm";
 import { etatEcheanceFournisseur } from "@/lib/echeances-fournisseurs";
 import { chargerTotauxDepenses } from "@/lib/depenses-totaux";
+import { lireOptionsChantiers, lireOptionsEmployes } from "@/lib/fiches-agregats";
 
 const LIMITE_LISTE = 1000;
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
@@ -29,11 +30,11 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
     supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_piece", { ascending: false }).order("id", { ascending: false }).range(0, LIMITE_LISTE - 1),
     chargerTotauxDepenses(supabase, ctx.entrepriseId),
     supabase.from("fournisseurs").select("*").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId,{statutsExclus:[]}).then((data)=>({data})),
     supabase.from("commandes_fournisseurs").select("id,numero,fournisseur_id").eq("entreprise_id", ctx.entrepriseId).order("date_commande", { ascending: false }),
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
     supabase.from("outils").select("id,reference,designation").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu,rebut)").order("designation"),
-    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+    lireOptionsEmployes(supabase,ctx.entrepriseId).then((data)=>({data})),
   ]);
 
   const { totalTtc: total, regle, nombre } = totaux;

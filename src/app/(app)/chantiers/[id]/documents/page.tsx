@@ -43,7 +43,7 @@ export default async function DocumentsChantierPage({
   ]);
   const documents = pageDocuments.lignes, mediasConversation = pageMedias.lignes;
   const lienPage = (cle: "apres" | "medias_apres", valeur: string | null) => { const q = new URLSearchParams(); const autre = cle === "apres" ? "medias_apres" : "apres"; if (messages[autre]) q.set(autre, messages[autre]!); if (valeur) q.set(cle, valeur); const t = q.toString(); return `/chantiers/${id}/documents${t ? `?${t}` : ""}`; };
-  const pagination = (cle: "apres" | "medias_apres", courant: boolean, suivant: string | null) => (courant || suivant) ? <nav aria-label="Pagination" className="flex items-center justify-between text-sm">{courant ? <Link href={lienPage(cle, null)} className="rounded-md border px-3 py-2">← Plus récents</Link> : <span />}{suivant ? <Link href={lienPage(cle, suivant)} className="rounded-md border px-3 py-2">Plus anciens →</Link> : <span />}</nav> : null;
+  const pagination = (cle: "apres" | "medias_apres", courant: boolean, suivant: string | null) => (courant || suivant) ? <nav aria-label="Pagination" className="mb-20 flex items-center justify-between text-sm">{courant ? <Link href={lienPage(cle, null)} className="rounded-md border px-3 py-2">← Plus récents</Link> : <span />}{suivant ? <Link href={lienPage(cle, suivant)} className="rounded-md border px-3 py-2">Plus anciens →</Link> : <span />}</nav> : null;
   if (!chantier) notFound();
 
   // Performance : un appel Storage par document (N+1) devenait notable avec

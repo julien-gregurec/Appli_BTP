@@ -22,7 +22,7 @@ import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { BlocReservesChantier } from "@/components/BlocReservesChantier";
 import { lireEtatReserves } from "@/lib/reserves-gp";
 import { urlReservesPourUtilisateur } from "@/lib/multi-app-server";
-import { lireCurseur, lireDocumentsChantier, lirePageCurseur, lireSyntheseChantier, type DocumentChantier, type FactureFournisseurRecente } from "@/lib/fiches-agregats";
+import { type DocumentChantier, type FactureFournisseurRecente, lireCurseur, lireDocumentsChantier, lireOptionsEmployes, lirePageCurseur, lireSyntheseChantier } from "@/lib/fiches-agregats";
 import { lireHeuresChantier, lirePagePointagesValidesChantier, type HeuresChantier } from "@/lib/rentabilite";
 
 const TAILLE_PAGE_POINTAGES = 50;
@@ -116,7 +116,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     supabase.from("documents_chantier").select("id,nom,categorie,note,mime_type,audience,created_at").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).eq("categorie", "plan").order("created_at",{ascending:false}).order("id",{ascending:false}).limit(6),
     supabase.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","chantier").eq("ressource_id",id).eq("actif",true).maybeSingle(),
     supabase.from("equipes_chantiers").select("id,role_chantier,date_debut,date_fin,note,employe:employes(id,prenom,nom,poste,statut)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_fin",{ascending:true}).order("role_chantier"),
-    peutGerer?supabase.from("employes").select("id,prenom,nom,poste").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(sorti,suspendu)').order("nom"):Promise.resolve({data:[]}),
+    peutGerer?lireOptionsEmployes(supabase,ctx.entrepriseId,{inclureNonActifs:true}).then((data)=>({data})):Promise.resolve({data:[]}),
     peutGererAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).is("chantier_id",null).neq("statut","annulee").order("date_piece",{ascending:false}).limit(100):Promise.resolve({data:[]}),
     peutVoirSousTraitants?supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,fournisseur:fournisseurs(id,nom,specialite)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("created_at",{ascending:false}):Promise.resolve({data:[]}),
   ]);

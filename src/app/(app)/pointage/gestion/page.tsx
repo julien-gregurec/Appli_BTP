@@ -7,6 +7,7 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { bornesMois, chargerAnciennesSaisiesPage, chargerCompteurs, chargerControlesZone, chargerSessionsPage, chargerTotauxParEmploye, nombrePages, numeroPage, TAILLE_PAGE_ANCIENNES_SAISIES, TAILLE_PAGE_SESSIONS, type ControleZone } from "@/lib/pointages-gestion";
+import { lireOptionsChantiers, lireOptionsEmployes } from "@/lib/fiches-agregats";
 
 const input="rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const un=<T,>(valeur:T|T[]|null):T|null=>Array.isArray(valeur)?valeur[0]??null:valeur;
@@ -38,8 +39,8 @@ export default async function GestionPointagesPage({searchParams}:{searchParams:
   const verifications=await chargerControlesZone(supabase,ctx.entrepriseId,sessions.map(s=>s.id));
   // PT-08 : listes du formulaire de régularisation, chargées seulement pour qui peut s'en servir.
   const[{data:employesActifs},{data:chantiersOuverts}]=peutGerer?await Promise.all([
-    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
+    lireOptionsEmployes(supabase,ctx.entrepriseId).then((data)=>({data})),
+    lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),
   ]):[{data:[]},{data:[]}];
   const aujourdhui=new Date().toISOString().slice(0,10);
   const limite=new Date(`${aujourdhui}T00:00:00Z`);limite.setUTCDate(limite.getUTCDate()-31);

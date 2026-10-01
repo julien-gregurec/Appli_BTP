@@ -10,7 +10,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { Lien as Link } from "@/components/Lien";
 import { LIEUX_HORS_CHANTIER, libelleAffectationDepense } from "@/lib/expenses/affectation";
 import { lirePageNotesFrais, lireSyntheseNotesFraisParEmploye, type GroupeNotesFrais } from "@/lib/pilotage-agregats";
-import { lireCurseur } from "@/lib/fiches-agregats";
+import { lireCurseur, lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const TAILLE_PAGE = 300;
 
@@ -30,7 +30,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
   const [{ data: employe }, { data: categories }, { data: chantiers }, { data: grandsDeplacements }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
     supabase.from("categories_notes_frais").select("code,libelle").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("ordre"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),
     supabase.from("grands_deplacements").select("id,destination,date_debut,date_fin").eq("entreprise_id", ctx.entrepriseId).in("statut", ["brouillon","soumis","valide"]).order("date_debut", { ascending: false }).limit(100),
   ]);
   // Liste paginée par curseur (300 par page, notes_frais_page) ; groupes de
@@ -79,6 +79,6 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
 
     {!peutGererEquipe&&<div className="grid gap-3 md:hidden">{liste.map((n) => { const st = statutNoteFrais(n.statut); const emp = un(n.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null); const chantier = un(n.chantier as {nom:string}|{nom:string}[]|null); return <Link key={n.id} href={`/notes-frais/${n.id}`} className="rounded-lg border p-4"><div className="flex justify-between gap-3"><strong>{n.reference}</strong><span className="text-xs" style={{color:st.couleur}}>{st.libelle}</span></div><p className="mt-2 text-sm">{n.fournisseur ?? "Sans fournisseur"} · {euros(n.montant_ttc)}</p><p className="mt-1 text-xs text-neutral-500">{n.date_frais} · {emp ? `${emp.prenom} ${emp.nom}` : "—"} · {libelleAffectationDepense(chantier?.nom,n.lieu_hors_chantier)}</p>{n.verrouille_at && <span className="mt-2 inline-block rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-white">Document verrouillé</span>}</Link>; })}{!liste.length && <p className="rounded-lg border border-dashed p-8 text-center text-sm text-neutral-500">Aucune dépense accessible.</p>}</div>}
     <div className="hidden overflow-x-auto rounded-lg border md:block"><table className="w-full text-sm"><thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500"><tr><th className="px-3 py-2">Référence</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Employé</th><th className="px-3 py-2">Fournisseur</th><th className="px-3 py-2">Affectation</th><th className="px-3 py-2 text-right">TTC</th><th className="px-3 py-2">Statut</th></tr></thead><tbody>{liste.map((n) => { const st = statutNoteFrais(n.statut); const emp = un(n.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null); const chantier = un(n.chantier as {nom:string}|{nom:string}[]|null); return <tr key={n.id} className="border-t"><td className="px-3 py-2"><Link href={`/notes-frais/${n.id}`} className="font-mono font-semibold hover:underline">{n.reference}</Link></td><td className="px-3 py-2">{n.date_frais}</td><td className="px-3 py-2">{emp ? `${emp.prenom} ${emp.nom}` : "—"}</td><td className="px-3 py-2">{n.fournisseur ?? "—"}</td><td className="px-3 py-2">{libelleAffectationDepense(chantier?.nom,n.lieu_hors_chantier)}</td><td className="px-3 py-2 text-right font-mono">{euros(n.montant_ttc)}</td><td className="px-3 py-2"><span style={{color:st.couleur}}>{st.libelle}</span>{n.verrouille_at && " 🔒"}</td></tr>; })}{!liste.length && <tr><td colSpan={7} className="p-8 text-center text-neutral-500">Aucune dépense accessible.</td></tr>}</tbody></table></div>
-    {(curseur||page.suivant)&&<nav aria-label="Pagination des notes de frais" className="flex items-center justify-between text-sm">{curseur?<Link href={lienFiltres({})} className="rounded-md border px-3 py-2">← Plus récentes</Link>:<span/>}{page.suivant?<Link href={lienFiltres({apres:page.suivant})} className="rounded-md border px-3 py-2">Plus anciennes →</Link>:<span/>}</nav>}
+    {(curseur||page.suivant)&&<nav aria-label="Pagination des notes de frais" className="mb-20 flex items-center justify-between text-sm">{curseur?<Link href={lienFiltres({})} className="rounded-md border px-3 py-2">← Plus récentes</Link>:<span/>}{page.suivant?<Link href={lienFiltres({apres:page.suivant})} className="rounded-md border px-3 py-2">Plus anciennes →</Link>:<span/>}</nav>}
   </div></main>;
 }

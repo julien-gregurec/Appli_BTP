@@ -2,6 +2,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { creerMetreAction, creerModeleDevisAction } from "@/app/actions/suite-metier";
 import { euros } from "@/lib/devis";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const champ="mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const un=<T,>(v:T|T[]|null):T|null=>Array.isArray(v)?v[0]??null:v;
@@ -10,7 +11,7 @@ export default async function OuvragesPage({searchParams}:{searchParams:Promise<
  const [{data:modeles},{data:metres},{data:chantiers},{data:devis}]=await Promise.all([
   sb.from("modeles_devis").select("id,nom,description,categorie,actif,lignes:lignes_modeles_devis(id,designation,type,quantite,unite,prix_unitaire_ht,taux_tva,ordre)").eq("entreprise_id",ctx.entrepriseId).order("nom"),
   sb.from("metres").select("id,numero,nom,date_releve,notes,chantier:chantiers(nom),devis:devis(numero),lignes:lignes_metres(id,designation,resultat,unite,formule)").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}),
-  sb.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
+  lireOptionsChantiers(sb,ctx.entrepriseId).then((data)=>({data})),
   sb.from("devis").select("id,numero").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(100),
  ]);
  return <main className="p-4 sm:p-8"><div className="mx-auto max-w-7xl space-y-6"><header><h1 className="text-xl font-semibold">Ouvrages, modèles et métrés</h1><p className="text-sm text-neutral-500">Bibliothèque de devis chiffrés et calculs de surfaces, longueurs et quantités.</p></header>{message.error&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{message.error}</p>}{message.success&&<p className="rounded bg-green-50 p-3 text-sm text-green-700">{message.success}</p>}

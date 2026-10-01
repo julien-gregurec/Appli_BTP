@@ -16,6 +16,7 @@ import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { lireAlertesStock, lireDashboardChantiers, type AlertesStock, type DashboardChantiers } from "@/lib/pilotage-agregats";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 // Alertes d’échéances (outillage, livraisons) : filtrées par date en base et
 // bornées ; au-delà, l’écran le signale.
@@ -110,7 +111,7 @@ export default async function DashboardPage() {
     // Seules les échéances à 30 jours produisent une alerte : filtrées en base.
     voir.outillage ? supabase.from("outils").select("id, reference, designation, prochaine_verification").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu)").lte("prochaine_verification", dansJours(30)).order("prochaine_verification").order("id").limit(LIMITE_ALERTES) : null,
     voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]).lte("date_livraison_prevue", dansJours(3)).order("date_livraison_prevue").order("id").limit(LIMITE_ALERTES) : null,
-    peutPointer && employeCompte ? supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom") : null,
+    peutPointer && employeCompte ? lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})) : null,
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
     peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,

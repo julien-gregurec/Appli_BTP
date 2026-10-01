@@ -11,6 +11,7 @@ import { enregistrerReferenceComptableAction, modifierNoteFraisAction, transitio
 import { leverLegalHoldNoteFraisAction, poserLegalHoldNoteFraisAction } from "@/app/actions/notes-frais-admin";
 import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
 import { LIEUX_HORS_CHANTIER, libelleAffectationDepense, valeurAffectationDepense } from "@/lib/expenses/affectation";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
@@ -22,7 +23,7 @@ export default async function NoteFraisDetailPage({ params, searchParams }: { pa
   const [{ data: note }, { data: categories }, { data: chantiers }, { data: employeCompte }, { data: politique }, { data: grandsDeplacements }] = await Promise.all([
     supabase.from("notes_frais").select("*,employe:employes(id,prenom,nom),chantier:chantiers!notes_frais_chantier_entreprise_fkey(id,nom)").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("categories_notes_frais").select("code,libelle").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("ordre"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),
     supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
     supabase.from("politiques_conservation_notes_frais").select("mode_archivage,duree_conservation_annees,analyse_antivirus_obligatoire").eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("grands_deplacements").select("id,destination,date_debut,date_fin").eq("entreprise_id", ctx.entrepriseId).in("statut", ["brouillon","soumis","valide"]).order("date_debut", { ascending: false }).limit(100),

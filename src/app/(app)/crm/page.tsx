@@ -6,6 +6,7 @@ import { brevoEstConfigure } from "@/lib/brevo";
 import { euros } from "@/lib/devis";
 import { RelanceForm } from "@/components/RelanceForm";
 import { lireSyntheseCrm, type SyntheseCrm } from "@/lib/pilotage-agregats";
+import { lireOptionsClients } from "@/lib/fiches-agregats";
 
 // Factures proposées à la relance : les plus anciennes échéances d'abord ;
 // les indicateurs, eux, portent sur toutes les factures (gp_crm_synthese).
@@ -18,7 +19,7 @@ const nomClient=(c:{nom?:string|null;prenom?:string|null;societe?:string|null}|n
 export default async function CrmPage({searchParams}:{searchParams:Promise<{error?:string;success?:string}>}){
  const message=await searchParams,ctx=await getContexteEntreprise(),sb=await createClient();const aujourdHui=new Date().toISOString().slice(0,10);
  const [{data:clients},{data:factures},{data:activites},{data:relances},synthese]=await Promise.all([
-  sb.from("clients").select("id,nom,prenom,societe,email").eq("entreprise_id",ctx.entrepriseId).neq("statut","inactif").order("societe"),
+  lireOptionsClients(sb,ctx.entrepriseId,{statutExclu:"inactif",tri:"societe"}).then((data)=>({data})),
   sb.from("factures").select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients!factures_client_id_fkey(nom,prenom,societe,email),chantier:chantiers(nom,reference_interne)").eq("entreprise_id",ctx.entrepriseId).in("statut",["envoyee","payee_partiel","en_retard"]).order("date_echeance").order("id").limit(LIMITE_RELANCES),
   sb.from("appels_contacts").select("id,type,sens,objet,compte_rendu,a_rappeler_at,termine,created_at,client:clients(nom,prenom,societe)").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(100),
   sb.from("relances_impayes").select("id,niveau,canal,statut,date_prevue,date_envoi,sujet,facture:factures!relances_impayes_facture_id_fkey(id,numero,client:clients!factures_client_id_fkey(nom,prenom,societe))").eq("entreprise_id",ctx.entrepriseId).order("date_prevue",{ascending:false}).limit(100),

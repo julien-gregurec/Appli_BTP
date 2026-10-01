@@ -8,6 +8,7 @@ import { Lien as Link } from "@/components/Lien";
 import { lienMaps } from "@/lib/maps";
 import { ChantiersPlanningProvider, ModifierAffectationDiffere } from "@/components/ModifierAffectationDiffere";
 import { chargerPlanningSemaine } from "@/lib/pointages-donnees";
+import { lireOptionsChantiers, lireOptionsEmployes } from "@/lib/fiches-agregats";
 
 type A = {
   id: string;
@@ -98,8 +99,8 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   // Semaine entière (RPC planning_semaine) : affectations et pointages validés
   // étaient plafonnés à 1 000 lignes, et les heures prévues / réalisées avec.
   const [{ data: chantiers }, { data: employes }, semaine] = await Promise.all([
-    sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
-    sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+    lireOptionsChantiers(sb,ctx.entrepriseId).then((data)=>({data})),
+    lireOptionsEmployes(sb,ctx.entrepriseId).then((data)=>({data})),
     chargerPlanningSemaine(sb, ctx.entrepriseId, iso(debut), iso(fin), peutVoirToutLePlanning ? null : employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
   ]);
 

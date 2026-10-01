@@ -1,0 +1,20 @@
+admin | notes_frais page 300 (RPC) | 139 ms
+admin | messages page 200 | 408 ms
+admin | interventions historique 50 | 80 ms
+admin | interventions ouvertes 201 | 326 ms
+admin | commandes page 100 | 158 ms
+admin | appels d'offres historique | 72 ms
+admin | mouvements outil 50 | 27 ms
+admin | missions sous-traitant 50 | 84 ms
+admin | dépenses chantier 50 | 82 ms
+admin | paiements notes 101 | 113 ms
+ouvrier | notes_frais page 300 (RPC) | 43 ms
+ouvrier | messages page 200 | 57675 ms
+ouvrier | interventions historique 50 | 12554 ms
+ouvrier | interventions ouvertes 201 | 13446 ms
+ouvrier | commandes page 100 | 24784 ms
+ouvrier | appels d'offres historique | 24165 ms
+ouvrier | mouvements outil 50 | 27 ms
+ouvrier | missions sous-traitant 50 | 26289 ms
+ouvrier | dépenses chantier 50 | 24884 ms
+ouvrier | paiements notes 101 | 53827 ms

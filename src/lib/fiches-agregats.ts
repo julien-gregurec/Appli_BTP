@@ -191,3 +191,36 @@ export function borner<T>(lignes: T[] | null | undefined, limite: number): { lig
   const toutes = lignes ?? [];
   return { lignes: toutes.slice(0, limite), autres: toutes.length > limite };
 }
+
+// ---------------------------------------------------------------------------
+// Listes de choix complètes (gp_options_chantiers, gp_options_employes,
+// migration 20260930000404) : la lecture PostgREST triée par nom était tronquée
+// à 1 000 lignes et évaluait la RLS de chaque ligne avant d'en rendre une.
+// En cas d'erreur : liste vide (l'écran reste utilisable, sans choix faux).
+
+export type OptionChantier = { id: string; nom: string; reference_interne: string | null; client_id: string; ville: string | null; statut: string };
+export type OptionEmploye = { id: string; prenom: string; nom: string; poste: string | null; statut: string };
+
+export async function lireOptionsChantiers(supabase: SupabaseClient, entrepriseId: string, options: { statutsExclus?: string[]; clientId?: string; tri?: "nom" | "recent" } = {}): Promise<OptionChantier[]> {
+  const { data, error } = await supabase.rpc("gp_options_chantiers", {
+    p_entreprise_id: entrepriseId, p_statuts_exclus: options.statutsExclus ?? ["archive", "annule"], p_client_id: options.clientId ?? null, p_tri: options.tri ?? "nom",
+  });
+  if (error) { console.error("[options] chantiers indisponibles", error.message); return []; }
+  return (data ?? []) as OptionChantier[];
+}
+
+export async function lireOptionsEmployes(supabase: SupabaseClient, entrepriseId: string, options: { inclureNonActifs?: boolean } = {}): Promise<OptionEmploye[]> {
+  const { data, error } = await supabase.rpc("gp_options_employes", { p_entreprise_id: entrepriseId, p_inclure_inactifs: options.inclureNonActifs ?? false });
+  if (error) { console.error("[options] salariés indisponibles", error.message); return []; }
+  return (data ?? []) as OptionEmploye[];
+}
+
+export type OptionClient = { id: string; nom: string | null; prenom: string | null; societe: string | null; email: string | null; statut: string | null };
+
+export async function lireOptionsClients(supabase: SupabaseClient, entrepriseId: string, options: { statut?: string; statutExclu?: string; tri?: "recent" | "nom" | "societe" } = {}): Promise<OptionClient[]> {
+  const { data, error } = await supabase.rpc("gp_options_clients", {
+    p_entreprise_id: entrepriseId, p_statut: options.statut ?? null, p_statut_exclu: options.statutExclu ?? null, p_tri: options.tri ?? "recent",
+  });
+  if (error) { console.error("[options] clients indisponibles", error.message); return []; }
+  return (data ?? []) as OptionClient[];
+}
