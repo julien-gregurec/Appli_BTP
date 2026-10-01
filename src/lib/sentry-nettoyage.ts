@@ -11,32 +11,54 @@ import { masquerPourJournal } from "@elsatia/email";
 
 type Evenement = {
   message?: string;
+  exception?: { values?: { value?: string }[] };
+  extra?: Record<string, unknown>;
   request?: { url?: string; query_string?: unknown; cookies?: unknown; headers?: Record<string, string> };
   breadcrumbs?: { message?: string; data?: Record<string, unknown> }[];
 };
 
 const EN_TETES_SENSIBLES = new Set(["cookie", "authorization", "x-supabase-auth", "stripe-signature"]);
 
+// Données bancaires (rotation des clés V1) : IBAN complet (avec ou sans espaces), valeur
+// chiffrée « v1:… » / « v2:kN:A256GCM:… » et trousseau « kN:<clé> ». Les quatre derniers
+// caractères seuls (« •••• 0189 ») ne sont pas un IBAN et restent lisibles.
+const IBAN = /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g;
+const CHIFFRE_BANCAIRE = /\bv(?:1|2:k\d+:A256GCM):[A-Za-z0-9_:-]+/g;
+const CLE_TROUSSEAU = /\bk\d+:(?:[A-Za-z0-9+/]{43}=|[0-9a-fA-F]{64})/g;
+
+export function masquerDonneesBancaires(texte: string): string {
+  return texte
+    .replace(CHIFFRE_BANCAIRE, "[chiffré bancaire masqué]")
+    .replace(CLE_TROUSSEAU, "[clé masquée]")
+    .replace(IBAN, "[IBAN masqué]");
+}
+
+const masquer = (texte: string) => masquerDonneesBancaires(masquerPourJournal(texte));
+
 function masquerValeur(valeur: unknown): unknown {
-  return typeof valeur === "string" ? masquerPourJournal(valeur) : valeur;
+  return typeof valeur === "string" ? masquer(valeur) : valeur;
 }
 
 export function nettoyerEvenementSentry<T>(evenement: T): T {
   const e = evenement as Evenement;
-  if (typeof e.message === "string") e.message = masquerPourJournal(e.message);
+  if (typeof e.message === "string") e.message = masquer(e.message);
+  for (const exception of e.exception?.values ?? []) {
+    if (typeof exception.value === "string") exception.value = masquer(exception.value);
+  }
+  if (e.extra) for (const cle of Object.keys(e.extra)) e.extra[cle] = masquerValeur(e.extra[cle]);
   if (e.request) {
-    if (typeof e.request.url === "string") e.request.url = masquerPourJournal(e.request.url);
+    if (typeof e.request.url === "string") e.request.url = masquer(e.request.url);
     delete e.request.query_string;
     delete e.request.cookies;
     if (e.request.headers) {
       for (const nom of Object.keys(e.request.headers)) {
         if (EN_TETES_SENSIBLES.has(nom.toLowerCase())) delete e.request.headers[nom];
-        else e.request.headers[nom] = masquerPourJournal(e.request.headers[nom]);
+        else e.request.headers[nom] = masquer(e.request.headers[nom]);
       }
     }
   }
   for (const miette of e.breadcrumbs ?? []) {
-    if (typeof miette.message === "string") miette.message = masquerPourJournal(miette.message);
+    if (typeof miette.message === "string") miette.message = masquer(miette.message);
     if (miette.data) for (const cle of Object.keys(miette.data)) miette.data[cle] = masquerValeur(miette.data[cle]);
   }
   return evenement;
