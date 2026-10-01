@@ -59,6 +59,9 @@ begin
       from generate_series(1, v) i
       cross join lateral (select round((((i * 37) % 997) + 1) * 3 * (1 - ((i % 5) * 2.5) / 100) * 1.07, 2) as ht,
                                  (array[20, 10, 5.5, 20, 0])[1 + i % 5]::numeric as taux) x;
+    -- Chaque avoir est rattaché à la facture précédente (jamais un avoir).
+    update public.factures set facture_origine_id = pg_temp.u(pfx || 'fa', ('x' || lpad(right(id::text, 12), 16, '0'))::bit(64)::bigint - 1)
+      where entreprise_id = e and type = 'avoir';
     insert into public.lignes_factures (id, facture_id, entreprise_id, designation, quantite, prix_unitaire_ht, remise_ligne, taux_tva, ordre)
       select pg_temp.u(pfx || '1f', i), pg_temp.u(pfx || 'fa', i), e, 'Prestation ' || i, 3, (((i * 37) % 997) + 1) * 1.07,
              (i % 5) * 2.5, (array[20, 10, 5.5, 20, 0])[1 + i % 5], 1

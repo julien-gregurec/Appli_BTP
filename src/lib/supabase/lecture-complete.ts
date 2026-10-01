@@ -22,7 +22,8 @@
 export const TAILLE_PAGE_LECTURE = 1000;
 export const MAX_LIGNES_LECTURE = 250_000;
 
-type ReponsePage<T> = { data: T[] | null; error: unknown; count?: number | null };
+type ErreurLecture = { message: string };
+type ReponsePage<T> = { data: T[] | null; error: ErreurLecture | null; count?: number | null };
 type RequetePaginable<T> = { range(debut: number, fin: number): PromiseLike<ReponsePage<T>> };
 export type OptionsComptage = { count?: "exact" };
 
@@ -36,7 +37,7 @@ export class LectureTropVolumineuseError extends Error {
 export async function lireToutesLesLignes<T>(
   construire: (options: OptionsComptage) => RequetePaginable<T>,
   { taillePage = TAILLE_PAGE_LECTURE, maxLignes = MAX_LIGNES_LECTURE }: { taillePage?: number; maxLignes?: number } = {},
-): Promise<{ data: T[]; error: null } | { data: null; error: unknown }> {
+): Promise<{ data: T[]; error: null } | { data: null; error: ErreurLecture }> {
   const lignes: T[] = [];
   let attendu: number | undefined;
   for (;;) {

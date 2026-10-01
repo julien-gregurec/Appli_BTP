@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  00:31:11
+   Duration  1.03s (transform 104ms, setup 0ms, import 165ms, tests 649ms, environment 0ms)
+
