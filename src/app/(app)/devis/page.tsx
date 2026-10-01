@@ -51,9 +51,14 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
             <h1 className="text-xl font-semibold">Devis</h1>
             <p className="text-sm text-neutral-500">{total} devis correspondant(s){nbPages > 1 ? ` — page ${page}/${nbPages}` : ""}</p>
           </div>
-          <Link href="/devis/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
-            + Nouveau devis
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/devis/imports-tools" className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700" data-testid="lien-imports-tools">
+              Imports Tools / Relevé
+            </Link>
+            <Link href="/devis/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
+              + Nouveau devis
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
