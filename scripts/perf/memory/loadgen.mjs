@@ -116,7 +116,7 @@ async function vu(i, fin) {
       const r = await fetch(BASE + route, { headers: { cookie, ...ENCODAGE }, redirect: "manual" });
       status = r.status;
       bytes = (await r.arrayBuffer()).byteLength;
-    } catch (e) { status = "ERR"; }
+    } catch { status = "ERR"; }
     note(route, performance.now() - t0, status, bytes);
     if (THINK) await new Promise((r) => setTimeout(r, THINK * (0.5 + Math.random())));
   }

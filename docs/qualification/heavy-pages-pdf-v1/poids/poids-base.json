@@ -1,0 +1,62 @@
+{
+  "/dashboard": {
+    "status": 200,
+    "n": 5,
+    "ttfbP50": 783,
+    "ttfbMax": 877,
+    "totalP50": 814,
+    "totalMax": 948,
+    "octets": 4931839,
+    "options": 0,
+    "forms": 1,
+    "details": 8,
+    "actionsLiees": 0,
+    "actionsCles": 0,
+    "alertesRendues": 2686
+  },
+  "/planning?semaine=2026-09-21": {
+    "status": 200,
+    "n": 5,
+    "ttfbP50": 918,
+    "ttfbMax": 949,
+    "totalP50": 926,
+    "totalMax": 956,
+    "octets": 1281258,
+    "options": 7,
+    "forms": 382,
+    "details": 388,
+    "actionsLiees": 0,
+    "actionsCles": 0,
+    "alertesRendues": 0
+  },
+  "/pointage/gestion?mois=2026-09": {
+    "status": 200,
+    "n": 5,
+    "ttfbP50": 3263,
+    "ttfbMax": 3479,
+    "totalP50": 3294,
+    "totalMax": 3496,
+    "octets": 3540233,
+    "options": 190,
+    "forms": 3003,
+    "details": 10,
+    "actionsLiees": 3000,
+    "actionsCles": 0,
+    "alertesRendues": 0
+  },
+  "/pointage?mois=2026-09": {
+    "status": 200,
+    "n": 5,
+    "ttfbP50": 312,
+    "ttfbMax": 358,
+    "totalP50": 313,
+    "totalMax": 359,
+    "octets": 63622,
+    "options": 0,
+    "forms": 2,
+    "details": 9,
+    "actionsLiees": 0,
+    "actionsCles": 0,
+    "alertesRendues": 0
+  }
+}

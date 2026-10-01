@@ -23,7 +23,7 @@ for (let i = 0; i < n; i++) {
     : fmt.format(d);
   x += s.length;
 }
-console.log(`${mode}: ${n} formats en ${Math.round(performance.now() - t0)} ms`);
+console.log(`${mode}: ${n} formats en ${Math.round(performance.now() - t0)} ms (contrôle ${x})`);
 snap("fin boucle");
 global.gc?.(); global.gc?.();
 snap("après GC");

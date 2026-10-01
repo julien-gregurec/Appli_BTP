@@ -1,0 +1,1 @@
+{"event":"memory_config","heapLimitMo":8204,"limiteConteneurMo":1024,"pdfConcurrence":2,"ok":false,"message":"plafond de heap V8 (8204 Mo) supérieur à 75 % de la limite du conteneur (1024 Mo) : définir NODE_OPTIONS=--max-old-space-size (voir ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 § 7)"}

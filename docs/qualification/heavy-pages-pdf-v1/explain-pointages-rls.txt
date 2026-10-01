@@ -1,0 +1,30 @@
+BEGIN
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "facc0000-0000-4000-a000-000000000001", "role" : "authenticated"}
+(1 row)
+
+SET
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2147.33..2147.83 rows=202 width=25) (actual time=1995.854..1996.127 rows=1000 loops=1)
+   Buffers: shared hit=57586
+   ->  Sort  (cost=2147.33..2147.83 rows=202 width=25) (actual time=1995.852..1996.026 rows=1000 loops=1)
+         Sort Key: date DESC
+         Sort Method: quicksort  Memory: 158kB
+         Buffers: shared hit=57586
+         ->  Bitmap Heap Scan on pointages  (cost=35.05..2139.59 rows=202 width=25) (actual time=5.784..1994.005 rows=1558 loops=1)
+               Recheck Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= '2026-09-01'::date) AND (date <= '2026-09-30'::date))
+               Filter: (peut_consulter_pointage_employe(entreprise_id, employe_id) AND est_membre_actif(entreprise_id))
+               Heap Blocks: exact=72
+               Buffers: shared hit=57583
+               ->  Bitmap Index Scan on pointages_entreprise_date_idx  (cost=0.00..35.00 rows=1817 width=0) (actual time=0.071..0.072 rows=1560 loops=1)
+                     Index Cond: ((entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid) AND (date >= '2026-09-01'::date) AND (date <= '2026-09-30'::date))
+                     Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=139
+ Planning Time: 0.336 ms
+ Execution Time: 1996.216 ms
+(18 rows)
+
+ROLLBACK
