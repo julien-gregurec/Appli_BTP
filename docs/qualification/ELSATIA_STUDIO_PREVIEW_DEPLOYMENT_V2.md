@@ -3,6 +3,45 @@
 Date : 2026-10-01 · Branche : `claude/studio-preview-live-deploy-v2` (depuis `origin/claude/charming-allen-k61cec` @ `561793c0`)
 · Poste opérateur : Mac local · Guide utilisateur : `docs/qualification/ELSATIA_STUDIO_PREVIEW_USER_TEST_V2.md`
 
+## Mise à jour V4 — tentative « finalisation depuis Mac local » (2026-10-01)
+
+Session : Claude Code **cloud** (conteneur éphémère Linux), **pas le Mac local** annoncé par la mission.
+Branche poussée : `claude/cool-gauss-wjvmd8` (branche de session imposée), repartie de
+`origin/claude/vigilant-fermi-tvd8jb` @ `73312fa` (contenu V3.8 intact).
+
+### Verdict V4
+
+**STUDIO PREVIEW BLOCKED** (connexion ELSATIA) — inchangé.
+
+| Étape mission | Résultat V4 |
+|---|---|
+| 1. Contexte local | `pwd` = `/home/user/Appli_BTP` (conteneur cloud), **pas un Mac** → `DECISION_REQUIRED` : exécution conservatrice = documenter, aucune action distante |
+| 2. Connectivité | `supabase` / `vercel` CLI absents ; aucun jeton (`SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`) ni config locale ; `api.supabase.com`, `pgvvpqyjziyapbbkydmc.supabase.co`, `api.vercel.com`, `studio-preview-elsatia.vercel.app` → **CONNECT 403** (politique réseau de l'environnement) |
+| 3. Statut GP Preview / relance Pro | **NON VÉRIFIABLE / NON FAITE** |
+| 4. Backup (DB, ledger, Auth, Storage) | **NON FAIT** → donc aucune migration (règle respectée) |
+| 5. Ledger vs V8 (371, `20260928000812`) | **NON LU** |
+| 6. Upgrade V8 | **NON FAIT** |
+| 7. Variables Preview | **NON CONFIGURÉES** — liste exacte : V3.6 |
+| 8. Clé de signature identité | **NON CRÉÉE** — aucun secret généré, lu ou écrit |
+| 9. Déploiement GP Preview | **NON FAIT** (aucun `--prod`) ; routes `/identity/studio/handoff`, `/api/elsatia-identity/jwks`, `/api/cron/elsatia-identity` non testables |
+| 10–12. Pont, sécurité, storage authentifié | **REMOTE_PROOF_REQUIRED** (V3.7) |
+| 13. `scripts/preview/studio-preview-smoke.mjs` | non relancé (cible injoignable : 403 proxy) |
+| 14. Navigateur | non testé (cible injoignable) |
+| 15. DNS `studio-preview.elsatia.fr` | **DNS_PENDING** (non vérifié) |
+| 16. Redis / worker | **WORKER_PREVIEW_PENDING** |
+
+### Cause du blocage V4
+
+`BLOCKED_SESSION_NO_PROVIDER_ACCESS` (identique V3). La mission suppose les accès réseau du Mac ; elle a été
+lancée dans une session cloud dont le réseau refuse Supabase et Vercel. Pour débloquer, au choix :
+
+1. exécuter le runbook **V3.8** depuis le Mac (Supabase CLI + Vercel CLI connectés) ;
+2. ou, en session cloud : autoriser `api.supabase.com`, `*.supabase.co`, `api.vercel.com`, `*.vercel.app`
+   dans la politique réseau de l'environnement **et** fournir `SUPABASE_ACCESS_TOKEN` / `VERCEL_TOKEN`
+   comme secrets d'environnement, puis relancer la mission.
+
+Aucune modification de code dans cette session. Aucune Production touchée.
+
 ## Mise à jour V3 — pont d'identité GP Preview → Studio Preview (2026-10-01)
 
 Session : Claude Code **cloud** (conteneur éphémère), branche `claude/vigilant-fermi-tvd8jb` (depuis
