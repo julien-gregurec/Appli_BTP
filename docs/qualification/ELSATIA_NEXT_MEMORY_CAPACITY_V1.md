@@ -34,7 +34,9 @@ Résumé chiffré (détails et fichiers bruts aux §§ 2-12) :
 | `/planning` seule, 10 VU — RSS après GC forcé | **2 773 Mo** | **255 Mo** |
 | `/planning` + semaine d'affectations réaliste — RSS max / après GC | 2 609 / 1 585 Mo | 1 464 / 459 Mo |
 | Micro-banc 200 000 formats — RSS après GC | 2 350 Mo (`new` par appel) | 58 Mo (instance réutilisée) |
-| Profil réaliste mixte 25 VU — RSS max · après GC (T+15) | 1 119 · 615 Mo | voir § 2.2 |
+| Profil réaliste mixte 25 VU — RSS max | 1 119 Mo | 744 Mo |
+| Profil réaliste après 50 VU — RSS à T+15 après GC forcé | 615 Mo | 356 Mo |
+| Profil réaliste 50 VU — p50 · débit | 6,2 s · 3,42 req/s | 1,3 s · 5,83 req/s |
 
 Les autres constats mesurés n'ont **pas** été corrigés : ce sont des amplificateurs, pas la cause de la
 rétention. Ils sont listés au § 13 avec leurs preuves :
@@ -159,7 +161,33 @@ grandeur :
 
 ### 2.2 Après correctif — run R3 (`docs/qualification/memory-v1/R3-apres/`)
 
-<!-- R3 -->
+Même protocole que R2 (build après correctif, serveur neuf, même fixture). Mémoires en Mo.
+
+| Phase | RSS max | RSS fin | heapUsed max | heapTotal max | external max | arrayBuffers max | GC mineur n / ms | GC majeur n / ms | ELD p99 max | ELU moy |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| idle (60 s) | 246 | 221 | 96 | 126 | 5 | 1 | 1 / 1 | 3 / 24 | 52 ms | 0,00 |
+| 1 VU | **305** | 249 | 116 | 157 | 26 | 22 | 195 / 356 | 18 / 172 | 106 ms | 0,03 |
+| 10 VU | **583** | 583 | 370 | 400 | 47 | 41 | 414 / 2 064 | 10 / 130 | 121 ms | 0,15 |
+| 25 VU | **744** | 704 | 479 | 511 | 73 | 69 | 866 / 5 912 | 12 / 832 | 418 ms | 0,35 |
+| 50 VU | **1 001** | 999 | 649 | 691 | 121 | 117 | 1 319 / 12 969 | 24 / 1 574 | 707 ms | 0,67 |
+
+| Palier | req/s | p50 | p95 | p99 |
+|---|---:|---:|---:|---:|
+| 1 VU | 0,19 | 249 ms | 797 ms | 908 ms |
+| 10 VU | 1,63 | 248 ms | 701 ms | 895 ms |
+| 25 VU | 3,70 | 351 ms | 1,2 s | 6,0 s |
+| 50 VU | **5,83** | 1,3 s | 4,8 s | 13,7 s |
+
+Avant → après, par palier :
+
+| Palier | RSS max | p50 | Débit | Temps de GC mineur |
+|---|---|---|---|---|
+| 1 VU | 646 → 305 Mo | | | 2 204 → 356 ms |
+| 10 VU | 1 004 → 583 Mo | | | 20 102 → 2 064 ms |
+| 25 VU | 1 119 → 744 Mo | 1,2 s → 351 ms | | 38 911 → 5 912 ms |
+| 50 VU | 1 231 → 1 001 Mo | 6,2 s → 1,3 s | 3,42 → 5,83 req/s (+70 %) | 48 485 → 12 969 ms |
+
+Le correctif rend aussi du CPU : une construction de `Intl.DateTimeFormat` coûte ~58 µs (§ 7).
 
 ### 2.3 Lecture
 
@@ -206,10 +234,17 @@ Mémoires en Mo.
 | | T+5 | 615 | 101 | 107 | 5 | 535 |
 | | T+15 | 615 | 101 | 107 | 5 | 535 |
 | | T+15 + GC forcé | **615** | **101** | 107 | 5 | 535 |
-| R3 après (50 VU, réaliste) | <!-- R3-T --> | | | | | |
+| R3 après (50 VU, réaliste) | T+0 | 999 | 573 | 635 | 100 | 917 |
+| | T+1 | 364 | 99 | 106 | 5 | 282 |
+| | T+5 | 364 | 99 | 105 | 5 | 282 |
+| | T+15 | 356 | 98 | 105 | 5 | 275 |
+| | T+15 + GC forcé | **356** | **98** | 105 | 5 | 275 |
 
-À T+1 le heap JS est revenu au niveau d'idle. **Le GC forcé ne change rien** : rien de collectable n'est
-retenu côté JS. La RSS reste stable ensuite ; elle ne croît pas.
+À T+1 le heap JS est revenu au niveau d'idle, avant comme après le correctif. **Le GC forcé ne change rien** :
+rien de collectable n'est retenu côté JS. La RSS reste stable ensuite ; elle ne croît pas.
+
+La mémoire native retenue (RssAnon − idle) passe de **409 Mo à 149 Mo** avec le correctif. Le reste est le
+comportement normal de glibc après des pics d'allocation (§ 12).
 
 ## 5. Heap snapshots et critère de fuite
 
