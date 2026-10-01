@@ -14,7 +14,7 @@
  * Tablette d'abord : cartes repliables, aucune table à défilement horizontal, cibles ≥ 40 px.
  */
 import Link from "next/link";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   agregerEstimation, allowedActions, breadcrumbFor, buildEstimationGpPayload, centimesText, comparerEstimations, decimalString, ETAT_PROJET_LABELS, estimationDetails,
   estimationToCsv, formatHeures, formatMontant, formatPrixUnitaire, formatQuantiteOuvrage, METRE_SYNTHESE_ETAT_LABELS, METRE_SYNTHESE_ETATS, OUVRAGE_UNITE_LABELS,
@@ -23,11 +23,13 @@ import {
   type BibliothequeOuvrage, type BibliothequePrix, type EstimationComparaison, type EstimationGroupe, type EstimationLigne, type EstimationSource, type MetreSyntheseEtat,
   type OuvrageRecord, type OuvrageUnite, type PlanEtat, type PrixComposante, type PrixDonnees, type PrixOuvrage, type PrixType, type QuantitatifNiveau,
   type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure,
+  gpImportMessage, resumeEnvoiGp, type EstimationGpPayload, type GpEnvoi, type GpEnvoiErreur, type GpImportResultat,
 } from "@elsatia/releve-domain";
 import { getElsatiaClient } from "@/lib/auth/client";
 import { estimationHref, ficheHref, metreHref, planHref, quantitatifsHref, readEstimationSelection, RELEVES_PATH, type EstimationSelection } from "@/lib/releve/navigation";
 import { estimationPiecesJointes } from "@/lib/releve/plan/estimation-export";
 import { SupabaseEstimationRepository } from "@/lib/releve/plan/supabase-estimation-repository";
+import { GpEnvoiError, SupabaseGpHandoffRepository } from "@/lib/releve/plan/supabase-gp-handoff-repository";
 import { SupabaseMetreRepository } from "@/lib/releve/plan/supabase-metre-repository";
 import { SupabaseQuantitatifRepository } from "@/lib/releve/plan/supabase-quantitatif-repository";
 import { SupabaseReleveMediaRepository } from "@/lib/releve/supabase-media-repository";
@@ -85,6 +87,7 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   const [feedback, setFeedback] = useState("");
   const [timing, setTiming] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [envoiOuvert, setEnvoiOuvert] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,15 +120,21 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   const erreurs = anomalies.filter((a) => a.gravite === "erreur").length;
   const baseName = `estimation-${structure.releve.nom}-${selection.etat}`;
 
+  /** Contrat `elsatia.tools.estimation` (Lot 10) : métré, photos et annotations chargés au moment de l'export / de l'envoi. */
+  const preparerContrat = async () => {
+    const [metre, medias] = await Promise.all([
+      new SupabaseMetreRepository(client).synthese(releveId, selection.etat).catch(() => []),
+      new SupabaseReleveMediaRepository(client).loadMediaContext(releveId).catch(() => ({ medias: [], elements: [] })),
+    ]);
+    const jointes = estimationPiecesJointes(medias.medias, medias.elements);
+    return buildEstimationGpPayload({ releveId, etat: selection.etat, structure, sources, details, metre, ...jointes });
+  };
+  const canSync = allowedActions(actor, structure.releve).includes("sync-gp");
+
   const exporterGp = async () => {
     setExporting(true);
     try {
-      const [metre, medias] = await Promise.all([
-        new SupabaseMetreRepository(client).synthese(releveId, selection.etat).catch(() => []),
-        new SupabaseReleveMediaRepository(client).loadMediaContext(releveId).catch(() => ({ medias: [], elements: [] })),
-      ]);
-      const jointes = estimationPiecesJointes(medias.medias, medias.elements);
-      const payload = buildEstimationGpPayload({ releveId, etat: selection.etat, structure, sources, details, metre, ...jointes });
+      const payload = await preparerContrat();
       download(JSON.stringify(payload, null, 2), "application/json", `${baseName}.gp.json`);
       setFeedback("Contrat d'estimation préparé (non transmis) : Gestion Pro décidera prix de vente, marge, remise, TVA et devis.");
     } catch (error) { setFeedback(error instanceof Error ? error.message : "Export impossible."); } finally { setExporting(false); }
@@ -161,6 +170,10 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
         <button type="button" className={releveStyles.secondary} data-testid="est-export-csv" onClick={() => download(estimationToCsv(details), "text/csv;charset=utf-8", `${baseName}.csv`)}>Exporter CSV</button>
         <button type="button" className={releveStyles.secondary} data-testid="est-export-json" disabled={exporting} title="Contrat de données vers Gestion Pro (préparé, non transmis ; aucun devis créé)"
           onClick={() => void exporterGp()}>Transfert GP (JSON)</button>
+        <button type="button" className={releveStyles.primary} data-testid="est-envoyer-gp" disabled={!canSync || sources.length === 0}
+          title={canSync ? "Transmettre cette estimation à Gestion Pro (chiffrage complet, prix de vente, marge, TVA, devis)"
+            : "Envoi réservé au métreur ou à l'administrateur Relevé disposant de la permission Gestion Pro « gérer les ouvrages »"}
+          onClick={() => setEnvoiOuvert(true)}>Envoyer vers Gestion Pro</button>
         <button type="button" className={releveStyles.secondary} data-testid="est-imprimer" onClick={() => {
           for (const node of document.querySelectorAll<HTMLDetailsElement>("details[data-print]")) node.open = true;
           window.setTimeout(() => window.print(), 50);
@@ -168,6 +181,9 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
         <Link className={releveStyles.secondary} href={quantitatifsHref({ releveId, etat: selection.etat })} data-testid="est-lien-quantitatifs">Quantitatifs</Link>
         <Link className={releveStyles.secondary} href={metreHref({ releveId, etat: selection.etat })}>Métré</Link>
       </div>
+
+      <GpEnvoiPanel key={selection.etat} releveId={releveId} etat={selection.etat} releveNom={structure.releve.nom} chantierNom={structure.releve.chantier.nom}
+        clientNom={structure.releve.client.nom} ouvert={envoiOuvert} onFermer={() => setEnvoiOuvert(false)} preparer={preparerContrat} canSync={canSync} />
 
       <dl className={styles.tiles} data-testid="est-totaux">
         <div className={styles.tile}><dt>Total projet HT</dt><dd data-testid="est-total">{formatMontant(couts.total)}</dd></div>
@@ -207,6 +223,98 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
       <Comparaison ctx={ctx} sources={sources} />
     </div>
   </>;
+}
+
+/**
+ * Lot 11 — « Envoyer vers Gestion Pro » : résumé, confirmation explicite, envoi RÉEL (RPC d'import GP), résultat.
+ * Tools ne crée aucun devis : Gestion Pro reçoit un import (source, version, snapshot) et décide du chiffrage.
+ */
+function GpEnvoiPanel({ releveId, etat, releveNom, chantierNom, clientNom, ouvert, onFermer, preparer, canSync }: {
+  releveId: string; etat: MetreSyntheseEtat; releveNom: string; chantierNom: string; clientNom: string | null; ouvert: boolean; onFermer(): void;
+  preparer(): Promise<EstimationGpPayload>; canSync: boolean;
+}) {
+  const client = getElsatiaClient();
+  const repository = useMemo(() => new SupabaseGpHandoffRepository(client), [client]);
+  const [envois, setEnvois] = useState<GpEnvoi[]>([]);
+  const [payload, setPayload] = useState<EstimationGpPayload | null>(null);
+  const [phase, setPhase] = useState<"idle" | "preparation" | "confirmation" | "envoi">("idle");
+  const [resultat, setResultat] = useState<GpImportResultat | null>(null);
+  const [erreur, setErreur] = useState<GpEnvoiErreur | null>(null);
+  const [duree, setDuree] = useState<number | null>(null);
+
+  const relire = useCallback(() => repository.envois(releveId).then(setEnvois).catch(() => undefined), [repository, releveId]);
+  useEffect(() => { void relire(); }, [relire]);
+  // Préparation à l'ouverture seulement (le contrat est relu au moment de l'envoi, jamais mis en cache).
+  const preparerRef = useRef(preparer);
+  const fermerRef = useRef(onFermer);
+  useEffect(() => { preparerRef.current = preparer; fermerRef.current = onFermer; });
+  useEffect(() => {
+    if (!ouvert) return;
+    let annule = false;
+    const timer = window.setTimeout(() => {
+      setPhase("preparation"); setErreur(null); setResultat(null);
+      preparerRef.current().then((p) => { if (!annule) { setPayload(p); setPhase("confirmation"); } })
+        .catch((error: unknown) => {
+          if (annule) return;
+          setErreur({ type: "contrat", message: error instanceof Error ? error.message : "Préparation impossible.", reessayable: true });
+          setPhase("idle"); fermerRef.current();
+        });
+    }, 0);
+    return () => { annule = true; window.clearTimeout(timer); };
+  }, [ouvert]);
+
+  const envoyer = async () => {
+    if (!payload) return;
+    setPhase("envoi"); setErreur(null);
+    const debut = performance.now();
+    try {
+      const r = await repository.envoyer(releveId, etat, payload);
+      setResultat(r); setPayload(null); setPhase("idle"); onFermer();
+      void relire();
+    } catch (error) {
+      setErreur(error instanceof GpEnvoiError ? error.erreur : { type: "reseau", message: "Gestion Pro est injoignable pour le moment.", reessayable: true });
+      setPhase("confirmation");
+    } finally { setDuree(Math.round(performance.now() - debut)); }
+  };
+  const annuler = () => { setPayload(null); setPhase("idle"); setErreur(null); onFermer(); };
+  const envoisEtat = envois.filter((e) => e.etat === etat);
+  const resume = payload ? resumeEnvoiGp(payload) : null;
+  if (!ouvert && !resultat && !erreur && envoisEtat.length === 0) return null;
+
+  return <section className={`${styles.section} ${styles.noPrint}`} aria-label="Envoi vers Gestion Pro" data-testid="gp-envoi" data-duree-ms={duree ?? undefined}>
+    <h2>Gestion Pro</h2>
+    {phase === "preparation" && <p className={styles.muted} role="status">Préparation du contrat d&apos;estimation…</p>}
+    {resume && payload && (phase === "confirmation" || phase === "envoi") && <div data-testid="gp-envoi-resume">
+      <p className={styles.muted}>Vérifiez avant l&apos;envoi. Gestion Pro recevra un <strong>import</strong> (et non un devis) : prix de vente, marge, remise, TVA et devis y sont décidés.</p>
+      <dl className={styles.tiles}>
+        <div className={styles.tile}><dt>Source</dt><dd data-testid="gp-resume-source">Tools · Relevé &amp; Métré</dd></div>
+        <div className={styles.tile}><dt>Relevé</dt><dd>{releveNom}</dd></div>
+        <div className={styles.tile}><dt>Chantier</dt><dd data-testid="gp-resume-chantier">{chantierNom}</dd></div>
+        <div className={styles.tile}><dt>Client</dt><dd>{clientNom ?? "—"}</dd></div>
+        <div className={styles.tile}><dt>État</dt><dd>{METRE_SYNTHESE_ETAT_LABELS[etat]}</dd></div>
+        <div className={styles.tile}><dt>Contrat</dt><dd data-testid="gp-resume-contrat">{resume.contrat}</dd></div>
+        <div className={styles.tile}><dt>Ouvrages</dt><dd data-testid="gp-resume-ouvrages">{resume.ouvrages}</dd></div>
+        <div className={styles.tile}><dt>Lignes</dt><dd data-testid="gp-resume-lignes">{resume.lignes} · {resume.lignesSansPrix} sans prix</dd></div>
+        <div className={styles.tile}><dt>Montant estimatif Tools</dt><dd data-testid="gp-resume-montant">{formatMontant(scaled(Number(resume.montantHt), 2))} HT</dd></div>
+        <div className={styles.tile}><dt>Pièces jointes</dt><dd>{resume.photos} photo(s) · {resume.annotations} annotation(s) · {resume.anomalies} anomalie(s)</dd></div>
+      </dl>
+      <div className={styles.bar}>
+        <button type="button" className={releveStyles.primary} data-testid="gp-envoi-confirmer" disabled={phase === "envoi" || !canSync} onClick={() => void envoyer()}>
+          {phase === "envoi" ? "Envoi en cours…" : erreur?.reessayable ? "Renvoyer" : "Confirmer l'envoi"}</button>
+        <button type="button" className={releveStyles.secondary} data-testid="gp-envoi-annuler" disabled={phase === "envoi"} onClick={annuler}>Annuler</button>
+      </div>
+    </div>}
+    {resultat && <p className={releveStyles.feedback} role="status" data-testid="gp-envoi-message" data-statut={resultat.statut} data-version={resultat.version}>{gpImportMessage(resultat)}</p>}
+    {erreur && <p className={releveStyles.feedback} role="alert" data-testid="gp-envoi-erreur" data-type={erreur.type}>
+      {erreur.message}{erreur.type === "obsolete" && <> <button type="button" className={releveStyles.secondary} data-testid="gp-envoi-recharger" onClick={() => window.location.reload()}>Recharger l&apos;estimation</button></>}
+    </p>}
+    {envoisEtat.length > 0 && <ul className={styles.rows} data-testid="gp-envois">
+      {envoisEtat.map((e) => <li key={e.importId} data-testid="gp-envoi-historique" data-version={e.version}>
+        <span>Version {e.version} · {new Date(e.le).toLocaleString("fr-FR")} · {e.ouvrages} ouvrage(s), {e.lignes} ligne(s) · {formatMontant(scaled(e.montant, 2))} HT estimatifs</span>
+        <span className={styles.badge}>{e.priseEnCharge ? "Prise en charge dans Gestion Pro" : e.nouvelleVersion ? "Remplacée par une version plus récente" : "Reçue par Gestion Pro"}</span>
+      </li>)}
+    </ul>}
+  </section>;
 }
 
 function GroupeCard({ groupe, open: initial }: { groupe: EstimationGroupe; open: boolean }) {
