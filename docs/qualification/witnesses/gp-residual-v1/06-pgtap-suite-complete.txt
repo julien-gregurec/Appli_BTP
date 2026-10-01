@@ -71,7 +71,7 @@ gp_pilot_rgpd_manifeste_fichiers plan=9 ok=9 not_ok=0 erreurs=0 PROPRE
 gp_pointages_totaux_mois_v1 plan=43 ok=43 not_ok=0 erreurs=0 PROPRE
 gp_reception_commande_stock_transactionnel_v1 plan=66 ok=66 not_ok=0 erreurs=0 PROPRE
 gp_rentabilite_agregats_v1 plan=60 ok=60 not_ok=0 erreurs=0 PROPRE
-gp_residuel_agregats_v1 plan=230 ok=230 not_ok=0 erreurs=0 PROPRE
+gp_residuel_agregats_v1 plan=283 ok=64 not_ok=1 erreurs=230 NON_PROPRE
 gp_v1_numerotation_documents plan=15 ok=15 not_ok=0 erreurs=0 PROPRE
 grants_explicites_socle_comptes plan=3 ok=3 not_ok=0 erreurs=0 PROPRE
 idempotence_paiement_et_avoir plan=8 ok=8 not_ok=0 erreurs=0 PROPRE
@@ -166,5 +166,5 @@ v8_convergence_incident_gardes_v1 plan=32 ok=32 not_ok=0 erreurs=0 PROPRE
 verrouillage_colonnes_commerciales_entreprises plan=9 ok=9 not_ok=0 erreurs=0 PROPRE
 verrouiller_facture_emise plan=6 ok=6 not_ok=0 erreurs=0 PROPRE
 workflow_devis_v1_chantier_depuis_devis plan=10 ok=10 not_ok=0 erreurs=0 PROPRE
-TOTAL fichiers=168 propres=159 ok=8663 not_ok=14 journaux=/tmp/claude-0/-home-user-Appli-BTP/02637267-460a-58a8-987d-319d31323338/scratchpad/pgtap-full
+TOTAL fichiers=168 propres=158 ok=8497 not_ok=15 journaux=/tmp/claude-0/-home-user-Appli-BTP/02637267-460a-58a8-987d-319d31323338/scratchpad/pgtap-full2
 FIN

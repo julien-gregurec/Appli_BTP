@@ -253,3 +253,27 @@ export async function lireSyntheseParc(supabase: SupabaseClient, entrepriseId: s
   const d = data as { vehicules: Record<string, unknown>; outils: Record<string, unknown> };
   return { vehicules: { nb: nombre(d.vehicules.nb), alertes: nombre(d.vehicules.alertes) }, outils: { nb: nombre(d.outils.nb), alertes: nombre(d.outils.alertes), horsService: nombre(d.outils.hors_service) } };
 }
+
+/**
+ * Page par curseur croissant sur (nom, id) — nom non unique, non nul — pour les
+ * annuaires (fournisseurs, sous-traitants). Curseur opaque (base64url).
+ */
+export async function lirePageParNom<T extends { id: string; nom: string }>(
+  requete: unknown,
+  taille: number,
+  apres: string | null,
+): Promise<{ lignes: T[]; suivant: string | null }> {
+  type Chainable = { or(f: string): Chainable; order(c: string, o: { ascending: boolean }): Chainable; limit(n: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }> };
+  let q = requete as Chainable;
+  let curseur: { nom: string; id: string } | null = null;
+  try { curseur = apres ? JSON.parse(Buffer.from(apres, "base64url").toString("utf8")) : null; } catch { curseur = null; }
+  if (curseur && typeof curseur.nom === "string" && /^[0-9a-f-]{36}$/i.test(curseur.id)) {
+    const nom = `"${curseur.nom.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+    q = q.or(`nom.gt.${nom},and(nom.eq.${nom},id.gt.${curseur.id})`);
+  }
+  const { data, error } = await q.order("nom", { ascending: true }).order("id", { ascending: true }).limit(taille + 1);
+  if (error) throw new Error(`Liste indisponible : ${error.message}`);
+  const lignes = (data ?? []).slice(0, taille);
+  const derniere = lignes[lignes.length - 1];
+  return { lignes, suivant: (data ?? []).length > taille && derniere ? Buffer.from(JSON.stringify({ nom: derniere.nom, id: derniere.id })).toString("base64url") : null };
+}

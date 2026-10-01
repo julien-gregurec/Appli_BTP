@@ -235,3 +235,6 @@ $$;
 
 revoke all on function public.gp_parc_synthese(uuid, date) from public, anon;
 grant execute on function public.gp_parc_synthese(uuid, date) to authenticated;
+
+-- Annuaires /fournisseurs et /sous-traitants paginés par curseur (nom, id).
+create index if not exists fournisseurs_annuaire_curseur_idx on public.fournisseurs (entreprise_id, type_tiers, nom, id);
