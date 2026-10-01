@@ -420,14 +420,19 @@ Aucun rollback ne touche la Production. Aucun ne suppose de PITR (plan gratuit).
 | `test:preview-pack` | ✅ 31/31 |
 | **`test:preview-v8-gate` (nouveau)** | ✅ **12/12** |
 | `test:seeds` | ✅ 48/48 |
-| `verify:seeds` (base fraîche 371) | voir §13.1 |
+| `verify:seeds` (base fraîche 371) | ✅ **`ALL ACTIVE SEEDS QUALIFIED — 16/16 sur 371`** (§13.1) |
 | `test:migration-targets` 7/7 · `test:preflight-preview` 5/5 · `test:smoke-email` 13/13 · `test:dr-guard` 10/10 · `test:incident-drill` 6/6 · scripts Stripe 5/10/6 | ✅ |
 | `verify:env-manifest` (14 DECISION_REQUIRED, inchangé) · `test:env-manifest` 67/67 · `verify:secrets` · `verify:stripe-prices` | ✅ |
 | DB verify sur base **V7 + pilote upgradée en V8** (répétition) | ✅ **GO** : 371/371, 37 contrôles (2 non bloquants avant propriétaire), préflight 2 anomalies attendues `--before-owner`, 39/39 RPC |
 
 ### 13.1 Seeds
 
-<!-- rempli après exécution -->
+`SEEDS_DR_PGPASSWORD=… node scripts/seeds/verify-seeds.mjs` :
+
+| Passe | Résultat | Cause |
+|---|---|---|
+| 1 | `SEED BLOCKERS REMAIN — 15/16` : `dr-synthetic` en échec | **environnement** : extension `plpython3u` absente du conteneur (`00_supabase_stubs.sql:187`), paquet `postgresql-plpython3-16` non installé. C'est un prérequis déjà listé au rapport V8 §18. Aucun code modifié |
+| 2 (après `apt-get install postgresql-plpython3-16`) | ✅ **`ALL ACTIVE SEEDS QUALIFIED — 16/16 seeds qualifiés sur 371 migrations (20260928000812_…)`** | — |
 
 ## 14. Dry-run de la procédure Preview
 
