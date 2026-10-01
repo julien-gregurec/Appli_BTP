@@ -58,3 +58,15 @@ export function formatHeure(value: string) {
 export function formatJourCourt(date: Date) {
   return FORMAT_JOUR_COURT.format(date);
 }
+
+// Types d'activité d'une affectation du planning des équipes (ordre d'affichage des listes).
+// Partagé entre la page (libellés) et le formulaire client « Modifier » : une seule copie.
+export const ACTIVITES_AFFECTATION: [string, string][] = [
+  ["chantier", "Chantier"],
+  ["bureau", "Bureau"],
+  ["depot", "Dépôt"],
+  ["visite_medicale", "Visite médicale"],
+  ["formation", "Formation"],
+  ["conge", "Congé / absence"],
+  ["autre", "Autre activité"],
+];
