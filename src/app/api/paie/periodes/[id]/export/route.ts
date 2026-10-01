@@ -7,6 +7,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { reponseXlsx } from "@/lib/xlsx";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lireParLots, lireToutesLesLignes } from "@/lib/supabase/lecture-complete";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,7 +42,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const [{ data: periode, error: erreurPeriode }, { data: dossiers, error: erreurDossiers }] = await Promise.all([
       supabase.from("periodes_paie").select("id,mois,date_debut,date_fin,statut,date_validation,date_export").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
-      supabase.from("dossiers_paie_salaries").select("id,employe_id,statut,heures_normales,heures_sup_25,heures_sup_50,heures_absence,jours_conges,total_paniers,total_trajets,total_transports,total_grands_deplacements,total_kilometres,total_primes,total_acomptes,total_notes_frais,commentaire_comptable,employe:employes(prenom,nom,reference_interne,poste)").eq("periode_id", id).eq("entreprise_id", ctx.entrepriseId).order("employe_id"),
+      // Lecture complète (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1) : PostgREST
+      // plafonne à 1 000 lignes sans erreur ; un export de paie n'est jamais partiel.
+      lireToutesLesLignes((options) => supabase.from("dossiers_paie_salaries").select("id,employe_id,statut,heures_normales,heures_sup_25,heures_sup_50,heures_absence,jours_conges,total_paniers,total_trajets,total_transports,total_grands_deplacements,total_kilometres,total_primes,total_acomptes,total_notes_frais,commentaire_comptable,employe:employes(prenom,nom,reference_interne,poste)", options).eq("periode_id", id).eq("entreprise_id", ctx.entrepriseId).order("employe_id").order("id")),
     ]);
     if (erreurPeriode || erreurDossiers) throw new Error(erreurPeriode?.message ?? erreurDossiers?.message);
     if (!periode) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
@@ -61,8 +64,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const fichiers: Record<string, Uint8Array> = { "variables-paie.csv": strToU8(csv(lignes)) };
     const dossierIds = ((dossiers ?? []) as DossierExport[]).map((dossier) => dossier.id);
+    // Toutes les pièces, par lots d'identifiants lus en entier et dans un ordre
+    // stable : au-delà de 1 000 pièces, le ZIP et son manifeste en omettaient
+    // sans erreur, et l'export était tout de même journalisé comme réussi.
     const { data: pieces, error: erreurPieces } = dossierIds.length
-      ? await supabase.from("pieces_jointes_paie").select("id,dossier_id,type_document,nom_original,storage_path,mime_type,taille_octets,empreinte_sha256").in("dossier_id", dossierIds)
+      ? await lireParLots(dossierIds, (lot, options) => supabase.from("pieces_jointes_paie").select("id,dossier_id,type_document,nom_original,storage_path,mime_type,taille_octets,empreinte_sha256", options).in("dossier_id", lot).order("id"))
       : { data: [], error: null };
     if (erreurPieces) throw new Error(erreurPieces.message);
     const manifeste: Array<Record<string, string | number | null>> = [];
