@@ -34,7 +34,7 @@ Cause unique, un blocage d'environnement et non applicatif :
    - Brevo ou fournisseur email ;
    - Redis.
 
-Conséquence : **aucune écriture distante, aucune lecture distante**. Le règle « STOP WRITES » s'applique de fait.
+Conséquence : **aucune écriture distante, aucune lecture distante**. La règle « STOP WRITES » s'applique de fait.
 
 Seule la partie locale de la mission a été exécutée (§A) : elle est verte.
 
