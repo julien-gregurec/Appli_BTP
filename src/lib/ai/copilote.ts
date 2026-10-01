@@ -143,11 +143,12 @@ async function heuresSupplementairesSemaine(supabase: Supabase, entrepriseId: st
 }
 
 async function rentabiliteChantiers(supabase: Supabase, entrepriseId: string) {
-  const lignes = await calculerRentabiliteChantiers(supabase, entrepriseId);
-  return lignes
-    .filter((l) => l.factureHt > 0 || l.coutMainOeuvre > 0 || l.coutAchats > 0 || l.coutSousTraitance > 0)
-    .sort((a, b) => a.marge - b.marge)
-    .slice(0, 30);
+  // Totaux calculés en base : une erreur ne doit jamais devenir des marges à 0.
+  try {
+    return await calculerRentabiliteChantiers(supabase, entrepriseId, { limite: 30 });
+  } catch {
+    return { error: "La rentabilité des chantiers n'est pas disponible pour le moment." };
+  }
 }
 
 async function chercherEmploye(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
