@@ -123,6 +123,29 @@ begin
     insert into public.mouvements_stock (id, entreprise_id, article_id, chantier_id, type, quantite, date)
       select pg_temp.u(pfx || '5d', i), e, pg_temp.u(pfx || '5a', i), pg_temp.u(pfx || 'ca', 1 + i % 20), 'sortie', 1 + i % 4, date '2026-01-01' + (i % 181)
       from generate_series(1, v) i;
+
+    -- Pointage : 60 salariés ; V pointages validés / à vérifier, V sessions et
+    -- V contrôles GPS en mars 2026 ; V affectations sur la semaine du
+    -- 2 au 8 mars 2026 (planning).
+    insert into public.employes (id, entreprise_id, prenom, nom, numero_inscription, identifiant_interne, reference_interne, statut)
+      select pg_temp.u(pfx || '7e', i), e, 'Prénom' || i, 'Salarié' || lpad(i::text, 3, '0'), 'INS-' || pfx || '-' || i, pfx || '-' || i, 'EMP-' || i, 'actif'
+      from generate_series(1, 60) i;
+    insert into public.pointages (id, entreprise_id, employe_id, chantier_id, date, heures_normales, heures_supplementaires, verification_statut, origine_pointage)
+      select pg_temp.u(pfx || '7a', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20), date '2026-03-01' + (i % 31),
+             round(1 + (i % 13) * 0.5, 2), round((i % 4) * 0.25, 2), case when i % 5 = 0 then 'a_verifier' else 'valide' end, 'gps_complet'
+      from generate_series(1, v) i;
+    insert into public.sessions_pointage (id, entreprise_id, employe_id, chantier_id, arrivee_at, depart_at, pause_minutes, latitude_arrivee, longitude_arrivee, pointage_id)
+      select pg_temp.u(pfx || '7b', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20),
+             timestamptz '2026-03-01 07:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second',
+             timestamptz '2026-03-01 16:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second', 60, 48.85, 2.35, pg_temp.u(pfx || '7a', i)
+      from generate_series(1, v) i;
+    insert into public.verifications_zone_pointage (id, entreprise_id, session_id, employe_id, chantier_id, latitude, longitude, distance_metres, dans_zone, created_at)
+      select pg_temp.u(pfx || '7c', i), e, pg_temp.u(pfx || '7b', i), pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20), 48.85, 2.35, i % 300, i % 9 <> 0,
+             timestamptz '2026-03-01 10:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second'
+      from generate_series(1, v) i;
+    insert into public.affectations (id, entreprise_id, chantier_id, employe_id, date, heures, type_activite, tache)
+      select pg_temp.u(pfx || '7d', i), e, pg_temp.u(pfx || 'ca', 1 + i % 20), pg_temp.u(pfx || '7e', 1 + i % 60), date '2026-03-02' + (i % 7), round(0.5 + (i % 15) * 0.5, 2), 'chantier', 'Tâche ' || i
+      from generate_series(1, v) i;
   end loop;
 end $$;
 

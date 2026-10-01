@@ -1,0 +1,141 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 3249ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /planning : affectations et heures réalisées de la semaine exactes 1218ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 4312ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /planning : affectations et heures réalisées de la semaine exactes 2330ms
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 5969ms
+   → expected [ 1000, 1000, 1000 ] to deeply equal [ 1462, 1462, 1462 ]
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /planning : affectations et heures réalisées de la semaine exactes 2767ms
+   → expected [ 1000, 268 ] to deeply equal [ 1462, 268 ]
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 17739ms
+   → expected [ 1000, 1000, 1000 ] to deeply equal [ 5000, 5000, 5000 ]
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /planning : affectations et heures réalisées de la semaine exactes 8921ms
+   → expected [ 1000, 908 ] to deeply equal [ 5000, 908 ]
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 31156ms
+   → expected [ 1000, 1000, 1000 ] to deeply equal [ 20000, 20000, 20000 ]
+ × src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /planning : affectations et heures réalisées de la semaine exactes 2136ms
+   → expected [ 1000, 1000 ] to deeply equal [ 20000, 3616 ]
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 2224ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts
+AssertionError: expected [ 1000, 1000, 1000 ] to deeply equal [ 1462, 1462, 1462 ]
+
+- Expected
++ Received
+
+  [
+-   1462,
+-   1462,
+-   1462,
++   1000,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:20:73
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /planning : affectations et heures réalisées de la semaine exactes
+AssertionError: expected [ 1000, 268 ] to deeply equal [ 1462, 268 ]
+
+- Expected
++ Received
+
+  [
+-   1462,
++   1000,
+    268,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:31:55
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts
+AssertionError: expected [ 1000, 1000, 1000 ] to deeply equal [ 5000, 5000, 5000 ]
+
+- Expected
++ Received
+
+  [
+-   5000,
+-   5000,
+-   5000,
++   1000,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:20:73
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /planning : affectations et heures réalisées de la semaine exactes
+AssertionError: expected [ 1000, 908 ] to deeply equal [ 5000, 908 ]
+
+- Expected
++ Received
+
+  [
+-   5000,
++   1000,
+    908,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:31:55
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts
+AssertionError: expected [ 1000, 1000, 1000 ] to deeply equal [ 20000, 20000, 20000 ]
+
+- Expected
++ Received
+
+  [
+-   20000,
+-   20000,
+-   20000,
++   1000,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:20:73
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /planning : affectations et heures réalisées de la semaine exactes
+AssertionError: expected [ 1000, 1000 ] to deeply equal [ 20000, 3616 ]
+
+- Expected
++ Received
+
+  [
+-   20000,
+-   3616,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/pointages-donnees.postgrest.test.ts:31:55
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 5 passed (11)
+   Start at  01:16:36
+   Duration  82.41s (transform 94ms, setup 0ms, import 159ms, tests 82.03s, environment 0ms)
+

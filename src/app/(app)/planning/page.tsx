@@ -7,6 +7,7 @@ import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 import { Lien as Link } from "@/components/Lien";
 import { lienMaps } from "@/lib/maps";
 import { ChantiersPlanningProvider, ModifierAffectationDiffere } from "@/components/ModifierAffectationDiffere";
+import { chargerPlanningSemaine } from "@/lib/pointages-donnees";
 
 type A = {
   id: string;
@@ -93,17 +94,17 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const { data: employeCompte } = peutVoirToutLePlanning
     ? { data: null }
     : await sb.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
-  const requeteAffectations = sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date");
 
-  const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
+  // Semaine entière (RPC planning_semaine) : affectations et pointages validés
+  // étaient plafonnés à 1 000 lignes, et les heures prévues / réalisées avec.
+  const [{ data: chantiers }, { data: employes }, semaine] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    peutVoirToutLePlanning ? requeteAffectations : requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
-    sb.from("pointages").select("date,heures_normales,heures_supplementaires,verification_statut,employe_id,chantier_id").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).eq("verification_statut","valide"),
+    chargerPlanningSemaine(sb, ctx.entrepriseId, iso(debut), iso(fin), peutVoirToutLePlanning ? null : employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
   ]);
 
-  const affectations = (affectationsData ?? []) as A[];
-  const pointages=(pointagesData??[]) as P[];
+  const affectations = semaine.affectations as unknown as A[];
+  const pointages=semaine.pointages as unknown as P[];
   const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>pointages.filter(p=>p.employe_id===employeId&&p.date===date&&(!chantierId||p.chantier_id===chantierId)).reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];

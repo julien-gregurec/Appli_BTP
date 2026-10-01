@@ -1,0 +1,20 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 522ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /planning : affectations et heures réalisées de la semaine exactes 305ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 411ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /planning : affectations et heures réalisées de la semaine exactes 310ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 439ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /planning : affectations et heures réalisées de la semaine exactes 354ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 911ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /planning : affectations et heures réalisées de la semaine exactes 404ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 3133ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /planning : affectations et heures réalisées de la semaine exactes 984ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 14ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  01:32:10
+   Duration  8.23s (transform 138ms, setup 0ms, import 225ms, tests 7.79s, environment 0ms)
+

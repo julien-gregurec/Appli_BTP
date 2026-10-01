@@ -6,6 +6,7 @@ import { creerPointageRegularisationAction,supprimerPointageAction,validerPointa
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { chargerPointagesGestion } from "@/lib/pointages-donnees";
 
 const input="rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const un=<T,>(valeur:T|T[]|null):T|null=>Array.isArray(valeur)?valeur[0]??null:valeur;
@@ -33,10 +34,10 @@ export default async function GestionPointagesPage({searchParams}:{searchParams:
 
   const debutIso=`${debut}T00:00:00+02:00`;
   const finIso=`${fin}T23:59:59+02:00`;
-  const[{data:pointagesData},{data:sessionsData},{data:verificationsData},{data:entreprise}]=await Promise.all([
-    supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,latitude,longitude,verification_statut,origine_pointage,commentaire,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).gte("date",debut).lte("date",fin).order("date",{ascending:false}),
-    supabase.from("sessions_pointage").select("id,employe_id,chantier_id,arrivee_at,depart_at,pause_minutes,latitude_arrivee,longitude_arrivee,precision_arrivee_metres,latitude_depart,longitude_depart,precision_depart_metres,tache,pointage_id,pointage:pointages(id,verification_statut,anomalie_niveau,anomalie_motif,heures_attendues),employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).gte("arrivee_at",debutIso).lte("arrivee_at",finIso).order("arrivee_at",{ascending:false}),
-    supabase.from("verifications_zone_pointage").select("id,session_id,employe_id,chantier_id,latitude,longitude,precision_metres,distance_metres,dans_zone,created_at").eq("entreprise_id",ctx.entrepriseId).gte("created_at",debutIso).lte("created_at",finIso).order("created_at",{ascending:false}),
+  // Mois entier (RPC pointages_equipe_periode) : PostgREST plafonnait chaque
+  // liste à 1 000 lignes et les totaux d'heures par salarié étaient faux.
+  const[donnees,{data:entreprise}]=await Promise.all([
+    chargerPointagesGestion(supabase,ctx.entrepriseId,{debut,fin,debutIso,finIso}),
     supabase.from("entreprises").select("suivi_zone_actif,suivi_zone_frequence_minutes").eq("id",ctx.entrepriseId).maybeSingle(),
   ]);
   // PT-08 : listes du formulaire de régularisation, chargées seulement pour qui peut s'en servir.
@@ -47,9 +48,9 @@ export default async function GestionPointagesPage({searchParams}:{searchParams:
   const aujourdhui=new Date().toISOString().slice(0,10);
   const limite=new Date(`${aujourdhui}T00:00:00Z`);limite.setUTCDate(limite.getUTCDate()-31);
   const limiteRegularisation=limite.toISOString().slice(0,10);
-  const pointages=(pointagesData??[])as Pointage[];
-  const sessions=(sessionsData??[])as Session[];
-  const verifications=(verificationsData??[])as VerificationZone[];
+  const pointages=donnees.pointages as unknown as Pointage[];
+  const sessions=donnees.sessions as unknown as Session[];
+  const verifications=donnees.verifications as unknown as VerificationZone[];
   const lies=new Set(sessions.map(s=>s.pointage_id).filter(Boolean));
   const anciens=pointages.filter(p=>!lies.has(p.id));
   const parEmploye=new Map<string,{nom:string;heures:number}>();
