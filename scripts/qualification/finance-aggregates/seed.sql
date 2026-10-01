@@ -37,7 +37,8 @@ begin
     insert into public.postes (id, entreprise_id, nom) values (poste_adm, e, 'Administrateur'), (poste_ouv, e, 'Ouvrier');
     insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut) values (adm, e, poste_adm, 'actif'), (ouv, e, poste_ouv, 'actif');
     insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
-      select e, poste_adm, d.cle, true from public.permissions_disponibles d;
+      select e, poste_adm, d.cle, true from public.permissions_disponibles d
+      where d.cle <> 'mode_compte_depot'; -- un compte dépôt est renvoyé vers la borne stock
     insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
       select e, poste_ouv, d.cle, true from public.permissions_disponibles d where d.cle in ('voir_chantiers_assignes', 'acces_pointage', 'saisir_son_pointage');
 
