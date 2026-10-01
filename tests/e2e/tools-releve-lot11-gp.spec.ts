@@ -391,6 +391,24 @@ test("Sécurité : l'autre tenant ne voit, n'importe, ne compare ni ne chiffre r
   await expect(page.getByTestId("est-total")).toHaveCount(0);
 });
 
+test("Non-régression Gestion Pro : liste des devis, nouveau devis, chantiers et fiche chantier inchangés", async ({ page }) => {
+  await signInGp(page);
+  await page.goto(`${GP}/devis`);
+  await expect(page.getByRole("heading", { name: "Devis", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "+ Nouveau devis" })).toBeVisible();
+  await expect(page.getByTestId("lien-imports-tools")).toHaveText("Imports Tools / Relevé");
+  await page.goto(`${GP}/devis/nouveau`);
+  await expect(page.getByRole("heading", { name: "Nouveau devis" })).toBeVisible({ timeout: 60_000 });
+  await page.goto(`${GP}/chantiers`);
+  await expect(page.getByRole("heading", { name: "Chantiers", exact: true })).toBeVisible();
+  await expect(page.getByText(ctx.chantierGp.nom).first()).toBeVisible();
+  await page.goto(`${GP}/chantiers/${ctx.chantierGp.id}`);
+  await expect(page.getByRole("heading", { name: ctx.chantierGp.nom }).first()).toBeVisible({ timeout: 60_000 });
+  // Les devis brouillons créés depuis Tools apparaissent dans la liste GP comme les autres (sans numéro).
+  const { count } = await ctx.a.from("devis").select("id", { count: "exact", head: true }).eq("chantier_id", ctx.chantierGp.id).eq("statut", "brouillon").is("numero", null);
+  expect(count ?? 0).toBeGreaterThanOrEqual(1);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Performance : 100, 1 000, 5 000 lignes (ouvrages × 5 pièces) : envoi réel (préparation + contrôle serveur + import),
 // réimport identique, écran GP (liste, détail), comparaison, devis brouillon.
