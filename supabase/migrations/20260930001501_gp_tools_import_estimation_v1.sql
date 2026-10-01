@@ -192,14 +192,26 @@ alter table public.gp_tools_imports_lignes enable row level security;
 alter table public.gp_tools_imports_journal enable row level security;
 alter table public.gp_tools_correspondances_ouvrages enable row level security;
 
+-- Entreprises dont l'utilisateur peut lire les imports : membre ACTIF avec la permission GP `acces_devis`. Évaluée UNE
+-- fois par requête (sous-requête `(select …)`, InitPlan) et non par ligne : 5 000 lignes se lisent en quelques ms.
+create or replace function public.gp_tools_entreprises_lisibles()
+returns uuid[] language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(ue.entreprise_id), '{}'::uuid[])
+  from public.utilisateurs_entreprises ue
+  where ue.utilisateur_id = auth.uid() and ue.statut = 'actif'
+    and public.est_membre_actif(ue.entreprise_id) and public.a_permission(ue.entreprise_id, 'acces_devis');
+$$;
+revoke all on function public.gp_tools_entreprises_lisibles() from public, anon;
+grant execute on function public.gp_tools_entreprises_lisibles() to authenticated;
+
 create policy gp_tools_imports_select on public.gp_tools_imports for select to authenticated
-  using (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'acces_devis'));
+  using (entreprise_id = any ((select public.gp_tools_entreprises_lisibles())::uuid[]));
 create policy gp_tools_imports_lignes_select on public.gp_tools_imports_lignes for select to authenticated
-  using (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'acces_devis'));
+  using (entreprise_id = any ((select public.gp_tools_entreprises_lisibles())::uuid[]));
 create policy gp_tools_imports_journal_select on public.gp_tools_imports_journal for select to authenticated
-  using (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'acces_devis'));
+  using (entreprise_id = any ((select public.gp_tools_entreprises_lisibles())::uuid[]));
 create policy gp_tools_correspondances_select on public.gp_tools_correspondances_ouvrages for select to authenticated
-  using (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'acces_devis'));
+  using (entreprise_id = any ((select public.gp_tools_entreprises_lisibles())::uuid[]));
 
 revoke all on public.gp_tools_imports, public.gp_tools_imports_lignes, public.gp_tools_imports_journal,
   public.gp_tools_correspondances_ouvrages from public, anon, authenticated;
@@ -226,12 +238,17 @@ $$;
 create or replace function public.gp_tools_lignes_serveur(p_synthese jsonb)
 returns table (ref text, quantite numeric, montant numeric, plan_cle text)
 language sql immutable set search_path = public as $$
-  select s->>'planId' || ':' || (l->>'ouvrageId') || ':' || coalesce(l->>'pieceId', 'etage-' || (s->>'etageId')) || ':' || (l->>'etatProjet') || ':' || (l->>'nature'),
-         (l->>'quantite')::numeric, (l->>'montantRetenu')::numeric,
-         (s->>'planId') || '#' || (s->>'numero')
-  from jsonb_array_elements(coalesce(p_synthese, '[]'::jsonb)) s
-  cross join lateral jsonb_array_elements(coalesce(s->'estimation'->'lignes', '[]'::jsonb)) l
-  where exists (select 1 from jsonb_array_elements(coalesce(s->'quantitatif'->'ouvrages', '[]'::jsonb)) o where o->>'id' = l->>'ouvrageId');
+  -- Jointure par hachage (plan, ouvrage) : linéaire en lignes, même à 5 000 lignes × 1 000 ouvrages.
+  with plans as (select s from jsonb_array_elements(coalesce(p_synthese, '[]'::jsonb)) s),
+  ouvrages as (
+    select distinct p.s->>'planId' as plan_id, o->>'id' as ouvrage_id
+    from plans p cross join lateral jsonb_array_elements(coalesce(p.s->'quantitatif'->'ouvrages', '[]'::jsonb)) o),
+  lignes as (
+    select p.s->>'planId' as plan_id, p.s->>'etageId' as etage_id, p.s->>'numero' as numero, l
+    from plans p cross join lateral jsonb_array_elements(coalesce(p.s->'estimation'->'lignes', '[]'::jsonb)) l)
+  select x.plan_id || ':' || (x.l->>'ouvrageId') || ':' || coalesce(x.l->>'pieceId', 'etage-' || x.etage_id) || ':' || (x.l->>'etatProjet') || ':' || (x.l->>'nature'),
+         (x.l->>'quantite')::numeric, (x.l->>'montantRetenu')::numeric, x.plan_id || '#' || x.numero
+  from lignes x join ouvrages o on o.plan_id = x.plan_id and o.ouvrage_id = x.l->>'ouvrageId';
 $$;
 
 revoke all on function public.gp_tools_unite(text), public.gp_tools_client_nom(public.clients), public.gp_tools_lignes_serveur(jsonb)
@@ -297,6 +314,7 @@ declare
   v_plans_payload text; v_plans_serveur text;
   v_total_serveur numeric; v_nb_serveur integer;
   v_empreinte text;
+  v_texte text;
   v_existant public.gp_tools_imports;
   v_prec public.gp_tools_imports;
   v_version integer;
@@ -314,14 +332,15 @@ begin
     raise exception 'Relevé introuvable ou non accessible' using errcode = '42501';
   end if;
   v_ent := v_rel.entreprise_id;
+  -- Droits GP : membre RÉEL (pas une session support) d'une entreprise dont Gestion Pro est ouvert (abonnement GP actif
+  -- ou essai en cours). Vérifié AVANT la permission GP, pour un message exact quand Gestion Pro est fermé.
+  if not public.est_membre_actif_reel(v_ent) or not public.application_commercialement_ouverte(v_ent, 'gestion_pro') then
+    raise exception 'Gestion Pro n''est pas accessible pour cette entreprise' using errcode = '42501', hint = 'GP_INACCESSIBLE';
+  end if;
   -- Droits Tools : rôle métreur / administrateur Relevé, capability `releve-metre`, permission GP `gerer_ouvrages`.
   if not public.tools_releve_peut(p_releve_id, 'sync-gp') then
     raise exception 'Envoi vers Gestion Pro non autorisé : rôle métreur ou administrateur Relevé et permission Gestion Pro « gerer_ouvrages » requis'
       using errcode = '42501';
-  end if;
-  -- Droits GP : membre RÉEL (pas une session support) d'une entreprise dont Gestion Pro est ouvert.
-  if not public.est_membre_actif_reel(v_ent) or not public.application_commercialement_ouverte(v_ent, 'gestion_pro') then
-    raise exception 'Gestion Pro n''est pas accessible pour cette entreprise' using errcode = '42501', hint = 'GP_INACCESSIBLE';
   end if;
   if coalesce(p_etat, '') not in ('existant','projete','as_built') then
     raise exception 'État de synthèse inconnu : %', p_etat using errcode = '22023';
@@ -334,25 +353,25 @@ begin
 
   -- Le serveur fait foi : l'estimation est recalculée (moteur du Lot 10, droits compris) et comparée au contrat.
   v_synth := public.tools_releve_estimation_synthese(p_releve_id, p_etat);
-  select string_agg(distinct plan_cle, ',' order by plan_cle), coalesce(sum(montant), 0), count(*)
-    into v_plans_serveur, v_total_serveur, v_nb_serveur from public.gp_tools_lignes_serveur(v_synth);
   select string_agg((pl->>'planId') || '#' || (pl->>'numero'), ',' order by (pl->>'planId') || '#' || (pl->>'numero'))
     into v_plans_payload from jsonb_array_elements(coalesce(p_payload->'source'->'plans', '[]'::jsonb)) pl;
+  -- Une seule évaluation des lignes serveur ; comparaison ligne à ligne (référence, quantité, montant retenu).
+  with srv as materialized (select * from public.gp_tools_lignes_serveur(v_synth)),
+       cli as materialized (select l->>'ref' as ref, (l->>'quantite')::numeric as quantite, (l->>'montantRetenu')::numeric as montant
+                            from jsonb_array_elements(p_payload->'lignes') l)
+  select (select string_agg(distinct plan_cle, ',' order by plan_cle) from srv), (select coalesce(sum(montant), 0) from srv), (select count(*) from srv),
+         (select count(*) from srv full join cli on cli.ref = srv.ref
+          where srv.ref is null or cli.ref is null or srv.quantite is distinct from cli.quantite or srv.montant is distinct from cli.montant),
+         (select string_agg(ref || '|' || coalesce(quantite::text, '') || '|' || coalesce(montant::text, ''), E'\n' order by ref) from srv)
+    into v_plans_serveur, v_total_serveur, v_nb_serveur, v_ecarts, v_texte;
   if v_nb_serveur = 0 then
     raise exception 'Aucune ligne d''estimation à transmettre pour cet état' using errcode = '22023', hint = 'ESTIMATION_VIDE';
   end if;
-  select count(*) into v_ecarts
-  from public.gp_tools_lignes_serveur(v_synth) s
-  full join (select l->>'ref' as ref, (l->>'quantite')::numeric as quantite, (l->>'montantRetenu')::numeric as montant
-             from jsonb_array_elements(p_payload->'lignes') l) c on c.ref = s.ref
-  where s.ref is null or c.ref is null or s.quantite is distinct from c.quantite or s.montant is distinct from c.montant;
   if v_ecarts > 0 or v_plans_payload is distinct from v_plans_serveur or v_total_serveur <> (p_payload->'totaux'->>'total')::numeric then
     raise exception 'L''estimation a changé depuis son chargement (plan, ouvrage, prix ou quantité modifiés ou supprimés) : rechargez-la puis renvoyez-la'
       using errcode = 'PT409', hint = 'SOURCE_OBSOLETE', detail = format('%s ligne(s) en écart', v_ecarts);
   end if;
-  select encode(extensions.digest(convert_to(v_plans_serveur || E'\n' ||
-           string_agg(ref || '|' || coalesce(quantite::text, '') || '|' || coalesce(montant::text, ''), E'\n' order by ref), 'UTF8'), 'sha256'), 'hex')
-    into v_empreinte from public.gp_tools_lignes_serveur(v_synth);
+  v_empreinte := encode(extensions.digest(convert_to(v_plans_serveur || E'\n' || v_texte, 'UTF8'), 'sha256'), 'hex');
 
   -- Idempotence : même source, même contenu → le même import, jamais un doublon silencieux.
   select * into v_existant from public.gp_tools_imports

@@ -21,7 +21,7 @@ describe("parité contrat Tools (Lot 10) ↔ import Gestion Pro (migration 20260
   });
   it("même référence de ligne (plan:ouvrage:pièce|etage-<étage>:état:nature) : le serveur recompare chaque ligne", () => {
     expect(estimationTs).toContain("ref: `${source.planId}:${ligne.ouvrageId}:${ligne.pieceId ?? `etage-${source.etageId}`}:${ligne.etatProjet}:${ligne.nature}`");
-    expect(sql.replace(/\s+/g, " ")).toContain("s->>'planId' || ':' || (l->>'ouvrageId') || ':' || coalesce(l->>'pieceId', 'etage-' || (s->>'etageId')) || ':' || (l->>'etatProjet') || ':' || (l->>'nature')");
+    expect(sql.replace(/\s+/g, " ")).toContain("x.plan_id || ':' || (x.l->>'ouvrageId') || ':' || coalesce(x.l->>'pieceId', 'etage-' || x.etage_id) || ':' || (x.l->>'etatProjet') || ':' || (x.l->>'nature')");
   });
   it("Tools ne crée aucun devis : la création de devis n'existe que côté GP, en brouillon, sur action explicite", () => {
     expect(sql).toContain("gp_tools_import_creer_devis");

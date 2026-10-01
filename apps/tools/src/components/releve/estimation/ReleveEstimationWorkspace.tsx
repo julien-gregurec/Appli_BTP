@@ -172,7 +172,7 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
           onClick={() => void exporterGp()}>Transfert GP (JSON)</button>
         <button type="button" className={releveStyles.primary} data-testid="est-envoyer-gp" disabled={!canSync || sources.length === 0}
           title={canSync ? "Transmettre cette estimation à Gestion Pro (chiffrage complet, prix de vente, marge, TVA, devis)"
-            : "Envoi réservé au métreur ou à l'administrateur Relevé disposant de la permission Gestion Pro « gérer les ouvrages »"}
+            : "Envoi indisponible : rôle métreur ou administrateur Relevé, permission Gestion Pro « gérer les ouvrages » et Gestion Pro ouvert pour l'entreprise requis"}
           onClick={() => setEnvoiOuvert(true)}>Envoyer vers Gestion Pro</button>
         <button type="button" className={releveStyles.secondary} data-testid="est-imprimer" onClick={() => {
           for (const node of document.querySelectorAll<HTMLDetailsElement>("details[data-print]")) node.open = true;

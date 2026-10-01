@@ -390,7 +390,8 @@ select set_config('request.jwt.claim.sub', '', true);
 update public.entreprises set abonnement_statut = 'suspendu' where id = 'a0000000-0000-0000-0000-000000000001';
 set local role authenticated;
 select pg_temp.as_user('10000000-0000-0000-0000-000000000001');
-select throws_ok($$ select pg_temp.imp((select v from _k where nom = 'p4')) $$, '42501', null, 'T13. Gestion Pro suspendu pour l''entreprise : import refusé');
+select throws_ok($$ select pg_temp.imp((select v from _k where nom = 'p4')) $$, '42501', 'Gestion Pro n''est pas accessible pour cette entreprise',
+  'T13. Gestion Pro suspendu pour l''entreprise : import refusé, message explicite');
 reset role;
 select is((select count(*)::int from public.gp_tools_imports where source_releve_id = 'db000000-0000-0000-0000-000000000001'), 4, 'T14. GP inaccessible : rien d''écrit');
 

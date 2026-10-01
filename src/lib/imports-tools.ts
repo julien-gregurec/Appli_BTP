@@ -12,6 +12,9 @@ export const IMPORTS_TOOLS_CHEMIN = "/devis/imports-tools";
 export const importToolsHref = (id: string, comparer?: string | null) =>
   `${IMPORTS_TOOLS_CHEMIN}/${encodeURIComponent(id)}${comparer ? `?comparer=${encodeURIComponent(comparer)}` : ""}`;
 
+/** Colonnes d'un import, SANS le snapshot (plusieurs Mo à 5 000 lignes) : la liste et le détail ne lisent que ce qu'ils affichent. */
+export const COLONNES_IMPORT = "id,source_releve_id,source_etat,source_version,contract_name,contract_version,releve_nom,releve_reference,chantier_id,client_id,chantier_nom,client_nom,nb_ouvrages,nb_lignes,nb_lignes_sans_prix,nb_lignes_liees,montant_estimatif_ht,heures_estimees,statut,devis_id,devis_cree_le,precedent_import_id,nouvelle_version_id,transmis_par,created_at";
+
 export type ImportToolsStatut = "importe" | "devis_cree" | "remplace";
 
 export type ImportTools = {
