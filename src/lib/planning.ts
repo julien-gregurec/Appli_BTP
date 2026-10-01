@@ -39,17 +39,22 @@ export function formatDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const FORMAT_JOUR_COURT = new Intl.DateTimeFormat("fr-FR", {
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+});
+
 export function formatHeure(value: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return FORMAT_HEURE.format(new Date(value));
 }
 
 export function formatJourCourt(date: Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(date);
+  return FORMAT_JOUR_COURT.format(date);
 }

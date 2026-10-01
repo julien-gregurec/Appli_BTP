@@ -63,8 +63,11 @@ export function montantIndemnite(quantite: number, tarif: number) {
   return Math.round(quantite * tarif * 100) / 100;
 }
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1.
+const FORMAT_MOIS = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
+
 export function formaterMois(mois: string) {
-  return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${mois.slice(0, 7)}-01T12:00:00Z`));
+  return FORMAT_MOIS.format(new Date(`${mois.slice(0, 7)}-01T12:00:00Z`));
 }
 
 export function statutPeriodePaie(statut: string) {

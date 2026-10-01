@@ -19,8 +19,11 @@ type VehiculeListe = {
   employe: EmployeLie | EmployeLie[] | null;
 };
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_DATE_FR = new Intl.DateTimeFormat("fr-FR");
 const dateFr = (date: string | null) => date
-  ? new Intl.DateTimeFormat("fr-FR").format(new Date(`${date}T12:00:00`))
+  ? FORMAT_DATE_FR.format(new Date(`${date}T12:00:00`))
   : "—";
 
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
