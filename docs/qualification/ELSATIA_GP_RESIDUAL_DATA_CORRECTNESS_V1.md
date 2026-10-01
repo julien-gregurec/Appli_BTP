@@ -53,7 +53,7 @@ indépendants (exports ; écrans secondaires paie / banque / plateforme / CRM / 
 | F9 | Export de paie (XLSX / CSV / ZIP) | Pièces du ZIP et `manifeste.json` omises au-delà de 1 000, **export journalisé réussi** ; dossiers > 1 000 | `.in(dossierIds)` sans borne | `paie_export_contenu` (dossiers + pièces complets, visibilité RLS) |
 | F10 | `/notes-frais` | Groupes de validation par salarié (nombre, total, « à contrôler ») sur les **300** notes les plus récentes : une note en attente plus ancienne disparaissait de la validation | `.limit(300)` puis regroupement | `notes_frais_synthese_employes` + liste par curseur `notes_frais_page` |
 | F11 | `/crm` | « Factures à relancer », **« Reste à encaisser »**, « Rappels ouverts » (sur 100 communications) | listes plafonnées | `gp_crm_synthese` ; relances : 200 plus anciennes échéances, signalé |
-| F12 | `/dashboard` | Chantiers par statut, actifs, en retard ; alertes de stock (1 000 articles pris dans un ordre arbitraire) ; effectif présent | lectures sans borne | `gp_dashboard_chantiers`, `gp_alertes_stock`, `gp_effectif_actif` ; échéances outillage / livraisons filtrées par date |
+| F12 | `/dashboard` | Chantiers par statut, actifs, en retard ; alertes de stock (1 000 articles pris dans un ordre arbitraire) ; alertes véhicules (lus sans borne) et outils ; effectif présent | lectures sans borne | `gp_dashboard_chantiers`, `gp_alertes_stock`, `gp_alertes_parc`, `gp_effectif_actif` ; livraisons filtrées par date |
 | F13 | `/paiements-bancaires` | Notes validées les plus anciennes (donc les plus urgentes) jamais proposées au-delà de 100 ; lot de plus de 250 paiements **tronqué sans erreur** | `limit(100)` décroissant ; `.slice(0, 250)` | Plus anciennes d'abord + mention ; lot > 250 **refusé** avec message |
 | F14 | Plateforme — fiche entreprise | « Tarifs par poste » vide / partiel pour les tenants classés après la 1 000ᵉ ligne | `plateforme_postes_tarifs()` renvoie les postes de **toute** la plateforme (table → plafonnée) puis filtre JS | `plateforme_postes_tarifs_entreprise(p_entreprise_id)` |
 | F15 | Plateforme — applications | « Entreprises autorisées », « Utilisateurs habilités » | deux tables globales lues sans borne | `plateforme_applications_compteurs` |
@@ -126,7 +126,7 @@ Aucune modification de `max_rows`. Quatre migrations additives (aucune table mod
 | `20260930000401_gp_fiches_agregats_v1` | `gp_exiger_membre`, `gp_depenses_synthese`, `gp_client_synthese`, `gp_client_chantiers_page`, `gp_sous_traitant_missions_synthese`, `gp_chantier_documents_audiences`, `gp_chantier_documents_page`, `chantier_synthese_chiffree`, `gp_doe_contenu` ; index de curseur (entreprise, parent, date, id) |
 | `20260930000402_gp_pilotage_agregats_v1` | `paie_periode_synthese`, `paie_periode_dossiers_page`, `paie_export_contenu`, `notes_frais_synthese_employes`, `notes_frais_page`, `gp_crm_synthese`, `gp_dashboard_chantiers`, `gp_alertes_stock` |
 | `20260930000403_plateforme_agregats_par_tenant_v1` | `plateforme_postes_tarifs_entreprise`, `plateforme_applications_compteurs` |
-| `20260930000404_gp_options_selecteurs_v1` | `gp_options_chantiers / _employes / _clients`, `gp_parc_synthese`, `gp_effectif_actif`, `paie_anomalies_page` ; index CRM et annuaires ; **statistiques étendues** (dépendances entreprise ↔ parent, §7.3) |
+| `20260930000404_gp_options_selecteurs_v1` | `gp_options_chantiers / _employes / _clients`, `gp_parc_synthese`, `gp_alertes_parc`, `gp_effectif_actif`, `paie_anomalies_page` ; index CRM et annuaires ; **statistiques étendues** (dépendances entreprise ↔ parent, §7.3) |
 
 Côté Next : `src/lib/fiches-agregats.ts` (synthèses, pages RPC, curseurs `lirePageCurseur` / `lirePageCroissante` /
 `lirePageParNom`, `borner`, options) et `src/lib/pilotage-agregats.ts` ; ≈ 45 écrans modifiés. Principes :
@@ -170,6 +170,12 @@ page = dernier message ; page profonde à 20 000 en ≈ 9 ms.
 
 ### 7.1 Requêtes (PostgREST réel, avant → après)
 
+« Avant » : première exécution complète, schéma sans les index composites de ce lot
+(`01a-postgrest-mesures-premiere-execution.jsonl`). « Après » : exécution finale sur le train final
+(`01-postgrest-mesures.jsonl`, valeurs du même ordre). Sur le train final, les requêtes historiques profitent aussi
+des nouveaux index (sous-traitant à 20 000 : 3,9 s au lieu de 33,7 s), mais elles restent **fausses** au-delà
+de 1 000 lignes.
+
 | Chemin | 1 462 | 5 000 | 20 000 |
 |---|---|---|---|
 | Fiche client (totaux) | 2,3 s → 12 ms | 7,7 s → 22 ms | 1,8 s* → 30 ms |
@@ -203,16 +209,16 @@ Notes de frais 70,2 s → 0,14 s ; messages 53,4 s → 0,41 s ; commandes 35,2 s
 
 | Page | 1 462 | 5 000 | 20 000 |
 |---|---|---|---|
-| Fiche client | 0,28 s | 0,26 s | 0,24 s |
-| Fiche sous-traitant | 0,72 s | 0,68 s | 1,08 s |
-| Fiche véhicule / outil | 2,7 s | 0,35 / 0,42 s | 0,83 / 1,32 s |
-| `/flotte`, `/outillage` | 0,30 / 0,48 s | 0,32 / 0,33 s | 0,27 / 0,46 s |
-| Fiche chantier | 5,6 s | 0,97 s | 1,53 s |
-| Documents du chantier | 0,18 s | 0,24 s | 0,27 s |
-| DOE (dossier complet : 20 000 documents + 20 000 articles rendus) | 0,45 s | 1,34 s | 8,1 s |
-| Paie (période) | 0,41 s | 0,48 s | 0,62 s |
-| Notes de frais / CRM | 0,38 / 2,72 s | 0,42 / 0,25 s | 0,62 / 0,31 s |
-| Tableau de bord | 0,87 s | 2,0 s | voir §8 |
+| Fiche client | 0,25 s | 0,17 s | 0,25 s |
+| Fiche sous-traitant | 0,74 s | 0,65 s | 1,23 s |
+| Fiche véhicule / outil | 2,9 / 2,8 s | 0,45 / 0,41 s | 0,84 / 1,20 s |
+| `/flotte`, `/outillage` | 0,37 / 0,48 s | 0,35 / 0,29 s | 0,30 / 0,41 s |
+| Fiche chantier | 5,3 s | 0,98 s | 1,56 s |
+| Documents du chantier | 0,25 s | 0,19 s | 0,26 s |
+| DOE (dossier complet : 20 000 documents + 20 000 articles rendus) | 0,50 s | 1,37 s | 7,3 s |
+| Paie (période) | 0,43 s | 0,39 s | 0,77 s |
+| Notes de frais / CRM | 0,34 / 2,81 s | 0,38 / 0,27 s | 0,62 / 0,32 s |
+| Tableau de bord | 0,39 s | 0,78 s | 2,9 s (8,2 s avant `gp_alertes_parc`) |
 
 Avant correctifs, à 20 000 : sous-traitant 37 s, outil 43 s, notes de frais 37 s, CRM 37 s (selon la même
 recette). Les ≈ 2,5 s résiduelles à 1 462 (fiche véhicule, CRM) viennent du coût que le planificateur prête aux
@@ -222,15 +228,17 @@ fonctions de policy (§11.3).
 
 | Niveau | Résultat |
 |---|---|
-| pgTAP `gp_residuel_agregats_v1` (généré par `scripts/qualification/gp-residual/generer_pgtap.py`) — surface, parité RLS × 6 profils, cross-tenant, anon, plateforme ; 1 462 lignes par chemin | voir §8.1 |
+| pgTAP `gp_residuel_agregats_v1` (généré par `scripts/qualification/gp-residual/generer_pgtap.py`) — surface, parité RLS × 6 profils, cross-tenant, anon, plateforme ; 1 462 lignes par chemin | **303/303** (base neuve, train final) |
 | Vitest PostgREST réel `gp-residuel.postgrest.test.ts` (RED rejoué + GREEN, 5 volumes, sécurité) | **50/50** |
 | Vitest unitaires `fiches-agregats.test.ts` (curseurs, filtres, bornes ; CI sans base) | **10/10** |
 | Playwright `gp-residuel-data-correctness-v1.spec.ts` (pile réelle `max_rows = 1000`, Gestion Pro compilé) | **12/12** (1 462 / 5 000 / 20 000) |
 
 ### 8.1 pgTAP
 
-Parité sur base reconstruite du train final : **283/283** (`03-pgtap-parite-rls.log`), puis 293 assertions après
-l'ajout de `gp_effectif_actif` (résultat consigné dans le même témoin).
+Parité sur une base reconstruite du train final (382 migrations) : **303/303** (`03-pgtap-parite-rls.log`) —
+24 fonctions × (existence, anon sans EXECUTE, authenticated EXECUTE, SECURITY DEFINER + search_path), parité
+RLS de chaque fonction pour les six profils, refus admin B sur A (14 fonctions), refus sans identité,
+paramètres invalides, RPC plateforme.
 
 ## 9. Non-régression
 
@@ -245,7 +253,7 @@ l'ajout de `gp_effectif_actif` (résultat consigné dans le même témoin).
 | Notes de frais | `archivage_notes_frais_rls`, `fix_digest_search_path_audit_notes_frais` : propres |
 | Chantier | `ch08`, `correctif_rls_ecriture_chantiers`, `medias_messagerie_chantiers` : propres |
 | Isolation | `isolation_multitenant_*` (56 + 24 + 10) : propres |
-| Vitest (racine) | **2 656** réussis (2 646 de V8 + 10), 0 échec |
+| Vitest (racine) | **2 656** réussis (2 646 de V8 + 10 nouveaux), 0 échec ; suites PostgREST ignorées sans banc |
 | `tsc --noEmit`, `eslint src tests` | 0 erreur (5 avertissements préexistants, aucun dans ce lot) |
 | `next build` | ✅ |
 | `verify:migrations`, `verify:train-expectations` | ✅ |
