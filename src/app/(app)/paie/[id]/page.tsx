@@ -6,7 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { formaterMois, statutPeriodePaie, STATUTS_DOSSIER_PAIE } from "@/lib/paie";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
-import { lirePageDossiersPaie, lireSynthesePaie, type SynthesePaie } from "@/lib/pilotage-agregats";
+import { lireAnomaliesPaie, lirePageDossiersPaie, lireSynthesePaie, type AnomaliePaie, type SynthesePaie } from "@/lib/pilotage-agregats";
 
 type DossierPage={id:string;employe_id:string;statut:string;heures_normales:number;heures_sup_25:number;heures_sup_50:number;heures_absence:number;jours_conges:number;total_paniers:number;total_trajets:number;total_transports:number;total_grands_deplacements:number;total_kilometres:number;total_primes:number;total_acomptes:number;total_notes_frais:number;employe:{prenom:string;nom:string;reference_interne:string|null;poste:string|null;statut:string}|null};
 
@@ -22,7 +22,8 @@ export default async function PeriodePaiePage({params,searchParams}:{params:Prom
  const peutVoirTousDossiers=permissions===null||["gerer_paie","saisir_variables_paie","controler_variables_paie","exporter_paie","parametrer_paie","voir_paie_confidentielle"].some(cle=>permissions.includes(cle));
  const [{data:periode},{data:anomalies},{data:validations}]=await Promise.all([
   supabase.from("periodes_paie").select("*").eq("id",id).eq("entreprise_id",ctx.entrepriseId).maybeSingle(),
-  supabase.from("anomalies_paie").select("id,dossier_id,niveau,code,description,justification,created_at").eq("periode_id",id).is("corrigee_at",null).order("niveau").order("created_at").order("id").limit(LIMITE_ANOMALIES),
+  // Anomalies servies en base (paie_anomalies_page) : la policy coûtait ~16 ms par anomalie triée.
+  lireAnomaliesPaie(supabase,ctx.entrepriseId,id,null,LIMITE_ANOMALIES).then((data)=>({data}),(err:Error)=>{console.error("[paie] anomalies indisponibles",err.message);return {data:[] as AnomaliePaie[]};}),
   supabase.from("validations_paie").select("id,etape,action,commentaire,ancien_statut,nouveau_statut,created_at").eq("periode_id",id).order("created_at",{ascending:false}).limit(20),
  ]);if(!periode)notFound();
  let monDossierId:string|null=null;

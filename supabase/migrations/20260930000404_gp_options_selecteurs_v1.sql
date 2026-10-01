@@ -135,3 +135,74 @@ grant execute on function public.gp_options_clients(uuid, text, text, text) to a
 -- sous RLS, limite 100).
 create index if not exists appels_contacts_entreprise_created_idx on public.appels_contacts (entreprise_id, created_at desc);
 create index if not exists relances_impayes_entreprise_date_idx on public.relances_impayes (entreprise_id, date_prevue desc);
+
+-- Statistiques étendues (dépendances fonctionnelles) : un tiers, un véhicule,
+-- un outil, un chantier ou un client appartient à UNE entreprise. Sans elles,
+-- le planificateur multiplie les sélectivités de entreprise_id et de la
+-- colonne parente, sous-estime le nombre de lignes (76 estimées pour 1 462
+-- réelles) et choisit bitmap + tri plutôt que le parcours d'index ordonné avec
+-- LIMIT : la RLS est alors évaluée sur toutes les lignes (5,8 s pour 51 lignes
+-- mesurées sur la fiche sous-traitant à 1 462 missions).
+create statistics if not exists stat_sous_traitants_chantiers_entreprise_tiers (dependencies) on entreprise_id, fournisseur_id from public.sous_traitants_chantiers;
+create statistics if not exists stat_depenses_entreprise_tiers (dependencies) on entreprise_id, fournisseur_id from public.depenses_fournisseurs;
+create statistics if not exists stat_depenses_entreprise_vehicule (dependencies) on entreprise_id, vehicule_id from public.depenses_fournisseurs;
+create statistics if not exists stat_depenses_entreprise_outil (dependencies) on entreprise_id, outil_id from public.depenses_fournisseurs;
+create statistics if not exists stat_depenses_entreprise_chantier (dependencies) on entreprise_id, chantier_id from public.depenses_fournisseurs;
+create statistics if not exists stat_releves_entreprise_vehicule (dependencies) on entreprise_id, vehicule_id from public.releves_kilometrage;
+create statistics if not exists stat_mouvements_outillage_entreprise_outil (dependencies) on entreprise_id, outil_id from public.mouvements_outillage;
+create statistics if not exists stat_devis_entreprise_client (dependencies) on entreprise_id, client_id from public.devis;
+create statistics if not exists stat_factures_entreprise_client (dependencies) on entreprise_id, client_id from public.factures;
+create statistics if not exists stat_pieces_jointes_messages_entreprise_chantier (dependencies) on entreprise_id, chantier_id from public.pieces_jointes_messages;
+create statistics if not exists stat_notes_frais_entreprise_chantier (dependencies) on entreprise_id, chantier_id from public.notes_frais;
+analyze public.sous_traitants_chantiers, public.depenses_fournisseurs, public.releves_kilometrage, public.mouvements_outillage,
+        public.devis, public.factures, public.pieces_jointes_messages, public.notes_frais;
+
+-- Paie : liste des anomalies ouvertes d'une période (par niveau), même
+-- visibilité que paie_periode_synthese (nb_anomalies). Sous RLS, la policy
+-- (sous-requête sur le dossier + peut_gerer_paie) coûtait ~16 ms par anomalie
+-- triée : 8 s pour 500 anomalies sur 20 000.
+create or replace function public.paie_anomalies_page(
+  p_entreprise_id uuid,
+  p_periode_id uuid,
+  p_dossier_id uuid default null,
+  p_limite integer default 500
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_gestion boolean;
+  v_miens uuid[];
+  v_limite integer := least(greatest(coalesce(p_limite, 500), 1), 2000);
+begin
+  perform public.gp_exiger_membre(p_entreprise_id);
+  if p_periode_id is null then
+    raise exception 'GP_AGREGAT_PARAMETRES' using errcode = '22023';
+  end if;
+  v_gestion := public.peut_gerer_paie(p_entreprise_id);
+  select coalesce(array_agg(e.id), '{}') into v_miens
+  from public.employes e
+  where e.entreprise_id = p_entreprise_id and e.utilisateur_id = auth.uid();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', x.id, 'dossier_id', x.dossier_id, 'niveau', x.niveau, 'code', x.code, 'description', x.description,
+                                        'justification', x.justification, 'created_at', x.created_at)
+                     order by x.niveau, x.created_at, x.id)
+    from (
+      select a.*
+      from public.anomalies_paie a
+      join public.dossiers_paie_salaries d on d.id = a.dossier_id
+      where a.periode_id = p_periode_id and a.corrigee_at is null
+        and d.entreprise_id = p_entreprise_id
+        and (v_gestion or d.employe_id = any(v_miens))
+        and (p_dossier_id is null or a.dossier_id = p_dossier_id)
+      order by a.niveau, a.created_at, a.id
+      limit v_limite
+    ) x), '[]'::jsonb);
+end;
+$$;
+
+revoke all on function public.paie_anomalies_page(uuid, uuid, uuid, integer) from public, anon;
+grant execute on function public.paie_anomalies_page(uuid, uuid, uuid, integer) to authenticated;

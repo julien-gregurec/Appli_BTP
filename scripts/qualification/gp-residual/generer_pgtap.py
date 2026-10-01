@@ -44,6 +44,10 @@ FONCTIONS = [
     ("gp_alertes_stock", "uuid, integer"),
     ("paie_periode_dossiers_page", "uuid, uuid, text, text, uuid, integer, integer"),
     ("paie_export_contenu", "uuid, uuid, boolean"),
+    ("paie_anomalies_page", "uuid, uuid, uuid, integer"),
+    ("gp_options_chantiers", "uuid, text[], uuid, text"),
+    ("gp_options_employes", "uuid, boolean"),
+    ("gp_options_clients", "uuid, text, text, text"),
     ("plateforme_postes_tarifs_entreprise", "uuid"),
     ("plateforme_applications_compteurs", ""),
 ]
@@ -146,6 +150,10 @@ for libelle, uid in PROFILS:
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = '{A}' and periode_id = '{PER}'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = '{A}' and periode_id = '{PER}'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : {L}');""")
+    t(f"""select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('{A}', '{PER}', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = '{PER}' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : {L}');""")
     t(f"""select is((public.paie_periode_synthese('{A}', '{PER}')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = '{PER}' and corrigee_at is null),
   'parité RLS anomalies de paie : {L}');""")
@@ -174,6 +182,18 @@ for libelle, uid in PROFILS:
     t(f"""select is((public.gp_alertes_stock('{A}')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = '{A}' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : {L}');""")
+    t(f"""select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('{A}')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = '{A}' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : {L}');""")
+    t(f"""select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('{A}')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = '{A}' and statut = 'actif'),
+  'parité RLS options salariés : {L}');""")
+    t(f"""select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('{A}')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = '{A}'),
+  'parité RLS options clients : {L}');""")
     # Tenant B : refus pour un profil de A.
     t(f"select throws_ok($$select public.gp_client_synthese('{B}', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : {L}');")
     t(f"select throws_ok($$select public.plateforme_postes_tarifs_entreprise('{A}')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : {L}');")
@@ -186,7 +206,9 @@ for nom, appel in (("dépenses", f"public.gp_depenses_synthese('{A}', p_vehicule
                    ("DOE", f"public.gp_doe_contenu('{A}', '{CH1}')"), ("chantiers client", f"public.gp_client_chantiers_page('{A}', '{CLI}')"),
                    ("tableau de bord", f"public.gp_dashboard_chantiers('{A}', current_date)"), ("stock", f"public.gp_alertes_stock('{A}')"),
                    ("CRM", f"public.gp_crm_synthese('{A}')"), ("synthèse chantier", f"public.chantier_synthese_chiffree('{A}', '{CH1}')"),
-                   ("missions", f"public.gp_sous_traitant_missions_synthese('{A}', '{ST}')")):
+                   ("missions", f"public.gp_sous_traitant_missions_synthese('{A}', '{ST}')"),
+                   ("options chantiers", f"public.gp_options_chantiers('{A}')"), ("options salariés", f"public.gp_options_employes('{A}')"),
+                   ("options clients", f"public.gp_options_clients('{A}')")):
     t(f"select throws_ok($${'select ' + appel}$$, '42501', null, 'admin B refusé sur A ({nom})');")
 comme("10000000-0000-0000-0000-000000000001")
 t(f"select throws_ok($$select public.gp_depenses_synthese('{A}')$$, '22023', null, 'dépenses : au moins un axe exigé');")

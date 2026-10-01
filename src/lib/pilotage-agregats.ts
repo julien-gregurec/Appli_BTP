@@ -85,3 +85,10 @@ export async function lirePageNotesFrais(supabase: SupabaseClient, entrepriseId:
   const derniere = d.lignes[d.lignes.length - 1];
   return { lignes: d.lignes, suivant: d.suite && derniere ? `${derniere.date_frais ?? "null"}_${derniere.id}` : null };
 }
+
+export type AnomaliePaie = { id: string; dossier_id: string | null; niveau: string; code: string; description: string; justification: string | null; created_at: string };
+
+/** Anomalies ouvertes d'une période (par niveau), visibilité RLS évaluée une fois. */
+export async function lireAnomaliesPaie(supabase: SupabaseClient, entrepriseId: string, periodeId: string, dossierId: string | null, limite: number): Promise<AnomaliePaie[]> {
+  return rpc<AnomaliePaie[]>(supabase, "paie_anomalies_page", { p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_dossier_id: dossierId, p_limite: limite });
+}

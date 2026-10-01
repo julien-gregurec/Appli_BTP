@@ -35,15 +35,20 @@
 -- quelle que soit sa profondeur). Ordre `desc` natif (NULL en tête), celui des
 -- parcours arrière d'index et de src/lib/fiches-agregats.ts (lirePageCurseur).
 create index if not exists chantiers_client_created_idx on public.chantiers (client_id, created_at desc, id desc);
-create index if not exists factures_client_created_idx on public.factures (client_id, created_at desc, id desc);
-create index if not exists devis_client_created_idx on public.devis (client_id, created_at desc, id desc);
-create index if not exists depenses_fournisseurs_fournisseur_date_idx on public.depenses_fournisseurs (fournisseur_id, date_piece desc, id desc);
-create index if not exists depenses_fournisseurs_vehicule_date_idx on public.depenses_fournisseurs (vehicule_id, date_piece desc, id desc) where vehicule_id is not null;
-create index if not exists depenses_fournisseurs_outil_date_idx on public.depenses_fournisseurs (outil_id, date_piece desc, id desc) where outil_id is not null;
-create index if not exists depenses_fournisseurs_chantier_date_idx on public.depenses_fournisseurs (chantier_id, date_piece desc, id desc) where chantier_id is not null;
-create index if not exists sous_traitants_chantiers_fournisseur_created_idx on public.sous_traitants_chantiers (fournisseur_id, created_at desc, id desc);
-create index if not exists releves_kilometrage_vehicule_curseur_idx on public.releves_kilometrage (vehicule_id, date_releve desc, id desc);
-create index if not exists mouvements_outillage_outil_curseur_idx on public.mouvements_outillage (outil_id, created_at desc, id desc);
+-- Index (entreprise, parent, date, id) : avec les deux égalités, le parcours
+-- ordonné + LIMIT est le plan naturel. Sans l'entreprise en tête, le planificateur
+-- (qui ignore le coût des fonctions de policy) préférait un bitmap sur
+-- (entreprise, parent) suivi d'un tri, et évaluait la RLS de chaque ligne :
+-- 7,5 s pour 51 lignes à 5 000 missions.
+create index if not exists factures_client_created_idx on public.factures (entreprise_id, client_id, created_at desc, id desc);
+create index if not exists devis_client_created_idx on public.devis (entreprise_id, client_id, created_at desc, id desc);
+create index if not exists depenses_fournisseurs_fournisseur_date_idx on public.depenses_fournisseurs (entreprise_id, fournisseur_id, date_piece desc, id desc);
+create index if not exists depenses_fournisseurs_vehicule_date_idx on public.depenses_fournisseurs (entreprise_id, vehicule_id, date_piece desc, id desc) where vehicule_id is not null;
+create index if not exists depenses_fournisseurs_outil_date_idx on public.depenses_fournisseurs (entreprise_id, outil_id, date_piece desc, id desc) where outil_id is not null;
+create index if not exists depenses_fournisseurs_chantier_date_idx on public.depenses_fournisseurs (entreprise_id, chantier_id, date_piece desc, id desc) where chantier_id is not null;
+create index if not exists sous_traitants_chantiers_fournisseur_created_idx on public.sous_traitants_chantiers (entreprise_id, fournisseur_id, created_at desc, id desc);
+create index if not exists releves_kilometrage_vehicule_curseur_idx on public.releves_kilometrage (entreprise_id, vehicule_id, date_releve desc, id desc);
+create index if not exists mouvements_outillage_outil_curseur_idx on public.mouvements_outillage (entreprise_id, outil_id, created_at desc, id desc);
 create index if not exists documents_chantier_chantier_curseur_idx on public.documents_chantier (chantier_id, created_at desc, id desc);
 
 -- Garde commune : appelant authentifié et membre actif de l'entreprise.
@@ -524,4 +529,4 @@ create index if not exists appels_offres_entreprise_date_curseur_idx on public.a
 create index if not exists situations_travaux_entreprise_curseur_idx on public.situations_travaux (entreprise_id, created_at desc, id desc);
 create index if not exists contrats_entretien_entreprise_created_idx on public.contrats_entretien (entreprise_id, created_at desc, id);
 create index if not exists bons_livraison_entreprise_date_idx on public.bons_livraison (entreprise_id, date_livraison desc, id);
-create index if not exists pieces_jointes_messages_chantier_curseur_idx on public.pieces_jointes_messages (chantier_id, created_at desc, id desc) where chantier_id is not null;
+create index if not exists pieces_jointes_messages_chantier_curseur_idx on public.pieces_jointes_messages (entreprise_id, chantier_id, created_at desc, id desc) where chantier_id is not null;

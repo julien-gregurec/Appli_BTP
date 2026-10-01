@@ -11,7 +11,7 @@
 -- lignes par chemin (> max_rows = 1 000), audiences de documents mêlées (tous_affectes, encadrement, gestionnaires).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(230);
+select plan(273);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -137,6 +137,22 @@ select ok(to_regprocedure('public.paie_export_contenu(uuid, uuid, boolean)') is 
 select is(has_function_privilege('anon', 'public.paie_export_contenu(uuid, uuid, boolean)', 'execute'), false, 'paie_export_contenu : anon n''a pas EXECUTE');
 select is(has_function_privilege('authenticated', 'public.paie_export_contenu(uuid, uuid, boolean)', 'execute'), true, 'paie_export_contenu : authenticated a EXECUTE');
 select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.paie_export_contenu(uuid, uuid, boolean)')), 'paie_export_contenu : SECURITY DEFINER, search_path figé');
+select ok(to_regprocedure('public.paie_anomalies_page(uuid, uuid, uuid, integer)') is not null, 'paie_anomalies_page existe');
+select is(has_function_privilege('anon', 'public.paie_anomalies_page(uuid, uuid, uuid, integer)', 'execute'), false, 'paie_anomalies_page : anon n''a pas EXECUTE');
+select is(has_function_privilege('authenticated', 'public.paie_anomalies_page(uuid, uuid, uuid, integer)', 'execute'), true, 'paie_anomalies_page : authenticated a EXECUTE');
+select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.paie_anomalies_page(uuid, uuid, uuid, integer)')), 'paie_anomalies_page : SECURITY DEFINER, search_path figé');
+select ok(to_regprocedure('public.gp_options_chantiers(uuid, text[], uuid, text)') is not null, 'gp_options_chantiers existe');
+select is(has_function_privilege('anon', 'public.gp_options_chantiers(uuid, text[], uuid, text)', 'execute'), false, 'gp_options_chantiers : anon n''a pas EXECUTE');
+select is(has_function_privilege('authenticated', 'public.gp_options_chantiers(uuid, text[], uuid, text)', 'execute'), true, 'gp_options_chantiers : authenticated a EXECUTE');
+select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.gp_options_chantiers(uuid, text[], uuid, text)')), 'gp_options_chantiers : SECURITY DEFINER, search_path figé');
+select ok(to_regprocedure('public.gp_options_employes(uuid, boolean)') is not null, 'gp_options_employes existe');
+select is(has_function_privilege('anon', 'public.gp_options_employes(uuid, boolean)', 'execute'), false, 'gp_options_employes : anon n''a pas EXECUTE');
+select is(has_function_privilege('authenticated', 'public.gp_options_employes(uuid, boolean)', 'execute'), true, 'gp_options_employes : authenticated a EXECUTE');
+select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.gp_options_employes(uuid, boolean)')), 'gp_options_employes : SECURITY DEFINER, search_path figé');
+select ok(to_regprocedure('public.gp_options_clients(uuid, text, text, text)') is not null, 'gp_options_clients existe');
+select is(has_function_privilege('anon', 'public.gp_options_clients(uuid, text, text, text)', 'execute'), false, 'gp_options_clients : anon n''a pas EXECUTE');
+select is(has_function_privilege('authenticated', 'public.gp_options_clients(uuid, text, text, text)', 'execute'), true, 'gp_options_clients : authenticated a EXECUTE');
+select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.gp_options_clients(uuid, text, text, text)')), 'gp_options_clients : SECURITY DEFINER, search_path figé');
 select ok(to_regprocedure('public.plateforme_postes_tarifs_entreprise(uuid)') is not null, 'plateforme_postes_tarifs_entreprise existe');
 select is(has_function_privilege('anon', 'public.plateforme_postes_tarifs_entreprise(uuid)', 'execute'), false, 'plateforme_postes_tarifs_entreprise : anon n''a pas EXECUTE');
 select is(has_function_privilege('authenticated', 'public.plateforme_postes_tarifs_entreprise(uuid)', 'execute'), true, 'plateforme_postes_tarifs_entreprise : authenticated a EXECUTE');
@@ -235,6 +251,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : admin A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : admin A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : admin A');
@@ -263,6 +283,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : admin A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : admin A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : admin A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : admin A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : admin A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : admin A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : admin A');
@@ -354,6 +386,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : ouvrier A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : ouvrier A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : ouvrier A');
@@ -382,6 +418,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : ouvrier A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : ouvrier A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : ouvrier A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : ouvrier A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : ouvrier A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : ouvrier A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : ouvrier A');
@@ -473,6 +521,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : chef d''équipe A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : chef d''équipe A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : chef d''équipe A');
@@ -501,6 +553,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : chef d''équipe A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : chef d''équipe A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : chef d''équipe A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : chef d''équipe A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : chef d''équipe A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : chef d''équipe A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : chef d''équipe A');
@@ -592,6 +656,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : conducteur A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : conducteur A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : conducteur A');
@@ -620,6 +688,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : conducteur A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : conducteur A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : conducteur A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : conducteur A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : conducteur A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : conducteur A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : conducteur A');
@@ -711,6 +791,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : comptable A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : comptable A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : comptable A');
@@ -739,6 +823,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : comptable A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : comptable A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : comptable A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : comptable A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : comptable A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : comptable A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : comptable A');
@@ -830,6 +926,10 @@ select is(
   jsonb_build_object('d', (select array_agg(id order by employe_id, id) from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'),
                      'p', (select array_agg(p.id order by p.id) from public.pieces_jointes_paie p where p.dossier_id in (select id from public.dossiers_paie_salaries where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and periode_id = 'a9930000-0000-0000-0000-000000000001'))),
   'parité RLS contenu d''export de paie (dossiers et pièces) : dirigeant A');
+select is(
+  (select array_agg((x->>'id')::uuid order by n) from jsonb_array_elements(public.paie_anomalies_page('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001', null, 2000)) with ordinality t(x, n)),
+  (select array_agg(id order by niveau, created_at, id) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
+  'parité RLS liste des anomalies de paie : dirigeant A');
 select is((public.paie_periode_synthese('a0000000-0000-0000-0000-000000000001', 'a9930000-0000-0000-0000-000000000001')->>'nb_anomalies')::bigint,
   (select count(*) from public.anomalies_paie where periode_id = 'a9930000-0000-0000-0000-000000000001' and corrigee_at is null),
   'parité RLS anomalies de paie : dirigeant A');
@@ -858,6 +958,18 @@ select is(
 select is((public.gp_alertes_stock('a0000000-0000-0000-0000-000000000001')->>'nb')::bigint,
   (select count(*) from public.articles_stock where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and actif and quantite_stock <= seuil_alerte),
   'parité RLS alertes de stock : dirigeant A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.chantiers where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('archive','annule')),
+  'parité RLS options chantiers : dirigeant A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_employes('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.employes where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut = 'actif'),
+  'parité RLS options salariés : dirigeant A');
+select is(
+  (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
+  (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  'parité RLS options clients : dirigeant A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : dirigeant A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : dirigeant A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : dirigeant A');
@@ -873,6 +985,9 @@ select throws_ok($$select public.gp_alertes_stock('a0000000-0000-0000-0000-00000
 select throws_ok($$select public.gp_crm_synthese('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (CRM)');
 select throws_ok($$select public.chantier_synthese_chiffree('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (synthèse chantier)');
 select throws_ok($$select public.gp_sous_traitant_missions_synthese('a0000000-0000-0000-0000-000000000001', 'a9900000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (missions)');
+select throws_ok($$select public.gp_options_chantiers('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (options chantiers)');
+select throws_ok($$select public.gp_options_employes('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (options salariés)');
+select throws_ok($$select public.gp_options_clients('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'admin B refusé sur A (options clients)');
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}', true) is not null as profil;
 select throws_ok($$select public.gp_depenses_synthese('a0000000-0000-0000-0000-000000000001')$$, '22023', null, 'dépenses : au moins un axe exigé');
 select throws_ok($$select public.gp_client_synthese('a0000000-0000-0000-0000-000000000001', null)$$, '22023', null, 'client : identifiant exigé');
