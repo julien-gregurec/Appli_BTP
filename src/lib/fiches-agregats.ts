@@ -180,3 +180,13 @@ export async function lireContenuDoe(supabase: SupabaseClient, entrepriseId: str
   const d = data as { documents: DocumentDoe[]; articles: ArticleDoe[]; article_ids: string[]; fiches_techniques: FicheTechniqueDoe[] };
   return { documents: d.documents, articles: d.articles, articleIds: d.article_ids, fichesTechniques: d.fiches_techniques };
 }
+
+/**
+ * Liste volontairement bornée : la requête demande `limite + 1` lignes, on en
+ * affiche `limite` et `autres` dit à l'écran qu'il en existe davantage — jamais
+ * une liste tronquée présentée comme complète.
+ */
+export function borner<T>(lignes: T[] | null | undefined, limite: number): { lignes: T[]; autres: boolean } {
+  const toutes = lignes ?? [];
+  return { lignes: toutes.slice(0, limite), autres: toutes.length > limite };
+}

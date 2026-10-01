@@ -4,6 +4,7 @@ import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutE
 import { permissionsUtilisateur } from "@/lib/permissions";
 import Image from "next/image";
 import { Lien as Link } from "@/components/Lien";
+import { lireToutesLesLignes } from "@/lib/supabase/lecture-complete";
 
 type EmployeListe = {
   id: string;
@@ -102,15 +103,17 @@ export default async function EmployesPage() {
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }, { data: couts }] = await Promise.all([
     // employes_fiche : coordonnées pour acces_employes, numéro d'inscription
     // seulement pour gerer_employes (20260928000806).
-    supabase
+    lireToutesLesLignes((options) => supabase
       .from("employes_fiche")
-      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url")
+      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url", options)
       .eq("entreprise_id", ctx.entrepriseId)
-      .order("nom", { ascending: true }),
+      .order("nom", { ascending: true }).order("id")),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
-    supabase.from("permissions_poste").select("poste_id, cle_permission, autorise").eq("entreprise_id", ctx.entrepriseId).eq("autorise", true),
+    // Lecture complète : 100 droits par poste, la table dépasse 1 000 lignes dès
+    // 11 postes complets et PostgREST tronquait les droits affichés.
+    lireToutesLesLignes<{ poste_id: string; cle_permission: string; autorise: boolean }>((options) => supabase.from("permissions_poste").select("poste_id, cle_permission, autorise", options).eq("entreprise_id", ctx.entrepriseId).eq("autorise", true).order("poste_id").order("cle_permission")),
     supabase.from("permissions_disponibles").select("cle, description"),
-    supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
+    lireToutesLesLignes<{ employe_id: string; cout_horaire: number | null }>((options) => supabase.from("employes_cout_horaire").select("employe_id, cout_horaire", options).eq("entreprise_id", ctx.entrepriseId).order("employe_id")),
   ]);
   const postesParId = new Map((postes ?? []).map((poste) => [poste.id, poste.nom]));
   const coutHoraireParEmploye = new Map((couts ?? []).map((cout) => [cout.employe_id, cout.cout_horaire]));

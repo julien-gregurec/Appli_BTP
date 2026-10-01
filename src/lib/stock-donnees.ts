@@ -19,7 +19,7 @@ export type LigneInventaireLue = { id: string; quantite_theorique: number; quant
 export async function chargerArticlesStock(supabase: SupabaseClient, entrepriseId: string, avecPrix: boolean): Promise<ArticleStockLu[]> {
   const { data, error } = avecPrix
     ? await lireToutesLesLignes<ArticleStockLu>((options) => supabase.rpc("articles_stock_avec_prix", { p_entreprise_id: entrepriseId }, options).order("designation").order("id"))
-    : await lireParCurseur<ArticleStockLu>(() => supabase.from("articles_stock").select("id,reference,designation,unite,quantite_stock,seuil_alerte,emplacement,marque,code_barres,actif").eq("entreprise_id", entrepriseId).eq("actif", true), "id");
+    : await lireParCurseur<ArticleStockLu>(() => supabase.from("articles_stock").select("id,reference,designation,unite,quantite_stock,seuil_alerte,emplacement,marque,code_barres,actif,zone_id").eq("entreprise_id", entrepriseId).eq("actif", true), "id");
   if (error) throw new Error(error.message);
   return avecPrix ? data : trierArticles(data);
 }

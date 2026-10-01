@@ -14,7 +14,9 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
   const [{ data: charges }, { data: fournisseurs }, { data: chantiers }] = await Promise.all([
     supabase.from("charges_recurrentes").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", contexte.entrepriseId).order("prochaine_echeance"),
     supabase.from("fournisseurs").select("id,nom").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("nom"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", contexte.entrepriseId).order("nom"),
+    // Chantiers ouverts seulement, comme les autres sélecteurs : la liste de
+    // tous les chantiers était plafonnée à 1 000 (ordre alphabétique).
+    supabase.from("chantiers").select("id,nom").eq("entreprise_id", contexte.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
   ]);
   const champ = "rounded-md border px-3 py-2 text-sm dark:bg-neutral-900";
   const aujourdHui = new Date().toISOString().slice(0, 10);
