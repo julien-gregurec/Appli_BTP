@@ -3,7 +3,157 @@
 Date : 2026-10-01 · Branche : `claude/studio-preview-live-deploy-v2` (depuis `origin/claude/charming-allen-k61cec` @ `561793c0`)
 · Poste opérateur : Mac local · Guide utilisateur : `docs/qualification/ELSATIA_STUDIO_PREVIEW_USER_TEST_V2.md`
 
-## Verdict
+## Mise à jour V3 — pont d'identité GP Preview → Studio Preview (2026-10-01)
+
+Session : Claude Code **cloud** (conteneur éphémère), branche `claude/vigilant-fermi-tvd8jb` (depuis
+`claude/studio-preview-live-deploy-v2` @ `42a17059`). Train de référence : **CANONICAL TRAIN V8 LOCALLY QUALIFIED**,
+`claude/sleepy-cannon-6je2vo` @ `53b4bc7`.
+
+### Verdict V3
+
+**STUDIO PREVIEW BLOCKED** (connexion ELSATIA) — inchangé côté distant.
+
+| | |
+|---|---|
+| URL de test | https://studio-preview-elsatia.vercel.app (inchangée, non redéployée) |
+| Login ELSATIA | **BLOQUÉ** — rien n'a pu être modifié à distance depuis cette session |
+| Cause du blocage V3 | **`BLOCKED_SESSION_NO_PROVIDER_ACCESS`** : la politique réseau de l'environnement cloud refuse `api.supabase.com`, `*.supabase.co`, `api.vercel.com` et `*.vercel.app` (CONNECT 403 au proxy) ; aucun jeton Supabase ni Vercel n'est fourni à l'environnement. Aucune action distante n'était possible : ni relance du projet, ni backup, ni migration, ni variable, ni déploiement, ni test HTTP. |
+| Fait dans cette session | diagnostic et correction documentée du build GP, inventaire exact des variables du pont, compatibilité contrat V8 ↔ Studio déployé, portes locales V8 (typecheck, lint, Vitest, build), runbook opérateur ci-dessous |
+
+Aucune Production, aucun `--prod`, aucun merge `main`, aucun Stripe, aucun secret lu ou écrit.
+
+### V3.1 Statut GP Preview (`elsatia-preview`, `pgvvpqyjziyapbbkydmc`)
+
+| Contrôle | Résultat |
+|---|---|
+| Statut réel du projet | **NON VÉRIFIABLE** depuis cette session (API Management refusée par le réseau) — dernier état connu : INACTIVE (V2 §2) |
+| Relance (plan Pro annoncé) | **non faite** — à faire au dashboard ou `supabase projects restore`… voir V3.8 étape 1 |
+| database / Auth / PostgREST / Storage / API | non vérifiés (`*.supabase.co` refusé) |
+
+### V3.2 Backup
+
+**Aucun backup fait, donc aucune migration faite** (règle « aucune migration sans backup » respectée).
+Procédure prête : V3.8 étape 2.
+
+### V3.3 Ledger / train
+
+| | |
+|---|---|
+| Train canonique V8 (local) | **371 migrations GP**, dernière `20260928000812` ; `train-expectations --check` OK ; DB verify : 37 contrôles |
+| Écart V7 → V8 | +12 migrations (`git diff 547f0b6f 53b4bc7 -- supabase/migrations`), dont la broker d'identité déjà présente en V7 (`20260927100000_elsatia_identity_broker`) |
+| Ledger distant GP Preview | **NON LU** (accès refusé) ; dernier code servi connu : 23 août (`cf490f5d`), sans pont |
+| Décision | appliquer **V8** (pas V7) : le pack Preview V8 (`scripts/preview/*`, `train-expectations`) est déjà aligné V8. Aucun downgrade possible : on ne fait que `db push` en avant après comparaison du ledger. |
+
+### V3.4 Build GP — cause racine et correctif
+
+Reproduit à l'identique en local, conditions Vercel Preview (`VERCEL_ENV=preview`) :
+
+```
+ELSATIA Tools — variables publiques : mode « production » (enforced).
+  ERREUR  NEXT_PUBLIC_TOOLS_BILLING_API_URL : absente
+Build interrompu avant `next build`.
+```
+
+Cause : le script `build` racine est `next build && npm --prefix apps/tools run build`. Le projet Vercel
+`elsatia-preview` (commande par défaut `npm run build`) construit donc **aussi Tools**, dont la garde
+`apps/tools/scripts/verify-public-env.mjs` passe en mode *enforced* dès que `NEXT_PUBLIC_TOOLS_ENV` n'est pas `preview`.
+Ce n'est pas un défaut GP : c'est une variable **Tools** évaluée par le build du projet GP.
+
+Valeur Preview correcte : **l'origine de la GP Preview elle-même** (= `NEXT_PUBLIC_APP_URL` de la GP Preview),
+c'est la règle `X-URL-TOOLS-BILLING` de `scripts/preview/env-check.mjs` (« API de facturation Tools → GP », même origine).
+Jamais `https://app.elsatia.fr`. Prouvé : même garde, URL GP Preview fournie → **exit 0**.
+
+Autres variables exigées par le preflight GP `check-env-manifest --auto --app gestion_pro` (cible preview, mode enforce) :
+`ELSATIA_APPLICATION_ENV=preview`, `NEXT_PUBLIC_COLORS_URL` (URL Colors Preview), en plus de Supabase et `NEXT_PUBLIC_APP_URL`.
+
+Alternative équivalente (réglage projet, pas code) : Build Command du projet `elsatia-preview` = `npm run build:gestion-pro`
+(ne construit pas Tools). Non retenue par défaut : modifie le comportement du projet pour toutes les branches.
+`vercel.json` n'est **pas** modifié (partagé avec le projet Production).
+
+### V3.5 Portes locales sur V8 (`53b4bc7`, Node 22, conteneur cloud)
+
+| Porte | Résultat |
+|---|---|
+| `npm run typecheck` (GP + Tools + Réserves + Colors) | **OK** |
+| `npm run lint` (4 applications) | **OK** |
+| Vitest GP | **2588 passés**, 36 ignorés (204 fichiers + 2 ignorés) |
+| Vitest Tools / Réserves / Colors | **2150** / **226** / **431** passés |
+| Build GP + Tools, conditions Preview, valeurs factices non secrètes | **OK** — preflight GP `GO`, garde Tools `GO`, GP compilé + Tools compilé ; routes du pont présentes : `/identity/studio/handoff`, `/api/elsatia-identity/jwks`, `/api/cron/elsatia-identity` |
+
+### V3.6 Pont B + I1 — inventaire exact des variables (aucune valeur)
+
+Compatibilité : `git diff 53b4bc7 42a17059` sur `packages/elsatia-identity`, `packages/client-contracts`,
+`src/app/identity`, `src/app/api/elsatia-identity`, `src/lib/elsatia-identity`, `apps/studio/src/lib/identity*.ts`,
+`apps/studio/src/app/auth` → **vide** : le Studio déployé (V2) parle exactement le contrat de V8.
+
+Routes GP du pont (V8) : `GET /identity/studio/handoff` (émission jeton signé, jti one-time),
+`GET /api/elsatia-identity/jwks` (clés publiques), `GET /api/cron/elsatia-identity` (outbox lifecycle → Studio).
+
+**Projet Vercel `elsatia-preview`, scope Preview uniquement :**
+
+| Variable | Nature | Valeur attendue (forme) |
+|---|---|---|
+| `ELSATIA_IDENTITY_ISSUER` | config | `https://<GP_PREVIEW>/identity` |
+| `ELSATIA_IDENTITY_SIGNING_KEYS` | **secret** | `{"current":{JWK ES256 privé}}` généré par `packages/elsatia-identity/scripts/keygen.mjs`, hors dépôt |
+| `ELSATIA_STUDIO_EXCHANGE_URL` | config | `https://studio-preview-elsatia.vercel.app/auth/elsatia/exchange` |
+| `ELSATIA_STUDIO_LIFECYCLE_URL` | config | `https://studio-preview-elsatia.vercel.app/api/elsatia/lifecycle` |
+| `STUDIO_ACCESS_MODE` | config | `allowlist` (fail-closed) |
+| `STUDIO_ACCESS_ALLOWLIST` | config sensible | adresses des comptes de recette |
+| `NEXT_PUBLIC_TOOLS_BILLING_API_URL` | config publique | `https://<GP_PREVIEW>` (V3.4) |
+| `ELSATIA_APPLICATION_ENV` | config | `preview` |
+| `NEXT_PUBLIC_APP_URL` | config publique | `https://<GP_PREVIEW>` |
+| `NEXT_PUBLIC_COLORS_URL` | config publique | URL Colors Preview |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` + clé serveur | config / **secret** | projet `pgvvpqyjziyapbbkydmc` uniquement |
+
+**Projet Vercel `elsatia-studio-preview`, scope Preview** (déjà posées en V2, à réaligner sur `<GP_PREVIEW>`, garde « même hôte ») :
+`ELSATIA_IDENTITY_ISSUER`, `ELSATIA_IDENTITY_HANDOFF_URL` (`https://<GP_PREVIEW>/identity/studio/handoff`),
+`ELSATIA_IDENTITY_JWKS_URL` (`https://<GP_PREVIEW>/api/elsatia-identity/jwks`).
+
+`<GP_PREVIEW>` = alias de branche Preview GP stable (pas le déploiement production du projet `elsatia-preview`).
+
+**Configurées dans cette session : aucune** (accès Vercel refusé).
+
+### V3.7 Tests distants non exécutés (REMOTE_PROOF_REQUIRED)
+
+Identity flow (connexion GP → handoff → exchange → session Studio → workspace → logout), sécurité (jeton valide/expiré,
+jti one-time, rejeu, révoqué, entreprise non autorisée, audience, signature, open redirect, logout), signup 422,
+Storage authentifié (upload/lecture/URL signée/suppression, autre tenant, anonyme, réservation/bail), smoke distant,
+navigateur : **aucun exécutable** depuis cette session. Preuves locales inchangées (V1 : identité 70/70, Playwright 23/23 ;
+V2 : signup 422 et smoke GO prouvés à distance le 2026-10-01 depuis le poste opérateur).
+
+### V3.8 Runbook opérateur (poste avec Supabase CLI + Vercel CLI, ou session cloud avec réseau et jetons)
+
+1. **Relance** : dashboard Supabase › `elsatia-preview` › Restore (Pro actif). Attendre `ACTIVE_HEALTHY`
+   (`supabase projects list`), puis `curl https://pgvvpqyjziyapbbkydmc.supabase.co/auth/v1/health` (avec la clé publishable) → 200.
+2. **Backup** (hors dépôt, `~/elsatia-preview/backups/<date>/`) : `supabase db dump --linked -f schema.sql`,
+   `--data-only -f data.sql`, `--role-only -f roles.sql` ; `supabase migration list --linked > ledger.txt` ;
+   inventaire Auth (`select count(*), max(created_at) from auth.users`) ; inventaire Storage
+   (`select bucket_id, count(*) from storage.objects group by 1`).
+3. **Ledger** : comparer `ledger.txt` aux 371 versions V8. Si le distant contient une version absente de V8 → **stop** (pas de réparation improvisée).
+   Sinon, depuis un checkout propre de `53b4bc7` lié au seul projet `pgvvpqyjziyapbbkydmc` : `supabase db push --linked`,
+   puis `scripts/preview/db-verify.mjs` (37 contrôles).
+4. **Clé de signature** : `node packages/elsatia-identity/scripts/keygen.mjs` → stocker hors dépôt, poser
+   `ELSATIA_IDENTITY_SIGNING_KEYS` via `vercel env add … preview` (entrée standard, jamais en argument).
+5. **Variables** V3.6 sur `elsatia-preview` (Preview), puis réaligner les 3 variables Studio.
+6. **Déploiement GP Preview** : pousser une branche contenant V8 (ex. `claude/sleepy-cannon-6je2vo`) ; vérifier le build ;
+   **tester HTTP** : `GET <GP_PREVIEW>/api/elsatia-identity/jwks` → 200 JSON `keys[]` sans `d` ;
+   `GET <GP_PREVIEW>/identity/studio/handoff?nonce=…` non connecté → redirection `/login?next=/identity/studio/handoff…` de la GP (sans nonce valide → retour `/login` Studio) ; JWKS 503 = clé non configurée.
+7. Redéployer Studio Preview (`scripts/preview/studio-preview-deploy.sh`), rejouer `studio-preview-smoke.mjs`, puis le
+   guide `ELSATIA_STUDIO_PREVIEW_USER_TEST_V2.md` §9 et les tests Storage authentifiés.
+
+### V3.9 Statuts annexes
+
+- `DNS_PENDING` : CNAME `studio-preview` → `0bb61110fdabc9c0.vercel-dns-017.com` (Squarespace) non vérifiable ici.
+- `WORKER_PREVIEW_PENDING` : worker vidéo et Redis, hors périmètre.
+- Action requise pour débloquer une session cloud : autoriser `api.supabase.com`, `*.supabase.co`, `api.vercel.com`,
+  `*.vercel.app` dans l'accès réseau de l'environnement et fournir `SUPABASE_ACCESS_TOKEN` et `VERCEL_TOKEN`
+  comme variables d'environnement (portée limitée aux projets Preview).
+
+---
+
+## Historique V2 (déploiement Studio, 2026-10-01 matin)
+
+### Verdict V2
 
 **STUDIO PREVIEW PARTIALLY READY**
 
