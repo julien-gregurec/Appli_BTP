@@ -9,13 +9,21 @@ import { AnalyseDocumentIA } from "@/components/AnalyseDocumentIA";
 import { DOCUMENT_CATEGORIES, libelleCategorie, tailleLisible } from "@/lib/documents";
 import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 import { iaEstActive } from "@/lib/preview-features";
+import { lireCurseur, lireDocumentsChantier, lirePageCurseur } from "@/lib/fiches-agregats";
+
+// Un chantier peut compter des milliers de photos : PostgREST tronquait la
+// liste à 1 000 sans erreur, et la RLS par ligne coûtait ~2,5 ms par document
+// (51 s pour compter 20 000 photos). Documents servis par
+// gp_chantier_documents_page (nombre exact, visibilité évaluée une fois),
+// médias de conversation paginés par curseur.
+const TAILLE_PAGE = 60;
 
 export default async function DocumentsChantierPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{ error?: string; success?: string; apres?: string; medias_apres?: string }>;
 }) {
   const { id } = await params;
   const messages = await searchParams;
@@ -24,18 +32,18 @@ export default async function DocumentsChantierPage({
   const permissions = await permissionsUtilisateur(ctx);
   const peutUtiliserIA = iaEstActive() && aAccesIA(permissions);
   const peutSupprimer = permissions === null || permissions.includes("gerer_chantiers");
-  const [{ data: chantier }, { data: documents }, { data: mediasConversation }] = await Promise.all([
+  const curseur = lireCurseur(messages.apres), curseurMedias = lireCurseur(messages.medias_apres);
+  const [{ data: chantier }, pageDocuments, pageMedias] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
-    supabase.from("documents_chantier")
-      .select("id, nom, categorie, storage_path, mime_type, taille_octets, note, audience, created_at")
-      .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
-      .order("created_at", { ascending: false }),
-    supabase.from("pieces_jointes_messages")
+    lireDocumentsChantier(supabase, ctx.entrepriseId, id, TAILLE_PAGE, curseur),
+    lirePageCurseur(supabase.from("pieces_jointes_messages")
       .select("id,nom_original,mime_type,type_media,taille_octets,storage_path,created_at")
-      .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
-      .order("created_at", { ascending: false }),
+      .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId), "created_at", TAILLE_PAGE, curseurMedias),
   ]);
+  const documents = pageDocuments.lignes, mediasConversation = pageMedias.lignes;
+  const lienPage = (cle: "apres" | "medias_apres", valeur: string | null) => { const q = new URLSearchParams(); const autre = cle === "apres" ? "medias_apres" : "apres"; if (messages[autre]) q.set(autre, messages[autre]!); if (valeur) q.set(cle, valeur); const t = q.toString(); return `/chantiers/${id}/documents${t ? `?${t}` : ""}`; };
+  const pagination = (cle: "apres" | "medias_apres", courant: boolean, suivant: string | null) => (courant || suivant) ? <nav aria-label="Pagination" className="flex items-center justify-between text-sm">{courant ? <Link href={lienPage(cle, null)} className="rounded-md border px-3 py-2">← Plus récents</Link> : <span />}{suivant ? <Link href={lienPage(cle, suivant)} className="rounded-md border px-3 py-2">Plus anciens →</Link> : <span />}</nav> : null;
   if (!chantier) notFound();
 
   // Performance : un appel Storage par document (N+1) devenait notable avec
@@ -77,7 +85,7 @@ export default async function DocumentsChantierPage({
             <p className="text-sm text-neutral-500">Plans, photos de suivi, livraisons et pièces techniques.</p>
             <Link href={`/chantiers/${id}/comptes-rendus`} className="mt-1 inline-block text-sm font-medium text-[#9a7625] hover:underline">✨ Comptes-rendus par dictée →</Link>
           </div>
-          <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{avecUrls.length + (mediasConversation?.length ?? 0)} élément{avecUrls.length + (mediasConversation?.length ?? 0) > 1 ? "s" : ""}</span>
+          <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{pageDocuments.total} document{pageDocuments.total > 1 ? "s" : ""}</span>
         </div>
 
         {messages.error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{messages.error}</p>}
@@ -134,6 +142,7 @@ export default async function DocumentsChantierPage({
                 </article>
               ))}
             </div>
+            {pagination("medias_apres", Boolean(curseurMedias), pageMedias.suivant)}
           </section>
         )}
 
@@ -152,7 +161,7 @@ export default async function DocumentsChantierPage({
                   <div className="space-y-3 p-3">
                     <div>
                       <p className="truncate text-sm font-medium" title={document.nom}>{document.nom}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">{libelleCategorie(document.categorie)} · {tailleLisible(Number(document.taille_octets))}</p><p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-[#9a7625]">{document.audience==="tous_affectes"?"Équipe affectée":document.audience==="encadrement"?"Encadrement":"Gestionnaires"}</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">{libelleCategorie(document.categorie ?? "autre")} · {tailleLisible(Number(document.taille_octets))}</p><p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-[#9a7625]">{document.audience==="tous_affectes"?"Équipe affectée":document.audience==="encadrement"?"Encadrement":"Gestionnaires"}</p>
                     </div>
                     {document.note && <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">{document.note}</p>}
                     {peutUtiliserIA && MIME_ANALYSABLES_IA.includes(document.mime_type) && <AnalyseDocumentIA documentId={document.id} />}
@@ -175,6 +184,7 @@ export default async function DocumentsChantierPage({
             <p className="mt-1 text-sm text-neutral-500">Ajoutez une photo, un plan ou une pièce technique ci-dessus.</p>
           </div>
         ) : null}
+        {pagination("apres", Boolean(curseur), pageDocuments.suivant)}
       </div>
     </main>
   );
