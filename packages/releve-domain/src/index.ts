@@ -52,3 +52,4 @@ export * from "./units";
 export * from "./metre";
 export * from "./quantitatif";
 export * from "./estimation";
+export * from "./gp-handoff";
