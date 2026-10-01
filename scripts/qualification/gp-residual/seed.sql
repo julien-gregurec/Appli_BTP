@@ -7,7 +7,7 @@
 --   fiche outil        : V factures, V mouvements
 --   fiche chantier     : V documents (chantier 1), plus les V factures
 --                        fournisseurs ci-dessus rattachées au chantier 1
--- Partie 2 (plus bas) : paie, notes de frais, CRM, tableau de bord, DOE,
+-- Parties 2 et 3 (plus bas) : parc (outils, véhicules), paie, notes de frais, CRM, tableau de bord, DOE,
 -- messagerie, interventions, appels d'offres, commandes, droits par poste.
 -- Utilisateurs : administrateur (toutes permissions) r<V>…a1, ouvrier sans
 -- droit finance r<V>…a2.
@@ -224,6 +224,26 @@ begin
     insert into public.postes (id, entreprise_id, nom) select pg_temp.u(pfx || 'f4', i), e, 'Poste ' || i from generate_series(1, 12) i;
     insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
       select e, pg_temp.u(pfx || 'f4', i), d.cle, true from generate_series(1, 12) i cross join public.permissions_disponibles d;
+  end loop;
+end $$;
+
+-- Partie 3 : parc (pages /flotte et /outillage) — V outils et V véhicules de
+-- plus, échéances variées (un tiers échues), 1 outil sur 9 hors service.
+do $$
+declare
+  v int; e uuid; pfx text;
+  volumes int[] := array[500, 1000, 1462, 5000, 20000, 300];
+  prefixes text[] := array['a0500', 'a1000', 'a1462', 'a5000', 'a2000', 'ae000'];
+begin
+  for k in 1 .. array_length(volumes, 1) loop
+    v := volumes[k]; pfx := prefixes[k]; e := pg_temp.u(pfx || 'e', 1);
+    insert into public.outils (id, entreprise_id, reference, designation, categorie, statut, etat, prochaine_verification)
+      select pg_temp.u(pfx || 'f5', i), e, 'OUT-P-' || lpad(i::text, 6, '0'), 'Outil ' || i, 'manuel',
+             case when i % 9 = 0 then 'hors_service' else 'disponible' end, 'bon', date '2026-10-01' + ((i % 3) - 1) * 200
+      from generate_series(1, v) i;
+    insert into public.vehicules (id, entreprise_id, immatriculation, marque, modele, type, statut, kilometrage, controle_technique_echeance)
+      select pg_temp.u(pfx || 'f6', i), e, 'PV-' || lpad(i::text, 6, '0'), 'Renault', 'Kangoo', 'utilitaire', 'actif', 1000, date '2026-10-01' + ((i % 3) - 1) * 200
+      from generate_series(1, v) i;
   end loop;
 end $$;
 

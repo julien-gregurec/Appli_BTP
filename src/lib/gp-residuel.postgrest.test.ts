@@ -22,7 +22,7 @@ import { appendFileSync } from "node:fs";
 import { PostgrestClient } from "@supabase/postgrest-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { lireChantiersClient, lireContenuDoe, lireCurseur, lireDocumentsChantier, lirePageCurseur, lireSyntheseChantier, lireSyntheseClient, lireSyntheseDepenses, lireSyntheseMissionsSousTraitant, type Curseur } from "@/lib/fiches-agregats";
+import { lireChantiersClient, lireContenuDoe, lireCurseur, lireDocumentsChantier, lirePageCurseur, lireSyntheseChantier, lireSyntheseClient, lireSyntheseDepenses, lireSyntheseMissionsSousTraitant, lireSyntheseParc, type Curseur } from "@/lib/fiches-agregats";
 import { lireAlertesStock, lireContenuExportPaie, lireDashboardChantiers, lirePageDossiersPaie, lireSyntheseCrm, lireSyntheseNotesFraisParEmploye, lireSynthesePaie } from "@/lib/pilotage-agregats";
 import { lireToutesLesLignes } from "@/lib/supabase/lecture-complete";
 
@@ -171,7 +171,15 @@ describe.skipIf(!URL_BANC)("GP résiduel : exactitude au-delà de 1 000 lignes (
         }
         expect(vus.size).toBe(n);
       }
-      noter("fiches véhicule/outil", n, { avant_ms: h.ms, apres_ms: c.ms, page_profonde_ms: derniere.ms, verite_vehicule: veh, corrige_vehicule: c.r[0].totalTtc });
+      // Bandeaux /outillage et /flotte : compteurs du parc (V + 1 outils, V + 1 véhicules).
+      const [nbOutils, outilsEchus, horsService, nbVehicules, vehiculesEchus] = verite(`select (select count(*) from outils where entreprise_id = '${id.e}'), (select count(*) from outils where entreprise_id = '${id.e}' and prochaine_verification <= current_date), (select count(*) from outils where entreprise_id = '${id.e}' and statut = 'hors_service'), (select count(*) from vehicules where entreprise_id = '${id.e}'), (select count(*) from vehicules where entreprise_id = '${id.e}' and (controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date))`);
+      const hOutils = (await sb.from("outils").select("id,statut,prochaine_verification").eq("entreprise_id", id.e).order("reference")).data ?? [];
+      attendreHistorique(n + 1, hOutils.length, nbOutils);
+      const aujourdhui = execFileSync("su", ["postgres", "-c", `psql -X -At -d ${DB}`], { input: "select current_date", encoding: "utf8" }).trim();
+      const parc = await lireSyntheseParc(sb, id.e, aujourdhui);
+      expect(parc.outils).toEqual({ nb: nbOutils, alertes: outilsEchus, horsService });
+      expect(parc.vehicules).toEqual({ nb: nbVehicules, alertes: vehiculesEchus });
+      noter("fiches véhicule/outil", n, { verite_outils: nbOutils, historique_outils: hOutils.length, avant_ms: h.ms, apres_ms: c.ms, page_profonde_ms: derniere.ms, verite_vehicule: veh, corrige_vehicule: c.r[0].totalTtc });
     }, 180_000);
 
     it(`fiche chantier — documents (${n}), synthèse chiffrée, DOE`, async () => {

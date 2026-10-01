@@ -206,3 +206,32 @@ $$;
 
 revoke all on function public.paie_anomalies_page(uuid, uuid, uuid, integer) from public, anon;
 grant execute on function public.paie_anomalies_page(uuid, uuid, uuid, integer) to authenticated;
+
+-- Parc (pages /flotte et /outillage) : compteurs du bandeau calculés en base.
+-- Ils comptaient une liste PostgREST plafonnée à 1 000 (« N outil(s) ·
+-- X vérification(s) échue(s) · Y hors service »). Visibilité : vehicules et
+-- outils → est_membre_actif (seule policy SELECT).
+create or replace function public.gp_parc_synthese(p_entreprise_id uuid, p_aujourdhui date)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.gp_exiger_membre(p_entreprise_id);
+  return jsonb_build_object(
+    'vehicules', (select jsonb_build_object(
+        'nb', count(*),
+        'alertes', count(*) filter (where controle_technique_echeance <= p_aujourdhui or assurance_echeance <= p_aujourdhui or prochain_entretien_date <= p_aujourdhui))
+      from public.vehicules where entreprise_id = p_entreprise_id),
+    'outils', (select jsonb_build_object(
+        'nb', count(*),
+        'alertes', count(*) filter (where prochaine_verification <= p_aujourdhui),
+        'hors_service', count(*) filter (where statut = 'hors_service'))
+      from public.outils where entreprise_id = p_entreprise_id));
+end;
+$$;
+
+revoke all on function public.gp_parc_synthese(uuid, date) from public, anon;
+grant execute on function public.gp_parc_synthese(uuid, date) to authenticated;

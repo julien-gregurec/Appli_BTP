@@ -45,6 +45,7 @@ FONCTIONS = [
     ("paie_periode_dossiers_page", "uuid, uuid, text, text, uuid, integer, integer"),
     ("paie_export_contenu", "uuid, uuid, boolean"),
     ("paie_anomalies_page", "uuid, uuid, uuid, integer"),
+    ("gp_parc_synthese", "uuid, date"),
     ("gp_options_chantiers", "uuid, text[], uuid, text"),
     ("gp_options_employes", "uuid, boolean"),
     ("gp_options_clients", "uuid, text, text, text"),
@@ -194,6 +195,11 @@ for libelle, uid in PROFILS:
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('{A}')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = '{A}'),
   'parité RLS options clients : {L}');""")
+    t(f"""select is(public.gp_parc_synthese('{A}', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = '{A}'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = '{A}')),
+  'parité RLS compteurs du parc : {L}');""")
     # Tenant B : refus pour un profil de A.
     t(f"select throws_ok($$select public.gp_client_synthese('{B}', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : {L}');")
     t(f"select throws_ok($$select public.plateforme_postes_tarifs_entreprise('{A}')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : {L}');")

@@ -11,7 +11,7 @@
 -- lignes par chemin (> max_rows = 1 000), audiences de documents mêlées (tous_affectes, encadrement, gestionnaires).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(273);
+select plan(283);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -141,6 +141,10 @@ select ok(to_regprocedure('public.paie_anomalies_page(uuid, uuid, uuid, integer)
 select is(has_function_privilege('anon', 'public.paie_anomalies_page(uuid, uuid, uuid, integer)', 'execute'), false, 'paie_anomalies_page : anon n''a pas EXECUTE');
 select is(has_function_privilege('authenticated', 'public.paie_anomalies_page(uuid, uuid, uuid, integer)', 'execute'), true, 'paie_anomalies_page : authenticated a EXECUTE');
 select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.paie_anomalies_page(uuid, uuid, uuid, integer)')), 'paie_anomalies_page : SECURITY DEFINER, search_path figé');
+select ok(to_regprocedure('public.gp_parc_synthese(uuid, date)') is not null, 'gp_parc_synthese existe');
+select is(has_function_privilege('anon', 'public.gp_parc_synthese(uuid, date)', 'execute'), false, 'gp_parc_synthese : anon n''a pas EXECUTE');
+select is(has_function_privilege('authenticated', 'public.gp_parc_synthese(uuid, date)', 'execute'), true, 'gp_parc_synthese : authenticated a EXECUTE');
+select ok((select prosecdef and proconfig::text like '%search_path=public%' from pg_proc where oid = to_regprocedure('public.gp_parc_synthese(uuid, date)')), 'gp_parc_synthese : SECURITY DEFINER, search_path figé');
 select ok(to_regprocedure('public.gp_options_chantiers(uuid, text[], uuid, text)') is not null, 'gp_options_chantiers existe');
 select is(has_function_privilege('anon', 'public.gp_options_chantiers(uuid, text[], uuid, text)', 'execute'), false, 'gp_options_chantiers : anon n''a pas EXECUTE');
 select is(has_function_privilege('authenticated', 'public.gp_options_chantiers(uuid, text[], uuid, text)', 'execute'), true, 'gp_options_chantiers : authenticated a EXECUTE');
@@ -295,6 +299,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : admin A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : admin A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : admin A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : admin A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : admin A');
@@ -430,6 +439,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : ouvrier A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : ouvrier A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : ouvrier A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : ouvrier A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : ouvrier A');
@@ -565,6 +579,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : chef d''équipe A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : chef d''équipe A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : chef d''équipe A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : chef d''équipe A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : chef d''équipe A');
@@ -700,6 +719,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : conducteur A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : conducteur A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : conducteur A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : conducteur A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : conducteur A');
@@ -835,6 +859,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : comptable A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : comptable A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : comptable A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : comptable A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : comptable A');
@@ -970,6 +999,11 @@ select is(
   (select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(public.gp_options_clients('a0000000-0000-0000-0000-000000000001')) x),
   (select array_agg(id order by id::text) from public.clients where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'parité RLS options clients : dirigeant A');
+select is(public.gp_parc_synthese('a0000000-0000-0000-0000-000000000001', current_date),
+  jsonb_build_object(
+    'vehicules', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where controle_technique_echeance <= current_date or assurance_echeance <= current_date or prochain_entretien_date <= current_date)) from public.vehicules where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+    'outils', (select jsonb_build_object('nb', count(*), 'alertes', count(*) filter (where prochaine_verification <= current_date), 'hors_service', count(*) filter (where statut = 'hors_service')) from public.outils where entreprise_id = 'a0000000-0000-0000-0000-000000000001')),
+  'parité RLS compteurs du parc : dirigeant A');
 select throws_ok($$select public.gp_client_synthese('b0000000-0000-0000-0000-000000000001', 'b3000000-0000-0000-0000-000000000001')$$, '42501', null, 'cross-tenant refusé (client B) : dirigeant A');
 select throws_ok($$select public.plateforme_postes_tarifs_entreprise('a0000000-0000-0000-0000-000000000001')$$, '42501', null, 'tarifs plateforme refusés à un membre de tenant : dirigeant A');
 select throws_ok($$select public.plateforme_applications_compteurs()$$, '42501', null, 'compteurs plateforme refusés à un membre de tenant : dirigeant A');

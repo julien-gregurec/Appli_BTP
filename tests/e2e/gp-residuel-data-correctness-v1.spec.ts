@@ -72,6 +72,11 @@ for (const [p, n] of [["a1462", 1462], ["a5000", 5000], ["a2000", 20000]] as con
       await expect(page.getByText(euros(verite(`select sum(montant_ttc) filter (where statut <> 'annulee') from depenses_fournisseurs where vehicule_id = '${id.vehicule}'`)), { exact: true })).toBeVisible();
       await expect(page.getByText(`${n} facture(s) au total.`)).toBeVisible();
 
+      await ouvrir(page, "/outillage");
+      await expect(page.getByText(`${verite(`select count(*) from outils where entreprise_id = '${id.e}'`)} outil(s) · ${verite(`select count(*) from outils where entreprise_id = '${id.e}' and prochaine_verification <= current_date`)} vérification(s) échue(s)`)).toBeVisible();
+      await ouvrir(page, "/flotte");
+      await expect(page.getByText(`${verite(`select count(*) from vehicules where entreprise_id = '${id.e}'`)} véhicule(s) ·`)).toBeVisible();
+
       await ouvrir(page, `/outillage/${id.outil}`);
       await expect(page.getByText(euros(verite(`select sum(montant_ttc) filter (where statut <> 'annulee') from depenses_fournisseurs where outil_id = '${id.outil}'`)), { exact: true })).toBeVisible();
     });

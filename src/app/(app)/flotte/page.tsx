@@ -1,8 +1,11 @@
 import { importerVehiculesAction } from "@/app/actions/flotte";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { lirePageCroissante, lireSyntheseParc, type SyntheseParc } from "@/lib/fiches-agregats";
 import { Lien as Link } from "@/components/Lien";
 import { STATUTS_VEHICULE } from "@/lib/flotte";
+
+const TAILLE_PAGE = 200;
 
 type EmployeLie = { prenom: string; nom: string };
 
@@ -28,25 +31,27 @@ const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value
 export default async function FlottePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{ error?: string; success?: string; apres?: string }>;
 }) {
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("vehicules")
-    .select("id,immatriculation,marque,modele,kilometrage,controle_technique_echeance,assurance_echeance,prochain_entretien_date,statut,employe:employes!vehicules_employe_entreprise_fk(prenom,nom)")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("immatriculation");
+  // Compteurs du bandeau en base (gp_parc_synthese) et liste paginée par
+  // curseur sur immatriculation : la liste complète, plafonnée à 1 000 par PostgREST,
+  // faisait compter et afficher un parc tronqué.
+  const aujourdhuiIso = new Date().toISOString().slice(0, 10);
+  const [page, synthese] = await Promise.all([
+    lirePageCroissante<Record<string, unknown>>(supabase
+      .from("vehicules")
+      .select("id,immatriculation,marque,modele,kilometrage,controle_technique_echeance,assurance_echeance,prochain_entretien_date,statut,employe:employes!vehicules_employe_entreprise_fk(prenom,nom)")
+      .eq("entreprise_id", ctx.entrepriseId), "immatriculation", TAILLE_PAGE, messages.apres ?? null),
+    lireSyntheseParc(supabase, ctx.entrepriseId, aujourdhuiIso).catch((err): SyntheseParc | null => { console.error("[parc] synthèse indisponible", err instanceof Error ? err.message : err); return null; }),
+  ]);
+  const data = page.lignes;
 
   const vehicules = (data ?? []) as VehiculeListe[];
   const aujourdHui = new Date().toISOString().slice(0, 10);
   const estEchue = (date: string | null) => Boolean(date && date <= aujourdHui);
-  const alertes = vehicules.filter((vehicule) => [
-    vehicule.controle_technique_echeance,
-    vehicule.assurance_echeance,
-    vehicule.prochain_entretien_date,
-  ].some(estEchue)).length;
 
   return (
     <main className="p-8">
@@ -54,7 +59,7 @@ export default async function FlottePage({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Flotte automobile</h1>
-            <p className="text-sm text-neutral-500">{vehicules.length} véhicule(s) · {alertes} échéance(s) à traiter</p>
+            <p className="text-sm text-neutral-500">{synthese ? `${synthese.vehicules.nb} véhicule(s) · ${synthese.vehicules.alertes} échéance(s) à traiter` : "Compteurs indisponibles"}</p>
           </div>
           <Link href="/flotte/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouveau véhicule
@@ -132,6 +137,12 @@ export default async function FlottePage({
               </table>
             </div>
           </>
+        )}
+        {(messages.apres || page.suivant) && (
+          <nav aria-label="Pagination" className="mb-20 flex items-center justify-between text-sm">
+            {messages.apres ? <Link href="/flotte" className="rounded-md border px-3 py-2">← Début de la liste</Link> : <span />}
+            {page.suivant ? <Link href={`/flotte?${new URLSearchParams({ apres: page.suivant })}`} className="rounded-md border px-3 py-2">Suite →</Link> : <span />}
+          </nav>
         )}
       </div>
     </main>

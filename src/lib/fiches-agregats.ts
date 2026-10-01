@@ -224,3 +224,32 @@ export async function lireOptionsClients(supabase: SupabaseClient, entrepriseId:
   if (error) { console.error("[options] clients indisponibles", error.message); return []; }
   return (data ?? []) as OptionClient[];
 }
+
+/**
+ * Page par curseur en ordre CROISSANT sur une colonne unique et non nulle dans
+ * l'entreprise (référence d'outil, immatriculation) : coût constant par page.
+ */
+export async function lirePageCroissante<T extends Record<string, unknown>>(
+  requete: { gt(colonne: string, valeur: string): unknown; order(colonne: string, options: { ascending: boolean }): unknown },
+  colonne: keyof T & string,
+  taille: number,
+  apres: string | null,
+): Promise<{ lignes: T[]; suivant: string | null }> {
+  type Chainable = { gt(c: string, v: string): Chainable; order(c: string, o: { ascending: boolean }): Chainable; limit(n: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }> };
+  let q = requete as unknown as Chainable;
+  if (apres) q = q.gt(colonne, apres);
+  const { data, error } = await q.order(colonne, { ascending: true }).limit(taille + 1);
+  if (error) throw new Error(`Liste indisponible : ${error.message}`);
+  const lignes = (data ?? []).slice(0, taille);
+  const derniere = lignes[lignes.length - 1];
+  return { lignes, suivant: (data ?? []).length > taille && derniere ? String(derniere[colonne]) : null };
+}
+
+export type SyntheseParc = { vehicules: { nb: number; alertes: number }; outils: { nb: number; alertes: number; horsService: number } };
+
+export async function lireSyntheseParc(supabase: SupabaseClient, entrepriseId: string, aujourdhui: string): Promise<SyntheseParc> {
+  const { data, error } = await supabase.rpc("gp_parc_synthese", { p_entreprise_id: entrepriseId, p_aujourdhui: aujourdhui });
+  if (error || !data) throw erreur("gp_parc_synthese", error);
+  const d = data as { vehicules: Record<string, unknown>; outils: Record<string, unknown> };
+  return { vehicules: { nb: nombre(d.vehicules.nb), alertes: nombre(d.vehicules.alertes) }, outils: { nb: nombre(d.outils.nb), alertes: nombre(d.outils.alertes), horsService: nombre(d.outils.hors_service) } };
+}
