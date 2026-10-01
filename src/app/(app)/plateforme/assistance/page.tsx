@@ -1,3 +1,4 @@
+import { lireToutesLesLignes } from "@/lib/supabase/lecture-complete";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -70,9 +71,11 @@ export default async function PlateformeAssistancePage({
         .select("id,acteur_email,entreprise_id,motif_cle,perimetre,ticket,ouverte_at,expire_at,terminee_at,terminee_motif,revoquee_at")
         .order("ouverte_at", { ascending: false })
         .limit(100),
-      supabase.from("entreprises").select("id,nom").order("nom"),
+      // Lectures complètes : tenants × applications dépasse 1 000 lignes dès
+      // ~250 tenants, et PostgREST tronquait sans erreur.
+      lireToutesLesLignes<{ id: string; nom: string }>((options) => supabase.from("entreprises").select("id,nom", options).order("nom").order("id")),
       supabase.from("applications_elsatia").select("code,nom,actif,portee_donnees").order("ordre"),
-      supabase.from("acces_applications_entreprises").select("entreprise_id,application_code").eq("autorise", true),
+      lireToutesLesLignes<{ entreprise_id: string; application_code: string }>((options) => supabase.from("acces_applications_entreprises").select("entreprise_id,application_code", options).eq("autorise", true).order("entreprise_id").order("application_code")),
     ]);
 
   const contratAbsent =
