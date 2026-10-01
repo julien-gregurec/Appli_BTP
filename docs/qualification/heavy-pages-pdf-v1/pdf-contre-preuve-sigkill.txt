@@ -1,0 +1,7 @@
+# Contre-preuve : ancien montage (WebSocket, sans tube) — serveur tué par SIGKILL pendant une génération
+date: 2026-10-01T13:58:16+00:00
+processus Chromium 5 s après le SIGKILL du processus Node :
+  PID  PPID   RSS     ELAPSED COMMAND
+24339     1 133340      00:14 chromium
+
+=> orphelin rattaché à init (ppid 1). Nouveau montage (tube + marqueur) : voir pdf-tests.log, 'arrêt SIGKILL : Chromium arrêté sans intervention'.

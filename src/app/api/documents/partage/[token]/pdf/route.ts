@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
+import { genererPdfDepuisUrl, nomFichierPdf, reponseErreurPdf } from "@/lib/pdf/generer";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,9 +19,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(url.toString());
-  } catch {
-    return NextResponse.json({ error: "Lien invalide, expiré, ou document introuvable" }, { status: 404 });
+    pdf = await genererPdfDepuisUrl(url.toString(), null, { signal: request.signal });
+  } catch (erreur) {
+    // File saturée → 503 (Retry-After), délai → 504 ; sinon statut historique.
+    return reponseErreurPdf(erreur, 404, "Lien invalide, expiré, ou document introuvable");
   }
 
   return new NextResponse(new Uint8Array(pdf), {
