@@ -25,7 +25,7 @@ Le travail produit dans Tools (relevé → métré → quantitatif → estimatio
 | Mapping | ouvrage Tools → prestation GP ; sans correspondance : ligne « non liée », aucune donnée perdue |
 | Sécurité | même organisation, droits Tools, droits GP, chantier / client du tenant, cross-tenant refusé |
 | Audit | qui, quand, source, version, import, réimport, devis, correspondances |
-| Performance | 5 000 lignes : import serveur **2,1 s**, réimport 2,2 s, écran GP 3,1 s, comparaison 2,9 s |
+| Performance | 5 000 lignes : import serveur **2,1 s**, réimport 2,2 s, écran GP 2,9 s, comparaison 2,8 s |
 
 ### Chiffres clés (exécutés sur HEAD)
 
@@ -41,8 +41,9 @@ Le travail produit dans Tools (relevé → métré → quantitatif → estimatio
 | `tsc --noEmit` racine et `apps/tools` | 0 erreur |
 | ESLint `apps/tools`, `src`, `packages`, recette | 0 erreur (4 avertissements `<img>` antérieurs, hors lot) |
 | `verify:migrations`, `verify:train-expectations` | OK (attendus synchronisés : 373 / `20260930001501`) |
-| **Playwright Tools → GP** `tools-releve-lot11-gp.spec.ts` | **11 / 11** (voir §13) |
-| Playwright non-régression Relevé Lots 2 → 10 + Atelier | voir §14 |
+| **Playwright Tools → GP** `tools-releve-lot11-gp.spec.ts` | **11 / 11** (voir §13), passe finale complète |
+| Playwright non-régression Relevé Lots 2 → 10 + Atelier | **117 / 117** (15,9 min, une passe, pile réelle) |
+| Build Tools web / natif (Capacitor) / Gestion Pro | OK ; `/devis/imports-tools` et `/devis/imports-tools/[id]` dynamiques, `/releves/estimation` statique |
 
 ## 1. Base : Lot 10 porté sur V8 (sans fusion aveugle)
 
@@ -174,15 +175,15 @@ Pile réelle, `next dev` (Tools et GP), mesures Playwright (`RELEVE_E2E_PERF_OUT
 
 | Lignes (ouvrages) | Préparation du contrat | Envoi (écran) | dont serveur | Réimport identique | Nouvelle version | Liste GP | Détail GP | Comparaison | Devis brouillon |
 |---|---|---|---|---|---|---|---|---|---|
-| 100 (20) | 0,12 s | 0,20 s | 0,11 s | 0,31 s | 0,34 s | 0,87 s | 1,67 s | 1,73 s | 1,51 s |
-| 1 000 (200) | 0,18 s | 0,56 s | 0,42 s | 0,53 s | 0,79 s | 0,93 s | 2,60 s | 2,75 s | 2,26 s |
-| 5 000 (1 000) | 0,27 s | 2,70 s | 2,10 s | 2,22 s | 2,77 s | 0,90 s | 3,07 s | 2,91 s | 6,47 s |
+| 100 (20) | 0,16 s | 0,20 s | 0,11 s | 0,34 s | 0,29 s | 1,09 s | 1,72 s | 1,53 s | 1,51 s |
+| 1 000 (200) | 0,18 s | 0,59 s | 0,46 s | 0,55 s | 0,83 s | 1,17 s | 3,13 s | 3,68 s | 2,39 s |
+| 5 000 (1 000) | 0,42 s | 2,65 s | 2,06 s | 2,20 s | 2,89 s | 0,99 s | 2,87 s | 2,82 s | 6,08 s |
 
 Corrections faites pendant la recette (mesures avant → après, 5 000 lignes) :
 
 1. lignes serveur : `EXISTS` sur le tableau d'ouvrages (quadratique, évalué 3 fois) → jointure par hachage évaluée une fois : **import 10,0 s → 2,1 s** ;
 2. RLS par ligne (`est_membre_actif` + `a_permission` × 5 000) → helper évalué une fois par requête : comptage des lignes 5,3 s → quelques ms ;
-3. détail GP : le snapshot entier (9,3 Mo) n'est plus lu, seules ses sections affichées ; correspondances paginées : **détail 25,9 s → 3,1 s**, comparaison 17,5 s → 2,9 s.
+3. détail GP : le snapshot entier (9,3 Mo) n'est plus lu, seules ses sections affichées ; correspondances paginées : **détail 25,9 s → 2,9 s**, comparaison 17,5 s → 2,8 s.
 
 Le contrat de 5 000 lignes pèse ≈ 9 Mo. Mesures `next dev`, à remesurer en build de production / Preview.
 
@@ -211,7 +212,7 @@ Le contrat de 5 000 lignes pèse ≈ 9 Mo. Mesures `next dev`, à remesurer en b
 Non-régression :
 
 - pgTAP Relevé Lots 2 → 10 : 734 / 734, inchangés.
-- Playwright Relevé Lots 2 → 10 + Atelier : voir le tableau des commandes (§16).
+- Playwright Relevé Lots 2 → 10 + Atelier : **117 / 117** (Lots 2 → 9 + Atelier : 107, Lot 10 : 10), après le Lot 11, sur la même pile.
 - Devis GP : Vitest racine (dont devis) 2 642 / 2 642 ; pgTAP devis de la suite complète ; Playwright : liste des devis, nouveau devis, éditeur du devis importé, chantiers et fiche chantier.
 - Contrat `elsatia.tools.quantitatif` 1.0.0 : inchangé (validateur et tests du Lot 9 intacts, imbriqué tel quel).
 
@@ -265,5 +266,6 @@ npx playwright test tests/e2e/tools-releve-lot{2..10}.spec.ts tests/e2e/tools-at
 | Appareils physiques, Safari / WebKit | non testés (Chromium desktop) |
 | Builds de production | performances mesurées en `next dev` ; à remesurer en build / Preview |
 | Jeu pilote de recette | `seed_entreprise_pilote_btp.sql` crée l'entreprise « il y a 2 mois » : son essai GP est déjà échu (B-4 V8). La recette rouvre l'essai via `releve_lot11_gp_seed.sql` (et rejoue elle-même le cas « GP fermé ») |
-| Devis 5 000 lignes | création 6,5 s (≈ 1 000 lignes de devis, déclencheurs GP par ligne : tâches, verrou) |
+| Devis 5 000 lignes | création 6,1 s (≈ 1 000 lignes de devis, déclencheurs GP par ligne : tâches, verrou) |
 | Photos | transmises par référence (chemins), GP ne les affiche pas encore en vignettes |
+| Test Réserves à ordre indéterminé | `reserves_v3_parcours_bout_en_bout` test 31 (§15) : correction à faire dans un lot Réserves (tri secondaire de `reserves_export_historique`) |

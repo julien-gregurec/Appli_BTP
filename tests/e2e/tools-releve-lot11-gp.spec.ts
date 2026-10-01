@@ -401,9 +401,9 @@ test("Non-régression Gestion Pro : liste des devis, nouveau devis, chantiers et
   await expect(page.getByRole("heading", { name: "Nouveau devis" })).toBeVisible({ timeout: 60_000 });
   await page.goto(`${GP}/chantiers`);
   await expect(page.getByRole("heading", { name: "Chantiers", exact: true })).toBeVisible();
-  await expect(page.getByText(ctx.chantierGp.nom).first()).toBeVisible();
+  await expect(page.getByText(ctx.chantierGp.nom).filter({ visible: true }).first()).toBeVisible();
   await page.goto(`${GP}/chantiers/${ctx.chantierGp.id}`);
-  await expect(page.getByRole("heading", { name: ctx.chantierGp.nom }).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: ctx.chantierGp.nom }).filter({ visible: true }).first()).toBeVisible({ timeout: 60_000 });
   // Les devis brouillons créés depuis Tools apparaissent dans la liste GP comme les autres (sans numéro).
   const { count } = await ctx.a.from("devis").select("id", { count: "exact", head: true }).eq("chantier_id", ctx.chantierGp.id).eq("statut", "brouillon").is("numero", null);
   expect(count ?? 0).toBeGreaterThanOrEqual(1);
