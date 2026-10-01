@@ -6,7 +6,7 @@ import { Lien as Link } from "@/components/Lien";
 import { nomClient } from "@/lib/chantier-statuts";
 import { appliquerCorrespondancesAction, creerDevisDepuisImportAction, enregistrerCorrespondanceAction } from "@/app/actions/imports-tools";
 import {
-  ecartTexte, ETAT_PROJET_LIBELLES, IMPORTS_TOOLS_CHEMIN, importToolsHref, montantImport, resumeComparaison, sourceImport, statutImport,
+  COLONNES_IMPORT, ecartTexte, ETAT_PROJET_LIBELLES, IMPORTS_TOOLS_CHEMIN, importToolsHref, montantImport, resumeComparaison, sourceImport, statutImport,
   STATUT_COMPARAISON_LIBELLES, type ComparaisonImports, type ImportTools,
 } from "@/lib/imports-tools";
 
@@ -15,6 +15,8 @@ import {
  * comparaison avec une autre version, création EXPLICITE d'un devis brouillon. Rien ici ne modifie un devis existant.
  */
 const LIGNES_AFFICHEES = 300;
+/** Ouvrages par page de correspondances (chaque ligne porte un formulaire et la liste des prestations). */
+const OUVRAGES_PAR_PAGE = 100;
 const champ = "mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const carte = "rounded-xl border border-neutral-200 p-4 dark:border-neutral-800";
 
@@ -35,10 +37,10 @@ type Detail = ImportTools & {
 };
 
 export default async function ImportToolsDetailPage({ params, searchParams }: {
-  params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string; comparer?: string }>;
+  params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string; comparer?: string; op?: string }>;
 }) {
   const { id } = await params;
-  const { error, success, comparer } = await searchParams;
+  const { error, success, comparer, op } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
@@ -46,10 +48,11 @@ export default async function ImportToolsDetailPage({ params, searchParams }: {
   const peutGerer = permissions === null || permissions.includes("gerer_devis");
 
   const { data: brut } = await supabase.from("gp_tools_imports")
-    .select("*, photos:snapshot->photos, annotations:snapshot->annotations, anomalies:snapshot->anomalies, revetements:snapshot->revetements, etats:snapshot->etatsProjetes, ouvrages:snapshot->quantitatif->ouvrages")
+    // Jamais `snapshot` entier (plusieurs Mo à 5 000 lignes) : seulement les sections affichées.
+    .select(`${COLONNES_IMPORT}, dossier, verification, photos:snapshot->photos, annotations:snapshot->annotations, anomalies:snapshot->anomalies, revetements:snapshot->revetements, etats:snapshot->etatsProjetes, ouvrages:snapshot->quantitatif->ouvrages`)
     .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!brut) notFound();
-  const imp = { ...(brut as Record<string, unknown>), snapshot: undefined } as unknown as Detail;
+  const imp = brut as unknown as Detail;
 
   const [{ data: lignes, count }, { data: journal }, { data: autres }, { data: prestations }, { data: correspondances }, { data: clients }, { data: chantiers }, comparaison, suivante] = await Promise.all([
     supabase.from("gp_tools_imports_lignes").select("id,ordre,designation,lot,etat_projet,nature,unite,quantite,prix_unitaire_estimatif,montant_estimatif,corrige,emplacement,correspondance,prestation_id", { count: "exact" })
@@ -70,7 +73,11 @@ export default async function ImportToolsDetailPage({ params, searchParams }: {
   ]);
   const statut = statutImport(imp);
   const corr = new Map((correspondances ?? []).map((c) => [c.tools_cle, c.prestation_id as string | null]));
-  const ouvrages = [...new Map((imp.ouvrages ?? []).map((o) => [o.cle, o])).values()];
+  const tousOuvrages = [...new Map((imp.ouvrages ?? []).map((o) => [o.cle, o])).values()];
+  const pagesOuvrages = Math.max(1, Math.ceil(tousOuvrages.length / OUVRAGES_PAR_PAGE));
+  const pageOuvrages = Math.min(pagesOuvrages, Math.max(1, Number(op) || 1));
+  const ouvrages = tousOuvrages.slice((pageOuvrages - 1) * OUVRAGES_PAR_PAGE, pageOuvrages * OUVRAGES_PAR_PAGE);
+  const pageHref = (n: number) => `${importToolsHref(id, comparer)}${comparer ? "&" : "?"}op=${n}`;
   const lignesListe = (lignes ?? []) as Ligne[];
   const precedent = (autres ?? []).find((a) => a.source_version < imp.source_version);
 
@@ -151,6 +158,11 @@ export default async function ImportToolsDetailPage({ params, searchParams }: {
           </form> : <span className="text-xs">{prestation ? "Liée" : "Non liée"}</span>}
         </li>;
       })}</ul>
+      {pagesOuvrages > 1 && <nav className="mt-2 flex flex-wrap gap-2 text-xs" aria-label="Pages d'ouvrages" data-testid="import-ouvrages-pages">
+        <span className="text-neutral-500">{tousOuvrages.length} ouvrages · page {pageOuvrages}/{pagesOuvrages}</span>
+        {pageOuvrages > 1 && <Link href={pageHref(pageOuvrages - 1)} className="underline">Précédents</Link>}
+        {pageOuvrages < pagesOuvrages && <Link href={pageHref(pageOuvrages + 1)} className="underline">Suivants</Link>}
+      </nav>}
     </section>
 
     <section className={carte} data-testid="import-lignes-section">

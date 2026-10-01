@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { Lien as Link } from "@/components/Lien";
-import { ETAT_SOURCE_LIBELLES, importToolsHref, montantImport, regrouperParSource, statutImport, type ImportTools } from "@/lib/imports-tools";
+import { COLONNES_IMPORT, ETAT_SOURCE_LIBELLES, importToolsHref, montantImport, regrouperParSource, statutImport, type ImportTools } from "@/lib/imports-tools";
 
 /**
  * Imports Tools / Relevé (Lot 11) : estimations transmises par ELSATIA Tools. Une carte par source (relevé × état) :
@@ -14,7 +14,7 @@ export default async function ImportsToolsPage({ searchParams }: { searchParams:
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const { data } = await supabase.from("gp_tools_imports")
-    .select("id,source_releve_id,source_etat,source_version,contract_name,contract_version,releve_nom,releve_reference,chantier_id,client_id,chantier_nom,client_nom,nb_ouvrages,nb_lignes,nb_lignes_sans_prix,nb_lignes_liees,montant_estimatif_ht,heures_estimees,statut,devis_id,devis_cree_le,precedent_import_id,nouvelle_version_id,transmis_par,created_at")
+    .select(COLONNES_IMPORT)
     .eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }).limit(500);
   const groupes = regrouperParSource((data ?? []) as ImportTools[]);
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-6xl space-y-6">
