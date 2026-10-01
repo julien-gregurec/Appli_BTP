@@ -5,6 +5,8 @@
 -- période, pour prouver l'isolation. Chaque entreprise a :
 --   - un administrateur  (toutes permissions)       : f<V>…001
 --   - un ouvrier          (aucune permission finance) : f<V>…002
+-- La moitié des lignes rattachées à un chantier vont au chantier 1 (« gros
+-- chantier » : fiche chantier au-delà de 1 000 lignes dès V = 5 000).
 -- Chargement superutilisateur, triggers métier neutralisés
 -- (session_replication_role = replica) : on fabrique des documents déjà émis
 -- sans rejouer le cycle de vie. Les RLS, elles, restent actives à la lecture.
@@ -50,7 +52,7 @@ begin
     -- 1 sur 33 est annulée. Montants non ronds pour exercer les décimales.
     insert into public.factures (id, entreprise_id, numero, client_id, chantier_id, type, statut, date_emission, date_echeance,
                                  montant_ht, montant_tva, montant_ttc, montant_paye)
-      select pg_temp.u(pfx || 'fa', i), e, 'F-' || lpad(i::text, 6, '0'), pg_temp.u(pfx || 'c', 1 + i % 50), pg_temp.u(pfx || 'ca', 1 + i % 20),
+      select pg_temp.u(pfx || 'fa', i), e, 'F-' || lpad(i::text, 6, '0'), pg_temp.u(pfx || 'c', 1 + i % 50), pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end),
              case when i % 20 = 0 then 'avoir' else 'simple' end,
              case when i % 33 = 0 then 'annulee' when i % 4 = 0 then 'payee' when i % 4 = 1 then 'payee_partiel' when i % 4 = 2 then 'en_retard' else 'envoyee' end,
              date '2026-01-01' + (i % 181), date '2026-01-01' + (i % 181) + 30,
@@ -72,7 +74,7 @@ begin
 
     insert into public.depenses_fournisseurs (id, entreprise_id, fournisseur_id, chantier_id, numero_piece, categorie, date_piece, date_echeance,
                                               statut, montant_ht, taux_tva, montant_tva, montant_regle)
-      select pg_temp.u(pfx || 'df', i), e, pg_temp.u(pfx || 'd', 1 + i % 30), case when i % 3 = 0 then null else pg_temp.u(pfx || 'ca', 1 + i % 20) end,
+      select pg_temp.u(pfx || 'df', i), e, pg_temp.u(pfx || 'd', 1 + i % 30), case when i % 3 = 0 then null else pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end) end,
              'FF-' || lpad(i::text, 6, '0'), (array['materiaux', 'sous_traitance', 'location', 'transport', 'autre'])[1 + i % 5],
              date '2026-01-01' + (i % 181), date '2026-01-01' + (i % 181) + 45,
              case when i % 29 = 0 then 'annulee' when i % 3 = 0 then 'payee' when i % 3 = 1 then 'payee_partiel' else 'a_payer' end,
@@ -91,7 +93,7 @@ begin
                                     fournisseur, statut, chantier_id, valide_at)
       select pg_temp.u(pfx || '0f', i), e, 'NF-' || lpad(i::text, 6, '0'), date '2026-01-01' + (i % 181),
              round(((i * 17) % 300) + 4.99, 2), round((((i * 17) % 300) + 4.99) / 1.2, 2), round(((i * 17) % 300) + 4.99, 2) - round((((i * 17) % 300) + 4.99) / 1.2, 2), 20,
-             'repas', 'Restaurant ' || (i % 40), 'valide', pg_temp.u(pfx || 'ca', 1 + i % 20), now()
+             'repas', 'Restaurant ' || (i % 40), 'valide', pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), now()
       from generate_series(1, v) i;
     insert into public.documents_notes_frais (id, entreprise_id, note_frais_id, type_document, nombre_pages)
       select pg_temp.u(pfx || '0d', i), e, pg_temp.u(pfx || '0f', i), 'ticket_caisse', 1 from generate_series(1, v) i;
@@ -121,7 +123,7 @@ begin
              round(((i * 29) % 400) + 0.73, 2), timestamptz '2026-06-30 08:00' + (i % 50) * interval '1 second'
       from generate_series(1, v) i;
     insert into public.mouvements_stock (id, entreprise_id, article_id, chantier_id, type, quantite, date)
-      select pg_temp.u(pfx || '5d', i), e, pg_temp.u(pfx || '5a', i), pg_temp.u(pfx || 'ca', 1 + i % 20), 'sortie', 1 + i % 4, date '2026-01-01' + (i % 181)
+      select pg_temp.u(pfx || '5d', i), e, pg_temp.u(pfx || '5a', i), pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), 'sortie', 1 + i % 4, date '2026-01-01' + (i % 181)
       from generate_series(1, v) i;
 
     -- Pointage : 60 salariés ; V pointages validés / à vérifier, V sessions et
@@ -131,20 +133,20 @@ begin
       select pg_temp.u(pfx || '7e', i), e, 'Prénom' || i, 'Salarié' || lpad(i::text, 3, '0'), 'INS-' || pfx || '-' || i, pfx || '-' || i, 'EMP-' || i, 'actif'
       from generate_series(1, 60) i;
     insert into public.pointages (id, entreprise_id, employe_id, chantier_id, date, heures_normales, heures_supplementaires, verification_statut, origine_pointage)
-      select pg_temp.u(pfx || '7a', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20), date '2026-03-01' + (i % 31),
+      select pg_temp.u(pfx || '7a', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), date '2026-03-01' + (i % 31),
              round(1 + (i % 13) * 0.5, 2), round((i % 4) * 0.25, 2), case when i % 5 = 0 then 'a_verifier' else 'valide' end, 'gps_complet'
       from generate_series(1, v) i;
     insert into public.sessions_pointage (id, entreprise_id, employe_id, chantier_id, arrivee_at, depart_at, pause_minutes, latitude_arrivee, longitude_arrivee, pointage_id)
-      select pg_temp.u(pfx || '7b', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20),
+      select pg_temp.u(pfx || '7b', i), e, pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end),
              timestamptz '2026-03-01 07:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second',
              timestamptz '2026-03-01 16:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second', 60, 48.85, 2.35, pg_temp.u(pfx || '7a', i)
       from generate_series(1, v) i;
     insert into public.verifications_zone_pointage (id, entreprise_id, session_id, employe_id, chantier_id, latitude, longitude, distance_metres, dans_zone, created_at)
-      select pg_temp.u(pfx || '7c', i), e, pg_temp.u(pfx || '7b', i), pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', 1 + i % 20), 48.85, 2.35, i % 300, i % 9 <> 0,
+      select pg_temp.u(pfx || '7c', i), e, pg_temp.u(pfx || '7b', i), pg_temp.u(pfx || '7e', 1 + i % 60), pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), 48.85, 2.35, i % 300, i % 9 <> 0,
              timestamptz '2026-03-01 10:00+01' + (i % 31) * interval '1 day' + (i % 120) * interval '1 second'
       from generate_series(1, v) i;
     insert into public.affectations (id, entreprise_id, chantier_id, employe_id, date, heures, type_activite, tache)
-      select pg_temp.u(pfx || '7d', i), e, pg_temp.u(pfx || 'ca', 1 + i % 20), pg_temp.u(pfx || '7e', 1 + i % 60), date '2026-03-02' + (i % 7), round(0.5 + (i % 15) * 0.5, 2), 'chantier', 'Tâche ' || i
+      select pg_temp.u(pfx || '7d', i), e, pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), pg_temp.u(pfx || '7e', 1 + i % 60), date '2026-03-02' + (i % 7), round(0.5 + (i % 15) * 0.5, 2), 'chantier', 'Tâche ' || i
       from generate_series(1, v) i;
   end loop;
 end $$;
