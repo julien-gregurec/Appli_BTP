@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { chargerIdsLignesInventaire } from "@/lib/stock-donnees";
 
 const champ = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,9 +29,10 @@ export async function creerInventaireAction(formData: FormData) {
 export async function enregistrerInventaireAction(id: string, formData: FormData) {
   const contexte = await getContexteEntreprise();
   const supabase = await createClient();
-  const { data: lignes } = await supabase.from("lignes_inventaire").select("id").eq("inventaire_id", id).eq("entreprise_id", contexte.entrepriseId);
+  // Toutes les lignes (lecture complète) : la RPC refuse un comptage partiel.
+  const lignes = await chargerIdsLignesInventaire(supabase, contexte.entrepriseId, id);
   if (!lignes) redirect(`/inventaires/${id}?error=${encodeURIComponent("Inventaire introuvable")}`);
-  const comptages = lignes.map((ligne) => ({ ligne_id: ligne.id, quantite: Number(champ(formData, `q_${ligne.id}`)) }));
+  const comptages = lignes.map((ligneId) => ({ ligne_id: ligneId, quantite: Number(champ(formData, `q_${ligneId}`)) }));
   const valider = champ(formData, "intention") === "valider";
   const { error } = await supabase.rpc("enregistrer_comptage_inventaire", { p_entreprise_id: contexte.entrepriseId, p_inventaire_id: id, p_comptages: comptages, p_valider: valider });
   if (error) redirect(`/inventaires/${id}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerComptageInventaireAction", error, "Impossible d’enregistrer ce comptage."))}`);

@@ -1,0 +1,25 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 223ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 293ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 692ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 88ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 461ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 1272ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 112ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 808ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 2244ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 182ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 5662ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 17232ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 1140ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 8275ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 64302ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 232ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  01:09:50
+   Duration  103.61s (transform 91ms, setup 0ms, import 172ms, tests 103.23s, environment 0ms)
+

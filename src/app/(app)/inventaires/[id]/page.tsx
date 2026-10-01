@@ -6,6 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerSyntheseInventaire } from "@/lib/inventaires";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { chargerLignesInventaire } from "@/lib/stock-donnees";
 
 type ArticleInventaire = { reference: string; designation: string; unite: string };
 type LigneInventaire = {
@@ -32,24 +33,15 @@ export default async function InventairePage({
   const permissions = await permissionsUtilisateur(contexte);
   const peutVoirPrix = permissions === null || permissions.includes("voir_prix_stock") || permissions.includes("gerer_prix_stock");
   const supabase = await createClient();
-  const lignesPromise = peutVoirPrix
-    ? supabase.rpc("lignes_inventaire_avec_prix", {
-      p_entreprise_id: contexte.entrepriseId,
-      p_inventaire_id: id,
-    })
-    : supabase
-      .from("lignes_inventaire")
-      .select("id,quantite_theorique,quantite_comptee,article:articles_stock(reference,designation,unite)")
-      .eq("inventaire_id", id)
-      .eq("entreprise_id", contexte.entrepriseId)
-      .order("created_at");
-  const [{ data: inventaire }, { data: lignesData }] = await Promise.all([
+  // Toutes les lignes de l'inventaire : la synthèse et le formulaire de
+  // comptage (qui doit couvrir chaque article) portent sur l'inventaire entier.
+  const [{ data: inventaire }, lignesData] = await Promise.all([
     supabase.from("inventaires").select("*").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
-    lignesPromise,
+    chargerLignesInventaire(supabase, contexte.entrepriseId, id, peutVoirPrix),
   ]);
   if (!inventaire) notFound();
 
-  const lignes = ((lignesData ?? []) as Array<Record<string, unknown>>).map((ligne) => ({
+  const lignes = (lignesData as Array<Record<string, unknown>>).map((ligne) => ({
     id: String(ligne.id),
     quantite_theorique: Number(ligne.quantite_theorique),
     quantite_comptee: ligne.quantite_comptee === null ? null : Number(ligne.quantite_comptee),

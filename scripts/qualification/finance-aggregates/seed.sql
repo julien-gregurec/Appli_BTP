@@ -106,6 +106,23 @@ begin
       select pg_temp.u(pfx || '0a' || a.n, i), e, pg_temp.u(pfx || '0f', i), a.action, a.ancien, a.nouveau, timestamptz '2026-01-01' + (i % 181) * interval '1 day' + a.n * interval '1 hour'
       from generate_series(1, v) i
       cross join (values (1, 'soumission', 'brouillon', 'soumis'), (2, 'prise_en_charge', 'soumis', 'en_verification'), (3, 'validation', 'en_verification', 'valide')) a(n, action, ancien, nouveau);
+
+    -- Stock : V articles actifs (1 sur 7 sous le seuil), un inventaire validé
+    -- de V lignes, V sorties de stock vers les chantiers.
+    insert into public.articles_stock (id, entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte, prix_achat_ht, actif)
+      select pg_temp.u(pfx || '5a', i), e, 'ART-' || lpad(i::text, 6, '0'), 'Article ' || lpad(i::text, 6, '0'), 'u',
+             case when i % 7 = 0 then 1 else 10 + i % 90 end, 5, round(((i * 29) % 400) + 0.73, 2), true
+      from generate_series(1, v) i;
+    insert into public.inventaires (id, entreprise_id, numero, date_inventaire, statut, valide_at)
+      values (pg_temp.u(pfx || '5b', 1), e, 'INV-' || pfx, date '2026-06-30', 'valide', now());
+    insert into public.lignes_inventaire (id, entreprise_id, inventaire_id, article_id, quantite_theorique, quantite_comptee, prix_achat_ht_snapshot, created_at)
+      select pg_temp.u(pfx || '5c', i), e, pg_temp.u(pfx || '5b', 1), pg_temp.u(pfx || '5a', i),
+             case when i % 7 = 0 then 1 else 10 + i % 90 end, case when i % 11 = 0 then 9 + i % 90 else case when i % 7 = 0 then 1 else 10 + i % 90 end end,
+             round(((i * 29) % 400) + 0.73, 2), timestamptz '2026-06-30 08:00' + (i % 50) * interval '1 second'
+      from generate_series(1, v) i;
+    insert into public.mouvements_stock (id, entreprise_id, article_id, chantier_id, type, quantite, date)
+      select pg_temp.u(pfx || '5d', i), e, pg_temp.u(pfx || '5a', i), pg_temp.u(pfx || 'ca', 1 + i % 20), 'sortie', 1 + i % 4, date '2026-01-01' + (i % 181)
+      from generate_series(1, v) i;
   end loop;
 end $$;
 

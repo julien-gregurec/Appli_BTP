@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lireToutesLesLignes, LectureTropVolumineuseError } from "./lecture-complete";
+import { lireParCurseur, lireParLots, lireToutesLesLignes, LectureTropVolumineuseError } from "./lecture-complete";
 
 // Simule PostgREST : `max_rows` plafonne chaque réponse, sans erreur.
 function serveur(total: number, maxRows: number, { compte = true, erreurPage }: { compte?: boolean; erreurPage?: number } = {}) {
@@ -62,5 +62,68 @@ describe("lireToutesLesLignes", () => {
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(LectureTropVolumineuseError);
     expect(appels).toHaveLength(1);
+  });
+});
+
+// Simule une table triée par `id` derrière PostgREST plafonné à `maxRows`.
+function table(total: number, maxRows: number) {
+  const lignes = Array.from({ length: total }, (_, i) => ({ id: `id-${String(i).padStart(6, "0")}` }));
+  const appels: string[] = [];
+  const construire = () => {
+    let apres: string | null = null;
+    const requete = {
+      gt(_colonne: string, valeur: string) { apres = valeur; return requete; },
+      order() { return requete; },
+      limit(n: number) {
+        appels.push(apres ?? "");
+        const reste = lignes.filter((l) => apres === null || l.id > apres);
+        return Promise.resolve({ data: reste.slice(0, Math.min(n, maxRows)), error: null });
+      },
+    };
+    return requete;
+  };
+  return { construire, appels };
+}
+
+describe("lireParCurseur", () => {
+  it.each([0, 1, 999, 1000, 1001, 1462, 5000, 20000])("rend exactement %i lignes dans l'ordre de la clé", async (total) => {
+    const { construire } = table(total, 1000);
+    const { data } = await lireParCurseur(construire, "id");
+    expect(data).toHaveLength(total);
+    expect(new Set(data!.map((l) => l.id)).size).toBe(total);
+    expect([...data!].sort((a, b) => a.id.localeCompare(b.id))).toEqual(data);
+  });
+  it("reste complet si max_rows est inférieur à la page demandée", async () => {
+    const { construire } = table(1462, 300);
+    expect((await lireParCurseur(construire, "id")).data).toHaveLength(1462);
+  });
+  it("chaque page repart de la dernière clé lue", async () => {
+    const { construire, appels } = table(2500, 1000);
+    await lireParCurseur(construire, "id");
+    expect(appels).toEqual(["", "id-000999", "id-001999", "id-002499"]);
+  });
+  it("propage l'erreur et refuse au-delà du plafond", async () => {
+    const enErreur = () => ({ gt() { return this; }, order() { return this; }, limit: () => Promise.resolve({ data: null, error: { message: "boom" } }) });
+    expect(await lireParCurseur(enErreur, "id")).toEqual({ data: null, error: { message: "boom" } });
+    const { construire } = table(5000, 1000);
+    expect((await lireParCurseur(construire, "id", { maxLignes: 2000 })).error).toBeInstanceOf(LectureTropVolumineuseError);
+  });
+});
+
+describe("lireParLots", () => {
+  it("découpe les identifiants en lots et lit chaque lot en entier", async () => {
+    const ids = Array.from({ length: 450 }, (_, i) => `n${i}`);
+    const lots: number[] = [];
+    // Chaque identifiant porte 3 lignes : 100 identifiants → 300 lignes par lot.
+    const construire = (lot: string[], options: { count?: "exact" }) => ({
+      range(debut: number, fin: number) {
+        if (debut === 0) lots.push(lot.length);
+        const lignes = lot.flatMap((id) => [1, 2, 3].map((k) => ({ id: `${id}-${k}` })));
+        return Promise.resolve({ data: lignes.slice(debut, Math.min(fin + 1, debut + 250)), error: null, count: options.count ? lignes.length : null });
+      },
+    });
+    const { data } = await lireParLots(ids, construire);
+    expect(lots).toEqual([100, 100, 100, 100, 50]);
+    expect(data).toHaveLength(1350);
   });
 });

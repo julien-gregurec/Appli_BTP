@@ -74,3 +74,36 @@ export async function lireParLots<T>(
   }
   return { data: lignes, error: null };
 }
+
+// Pagination par curseur (keyset) sur une clé unique, pour les tables sous
+// RLS : avec `.range()`, chaque page réévalue la policy de toutes les lignes
+// qui la précèdent (mesuré : 0,4 s la première page, 7,7 s la vingtième sur
+// 20 000 lignes, soit ≈ 90 s pour tout lire) ; avec un curseur
+// `cle > dernière valeur`, chaque page ne coûte que ses propres lignes.
+// La lecture s'arrête sur une page vide : elle reste complète quel que soit
+// `max_rows`. L'ordre rendu est celui de la clé ; à l'appelant de retrier.
+type RequeteCurseur<T> = {
+  gt(colonne: string, valeur: string): RequeteCurseur<T>;
+  order(colonne: string): RequeteCurseur<T>;
+  limit(n: number): PromiseLike<ReponsePage<T>>;
+};
+
+export async function lireParCurseur<T extends Record<string, unknown>>(
+  construire: () => RequeteCurseur<T>,
+  cle: keyof T & string,
+  { taillePage = TAILLE_PAGE_LECTURE, maxLignes = MAX_LIGNES_LECTURE }: { taillePage?: number; maxLignes?: number } = {},
+): Promise<{ data: T[]; error: null } | { data: null; error: ErreurLecture }> {
+  const lignes: T[] = [];
+  let apres: string | null = null;
+  for (;;) {
+    const requete: RequeteCurseur<T> = apres === null ? construire() : construire().gt(cle, apres);
+    const { data, error } = await requete.order(cle).limit(taillePage);
+    if (error) return { data: null, error };
+    const page = data ?? [];
+    if (page.length === 0) break;
+    lignes.push(...page);
+    if (lignes.length > maxLignes) return { data: null, error: new LectureTropVolumineuseError(maxLignes) };
+    apres = String(page[page.length - 1][cle]);
+  }
+  return { data: lignes, error: null };
+}
