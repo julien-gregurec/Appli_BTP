@@ -42,6 +42,14 @@ lancée dans une session cloud dont le réseau refuse Supabase et Vercel. Pour d
 
 Aucune modification de code dans cette session. Aucune Production touchée.
 
+### V4.1 Relance après passage de l'organisation Supabase en Pro (2026-10-01)
+
+Re-test dans la même session cloud : `api.supabase.com`, `pgvvpqyjziyapbbkydmc.supabase.co`, `api.vercel.com`,
+`studio-preview-elsatia.vercel.app` → toujours **CONNECT 403** ; toujours aucun CLI ni jeton Supabase/Vercel ;
+aucun outil MCP Supabase/Vercel disponible. L'étape 1 de V3.8 (restore → `ACTIVE_HEALTHY`) est **non exécutable** ;
+la séquence s'arrête donc là (étapes 2–14 non lancées, aucun backup, aucune migration, aucun déploiement).
+Le passage en Pro lève le blocage côté Supabase, pas le blocage réseau de la session.
+
 ## Mise à jour V3 — pont d'identité GP Preview → Studio Preview (2026-10-01)
 
 Session : Claude Code **cloud** (conteneur éphémère), branche `claude/vigilant-fermi-tvd8jb` (depuis
