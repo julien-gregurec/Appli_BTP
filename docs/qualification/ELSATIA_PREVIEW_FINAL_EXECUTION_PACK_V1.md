@@ -1,7 +1,7 @@
 # ELSATIA — Preview : pack d'exécution final (V1)
 
 > **Train canonique V8 (2026-09-30)** — ce pack s'exécute désormais sur la ref V8
-> `claude/sleepy-cannon-6je2vo` (à publier en `integration/elsatia-canonical-train-v8`, même commit) : **<!--train:nb-->371<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000812<!--/train:derniere-->`**, DB verify
+> officielle `integration/elsatia-canonical-train-v8` @ `53b4bc7` (publiée le 2026-09-30, ex-`claude/sleepy-cannon-6je2vo`, même commit ; exécution gardée : `ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md`) : **<!--train:nb-->371<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000812<!--/train:derniere-->`**, DB verify
 > **<!--train:controles-->37<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet ; 18 : Stripe ordre + essai borné ; 19-23 : garde-fous V4 —
 > commandes fournisseurs RGPD, dette RGPD résiduelle, GP ↔ Réserves, Relevé & Métré non commercial,
@@ -78,7 +78,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 
 | | |
 |---|---|
-| Ref à déployer | **`claude/sleepy-cannon-6je2vo`** (V8 ; à publier en `integration/elsatia-canonical-train-v8`, même commit — rapport V8 §17). Historique : `integration/elsatia-canonical-train-v7` (359 → `20260928000701`), `integration/elsatia-canonical-train-v6` (358 → `20260928000601`), `integration/elsatia-canonical-train-v5` (355 → `20260928000301`), `integration/elsatia-canonical-train-v4` (352 → `20260927100000`), `integration/elsatia-canonical-train-v3` (340 → `20260926000505`), `integration/elsatia-canonical-train-v2` |
+| Ref à déployer | **`integration/elsatia-canonical-train-v8`** @ `53b4bc7` (V8, publiée le 2026-09-30 ; `DECISION_REQUIRED:V8-INTEGRATION-BRANCH` fermé — handoff V2 §1). Historique : `integration/elsatia-canonical-train-v7` (359 → `20260928000701`), `integration/elsatia-canonical-train-v6` (358 → `20260928000601`), `integration/elsatia-canonical-train-v5` (355 → `20260928000301`), `integration/elsatia-canonical-train-v4` (352 → `20260927100000`), `integration/elsatia-canonical-train-v3` (340 → `20260926000505`), `integration/elsatia-canonical-train-v2` |
 | Migrations | **<!--train:nb-->371<!--/train:nb-->**, `20260710000001` → **`<!--train:derniere-->20260928000812<!--/train:derniere-->`** ; `verify:migrations` ✅ (V3 : 340 → `20260926000505` ; V2 : 335 → `20260923000400`) |
 | Rejeu à froid (ce pack) | `rebuild_db.sh pack_preview` : **335/335**, 0 erreur (V2) ; train V4 : **352/352**, 0 erreur (rapport V4 §10) ; train V5 : **355/355**, 0 erreur (rapport V5 §9) ; train V6 : **358/358**, 0 erreur (rapport V6 §9) ; train V7 : **359/359**, 0 erreur (rapport V7 §9) ; train V8 : **371/371**, 0 erreur (rapport V8 §6) |
 | Applications | Gestion Pro (racine), Colors, Tools, Réserves, Studio (`apps/*`), worker `workers/studio-video` — **première Preview V4/V5/V6/V7/V8 : IN = Gestion Pro, Tools, Colors, Réserves ; OUT = Studio, worker Studio, Boutique, Stripe Connect** |
@@ -506,7 +506,7 @@ Chaque ligne suppose la précédente verte. Un échec = arrêt et §9.
 
 | # | Domaine | Action | Commande / geste | Sortie |
 |---|---|---|---|---|
-| 0 | Portes locales | sur la ref | `npm ci` ; `npm run verify:migrations verify:secrets verify:env-manifest test:env-manifest test:preview-pack test:preflight-preview test:smoke-email` | 335 · 0 secret · OK · 67 · 24 · 5 · 12 |
+| 0 | Portes locales | sur la ref | `npm ci` ; `npm run verify:migrations verify:secrets verify:env-manifest test:env-manifest test:preview-pack test:preflight-preview test:smoke-email` | <!--train:nb-->371<!--/train:nb--> · 0 secret · OK · 67 · 31 · 5 · 13 (V8 ; + `test:preview-v8-gate` 12/12, handoff V2) |
 | 1 | **DB** | sauvegarde, pré-contrôle, push, vérif | §4.1 → §4.2 | `db-verify --before-owner` GO |
 | 2 | **Auth** | URL Configuration, gabarits, SMTP, MFA | §4.3 | relevé écrit des 4 écrans |
 | 2b | Propriétaire + attestation | §4.6 lignes 1-2 | `db-verify` (sans option) GO |

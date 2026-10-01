@@ -1,7 +1,7 @@
 # ELSATIA — Runbook d'exécution Preview (V3)
 
 > **Remplacé pour l'exécution** par `docs/qualification/ELSATIA_PREVIEW_FINAL_EXECUTION_PACK_V1.md`
-> (train canonique **V8** `claude/sleepy-cannon-6je2vo`, à publier en `integration/elsatia-canonical-train-v8`, <!--train:nb-->371<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000812<!--/train:derniere-->`, scripts
+> (train canonique **V8** `integration/elsatia-canonical-train-v8` @ `53b4bc7`, publiée le 2026-09-30 ; outillage d'écriture gardée : `docs/qualification/ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md`, <!--train:nb-->371<!--/train:nb--> migrations, dernière `<!--train:derniere-->20260928000812<!--/train:derniere-->`, scripts
 > `scripts/preview/*` ; nombres générés par `npm run sync:train-expectations`). Sur le train V2, ce runbook
 > contient 6 affirmations fausses (portail Stripe, script `configurer-portail-stripe.mjs`, 3-D Secure,
 > ref D1, crons GP en Preview, prix de capacité) — liste au §11 du pack.
@@ -41,7 +41,7 @@ consigner, ne pas « continuer pour voir ».
 ## STEP 1 — Portes locales sur la ref (A)
 
 ```bash
-git fetch origin claude/sleepy-cannon-6je2vo && git checkout claude/sleepy-cannon-6je2vo   # ref V8, à publier en integration/elsatia-canonical-train-v8 (V7 : integration/elsatia-canonical-train-v7 ; V6 : integration/elsatia-canonical-train-v6 ; V5 : integration/elsatia-canonical-train-v5 ; V4 : integration/elsatia-canonical-train-v4 ; V3 : integration/elsatia-canonical-train-v3 ; ex-ref de préparation claude/fervent-dirac-eez6pk, 321 migrations, périmée)
+git fetch origin claude/modest-shannon-uhp2ic && git checkout claude/modest-shannon-uhp2ic   # V8 officielle (integration/elsatia-canonical-train-v8 @ 53b4bc7) + outillage pack V2, 0 écart applicatif/migrations : handoff V2 §1 (V7 : integration/elsatia-canonical-train-v7 ; V6 : integration/elsatia-canonical-train-v6 ; V5 : integration/elsatia-canonical-train-v5 ; V4 : integration/elsatia-canonical-train-v4 ; V3 : integration/elsatia-canonical-train-v3 ; ex-ref de préparation claude/fervent-dirac-eez6pk, 321 migrations, périmée)
 npm ci && for a in tools colors reserves; do npm ci --prefix apps/$a; done
 npm run verify:migrations        # attendu : <!--train:nb-->371<!--/train:nb--> migrations valides (train canonique V8, dernière <!--train:derniere-->20260928000812<!--/train:derniere-->), noms et horodatages uniques
 npm run verify:train-expectations # attendu : OK : attendus à jour (DB verify, runbooks)
@@ -71,6 +71,10 @@ commande.
 
 ## STEP 3 — Sauvegarde (J) — si D2 = réutiliser
 
+> **Train V8 (2026-10-01) : remplacé** par `docs/qualification/ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md` §3-§6 —
+> sauvegarde complète obligatoire (`npm run preview:backup`), ledger lu au moment de l'exécution et
+> `db push` autorisé seulement par `npm run preview:v8-gate -- --authorize-push`. Ne pas exécuter ce STEP tel quel.
+
 ```bash
 npx supabase db dump --linked -f preview-backup-$(date +%F).sql            # schéma
 npx supabase db dump --linked --data-only -f preview-backup-data-$(date +%F).sql
@@ -79,6 +83,10 @@ npx supabase db dump --linked --data-only -f preview-backup-data-$(date +%F).sql
 Plan gratuit : pas de PITR. **Sortie** : deux fichiers non vides, conservés hors dépôt.
 
 ## STEP 4 — Pré-contrôles de la base distante (J)
+
+> **Train V8 (2026-10-01) : remplacé** par `docs/qualification/ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md` §3-§6 —
+> sauvegarde complète obligatoire (`npm run preview:backup`), ledger lu au moment de l'exécution et
+> `db push` autorisé seulement par `npm run preview:v8-gate -- --authorize-push`. Ne pas exécuter ce STEP tel quel.
 
 ```bash
 npx supabase migration list --linked
@@ -96,6 +104,10 @@ npx supabase db push --linked --dry-run
 **Sortie** : dry-run qui liste uniquement des migrations du dépôt, dans l'ordre.
 
 ## STEP 5 — Migrations (J)
+
+> **Train V8 (2026-10-01) : remplacé** par `docs/qualification/ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md` §3-§6 —
+> sauvegarde complète obligatoire (`npm run preview:backup`), ledger lu au moment de l'exécution et
+> `db push` autorisé seulement par `npm run preview:v8-gate -- --authorize-push`. Ne pas exécuter ce STEP tel quel.
 
 ```bash
 npx supabase db push --linked
