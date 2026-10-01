@@ -148,6 +148,13 @@ begin
     insert into public.affectations (id, entreprise_id, chantier_id, employe_id, date, heures, type_activite, tache)
       select pg_temp.u(pfx || '7d', i), e, pg_temp.u(pfx || 'ca', case when i % 2 = 0 then 1 else 1 + i % 20 end), pg_temp.u(pfx || '7e', 1 + i % 60), date '2026-03-02' + (i % 7), round(0.5 + (i % 15) * 0.5, 2), 'chantier', 'Tâche ' || i
       from generate_series(1, v) i;
+
+    -- Journal IA : V opérations réussies dans le mois courant (1 à 3 opérations
+    -- décomptées chacune), journalisées par l'administrateur.
+    insert into public.journal_ia (id, entreprise_id, utilisateur_id, fonctionnalite, statut, created_at, cout_estime_ht, operations_decomptees)
+      select pg_temp.u(pfx || '1a', i), e, adm, 'devis', 'succes', date_trunc('month', now()) + (i % 3600) * interval '1 second',
+             round(0.0013 * (1 + i % 7), 4), 1 + i % 3
+      from generate_series(1, v) i;
   end loop;
 end $$;
 
