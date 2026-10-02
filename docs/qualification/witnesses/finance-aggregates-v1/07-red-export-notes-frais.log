@@ -1,0 +1,23 @@
+# Extrait (lignes probantes) du journal Vitest rouge — export notes de frais, code d'origine
+      Tests  9 failed | 2 passed (11)
+     × 1000 notes : jamais de sélection tronquée en silence 1379ms
+     × 1000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 13132ms
+     × 1462 notes : jamais de sélection tronquée en silence 1794ms
+     × 1462 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 13489ms
+     × 20000 notes : jamais de sélection tronquée en silence 22885ms
+     × 20000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 12791ms
+     × 500 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 13240ms
+     × 5000 notes : jamais de sélection tronquée en silence 5840ms
+     × 5000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 13070ms
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : jamais de sélection tronquée en silence
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : jamais de sélection tronquée en silence
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : jamais de sélection tronquée en silence
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : jamais de sélection tronquée en silence
+ FAIL  src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique
+ Test Files  1 failed (1)
+AssertionError: expected { statut: 'ok', notes: [ …(500) ] } to deeply equal { statut: 'trop_volumineux', …(1) }
+Error: TypeError: fetch failed

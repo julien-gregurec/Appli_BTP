@@ -1,0 +1,102 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 opérations : consommation et coût du mois exacts 199ms
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 opérations : consommation et coût du mois exacts 145ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 499ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes : totaux du gros chantier exacts 494ms
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 opérations : consommation et coût du mois exacts 103ms
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 opérations : consommation et coût du mois exacts 117ms
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 opérations : consommation et coût du mois exacts 140ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes : totaux du gros chantier exacts 312ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes > /planning : affectations et heures réalisées de la semaine exactes 369ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes : totaux du gros chantier exacts 336ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 482ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes : totaux du gros chantier exacts 460ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes > /planning : affectations et heures réalisées de la semaine exactes 387ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 511ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes > /planning : affectations et heures réalisées de la semaine exactes 374ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes : totaux du gros chantier exacts 1167ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 6ms
+ ✓ src/lib/ai/journal.postgrest.test.ts > quota IA — PostgREST réel (max_rows = 1000) vs PostgreSQL > aucune opération d'une autre entreprise, aucune pour un membre sans droit qui n'a rien consommé 2368ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 pièces : total TTC, réglé et nombre exacts 214ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 pièces : total TTC, réglé et nombre exacts 75ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 pièces : total TTC, réglé et nombre exacts 82ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 pièces : total TTC, réglé et nombre exacts 79ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 1129ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 pièces : total TTC, réglé et nombre exacts 117ms
+ ✓ src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise ni pour un ouvrier sans accès achats 24ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > journal des ventes : toutes les factures, totaux exacts 230ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > règlements clients : tous les paiements, avoirs en négatif 123ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > journal des achats : toutes les pièces non annulées 127ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes > /planning : affectations et heures réalisées de la semaine exactes 451ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > TVA déductible : synthèse par taux exacte 195ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts 189ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > journal des ventes : toutes les factures, totaux exacts 95ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 206ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 301ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > règlements clients : tous les paiements, avoirs en négatif 121ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > journal des achats : toutes les pièces non annulées 140ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > TVA déductible : synthèse par taux exacte 231ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts 192ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 692ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > journal des ventes : toutes les factures, totaux exacts 120ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > règlements clients : tous les paiements, avoirs en négatif 128ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 86ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > journal des achats : toutes les pièces non annulées 154ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > TVA déductible : synthèse par taux exacte 214ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 468ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts 171ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > journal des ventes : toutes les factures, totaux exacts 238ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > règlements clients : tous les paiements, avoirs en négatif 245ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > journal des achats : toutes les pièces non annulées 258ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > TVA déductible : synthèse par taux exacte 316ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 1262ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts 261ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 147ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /pointage/gestion : pointages, sessions, contrôles GPS et heures par salarié exacts 3289ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > journal des ventes : toutes les factures, totaux exacts 720ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 803ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes > /planning : affectations et heures réalisées de la semaine exactes 988ms
+ ✓ src/lib/pointages-donnees.postgrest.test.ts > pointage et planning — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 15ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > règlements clients : tous les paiements, avoirs en négatif 685ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > à encaisser, à payer et flux réalisés exacts 303ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > à encaisser, à payer et flux réalisés exacts 237ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > journal des achats : toutes les pièces non annulées 746ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > à encaisser, à payer et flux réalisés exacts 256ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > à encaisser, à payer et flux réalisés exacts 459ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > TVA déductible : synthèse par taux exacte 846ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 2287ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 193ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > TVA collectée : détail par facture et synthèse par taux exacts 659ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > sécurité > un administrateur ne lit rien d'une autre entreprise, même en forçant son identifiant 25ms
+ ✓ src/lib/exports-comptables.postgrest.test.ts > exports comptables — PostgREST réel (max_rows = 1000) vs PostgreSQL > sécurité > un ouvrier sans accès factures / dépenses ne lit aucune donnée comptable 23ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > à encaisser, à payer et flux réalisés exacts 1233ms
+ ✓ src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > aucune donnée d'une autre entreprise, aucune donnée pour un ouvrier sans droits 44ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 notes : jamais de sélection tronquée en silence 793ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : jamais de sélection tronquée en silence 1274ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : jamais de sélection tronquée en silence 1697ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 5824ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : jamais de sélection tronquée en silence 5703ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 17394ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts 929ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts 7909ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : jamais de sélection tronquée en silence 23452ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 23352ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes 38950ms
+ ✓ src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 264ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 23402ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 23052ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 22734ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 notes : sur une sélection de 500 notes, tous les justificatifs et tout l'historique 22399ms
+ ✓ src/lib/expenses/export-selection.postgrest.test.ts > export notes de frais — PostgREST réel (max_rows = 1000) vs PostgreSQL > aucune note d'une autre entreprise ni pour un ouvrier sans droit notes de frais 5200ms
+
+ Test Files  8 passed (8)
+      Tests  89 passed (89)
+   Start at  02:20:53
+   Duration  164.78s (transform 781ms, setup 0ms, import 1.52s, tests 255.74s, environment 1ms)
+
+
+real	2m45.777s
+user	0m13.666s
+sys	0m3.765s

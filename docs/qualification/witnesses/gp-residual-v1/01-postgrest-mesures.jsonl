@@ -1,0 +1,45 @@
+{"chemin":"fiche client","n":500,"avant_ms":879,"apres_ms":56,"avant_lignes":500,"verite":884152.63,"historique":884152.6300000002,"corrige":884152.63}
+{"chemin":"fiche client chantiers","n":500,"avant_lignes":500,"premiere_page_ms":14}
+{"chemin":"fiche sous-traitant","n":500,"avant_ms":2076,"apres_ms":16,"verite":479014.79,"historique":479014.7900000019,"corrige":479014.79}
+{"chemin":"fiches véhicule/outil","n":500,"verite_outils":501,"historique_outils":501,"avant_ms":840,"apres_ms":11,"page_profonde_ms":11,"verite_vehicule":575399.28,"corrige_vehicule":575399.28}
+{"chemin":"fiche chantier","n":500,"documents_avant_ms":1020,"documents_apres_ms":13,"synthese_v1_ms":1530,"synthese_v1_octets":274687,"synthese_v2_ms":28,"synthese_v2_octets":27908,"doe_ms":41,"verite_documents":500,"historique_documents":500}
+{"chemin":"paie","n":500,"avant_ms":913,"apres_ms":21,"page_dossiers_ms":14,"export_ms":55,"verite_primes":149399.25,"historique_primes_page":7807.8,"corrige_primes":149399.25}
+{"chemin":"notes de frais","n":500,"apres_ms":13,"verite_a_verifier":189,"historique_a_verifier":114}
+{"chemin":"crm/dashboard","n":500,"crm_avant_ms":589,"crm_apres_ms":13,"dashboard_chantiers_avant_ms":1006,"dashboard_apres_ms":15,"verite_reste":590994.68,"historique_reste":590994.6799999999}
+{"chemin":"listes","n":500,"messages_historique_contient_dernier":true,"droits_verite":1304,"droits_historique":1000}
+{"chemin":"fiche client","n":1000,"avant_ms":1447,"apres_ms":10,"avant_lignes":1000,"verite":1780359.31,"historique":1780359.3099999998,"corrige":1780359.31}
+{"chemin":"fiche client chantiers","n":1000,"avant_lignes":1000,"premiere_page_ms":10}
+{"chemin":"fiche sous-traitant","n":1000,"avant_ms":4337,"apres_ms":11,"verite":962240.58,"historique":962240.5800000041,"corrige":962240.58}
+{"chemin":"fiches véhicule/outil","n":1000,"verite_outils":1001,"historique_outils":1000,"avant_ms":1636,"apres_ms":11,"page_profonde_ms":7,"verite_vehicule":1155851.76,"corrige_vehicule":1155851.76}
+{"chemin":"fiche chantier","n":1000,"documents_avant_ms":2223,"documents_apres_ms":11,"synthese_v1_ms":2939,"synthese_v1_octets":549175,"synthese_v2_ms":29,"synthese_v2_octets":27902,"doe_ms":50,"verite_documents":1000,"historique_documents":1000}
+{"chemin":"paie","n":1000,"avant_ms":1989,"apres_ms":26,"page_dossiers_ms":20,"export_ms":98,"verite_primes":300600.3,"historique_primes_page":7807.8,"corrige_primes":300600.3}
+{"chemin":"notes de frais","n":1000,"apres_ms":13,"verite_a_verifier":375,"historique_a_verifier":113}
+{"chemin":"crm/dashboard","n":1000,"crm_avant_ms":1340,"crm_apres_ms":10,"dashboard_chantiers_avant_ms":1941,"dashboard_apres_ms":13,"verite_reste":1190370.42,"historique_reste":1190370.4200000009}
+{"chemin":"listes","n":1000,"messages_historique_contient_dernier":true,"droits_verite":1304,"droits_historique":1000}
+{"chemin":"fiche client","n":1462,"avant_ms":2574,"apres_ms":11,"avant_lignes":1000,"verite":2596122.16,"historique":1776955.2900000007,"corrige":2596122.16}
+{"chemin":"fiche client chantiers","n":1462,"avant_lignes":1000,"premiere_page_ms":14}
+{"chemin":"fiche sous-traitant","n":1462,"avant_ms":5985,"apres_ms":13,"verite":1412661.56,"historique":967040.4500000041,"corrige":1412661.56}
+{"chemin":"fiches véhicule/outil","n":1462,"verite_outils":1463,"historique_outils":1000,"avant_ms":2615,"apres_ms":19,"page_profonde_ms":8,"verite_vehicule":1696893.92,"corrige_vehicule":1696893.92}
+{"chemin":"fiche chantier","n":1462,"documents_avant_ms":3272,"documents_apres_ms":12,"synthese_v1_ms":4547,"synthese_v1_octets":802792,"synthese_v2_ms":27,"synthese_v2_octets":27895,"doe_ms":76,"verite_documents":1462,"historique_documents":1000}
+{"chemin":"paie","n":1462,"avant_ms":2613,"apres_ms":16,"page_dossiers_ms":16,"export_ms":132,"verite_primes":438287.85,"historique_primes_page":7807.8,"corrige_primes":438287.85}
+{"chemin":"notes de frais","n":1462,"apres_ms":13,"verite_a_verifier":549,"historique_a_verifier":112}
+{"chemin":"crm/dashboard","n":1462,"crm_avant_ms":1541,"crm_apres_ms":15,"dashboard_chantiers_avant_ms":3104,"dashboard_apres_ms":12,"verite_reste":1735304.02,"historique_reste":1636211.739999999}
+{"chemin":"listes","n":1462,"messages_historique_contient_dernier":false,"droits_verite":1304,"droits_historique":1000}
+{"chemin":"fiche client","n":5000,"avant_ms":7753,"apres_ms":16,"avant_lignes":1000,"verite":8903071.21,"historique":1783184.9400000002,"corrige":8903071.21}
+{"chemin":"fiche client chantiers","n":5000,"avant_lignes":1000,"premiere_page_ms":9}
+{"chemin":"fiche sous-traitant","n":5000,"avant_ms":18720,"apres_ms":17,"verite":4842244.64,"historique":963729.450000004,"corrige":4842244.64}
+{"chemin":"fiches véhicule/outil","n":5000,"verite_outils":5001,"historique_outils":1000,"avant_ms":8821,"apres_ms":19,"page_profonde_ms":9,"verite_vehicule":5816506.48,"corrige_vehicule":5816506.48}
+{"chemin":"fiche chantier","n":5000,"documents_avant_ms":11251,"documents_apres_ms":17,"synthese_v1_ms":14474,"synthese_v1_octets":2744979,"synthese_v2_ms":38,"synthese_v2_octets":27955,"doe_ms":224,"verite_documents":5000,"historique_documents":1000}
+{"chemin":"paie","n":5000,"avant_ms":8278,"apres_ms":26,"page_dossiers_ms":29,"export_ms":459,"verite_primes":1500899.4,"historique_primes_page":7807.8,"corrige_primes":1500899.4}
+{"chemin":"notes de frais","n":5000,"apres_ms":17,"verite_a_verifier":1875,"historique_a_verifier":115}
+{"chemin":"crm/dashboard","n":5000,"crm_avant_ms":5040,"crm_apres_ms":13,"dashboard_chantiers_avant_ms":11515,"dashboard_apres_ms":17,"verite_reste":5940068.11,"historique_reste":1590803.9499999995}
+{"chemin":"listes","n":5000,"messages_historique_contient_dernier":false,"droits_verite":1304,"droits_historique":1000}
+{"chemin":"fiche client","n":20000,"avant_ms":1844,"apres_ms":26,"avant_lignes":1000,"verite":35642637.34,"historique":1778764.14,"corrige":35642637.34}
+{"chemin":"fiche client chantiers","n":20000,"avant_lignes":1000,"premiere_page_ms":8}
+{"chemin":"fiche sous-traitant","n":20000,"avant_ms":3896,"apres_ms":32,"verite":19400294.43,"historique":971552.580000004,"corrige":19400294.43}
+{"chemin":"fiches véhicule/outil","n":20000,"verite_outils":20001,"historique_outils":1000,"avant_ms":1629,"apres_ms":33,"page_profonde_ms":7,"verite_vehicule":23303603.76,"corrige_vehicule":23303603.76}
+{"chemin":"fiche chantier","n":20000,"documents_avant_ms":2233,"documents_apres_ms":20,"synthese_v1_ms":56987,"synthese_v1_octets":10979191,"synthese_v2_ms":191,"synthese_v2_octets":28117,"doe_ms":848,"verite_documents":20000,"historique_documents":1000}
+{"chemin":"paie","n":20000,"avant_ms":42359,"apres_ms":154,"page_dossiers_ms":104,"export_ms":1988,"verite_primes":6005249.25,"historique_primes_page":7807.8,"corrige_primes":6005249.25}
+{"chemin":"notes de frais","n":20000,"apres_ms":41,"verite_a_verifier":7500,"historique_a_verifier":120}
+{"chemin":"crm/dashboard","n":20000,"crm_avant_ms":1581,"crm_apres_ms":26,"dashboard_chantiers_avant_ms":42454,"dashboard_apres_ms":119,"verite_reste":23764990.33,"historique_reste":1573686.9299999988}
+{"chemin":"listes","n":20000,"messages_historique_contient_dernier":false,"droits_verite":1304,"droits_historique":1000}

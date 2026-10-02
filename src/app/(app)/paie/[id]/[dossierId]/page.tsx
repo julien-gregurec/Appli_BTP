@@ -6,6 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { CATEGORIES_TEMPS_PAIE, estPeriodePaieModifiable, STATUTS_DOSSIER_PAIE, TYPES_ABSENCE_PAIE, TYPES_INDEMNITE_PAIE, TYPES_PRIME_PAIE } from "@/lib/paie";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const champ="mt-1 w-full rounded border px-3 py-2 text-sm dark:bg-neutral-900";
 const option=(items:readonly (readonly [string,string])[])=><>{items.map(([v,l])=><option key={v} value={v}>{l}</option>)}</>;
@@ -20,7 +21,7 @@ export default async function DossierPaiePage({params,searchParams}:{params:Prom
   supabase.from("temps_travail_paie").select("*,chantier:chantiers(nom)").eq("dossier_id",dossierId).order("date"),supabase.from("absences_paie").select("*").eq("dossier_id",dossierId).order("date_debut"),
   supabase.from("primes_paie").select("*").eq("dossier_id",dossierId).order("created_at"),supabase.from("indemnites_deplacement_paie").select("*,chantier:chantiers(nom)").eq("dossier_id",dossierId).order("date"),
   confidentiel?supabase.from("deductions_paie").select("*").eq("dossier_id",dossierId).order("created_at"):Promise.resolve({data:[],error:null}),supabase.from("regularisations_paie").select("*").eq("dossier_id",dossierId).order("created_at"),
-  supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),supabase.from("pieces_jointes_paie").select("id,type_document,nom_original,created_at").eq("dossier_id",dossierId).order("created_at",{ascending:false}),
+  lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),supabase.from("pieces_jointes_paie").select("id,type_document,nom_original,created_at").eq("dossier_id",dossierId).order("created_at",{ascending:false}),
  ]);if(!dossier)notFound();const periode=Array.isArray(dossier.periode)?dossier.periode[0]:dossier.periode;const employe=Array.isArray(dossier.employe)?dossier.employe[0]:dossier.employe;if(!periode||!employe)notFound();
  if(!peutVoirTousDossiers){const{data:monEmploye}=await supabase.from("employes").select("id").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();if(!monEmploye||monEmploye.id!==employe.id)notFound();}
  const modifiable=peutSaisir&&estPeriodePaieModifiable(periode.statut);

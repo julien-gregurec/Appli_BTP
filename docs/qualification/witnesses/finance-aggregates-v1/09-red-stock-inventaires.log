@@ -1,0 +1,148 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts (16 tests | 9 failed) 13807ms
+       × page /stock (prix visibles : true) : articles, alertes et valeur exacts 88ms
+       × page /stock (prix visibles : false) : articles, alertes et valeur exacts 589ms
+       × inventaire : synthèse de clôture et comptage portent sur toutes les lignes 95ms
+       × page /stock (prix visibles : true) : articles, alertes et valeur exacts 103ms
+       × page /stock (prix visibles : false) : articles, alertes et valeur exacts 1937ms
+       × inventaire : synthèse de clôture et comptage portent sur toutes les lignes 82ms
+       × page /stock (prix visibles : true) : articles, alertes et valeur exacts 112ms
+       × page /stock (prix visibles : false) : articles, alertes et valeur exacts 7512ms
+       × inventaire : synthèse de clôture et comptage portent sur toutes les lignes 122ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(16) }, { …(16) }, …(998) ] to have a length of 1462 but got 1000
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(10) }, { …(10) }, …(998) ] to have a length of 1462 but got 1000
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes
+AssertionError: expected [ Array(1000) ] to have a length of 1462 but got 1000
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:27:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(16) }, { …(16) }, …(998) ] to have a length of 5000 but got 1000
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(10) }, { …(10) }, …(998) ] to have a length of 5000 but got 1000
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes
+AssertionError: expected [ Array(1000) ] to have a length of 5000 but got 1000
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:27:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : true) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(16) }, { …(16) }, …(998) ] to have a length of 20000 but got 1000
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > page /stock (prix visibles : false) : articles, alertes et valeur exacts
+AssertionError: expected [ { …(10) }, { …(10) }, …(998) ] to have a length of 20000 but got 1000
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:17:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  src/lib/stock-donnees.postgrest.test.ts > stock et inventaires — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 articles > inventaire : synthèse de clôture et comptage portent sur toutes les lignes
+AssertionError: expected [ Array(1000) ] to have a length of 20000 but got 1000
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/stock-donnees.postgrest.test.ts:27:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 7 passed (16)
+   Start at  00:55:39
+   Duration  14.17s (transform 97ms, setup 0ms, import 165ms, tests 13.81s, environment 0ms)
+

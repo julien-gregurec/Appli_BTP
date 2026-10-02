@@ -3,20 +3,25 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerFournisseurAction, changerActivationFournisseurAction } from "@/app/actions/commandes";
 import { Lien as Link } from "@/components/Lien";
 import { DELAIS_PAIEMENT_FOURNISSEUR, libelleDelaiPaiementFournisseur } from "@/lib/echeances-fournisseurs";
+import { lirePageParNom } from "@/lib/fiches-agregats";
+
+const TAILLE_PAGE = 200;
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
-export default async function FournisseursPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function FournisseursPage({ searchParams }: { searchParams: Promise<{ error?: string; apres?: string }> }) {
+  const { error, apres } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: fournisseurs } = await supabase
+  // Annuaire paginé par curseur (nom, id) : la liste complète était plafonnée à
+  // 1 000 fournisseurs par PostgREST, sans le signaler.
+  const page = await lirePageParNom<{ id: string; reference: string; nom: string; contact_nom: string | null; email: string | null; telephone: string | null; ville: string | null; actif: boolean }>(supabase
     .from("fournisseurs")
     .select("id, reference, nom, contact_nom, email, telephone, ville, actif")
     .eq("entreprise_id", ctx.entrepriseId)
-    .eq("type_tiers", "fournisseur")
-    .order("nom");
+    .eq("type_tiers", "fournisseur"), TAILLE_PAGE, apres ?? null);
+  const fournisseurs = page.lignes;
 
   return (
     <main className="p-8">
@@ -86,6 +91,12 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
             </tbody>
           </table>
         </div>
+        {(apres || page.suivant) && (
+          <nav aria-label="Pagination" className="mb-20 flex items-center justify-between text-sm">
+            {apres ? <Link href="/fournisseurs" className="rounded-md border px-3 py-2">← Début de la liste</Link> : <span />}
+            {page.suivant ? <Link href={`/fournisseurs?${new URLSearchParams({ apres: page.suivant })}`} className="rounded-md border px-3 py-2">Suite →</Link> : <span />}
+          </nav>
+        )}
       </div>
     </main>
   );

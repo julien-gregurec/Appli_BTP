@@ -4,6 +4,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerChantierAction } from "@/app/actions/chantiers";
 import { nomClient, CHANTIER_STATUTS } from "@/lib/chantier-statuts";
 import { LocaliserGPSButton } from "@/components/LocaliserGPSButton";
+import { lireOptionsClients } from "@/lib/fiches-agregats";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -18,11 +19,8 @@ export default async function NouveauChantierPage({
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, nom, prenom, societe")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
+  // Liste de clients complète (gp_options_clients) : tronquée à 1 000 par PostgREST.
+  const clients = await lireOptionsClients(supabase, ctx.entrepriseId);
 
   const { data: types } = await supabase
     .from("types_chantier")

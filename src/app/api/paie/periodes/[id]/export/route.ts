@@ -7,11 +7,13 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { reponseXlsx } from "@/lib/xlsx";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { lireContenuExportPaie } from "@/lib/pilotage-agregats";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type EmployeLie = { prenom: string | null; nom: string | null; reference_interne: string | null; poste: string | null };
+type PieceExport = { id: string; dossier_id: string; type_document: string; nom_original: string; storage_path: string; mime_type: string; taille_octets: number; empreinte_sha256: string | null };
 type DossierExport = {
   id: string; employe_id: string; statut: string; heures_normales: number; heures_sup_25: number; heures_sup_50: number;
   heures_absence: number; jours_conges: number; total_paniers: number; total_trajets: number; total_transports: number;
@@ -39,10 +41,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const permissions = await permissionsUtilisateur(ctx);
     if (permissions !== null && !permissions.includes("exporter_paie")) return NextResponse.json({ error: "Autorisation d’export paie requise" }, { status: 403 });
 
-    const [{ data: periode, error: erreurPeriode }, { data: dossiers, error: erreurDossiers }] = await Promise.all([
+    // Contenu complet servi en base (paie_export_contenu, ELSATIA-GP-RESIDUAL-
+    // DATA-CORRECTNESS-V1) : PostgREST plafonnait les lectures à 1 000 lignes sans
+    // erreur (pièces du ZIP omises, export journalisé comme réussi), et une
+    // lecture paginée sous RLS coûtait ~4 ms par dossier. Un export de paie n'est
+    // jamais partiel : en cas d'erreur, il échoue.
+    const format = new URL(request.url).searchParams.get("format") ?? "xlsx";
+    const [{ data: periode, error: erreurPeriode }, contenu] = await Promise.all([
       supabase.from("periodes_paie").select("id,mois,date_debut,date_fin,statut,date_validation,date_export").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
-      supabase.from("dossiers_paie_salaries").select("id,employe_id,statut,heures_normales,heures_sup_25,heures_sup_50,heures_absence,jours_conges,total_paniers,total_trajets,total_transports,total_grands_deplacements,total_kilometres,total_primes,total_acomptes,total_notes_frais,commentaire_comptable,employe:employes(prenom,nom,reference_interne,poste)").eq("periode_id", id).eq("entreprise_id", ctx.entrepriseId).order("employe_id"),
+      lireContenuExportPaie<DossierExport, PieceExport>(supabase, ctx.entrepriseId, id, format === "zip").then((c) => ({ ...c, erreur: null as Error | null }), (erreur: Error) => ({ dossiers: [] as DossierExport[], pieces: [] as PieceExport[], erreur })),
     ]);
+    const dossiers = contenu.dossiers, erreurDossiers = contenu.erreur;
     if (erreurPeriode || erreurDossiers) throw new Error(erreurPeriode?.message ?? erreurDossiers?.message);
     if (!periode) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
 
@@ -53,18 +62,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
     lignes.push([], ["Document préparatoire uniquement. Il ne constitue ni un bulletin de paie, ni une déclaration sociale, ni un calcul officiel de cotisations."]);
 
-    const format = new URL(request.url).searchParams.get("format") ?? "xlsx";
     const base = nomPropre(`variables-paie-${periode.mois}`);
     if (format === "csv") { await journaliserExport(ctx.entrepriseId,ctx.userId,id,format,(dossiers??[]).length); return reponseCsv(lignes, `${base}.csv`); }
     if (format === "xlsx") { await journaliserExport(ctx.entrepriseId,ctx.userId,id,format,(dossiers??[]).length); return reponseXlsx(lignes, `${base}.xlsx`, { nomFeuille: "Variables de paie", ligneEntetes: 8 }); }
     if (format !== "zip") return NextResponse.json({ error: "Format d’export non reconnu" }, { status: 400 });
 
     const fichiers: Record<string, Uint8Array> = { "variables-paie.csv": strToU8(csv(lignes)) };
-    const dossierIds = ((dossiers ?? []) as DossierExport[]).map((dossier) => dossier.id);
-    const { data: pieces, error: erreurPieces } = dossierIds.length
-      ? await supabase.from("pieces_jointes_paie").select("id,dossier_id,type_document,nom_original,storage_path,mime_type,taille_octets,empreinte_sha256").in("dossier_id", dossierIds)
-      : { data: [], error: null };
-    if (erreurPieces) throw new Error(erreurPieces.message);
+    const pieces = contenu.pieces;
     const manifeste: Array<Record<string, string | number | null>> = [];
     for (const piece of pieces ?? []) {
       const { data, error } = await supabase.storage.from("documents-paie").download(piece.storage_path);

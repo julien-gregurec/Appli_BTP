@@ -7,6 +7,8 @@ import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 import { Lien as Link } from "@/components/Lien";
 import { lienMaps } from "@/lib/maps";
 import { ChantiersPlanningProvider, ModifierAffectationDiffere } from "@/components/ModifierAffectationDiffere";
+import { chargerPlanningSemaine } from "@/lib/pointages-donnees";
+import { lireOptionsChantiers, lireOptionsEmployes } from "@/lib/fiches-agregats";
 
 type A = {
   id: string;
@@ -93,18 +95,22 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const { data: employeCompte } = peutVoirToutLePlanning
     ? { data: null }
     : await sb.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
-  const requeteAffectations = sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date");
 
-  const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
-    sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
-    sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    peutVoirToutLePlanning ? requeteAffectations : requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
-    sb.from("pointages").select("date,heures_normales,heures_supplementaires,verification_statut,employe_id,chantier_id").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).eq("verification_statut","valide"),
+  // Semaine entière (RPC planning_semaine) : affectations et pointages validés
+  // étaient plafonnés à 1 000 lignes, et les heures prévues / réalisées avec.
+  const [{ data: chantiers }, { data: employes }, semaine] = await Promise.all([
+    lireOptionsChantiers(sb,ctx.entrepriseId).then((data)=>({data})),
+    lireOptionsEmployes(sb,ctx.entrepriseId).then((data)=>({data})),
+    chargerPlanningSemaine(sb, ctx.entrepriseId, iso(debut), iso(fin), peutVoirToutLePlanning ? null : employeCompte?.id ?? "00000000-0000-0000-0000-000000000000"),
   ]);
 
-  const affectations = (affectationsData ?? []) as A[];
-  const pointages=(pointagesData??[]) as P[];
-  const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>pointages.filter(p=>p.employe_id===employeId&&p.date===date&&(!chantierId||p.chantier_id===chantierId)).reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);
+  const affectations = semaine.affectations as unknown as A[];
+  const pointages=semaine.pointages as unknown as P[];
+  // Index par salarié / jour (/ chantier) : la semaine entière est désormais lue, et un
+  // filtrage complet par cellule devenait quadratique (mesuré : 23 s à 5 000 affectations).
+  const heuresParJour=new Map<string,number>();
+  for(const p of pointages){const h=Number(p.heures_normales)+Number(p.heures_supplementaires);const jour=`${p.employe_id}|${p.date}`;heuresParJour.set(jour,(heuresParJour.get(jour)??0)+h);const parChantier=`${jour}|${p.chantier_id}`;heuresParJour.set(parChantier,(heuresParJour.get(parChantier)??0)+h);}
+  const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>heuresParJour.get(chantierId?`${employeId}|${date}|${chantierId}`:`${employeId}|${date}`)??0;
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
   const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
@@ -112,7 +118,10 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   // un employe different — signe qu'elles viennent de la meme saisie groupee (planning manuel
   // multi-ouvriers, ou l'assistant IA), rien d'autre ne les relie en base. Proposees en cases
   // a cocher individuelles : chacune reste un choix explicite, jamais une propagation globale.
-  const autresMemeLot = (a: A) => affectations.filter((autre) => autre.id !== a.id && autre.date === a.date && Number(autre.heures) === Number(a.heures) && autre.type_activite === a.type_activite && (un(autre.chantier)?.id ?? null) === (un(a.chantier)?.id ?? null) && autre.lieu_activite === a.lieu_activite && autre.tache === a.tache);
+  const cleLot = (a: A) => JSON.stringify([a.date, Number(a.heures), a.type_activite, un(a.chantier)?.id ?? null, a.lieu_activite ?? null, a.tache ?? null]);
+  const lots = new Map<string, A[]>();
+  for (const a of affectations) { const cle = cleLot(a); const lot = lots.get(cle); if (lot) lot.push(a); else lots.set(cle, [a]); }
+  const autresMemeLot = (a: A) => (lots.get(cleLot(a)) ?? []).filter((autre) => autre.id !== a.id);
   const total = affectations.reduce((s, a) => s + Number(a.heures), 0);
   const totalOuvriers = new Set(affectations.map((a) => un(a.employe)?.id).filter(Boolean)).size;
   const aujourdhui = iso(new Date());

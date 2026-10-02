@@ -5,7 +5,10 @@ import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { DepenseFournisseurForm } from "@/components/DepenseFournisseurForm";
 import { etatEcheanceFournisseur } from "@/lib/echeances-fournisseurs";
+import { chargerTotauxDepenses } from "@/lib/depenses-totaux";
+import { lireOptionsChantiers, lireOptionsEmployes } from "@/lib/fiches-agregats";
 
+const LIMITE_LISTE = 1000;
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
 export default async function DepensesPage({ searchParams }: { searchParams: Promise<{ error?: string; chantier?: string; fournisseur?: string; categorie?: string }> }) {
@@ -14,6 +17,7 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
   const supabase = await createClient();
   const [
     { data: depenses },
+    totaux,
     { data: fournisseurs },
     { data: chantiers },
     { data: commandes },
@@ -21,17 +25,19 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
     { data: outils },
     { data: employes },
   ] = await Promise.all([
-    supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_piece", { ascending: false }),
+    // Liste : au plus LIMITE_LISTE pièces, les plus récentes, avec un avis
+    // explicite au-delà ; les totaux portent toujours sur toutes les pièces.
+    supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_piece", { ascending: false }).order("id", { ascending: false }).range(0, LIMITE_LISTE - 1),
+    chargerTotauxDepenses(supabase, ctx.entrepriseId),
     supabase.from("fournisseurs").select("*").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId,{statutsExclus:[]}).then((data)=>({data})),
     supabase.from("commandes_fournisseurs").select("id,numero,fournisseur_id").eq("entreprise_id", ctx.entrepriseId).order("date_commande", { ascending: false }),
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
     supabase.from("outils").select("id,reference,designation").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu,rebut)").order("designation"),
-    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+    lireOptionsEmployes(supabase,ctx.entrepriseId).then((data)=>({data})),
   ]);
 
-  const total = (depenses ?? []).filter((depense) => depense.statut !== "annulee").reduce((somme, depense) => somme + Number(depense.montant_ttc), 0);
-  const regle = (depenses ?? []).reduce((somme, depense) => somme + Number(depense.montant_regle), 0);
+  const { totalTtc: total, regle, nombre } = totaux;
 
   return (
     <main className="p-4 sm:p-8">
@@ -46,6 +52,7 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
           <div className="rounded border p-3">Réglé <strong className="block text-green-700">{euros(regle)}</strong></div>
           <div className="rounded border p-3">À payer <strong className="block text-amber-700">{euros(Math.max(0, total - regle))}</strong></div>
         </div>
+        {nombre > (depenses?.length ?? 0) && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">Les {depenses?.length ?? 0} pièces les plus récentes sont listées sur {nombre}. Les totaux ci-dessus portent sur toutes les pièces.</p>}
         <DepenseFournisseurForm
           fournisseurs={fournisseurs ?? []}
           chantiers={chantiers ?? []}

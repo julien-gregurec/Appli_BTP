@@ -10,6 +10,7 @@ import { DEPENSE_CATEGORIES, DEPENSE_STATUTS } from "@/lib/depenses";
 import { euros } from "@/lib/devis";
 import { preparerLotVirementsAction } from "@/app/actions/paiements-bancaires";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
@@ -25,7 +26,7 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
     supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(id,nom),commande:commandes_fournisseurs(id,numero),vehicule:vehicules(id,immatriculation,marque,modele),outil:outils(id,reference,designation),employe:employes(id,prenom,nom)").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
     supabase.from("reglements_fournisseurs").select("*").eq("depense_id", id).eq("entreprise_id", contexte.entrepriseId).order("date", { ascending: false }),
     peutGerer
-      ? supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id", contexte.entrepriseId).not("statut", "in", "(archive,annule)").order("nom")
+      ? lireOptionsChantiers(supabase,contexte.entrepriseId).then((data)=>({data}))
       : Promise.resolve({ data: [] }),
   ]);
   if (!depense) notFound();

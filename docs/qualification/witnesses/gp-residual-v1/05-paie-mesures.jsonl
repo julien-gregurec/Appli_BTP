@@ -1,0 +1,5 @@
+{"chemin":"paie","n":500,"avant_ms":1071,"apres_ms":24,"page_dossiers_ms":13,"export_ms":55,"verite_primes":149399.25,"historique_primes_page":7807.8,"corrige_primes":149399.25}
+{"chemin":"paie","n":1000,"avant_ms":2087,"apres_ms":19,"page_dossiers_ms":14,"export_ms":88,"verite_primes":300600.3,"historique_primes_page":7807.8,"corrige_primes":300600.3}
+{"chemin":"paie","n":1462,"avant_ms":3036,"apres_ms":21,"page_dossiers_ms":18,"export_ms":140,"verite_primes":438287.85,"historique_primes_page":7807.8,"corrige_primes":438287.85}
+{"chemin":"paie","n":5000,"avant_ms":9968,"apres_ms":26,"page_dossiers_ms":38,"export_ms":616,"verite_primes":1500899.4,"historique_primes_page":7807.8,"corrige_primes":1500899.4}
+{"chemin":"paie","n":20000,"avant_ms":40926,"apres_ms":91,"page_dossiers_ms":122,"export_ms":1720,"verite_primes":6005249.25,"historique_primes_page":7807.8,"corrige_primes":6005249.25}
