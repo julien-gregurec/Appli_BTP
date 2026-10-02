@@ -16,7 +16,8 @@ test("migrations : nombre, ordre, aucune GP ; tables : Studio seules ; RPC : tou
   const files = readdirSync(join(import.meta.dirname, "../../supabase/migrations")).filter((n) => n.endsWith(".sql"));
   expect(report.facts.migrations_applied).toBe(files.length);
   // Train V8 : 21 (V7) + garde de séquence d'identité (20260929170000) + mode sûr Studio (20260929180000).
-  expect(files.length).toBe(23);
+  // Train V9 : + export RGPD Studio (20261002100000).
+  expect(files.length).toBe(24);
   // Seule fonction ouverte à anon : l'état PUBLIC du mode sûr (classé, anon_allowed), sans secret.
   expect(report.facts.anon_executable).toBe(1);
   expect(studioSql("select string_agg(p.proname, ',') from pg_proc p where p.pronamespace = 'public'::regnamespace and has_function_privilege('anon', p.oid, 'execute')")).toBe("incident_etat_public");

@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260929000101 (RGPD data export V1 (claude/kind-mayer-w4wfy6) — en dernier), renuméroté 20261002001201
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA — RGPD : export des données, portabilité et droit d'accès V1 (art. 15 & 20).
 -- Rapport : docs/qualification/ELSATIA_RGPD_DATA_EXPORT_PORTABILITY_V1.md
 --

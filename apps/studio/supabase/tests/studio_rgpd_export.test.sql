@@ -1,4 +1,4 @@
--- Projet DÉDIÉ Studio : export RGPD d'un sujet ELSATIA (20260929100000_studio_rgpd_export.sql).
+-- Projet DÉDIÉ Studio : export RGPD d'un sujet ELSATIA (20261002100000_studio_rgpd_export.sql, renumérotée train V9).
 -- Anti-rejeu de la demande signée, périmètre OWN_DATA / SHARED, aucune donnée d'un autre membre,
 -- aucun secret technique, journal sans contenu, lecture seule des tables métier, mode lecture seule.
 begin;

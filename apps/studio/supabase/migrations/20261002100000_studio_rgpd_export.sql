@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260929100000 (RGPD data export V1, claude/kind-mayer-w4wfy6), renuméroté 20261002100000
+-- (collision de version avec 20260929100000_studio_render_admission ; strictement après 20260929180000, dernière migration dédiée de V8) ; corps inchangé.
 -- ELSATIA Studio — export RGPD des données d'un sujet ELSATIA (contrat inter-projets, B + I1).
 --
 -- PROJET STUDIO DÉDIÉ UNIQUEMENT (apps/studio/supabase/migrations).
