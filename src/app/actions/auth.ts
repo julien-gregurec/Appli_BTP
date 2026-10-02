@@ -1,6 +1,7 @@
 "use server";
 
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
@@ -10,6 +11,16 @@ import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { destinationIdentiteApresConnexion } from "@/lib/elsatia-identity/config";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { adresseIpClient, secretRateLimit } from "@/lib/security/rate-limit";
+import {
+  MESSAGE_CONNEXION_BLOQUEE,
+  MESSAGE_CONNEXION_INDISPONIBLE,
+  enregistrerEchecConnexion,
+  estEchecIdentifiants,
+  journaliserConnexion,
+  verifierBudgetConnexion,
+} from "@/lib/security/login-rate-limit";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -75,10 +86,34 @@ export async function loginAction(formData: FormData) {
   // Retour vers le passage d'identité (Studio) uniquement : aucune autre destination acceptée.
   const retourIdentite = destinationIdentiteApresConnexion(String(formData.get("next") ?? ""));
 
+  const suite = retourIdentite ? `&next=${encodeURIComponent(retourIdentite)}` : "";
+
+  // Anti-bruteforce par échecs (compte, compte+IP, IP) : décidé AVANT Supabase
+  // Auth, identique que le compte existe ou non (voir login-rate-limit.ts).
+  const entreeLimiteur = { email, ip: adresseIpClient(await headers()), secret: secretRateLimit() ?? "" };
+  const limiteur = entreeLimiteur.secret ? createAdminClient() : null;
+  const decision = limiteur
+    ? await verifierBudgetConnexion(limiteur, entreeLimiteur)
+    : ({ autorise: false, raison: "indisponible" } as const);
+  if (!decision.autorise) {
+    if (decision.raison === "bloque") {
+      await journaliserConnexion("auth.login.bloque", entreeLimiteur, {
+        politique: decision.politique.cle,
+        reessayerApres: decision.reessayerApres,
+      });
+      redirect(`/login?error=${encodeURIComponent(MESSAGE_CONNEXION_BLOQUEE)}${suite}`);
+    }
+    await journaliserConnexion("auth.login.limiteur_indisponible", entreeLimiteur);
+    redirect(`/login?error=${encodeURIComponent(MESSAGE_CONNEXION_INDISPONIBLE)}${suite}`);
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    const suite = retourIdentite ? `&next=${encodeURIComponent(retourIdentite)}` : "";
+    if (limiteur && estEchecIdentifiants(error)) {
+      const { enregistre } = await enregistrerEchecConnexion(limiteur, entreeLimiteur);
+      if (!enregistre) await journaliserConnexion("auth.login.echec_non_enregistre", entreeLimiteur);
+    }
     redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}${suite}`);
   }
   if (retourIdentite) redirect(retourIdentite);

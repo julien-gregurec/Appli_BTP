@@ -21,6 +21,13 @@ vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/lib/auth-mode", () => ({ isEmailLoginDisabled: () => false }));
 vi.mock("@/lib/brand", () => ({ BRAND: { urlPublique: mocks.urlCanonique } }));
 vi.mock("@/lib/plateforme", () => ({ estPlateformeAdmin: mocks.estPlateformeAdmin }));
+// Limiteur de connexion : budget toujours disponible ici (scénarios dédiés dans
+// auth-login-rate-limit.test.ts).
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    rpc: async () => ({ data: [{ autorise: true, restant: 1, reessayer_apres: 1 }], error: null }),
+  }),
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
@@ -117,6 +124,7 @@ describe("actions Auth et URL canonique", () => {
 describe("loginAction — routage post-connexion selon le statut admin plateforme", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.headers.mockResolvedValue(new Headers({ "x-real-ip": "203.0.113.7" }));
     mocks.signInWithPassword.mockResolvedValue({ error: null });
   });
 
