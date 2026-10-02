@@ -133,7 +133,7 @@ verifier_apres() {
   [ $c = 0 ] || stop "ledger après cutover ≠ 389 : runbook ELSATIA_V9_PREVIEW_ROLLBACK.md, cas A"
 
   etape 14 "DB verify (38 contrôles du train) + contrôles V9 (11)"
-  ELSATIA_PREVIEW_DB_URL="$DB_VERIFY_URL" node "$REPO/scripts/preview/db-verify.mjs" "${DB_VERIFY_ARGS[@]}" | tee "$OUT/db-verify.txt"
+  ELSATIA_PREVIEW_DB_URL="$DB_VERIFY_URL" node "$REPO/scripts/preview/db-verify.mjs" ${DB_VERIFY_ARGS[@]+"${DB_VERIFY_ARGS[@]}"} | tee "$OUT/db-verify.txt"
   local dv=${PIPESTATUS[0]}
   node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.db_verify "{\"code\":$dv}" >/dev/null
   psql_ro -F '|' -f "$REPO/docs/runbooks/sql/ELSATIA_V9_POST_CUTOVER_CHECKS.sql" > "$OUT/v9-checks.txt" 2>"$OUT/v9-checks.err" || true
