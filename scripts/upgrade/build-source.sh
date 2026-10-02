@@ -11,19 +11,23 @@
 # Jamais de donnée réelle ; jamais de connexion distante (lib/common.sh).
 #
 # Usage : scripts/upgrade/build-source.sh <base> [--source-ref SHA] [--source-migration-count N] [--vol N] [--sans-donnees]
+#                                         [--profil-acl supabase|minimal]   (défaut supabase : lib/supabase_default_privileges.sql)
+#                                         [--remediation F.sql]...  régularisation PRÉ-CUTOVER simulée (copie locale uniquement)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 . "$HERE/lib/common.sh"
 
 DB="${1:?usage: build-source.sh <base> [options]}"; shift
-SOURCE_REF="5777abbcb94fb899ed14a3e7e5213be8f3abb0e7"; SOURCE_N=210; VOL=500; DONNEES=1
+SOURCE_REF="5777abbcb94fb899ed14a3e7e5213be8f3abb0e7"; SOURCE_N=210; VOL=500; DONNEES=1; PROFIL_ACL=supabase; APRES_SQL=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --source-ref) SOURCE_REF="$2"; shift 2;;
     --source-migration-count) SOURCE_N="$2"; shift 2;;
     --vol) VOL="$2"; shift 2;;
     --sans-donnees) DONNEES=0; shift;;
+    --profil-acl) PROFIL_ACL="$2"; shift 2;;
+    --remediation) APRES_SQL+=("$2"); shift 2;;
     *) upg_die "option inconnue : $1";;
   esac
 done
@@ -41,6 +45,13 @@ upg_drop "$DB"
 su postgres -c "psql -X -q -d postgres -c 'create database \"$DB\"'" >/dev/null
 su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -v dbname=$DB -d $DB -f $REPO/scripts/local-postgres-bootstrap/pg_bootstrap.sql" >/dev/null 2>"$OUT/bootstrap.err" \
   || { cat "$OUT/bootstrap.err"; upg_die "bootstrap"; }
+case "$PROFIL_ACL" in
+  supabase) upg_psql "$DB" < "$HERE/lib/supabase_default_privileges.sql" >/dev/null || upg_die "profil ACL";;
+  minimal) ;;
+  *) upg_die "--profil-acl supabase|minimal";;
+esac
+su postgres -c "psql -X -q -d postgres -c \"comment on database \\\"$DB\\\" is 'upg:profil_acl=$PROFIL_ACL;source=$SOURCE_REF'\"" >/dev/null
+echo "  profil ACL : $PROFIL_ACL"
 upg_creer_ledger "$DB"
 t0=$(date +%s)
 for f in "$SRC_DIR"/supabase/migrations/*.sql; do
@@ -75,5 +86,8 @@ if [ "$VOL" -gt 0 ]; then
     || { cat "$OUT/err"; upg_die "volumétrie"; }
   echo "  ✓ entreprise volumétrique (vol=$VOL)"
 fi
+for r in "${APRES_SQL[@]}"; do
+  charger "remédiation pré-cutover simulée : $(basename "$r")" < "$r"
+done
 upg_q "$DB" "analyze" >/dev/null
 echo "  lignes totales : $(upg_q "$DB" "select sum(n_live_tup) from pg_stat_user_tables")"

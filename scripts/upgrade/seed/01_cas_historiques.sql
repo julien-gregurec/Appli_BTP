@@ -66,8 +66,22 @@ update public.entreprises en
        stripe_customer_id = ab.stripe_customer_id, stripe_subscription_id = ab.stripe_subscription_id,
        abonnement_statut = case ab.statut when 'annule' then 'annule' else ab.statut end
   from public.abonnements_entreprises ab where ab.entreprise_id = en.id;
--- essai expiré (A) ; impayé + suspension (B) ; annulation programmée ; suppression programmée (sans membre).
-update public.entreprises set abonnement_essai_fin = current_date - 15 where id = (select a from e);
+-- Période d'essai : état RÉEL par génération (cf. 20260824000231 : « les entreprises en essai sur Production ont
+-- abonnement_essai_fin = NULL », colonne abonnement_essai_debut absente avant 231, non rétro-remplie) :
+--   * entreprises créées AVANT 231 : essai_debut NULL ; essai_fin NULL, ou fixée par le webhook Stripe de
+--     Production (fcdd4e7c : abonnement_essai_fin = trial_end) — ici un essai Stripe de 45 jours (Ancienne Remise) ;
+--   * entreprises créées APRÈS 231 : trigger initialiser_essai_entreprise (debut = création, fin = debut + 30) ;
+--     A = essai expiré (créée il y a 45 jours).
+update public.entreprises set abonnement_essai_debut = null, abonnement_essai_fin = null
+ where id in ((select moyenne from e), (select petite from e), (select b from e),
+              'c2100000-0000-0000-0000-000000000001', 'c2100000-0000-0000-0000-000000000003');
+update public.entreprises set abonnement_essai_debut = null, abonnement_essai_fin = (created_at + interval '45 days')::date
+ where id = 'c2100000-0000-0000-0000-000000000002';
+update public.entreprises set created_at = now() - interval '45 days', abonnement_essai_debut = current_date - 45,
+       abonnement_essai_fin = current_date - 15 where id = (select a from e);
+update public.entreprises set created_at = now() - interval '8 months' where id = (select b from e);
+update public.entreprises set created_at = now() - interval '2 years' where id = (select petite from e);
+-- impayé + suspension (B) ; annulation programmée ; suppression programmée (sans membre).
 update public.entreprises set impaye_signale_at = now() - interval '40 days', suspension_prevue_at = now() - interval '10 days',
        impaye_message = 'Impayé synthétique (harnais)' where id = (select b from e);
 update public.entreprises set abonnement_annulation_prevue_at = now() - interval '1 month' where id = 'c2100000-0000-0000-0000-000000000003';
@@ -94,7 +108,7 @@ on conflict do nothing;
 -- 4. Utilisateurs : multi-entreprises, entreprise active orpheline, sans appartenance.
 insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut)
 select '10000000-0000-0000-0000-000000000001', (select moyenne from e),
-       (select id from public.postes where entreprise_id = (select moyenne from e) order by created_at limit 1), 'actif';
+       (select id from public.postes where entreprise_id = (select moyenne from e) and nom = 'Conducteur de travaux'), 'actif';
 insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut)
 select '20000000-0000-0000-0000-000000000002', (select petite from e),
        (select id from public.postes where entreprise_id = (select petite from e) order by created_at limit 1), 'desactive';
@@ -105,6 +119,31 @@ values ('00000000-0000-0000-0000-000000000000', 'a2100000-0000-0000-0000-0000000
 insert into public.utilisateurs (id, prenom, nom, entreprise_active_id)
 values ('a2100000-0000-0000-0000-0000000000ff', 'Sans', 'Entreprise', 'c2100000-0000-0000-0000-000000000001')
 on conflict (id) do update set entreprise_active_id = excluded.entreprise_active_id;
+
+-- 4 bis. Membre actif SANS poste (aucune permission) dans l'entreprise moyenne.
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', 'a2100000-0000-0000-0000-0000000000fe', 'authenticated', 'authenticated',
+        'sans-poste@entreprise-test.invalid', extensions.crypt('x', extensions.gen_salt('bf')), now(), now() - interval '1 year', now());
+insert into public.utilisateurs (id, prenom, nom, entreprise_active_id) values ('a2100000-0000-0000-0000-0000000000fe', 'Sans', 'Poste', (select moyenne from e))
+on conflict (id) do update set entreprise_active_id = excluded.entreprise_active_id;
+insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut)
+values ('a2100000-0000-0000-0000-0000000000fe', (select moyenne from e), null, 'actif');
+
+-- 4 ter. « Essai perpétuel » historique (UPG-P1-1) : entreprise créée AVANT 231, statut 'essai', dates d'essai
+-- NULL — état réel documenté par 20260824000231 (« dont l'entreprise réelle ELSATIA elle-même »).
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', 'a2100000-0000-0000-0000-000000000004', 'authenticated', 'authenticated',
+        'gerant@essai-perpetuel.invalid', extensions.crypt('x', extensions.gen_salt('bf')), now(), now() - interval '1 year', now());
+insert into public.utilisateurs (id, prenom, nom) values ('a2100000-0000-0000-0000-000000000004', 'Gérant', 'Essai perpétuel')
+on conflict (id) do nothing;
+select set_config('request.jwt.claims', '{"sub":"a2100000-0000-0000-0000-000000000004","role":"authenticated"}', true) is null,
+       set_config('request.jwt.claim.sub', 'a2100000-0000-0000-0000-000000000004', true) is null;
+create temp table ep as select public.creer_entreprise_bootstrap('Essai Perpetuel Historique', '00000000000006', null, null, 'Lyon') as id;
+select set_config('request.jwt.claims', '', true) is null, set_config('request.jwt.claim.sub', '', true) is null;
+update public.entreprises set created_at = now() - interval '1 year', abonnement_statut = 'essai',
+       abonnement_essai_debut = null, abonnement_essai_fin = null where id = (select id from ep);
+insert into public.clients (entreprise_id, reference_interne, type, nom, prenom, statut)
+select id, 'EP-CLI-' || g, 'particulier', 'ClientEP' || g, 'Perpétuel', 'actif' from ep, generate_series(1, 5) g;
 
 -- 5. RGPD : employé anonymisé (identité purgée, ligne conservée pour l'historique de paie).
 update public.employes set prenom = 'Anonyme', nom = 'Anonyme', email = null, telephone = null, statut = 'sorti',

@@ -33,6 +33,9 @@
 #   --resume               reprend la base de travail existante là où son ledger s'est arrêté
 #   --sans-sonde           pas de sonde RLS par utilisateur (passes volumétriques)
 #   --expected-changes F   changements de données déclarés (défaut scripts/upgrade/expected-changes.json)
+#   --bridge F             pont d'upgrade PROPOSÉ (fichier de migration hors train, ex. bridges/*.sql) inséré à sa
+#                          place lexicale, appliqué aussi au fresh de comparaison (répétable)
+#   --publish-plan         copie le plan qualifié (target-<sha8>.json) dans scripts/upgrade/manifests/ si verdict OK
 #   --source-manifest F    manifeste (version → sha256) des migrations historiques (défaut manifests/source-prod-210-5777abb.json)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,7 +44,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 BOOT="$REPO/scripts/local-postgres-bootstrap"
 
 TARGET_SHA=""; TARGET_N=""; SRC_DB=""; WORK_DB=""; FRESH_DB=""; DRY=0; STOP_AFTER=""; FAIL_AT=""; RESUME=0; SONDE=1
-ATTENDUS="$HERE/expected-changes.json"; OUT="${UPG_OUT:-}"
+ATTENDUS="$HERE/expected-changes.json"; OUT="${UPG_OUT:-}"; PONTS=()
 MANIFESTE="$HERE/manifests/source-prod-210-5777abb.json"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -58,6 +61,8 @@ while [ $# -gt 0 ]; do
     --sans-sonde) SONDE=0; shift;;
     --expected-changes) ATTENDUS="$2"; shift 2;;
     --source-manifest) MANIFESTE="$2"; shift 2;;
+    --bridge) PONTS+=("$2"); shift 2;;
+    --publish-plan) PUBLIER=1; shift;;
     -h|--help) sed -n '2,40p' "$0"; exit 0;;
     *) upg_die "option inconnue : $1";;
   esac
@@ -67,12 +72,14 @@ done
 [ -n "$SRC_DB" ] || upg_die "--source-db obligatoire (base historique peuplée, cf. build-source.sh)"
 upg_garde_locale "$TARGET_SHA" "$SRC_DB" "$WORK_DB" "$FRESH_DB" "$OUT"
 TARGET_SHA="$(git -C "$REPO" rev-parse --verify "$TARGET_SHA^{commit}" 2>/dev/null)" || upg_die "SHA cible inconnu du dépôt"
-WORK_DB="${WORK_DB:-${SRC_DB}_v9x}"; FRESH_DB="${FRESH_DB:-fresh_${TARGET_SHA:0:8}}"
+WORK_DB="${WORK_DB:-${SRC_DB}_v9x}"; FRESH_DB="${FRESH_DB:-fresh_${TARGET_SHA:0:8}${PONTS:+_p${#PONTS[@]}}}"
 for b in "$SRC_DB" "$WORK_DB" "$FRESH_DB"; do upg_nom_base "$b"; done
 [ "$SRC_DB" != "$WORK_DB" ] || upg_die "la base source n'est jamais modifiée : --work-db doit différer"
 upg_exists "$SRC_DB" || upg_die "base source $SRC_DB absente (scripts/upgrade/build-source.sh)"
+PROFIL_ACL=$(upg_q postgres "select coalesce(substring(shobj_description(oid, 'pg_database') from 'profil_acl=([a-z]+)'), 'minimal') from pg_database where datname = '$SRC_DB'")
+[ "$PROFIL_ACL" = supabase ] && FRESH_DB="${FRESH_DB}_sb"
 OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"; chmod 777 "$OUT"
-echo "ELSATIA production → V9.x : cible $TARGET_SHA ($TARGET_N migrations) ; source $SRC_DB ; travail $WORK_DB ; preuves $OUT"
+echo "ELSATIA production → V9.x : cible $TARGET_SHA ($TARGET_N migrations) ; source $SRC_DB (profil ACL $PROFIL_ACL) ; travail $WORK_DB ; fresh $FRESH_DB ; preuves $OUT"
 VERDICT_KO=0
 ko() { VERDICT_KO=1; echo "  ❌ $*"; echo "$*" >> "$OUT/echecs.txt"; }
 ok() { echo "  ✅ $*"; }
@@ -82,8 +89,14 @@ etape() { echo; echo "== $* =="; }
 TGT="$OUT/target"; upg_extraire_migrations "$REPO" "$TARGET_SHA" "$TGT"; MIG="$TGT/supabase/migrations"
 n=$(ls "$MIG"/*.sql | wc -l)
 [ "$n" = "$TARGET_N" ] || upg_die "le commit cible porte $n migrations, --target-migration-count=$TARGET_N"
+for p in "${PONTS[@]}"; do
+  [ -f "$p" ] || upg_die "pont introuvable : $p"
+  vp=$(basename "$p" | cut -d_ -f1)
+  ls "$MIG"/"${vp}"_*.sql >/dev/null 2>&1 && upg_die "pont $p : la version $vp existe déjà dans la cible"
+  cp "$p" "$MIG/"; chmod a+r "$MIG/$(basename "$p")"; echo "  pont d'upgrade proposé inséré : $(basename "$p")"
+done
 upg_versions_dir "$MIG" > "$OUT/versions_cible.txt"
-[ "$(sort -u "$OUT/versions_cible.txt" | wc -l)" = "$n" ] || upg_die "versions dupliquées dans la cible"
+[ "$(sort -u "$OUT/versions_cible.txt" | wc -l)" = "$(wc -l < "$OUT/versions_cible.txt")" ] || upg_die "versions dupliquées dans la cible"
 
 # --- Base de travail ------------------------------------------------------------------------------
 if [ "$RESUME" = 1 ]; then
@@ -201,7 +214,7 @@ while read -r m; do
 done < "$OUT/en_attente.txt"
 upg_ledger "$WORK_DB" > "$OUT/ledger_apres.txt"
 echo "  $appl migration(s) appliquée(s) en $(( $(date +%s) - t0 )) s ; ledger $(wc -l < "$OUT/ledger_apres.txt") versions"
-if diff -q "$OUT/ledger_apres.txt" "$OUT/versions_cible.txt" >/dev/null; then ok "ledger après = les $TARGET_N fichiers de la cible"
+if diff -q "$OUT/ledger_apres.txt" "$OUT/versions_cible.txt" >/dev/null; then ok "ledger après = les $TARGET_N fichiers de la cible${PONTS:+ + ${#PONTS[@]} pont(s)}"
 else ko "ledger après ≠ fichiers cible"; diff "$OUT/ledger_apres.txt" "$OUT/versions_cible.txt" | head; fi
 
 etape "6. Snapshot après"
@@ -211,9 +224,10 @@ python3 "$HERE/lib/security_snapshot.py" "$WORK_DB" "$OUT/securite_apres" || ko 
 "${SNAP_ENV[@]}" python3 "$BOOT/upgrade_snapshot.py" "$WORK_DB" "$OUT/sonde_apres.json" >/dev/null || ko "sonde après"
 
 etape "7. Comparaison schéma : upgradé vs fresh cible"
-if ! upg_exists "$FRESH_DB" || [ "$(upg_q "$FRESH_DB" "select count(*) from supabase_migrations.schema_migrations" 2>/dev/null)" != "$TARGET_N" ]; then
+if ! upg_exists "$FRESH_DB" || [ "$(upg_q "$FRESH_DB" "select count(*) from supabase_migrations.schema_migrations" 2>/dev/null)" != "$(wc -l < "$OUT/versions_cible.txt")" ]; then
   upg_drop "$FRESH_DB"; su postgres -c "psql -X -q -d postgres -c 'create database \"$FRESH_DB\"'" >/dev/null
   su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -v dbname=$FRESH_DB -d $FRESH_DB -f $BOOT/pg_bootstrap.sql" >/dev/null 2>&1
+  [ "$PROFIL_ACL" = supabase ] && upg_psql "$FRESH_DB" < "$HERE/lib/supabase_default_privileges.sql" >/dev/null
   upg_creer_ledger "$FRESH_DB"
   for f in "$MIG"/*.sql; do appliquer "$FRESH_DB" "$f" reel || upg_die "fresh cible : $(basename "$f")"; done
   ok "fresh cible $FRESH_DB construite ($TARGET_N migrations)"
@@ -243,6 +257,8 @@ python3 "$HERE/lib/security_compare.py" "$OUT/securite_avant" "$OUT/securite_apr
 [ "${PIPESTATUS[0]}" = 0 ] || ko "sécurité / catalogue : écart upgradé ≠ fresh cible"
 python3 "$BOOT/upgrade_compare.py" "$OUT/sonde_avant.json" "$OUT/sonde_apres.json" > "$OUT/sonde_comparaison.txt"
 grep -E "^Sonde RLS|^RLS flags|^Policies" "$OUT/sonde_comparaison.txt" | sed 's/^/  /'
+python3 "$HERE/lib/access_check.py" "$SRC_DB" "$WORK_DB" "$OUT/sonde_avant.json" "$OUT/sonde_apres.json" "$ATTENDUS" "$OUT/acces.json" | sed 's/^/  /'
+[ "${PIPESTATUS[0]}" = 0 ] || ko "continuité d'accès : perte ou réduction non déclarée"
 
 etape "16. Contrôles de données : zéro perte"
 python3 "$HERE/lib/fingerprint.py" compare "$OUT/avant" "$OUT/apres" "$ATTENDUS" "$OUT/zero_perte.json" | sed 's/^/  /'
@@ -252,6 +268,22 @@ etape "17. Performance sanity"
 python3 "$HERE/lib/perf_sanity.py" "$SRC_DB" "$WORK_DB" "$OUT/perf.json" | sed 's/^/  /'
 [ "${PIPESTATUS[0]}" = 0 ] || ko "performance : régression > seuil"
 python3 "$HERE/lib/classify.py" risques "$OUT/mesures.jsonl" "$MIG" "$OUT/classification.json" --fonctions-source "$OUT/securite_avant/functions.txt" | tail -6 | sed 's/^/  /'
+
+# Plan qualifié pour ce SHA (lu par le preflight, P6/P7) : migrations en attente classées + préconditions.
+python3 - "$OUT" "$TARGET_SHA" "$TARGET_N" "$MANIFESTE" "$VERDICT_KO" "${PONTS[@]}" <<'PY'
+import json, os, sys
+out, sha, n, man, ko, ponts = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], [os.path.basename(p) for p in sys.argv[6:]]
+cl = json.load(open(os.path.join(out, "classification.json")))
+noms_ponts = {p.split("_")[0] for p in ponts}
+pre = ["bloquant_essai_hors_fenetre", "bloquant_essai_perpetuel"] + ([] if "20260921000298" in noms_ponts else ["lignes_factures_emises"])
+plan = {"target_sha": sha, "target_migration_count": n, "source_manifest": os.path.basename(man), "ponts": ponts,
+        "qualifie": ko == "0", "preconditions_bloquantes": pre,
+        "migrations": [{k: m[k] for k in ("migration", "verrou", "rollback", "ms", "motifs")} for m in cl]}
+p = os.path.join(out, f"target-{sha[:8]}.json")
+json.dump(plan, open(p, "w"), indent=1, ensure_ascii=False)
+print(f"  plan qualifié écrit : {p} ({len(plan['migrations'])} migrations, préconditions bloquantes {pre})")
+PY
+[ -n "${PUBLIER:-}" ] && [ "$VERDICT_KO" = 0 ] && cp "$OUT/target-${TARGET_SHA:0:8}.json" "$HERE/manifests/" && echo "  plan publié dans scripts/upgrade/manifests/"
 
 echo
 if [ "$VERDICT_KO" = 0 ]; then echo "VERDICT HARNAIS : ✅ UPGRADE QUALIFIÉ ($SRC_DB → $TARGET_SHA, $TARGET_N migrations). Preuves : $OUT"

@@ -33,15 +33,18 @@ begin
   perform set_config('request.jwt.claim.sub', '', true);
 end $$;
 -- Effectif de l'entreprise moyenne (le seed 5 ans exige des employés actifs) et de la petite.
-insert into public.employes (entreprise_id, reference_interne, prenom, nom, email, poste, type_contrat, date_entree, taux_horaire, cout_horaire, statut, utilisateur_id)
+-- La fiche liée au gérant porte le poste « Gérant » (un trigger recopie le poste de la fiche sur l'appartenance).
+insert into public.employes (entreprise_id, reference_interne, prenom, nom, email, poste, type_contrat, date_entree, taux_horaire, cout_horaire, statut, utilisateur_id, poste_id)
 select a.entreprise_id, 'HIST-EMP-'||lpad(g::text, 3, '0'),
        (array['Paul','Léa','Hugo','Inès','Marc','Zoé','Luc','Emma'])[1 + (g - 1) % 8], 'Salarié'||g,
        'salarie'||g||'@entreprise-test.invalid', (array['Ouvrier','Chef d''équipe','Conducteur'])[1 + g % 3],
        case when g % 4 = 0 then 'cdd' else 'cdi' end, current_date - (g * 200), 15 + g, 28 + g, 'actif',
-       case when g = 1 then 'a2100000-0000-0000-0000-000000000001'::uuid end
+       case when g = 1 then 'a2100000-0000-0000-0000-000000000001'::uuid end,
+       case when g = 1 then (select id from public.postes where entreprise_id = a.entreprise_id and nom = 'Gérant') end
   from amorce a, generate_series(1, 8) g where a.cle = 'moyenne';
-insert into public.employes (entreprise_id, reference_interne, prenom, nom, email, type_contrat, date_entree, taux_horaire, statut, utilisateur_id)
+insert into public.employes (entreprise_id, reference_interne, prenom, nom, email, type_contrat, date_entree, taux_horaire, statut, utilisateur_id, poste_id)
 select a.entreprise_id, 'HIST-PET-'||g, 'Artisan', 'Petit'||g, 'artisan'||g||'@petite-histo.invalid', 'cdi', current_date - 400, 18, 'actif',
-       case when g = 1 then 'a2100000-0000-0000-0000-000000000002'::uuid end
+       case when g = 1 then 'a2100000-0000-0000-0000-000000000002'::uuid end,
+       case when g = 1 then (select id from public.postes where entreprise_id = a.entreprise_id and nom = 'Gérant') end
   from amorce a, generate_series(1, 2) g where a.cle = 'petite';
 commit;

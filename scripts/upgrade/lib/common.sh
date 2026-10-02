@@ -39,7 +39,15 @@ upg_nom_base() {
 upg_psql() { su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d $1"; }
 upg_q() { su postgres -c "psql -X -q -At -v ON_ERROR_STOP=1 -d $1 -c \"$2\""; }
 upg_drop() { su postgres -c "psql -X -q -d postgres -c 'drop database if exists \"$1\" with (force)'" >/dev/null; }
-upg_clone() { upg_drop "$2"; su postgres -c "psql -X -q -d postgres -c 'create database \"$2\" template \"$1\"'" >/dev/null; }
+# Copie par template + recopie des réglages de base (ALTER DATABASE … SET, ex. search_path = public, extensions,
+# que Supabase porte sur ses rôles) : un template ne les transmet pas.
+upg_clone() {
+  upg_drop "$2"; su postgres -c "psql -X -q -d postgres -c 'create database \"$2\" template \"$1\"'" >/dev/null
+  local r
+  while IFS= read -r r; do
+    [ -n "$r" ] && su postgres -c "psql -X -q -d postgres -c \"alter database \\\"$2\\\" set ${r%%=*} = ${r#*=}\"" >/dev/null
+  done < <(upg_q postgres "select unnest(setconfig) from pg_db_role_setting where setrole = 0 and setdatabase = (select oid from pg_database where datname = '$1')")
+}
 upg_exists() { [ "$(upg_q postgres "select count(*) from pg_database where datname='$1'")" = 1 ]; }
 
 # Fichiers de migration d'un SHA git, extraits dans un répertoire (sans checkout).

@@ -127,6 +127,41 @@ def lire_tsv(p):
     return d
 
 
+def colonnes_modifiees(base_a, base_p, t, m, cols_apres):
+    """Nombre de lignes existantes modifiées, PAR COLONNE d'avant encore présente (lecture des deux bases)."""
+    s, n = t.split(".", 1)
+    cols, pk = [c for c in m["colonnes"] if c in cols_apres], m["pk"]
+    if not pk:
+        return {"(ligne entière, table sans PK)": -1}
+    cle = "||'|'||".join(f"coalesce(r.{q_ident(c)}::text,'∅')" for c in pk)
+    sel = ",".join(f"md5(coalesce(r.{q_ident(c)}::text,'∅'))" for c in cols)
+    sql = f"copy (select {cle}, {sel} from {q_ident(s)}.{q_ident(n)} r) to stdout;"
+    da = {l.split("\t")[0]: l.split("\t")[1:] for l in psql(base_a, sql).splitlines()}
+    dp = {l.split("\t")[0]: l.split("\t")[1:] for l in psql(base_p, sql).splitlines()}
+    vide = hashlib.md5("∅".encode()).hexdigest()
+    res = {}
+    for k, va in da.items():
+        vp = dp.get(k)
+        if vp is None:
+            continue
+        for c, x, y in zip(cols, va, vp):
+            if x != y:
+                cle_c = c + ("" if x != vide else "∅→")  # « c∅→ » : NULL renseigné ; « c » : valeur écrasée
+                res[cle_c] = res.get(cle_c, 0) + 1
+    return res
+
+
+def valeurs_deplacees(base_a, base_p, t, pk, c, dest):
+    """dest = « schéma.table.colonne » indexée par la même clé que t (colonne de jointure = clé : ligne_de)."""
+    s, n = t.split(".", 1)
+    ds, dn, dc, dk = dest.split(".")  # schéma.table.colonne.colonne_clé (même valeur que la PK unique de t)
+    a = psql(base_a, f"copy (select r.{q_ident(pk[0])}::text, coalesce(r.{q_ident(c)}::text,'∅') from {q_ident(s)}.{q_ident(n)} r) to stdout;")
+    p = psql(base_p, f"copy (select r.{q_ident(dk)}::text, coalesce(r.{q_ident(dc)}::text,'∅') from {q_ident(ds)}.{q_ident(dn)} r) to stdout;")
+    da = dict(l.split("\t") for l in a.splitlines())
+    dp = dict(l.split("\t") for l in p.splitlines())
+    return sum(1 for k, v in da.items() if v != "∅" and dp.get(k) != v)
+
+
 def compare(av, ap, attendus_p, rapport_p):
     A = json.load(open(os.path.join(av, "meta.json")))
     P = json.load(open(os.path.join(ap, "meta.json")))
@@ -138,24 +173,48 @@ def compare(av, ap, attendus_p, rapport_p):
             rapport["tables_disparues"].append(t)
             rapport["p0"].append(f"table disparue : {t} ({m['lignes']} lignes)")
             continue
-        if m["empreinte"] == P["tables"][t]["empreinte"]:
+        if m["empreinte"] == P["tables"][t]["empreinte"] and set(m["colonnes"]) <= set(P["tables"][t]["colonnes"]):
             continue
         a = lire_tsv(os.path.join(av, "rows", t + ".tsv"))
         p = lire_tsv(os.path.join(ap, "rows", t + ".tsv"))
         supp = sorted(set(a) - set(p))
         aj = sorted(set(p) - set(a))
         mod = sorted(k for k in a if k in p and a[k] != p[k])
-        r = {"supprimees": len(supp), "modifiees": len(mod), "ajoutees": len(aj),
+        cols_apres = P["tables"][t]["colonnes"]
+        disparues = [c for c in m["colonnes"] if c not in cols_apres]
+        cols_mod = colonnes_modifiees(A["base"], P["base"], t, m, cols_apres) if mod else {}
+        r = {"supprimees": len(supp), "modifiees": len(mod), "ajoutees": len(aj), "colonnes_modifiees": cols_mod,
+             "colonnes_disparues": disparues,
              "ex_supprimees": supp[:5], "ex_modifiees": mod[:5]}
         regle = att_t.get(t, {})
         if supp and not regle.get("suppression_autorisee"):
             rapport["p0"].append(f"{t} : {len(supp)} ligne(s) existante(s) SUPPRIMÉE(S) non déclarée(s)")
-        if mod and not regle.get("modification_autorisee"):
-            rapport["p0"].append(f"{t} : {len(mod)} ligne(s) existante(s) MODIFIÉE(S) non déclarée(s)")
+        for c in disparues:
+            dest = regle.get("colonnes_deplacees", {}).get(c)
+            if not dest:
+                rapport["p0"].append(f"{t} : colonne {c} SUPPRIMÉE par l'upgrade (valeurs d'avant non retrouvées)")
+            else:
+                manq = valeurs_deplacees(A["base"], P["base"], t, m["pk"], c, dest)
+                if manq:
+                    rapport["p0"].append(f"{t}.{c} déplacée vers {dest} : {manq} valeur(s) non retrouvée(s)")
+                else:
+                    rapport["declares"].append(f"{t}.{c} déplacée vers {dest} : toutes les valeurs retrouvées")
+        # Une valeur NULL renseignée (« c∅→ ») est admise par colonnes_renseignables OU colonnes_modifiables ;
+        # une valeur existante ÉCRASÉE (« c ») uniquement par colonnes_modifiables.
+        def admis(c):
+            if c.endswith("∅→"):
+                b = c[:-2]
+                return b in regle.get("colonnes_renseignables", []) or b in regle.get("colonnes_modifiables", [])
+            return c in regle.get("colonnes_modifiables", [])
+        hors = sorted(c for c in cols_mod if not admis(c))
+        if mod and hors:
+            rapport["p0"].append(f"{t} : {len(mod)} ligne(s) existante(s) MODIFIÉE(S) ; colonnes non déclarées : "
+                                 + ", ".join(f"{c}({cols_mod[c]})" for c in hors))
         if aj and not regle.get("ajout_autorise"):
             rapport["p0"].append(f"{t} : {len(aj)} ligne(s) AJOUTÉE(S) non déclarée(s) dans une table existante")
-        if (supp or mod or aj) and regle:
-            rapport["declares"].append(f"{t} : {regle.get('justification', '?')}")
+        if (supp or mod or aj or disparues) and regle:
+            detail = ", ".join(f"{c}({n})" for c, n in sorted(cols_mod.items()))
+            rapport["declares"].append(f"{t} : -{len(supp)} ~{len(mod)} +{len(aj)} [{detail}] — {regle.get('justification', '?')}")
         rapport["tables"][t] = r
     for k, f in A["fk"].items():
         apres = P["fk"].get(k)
@@ -174,10 +233,14 @@ def compare(av, ap, attendus_p, rapport_p):
             dp = open(os.path.join(ap, "critique_" + k + ".txt")).read().splitlines() if mp else []
             d = {"valeur": k, "disparues": sorted(set(da) - set(dp))[:10], "apparues": sorted(set(dp) - set(da))[:10]}
             rapport["critiques"].append(d)
-            if k not in att_c:
-                rapport["p0"].append(f"valeurs critiques « {k} » modifiées ({len(set(da) - set(dp))} disparue(s))")
+            disp = set(da) - set(dp)
+            regle_c = att_c.get(k)
+            if not regle_c:
+                rapport["p0"].append(f"valeurs critiques « {k} » modifiées ({len(disp)} disparue(s), {len(set(dp) - set(da))} apparue(s))")
+            elif regle_c.get("mode") == "ajouts_seulement" and disp:
+                rapport["p0"].append(f"valeurs critiques « {k} » : {len(disp)} valeur(s) d'avant DISPARUE(S) (seuls des ajouts sont déclarés)")
             else:
-                rapport["declares"].append(f"critique {k} : {att_c[k]}")
+                rapport["declares"].append(f"critique {k} : +{len(set(dp) - set(da))} / -{len(disp)} — {regle_c.get('justification', '?')}")
     rapport["verdict"] = "ZERO_PERTE" if not rapport["p0"] else "P0_PERTE_OU_ECART_NON_DECLARE"
     json.dump(rapport, open(rapport_p, "w"), indent=1, ensure_ascii=False)
     nb_l = sum(v["lignes"] for v in A["tables"].values())

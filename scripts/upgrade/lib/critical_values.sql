@@ -9,8 +9,9 @@ select entreprise_id||'|'||coalesce(plan_id::text,'∅')||'|'||code_offre||'|'||
 select code||'|v'||version||'|'||coalesce(prix_mensuel_ht::text,'∅')||'|'||coalesce(prix_annuel_ht::text,'∅')||'|'||id
   from public.plans_abonnement order by 1;
 -- @entreprises_abonnement
+-- (dates d'essai : contrôlées colonne par colonne au niveau table — cf. expected-changes.json, UPG-P2-1)
 select id||'|'||nom||'|'||abonnement_statut||'|'||coalesce(abonnement_offre,'∅')||'|'||coalesce(abonnement_version_tarif::text,'∅')
-       ||'|'||coalesce(abonnement_prix_contractuel_ht::text,'∅')||'|'||coalesce(abonnement_periodicite,'∅')||'|'||coalesce(abonnement_essai_fin::text,'∅')
+       ||'|'||coalesce(abonnement_prix_contractuel_ht::text,'∅')||'|'||coalesce(abonnement_periodicite,'∅')
        ||'|'||coalesce(stripe_customer_id,'∅')||'|'||coalesce(stripe_subscription_id,'∅')||'|'||coalesce(remise_stripe_coupon_id,'∅')
        ||'|'||coalesce(suppression_prevue_at::text,'∅')||'|'||coalesce(siret,'∅')
   from public.entreprises order by 1;
