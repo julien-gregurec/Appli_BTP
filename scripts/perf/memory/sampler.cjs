@@ -10,6 +10,7 @@
 // Commandes (fichier $MEM_SAMPLER_DIR/cmd, lu puis supprimé à chaque tick) :
 //   gc              -> global.gc() complet (si --expose-gc), échantillon marqué
 //   snap:<label>    -> gc puis v8.writeHeapSnapshot(<dir>/heap-<label>-<pid>.heapsnapshot)
+/* eslint-disable @typescript-eslint/no-require-imports -- module CommonJS préchargé par `node -r` (train V9) : require() est la seule forme possible ici. */
 "use strict";
 const dir = process.env.MEM_SAMPLER_DIR;
 if (dir) {

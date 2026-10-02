@@ -96,6 +96,23 @@ if os.environ.get("UPGRADE_SNAPSHOT_V8") == "1":
         "reserves_annuaire_publication", "reserves_evenements_notifications",
     ]
 
+# Train V9 (ELSATIA_CANONICAL_TRAIN_V9_CONVERGENCE_V1 §6) : ajoutés seulement quand
+# UPGRADE_SNAPSHOT_V9=1 (harnais upgrade-v8-v9.sh) ; les harnais V3 → V8 rejouent leurs chiffres.
+if os.environ.get("UPGRADE_SNAPSHOT_V9") == "1":
+    TABLES_METIER += [
+        # Chiffrement bancaire (rotation des clés) : données chiffrées existantes.
+        "coordonnees_bancaires", "ordres_virements", "lots_virements",
+        # Agrégats GP (exactitude > 1 000) : sources lues par les nouvelles RPC.
+        "paiements", "inventaires", "lignes_inventaire", "journal_ia", "verifications_zone_pointage",
+        "periodes_paie", "dossiers_paie_salaries", "anomalies_paie", "pieces_jointes_paie",
+        "vehicules", "outils", "releves_kilometrage", "mouvements_outillage", "appels_contacts",
+    ]
+    TABLES_SONDE_RLS += [
+        "coordonnees_bancaires", "ordres_virements", "sessions_pointage", "verifications_zone_pointage",
+        "mouvements_stock", "articles_stock", "vehicules", "outils", "journal_ia", "dossiers_paie_salaries",
+        "documents_chantier", "sous_traitants_chantiers", "permissions_poste",
+    ]
+
 
 def psql(db, sql):
     out = subprocess.run(
