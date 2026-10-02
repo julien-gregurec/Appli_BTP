@@ -29,7 +29,7 @@ export default async function AccesRefusePage({ searchParams }: { searchParams: 
         <h1>Votre accès Colors doit être autorisé</h1>
         <p><strong>{organisation}</strong> — {explicationRefus(params.motif)}</p>
         <div className="denied-actions">
-          <a className="primary" href={compteUrl}>Ouvrir le compte ELSATIA</a>
+          {compteUrl && <a className="primary" href={compteUrl}>Ouvrir le compte ELSATIA</a>}
           <form action={deconnexionAction}><button type="submit">Se déconnecter</button></form>
         </div>
       </section>

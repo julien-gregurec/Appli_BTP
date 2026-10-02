@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { creerGardeProxy } from "@elsatia/incident-control";
+import { clePubliqueSupabaseConfiguree, urlSupabaseConfiguree } from "@/lib/supabase/cles";
 
 /**
  * Mode sûr (incident) pour Réserves — voir `packages/incident-control` et la migration
@@ -9,8 +10,8 @@ import { creerGardeProxy } from "@elsatia/incident-control";
  */
 const garde = creerGardeProxy({
   app: "reserves",
-  urlSupabase: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  clePublique: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  urlSupabase: urlSupabaseConfiguree(),
+  clePublique: clePubliqueSupabaseConfiguree(),
 });
 
 export async function reponseModeSur(chemin: string, methode: string, entetes: Headers): Promise<NextResponse | null> {

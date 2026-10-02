@@ -8,6 +8,8 @@ export interface EntreeContrat {
   name: string;
   kind: NatureVariable;
   level: ExigenceVariable;
+  /** Nom hérité accepté en repli transitoire (A-07). */
+  alias?: string;
   role: string;
 }
 
@@ -37,6 +39,8 @@ export declare const RAISONS: {
   modeInconnu: string;
   modeIncoherent: string;
   formeSecrete: string;
+  aliasHerite: string;
+  aliasDivergent: string;
 };
 export declare function resoudreMode(env?: Record<string, string | undefined>): ModeBuild;
 export declare function niveauApplication(mode: ModeBuild): NiveauApplication;

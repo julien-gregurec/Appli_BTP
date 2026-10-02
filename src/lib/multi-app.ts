@@ -1,4 +1,8 @@
-import type { ApplicationElsatiaAutorisee } from "@elsatia/application-access";
+import {
+  environnementNavigationServeur,
+  urlApplicationPourEnvironnement,
+  type ApplicationElsatiaAutorisee,
+} from "@elsatia/application-access";
 
 export type EnvironnementApplications = "local" | "preview" | "production";
 
@@ -32,26 +36,34 @@ export const LIBELLES_ROLES_APPLICATIONS: Record<string, string> = {
   administrateur_plateforme_global: "Administration ELSATIA",
 };
 
+/**
+ * Environnement de navigation (A-08, `@elsatia/application-access`) : valeur inconnue, ou
+ * déploiement Vercel non déclaré → `null`, donc aucun lien inter-applications. Absente sur un
+ * poste de développement → `local`.
+ */
 export function environnementApplications(
   valeur = process.env.ELSATIA_APPLICATION_ENV,
-): EnvironnementApplications {
-  if (valeur === "preview" || valeur === "production") return valeur;
-  return "local";
+  vercelEnv = process.env.VERCEL_ENV,
+): EnvironnementApplications | null {
+  return environnementNavigationServeur({ ELSATIA_APPLICATION_ENV: valeur, VERCEL_ENV: vercelEnv });
 }
 
+/**
+ * URL d'une application du catalogue pour l'environnement courant, validée : jamais une URL
+ * de Production en Preview, jamais une URL hors Production en Production, jamais de repli
+ * d'un environnement sur un autre. `null` = lien non proposé.
+ */
 export function urlApplication(
   application: Pick<ApplicationElsatiaAutorisee, "urlLocale" | "urlPreview" | "urlProduction">,
-  environnement = environnementApplications(),
+  environnement: EnvironnementApplications | null = environnementApplications(),
 ): string | null {
-  if (environnement === "production") return application.urlProduction;
-  if (environnement === "preview") return application.urlPreview;
-  return application.urlLocale;
+  return urlApplicationPourEnvironnement(application, environnement);
 }
 
 export function construireSelecteurApplications(
   applications: ApplicationElsatiaAutorisee[],
   applicationCourante = "gestion_pro",
-  environnement = environnementApplications(),
+  environnement: EnvironnementApplications | null = environnementApplications(),
 ): DestinationApplication[] {
   return applications.map((application) => ({
     code: application.applicationCode,

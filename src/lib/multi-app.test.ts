@@ -16,7 +16,7 @@ const application = (code: string, roleCode = `${code}_utilisateur`): Applicatio
   roleCode,
   urlLocale: `http://localhost/${code}`,
   urlPreview: `https://preview.example/${code}`,
-  urlProduction: `https://example.com/${code}`,
+  urlProduction: `https://${code}.elsatia.fr`,
   icone: null,
   estAdminPlateforme: false,
 });
@@ -25,10 +25,16 @@ describe("ELSATIA Gestion Pro multi-app UI V1 — 20 scénarios", () => {
   it("01 — choisit local par défaut", () => expect(environnementApplications(undefined)).toBe("local"));
   it("02 — reconnaît preview", () => expect(environnementApplications("preview")).toBe("preview"));
   it("03 — reconnaît production", () => expect(environnementApplications("production")).toBe("production"));
-  it("04 — rabat une valeur inconnue sur local", () => expect(environnementApplications("staging")).toBe("local"));
+  // A-08 (satellites Preview readiness V2) : une valeur inconnue ne produit plus de liens
+  // locaux sur un déploiement — elle n'en produit aucun (fail closed).
+  it("04 — refuse une valeur inconnue (aucun lien)", () => expect(environnementApplications("staging")).toBeNull());
+  it("04b — déploiement Vercel non déclaré : aucun lien", () => expect(environnementApplications(undefined, "preview")).toBeNull());
   it("05 — sélectionne l’URL locale", () => expect(urlApplication(application("colors"), "local")).toBe("http://localhost/colors"));
   it("06 — sélectionne l’URL preview", () => expect(urlApplication(application("colors"), "preview")).toBe("https://preview.example/colors"));
-  it("07 — sélectionne l’URL production", () => expect(urlApplication(application("colors"), "production")).toBe("https://example.com/colors"));
+  it("07 — sélectionne l’URL production", () => expect(urlApplication(application("colors"), "production")).toBe("https://colors.elsatia.fr"));
+  it("07b — A-08 : une url_preview de Production n’est jamais servie en Preview", () => expect(urlApplication({ ...application("colors"), urlPreview: "https://colors.elsatia.fr" }, "preview")).toBeNull());
+  it("07c — A-08 : une URL hors Production n’est jamais servie en Production", () => expect(urlApplication({ ...application("colors"), urlProduction: "https://colors-git-x.vercel.app" }, "production")).toBeNull());
+  it("07d — A-08 : environnement inconnu → aucun lien", () => expect(urlApplication(application("colors"), null)).toBeNull());
   it("08 — conserve une URL absente comme non configurée", () => expect(urlApplication({ ...application("future"), urlPreview: null }, "preview")).toBeNull());
   it("09 — marque Gestion Pro comme application courante", () => expect(construireSelecteurApplications([application("gestion_pro")], "gestion_pro", "local")[0].active).toBe(true));
   it("10 — ne marque pas Colors comme application courante", () => expect(construireSelecteurApplications([application("colors")], "gestion_pro", "local")[0].active).toBe(false));

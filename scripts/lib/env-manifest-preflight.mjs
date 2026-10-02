@@ -94,7 +94,19 @@ export function runPreflight(manifest, env, { target, apps, phase = "all" }) {
 
   // 2. Présence, dépréciation, interdits, formats.
   for (const v of applicable) {
-    const present = isSet(env, v.name);
+    let present = isSet(env, v.name);
+    // Alias hérité (A-07) : un nom déprécié accepté en repli satisfait seul la variable — un
+    // environnement déjà configuré n'est pas cassé — mais avec un avertissement ; deux valeurs
+    // différentes sous les deux noms sont une erreur (le code n'en lirait qu'une).
+    for (const alias of v.accepted_aliases ?? []) {
+      if (!isSet(env, alias)) continue;
+      if (present && env[alias].trim() !== env[v.name].trim()) {
+        err("PF-ALIAS-CONFLICT", alias, `valeur différente de ${v.name} (le code ne lit que ${v.name})`);
+      } else if (!present) {
+        warn("PF-ALIAS-IN-USE", alias, `alias hérité utilisé à la place de ${v.name} : renommer la variable`);
+        present = true;
+      }
+    }
     rows.push({ name: v.name, required: v.required, state: present ? "présente" : "absente", secret: v.secret, dr: v.dr_critical });
     if (!present) {
       if (v.flag) {
@@ -108,7 +120,7 @@ export function runPreflight(manifest, env, { target, apps, phase = "all" }) {
       else if (v.required_when) out.push(finding("info", "PF-CONDITIONAL-ABSENT", v.name, `absente — requise ${v.required_when}`));
       continue;
     }
-    const value = env[v.name];
+    const value = isSet(env, v.name) ? env[v.name] : env[(v.accepted_aliases ?? []).find((alias) => isSet(env, alias))];
     if (v.deprecated) warn("PF-DEPRECATED-PRESENT", v.name, `variable dépréciée en place → ${v.replacement ?? "aucun remplaçant"} (${v.migration ?? "voir manifeste"})`);
     if (v.forbidden_in?.includes(target) && !FALSY.has(value.trim().toLowerCase())) {
       err("PF-FORBIDDEN-PRESENT", v.name, `interdite (ou à false) en ${target}`);

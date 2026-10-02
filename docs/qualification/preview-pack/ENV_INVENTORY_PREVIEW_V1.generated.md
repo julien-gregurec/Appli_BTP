@@ -9,7 +9,7 @@
 | gestion_pro | 135 | 21 | 88 | 26 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
-| reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
+| reserves | 11 | 5 | 3 | 3 | 1 | 4 | 2 | 5 |
 | studio | 27 | 7 | 8 | 12 | 0 | 3 | 4 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
 
@@ -182,13 +182,14 @@
 |---|---|---|---|---|---|---|---|---|---|
 | `ELSATIA_APPLICATION_ENV` | REQUIRED |  |  | oui |  | `preview` | local, test, preview, production |  |  |
 | `NEXT_PUBLIC_RESERVES_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` *(dépréciée)* | REQUIRED | oui |  | oui |  |  |  |  |  |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `SUPABASE_SERVICE_ROLE_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
 | `BREVO_API_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `EMAIL_FROM_ADDRESS` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `EMAIL_PREVIEW_ALLOWLIST` | CONDITIONAL |  |  |  | oui |  |  |  | pour recevoir un e-mail applicatif en Preview ou en local |
 | `EMAIL_FROM_NAME` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` *(dépréciée)* | OPTIONAL | oui |  | oui |  |  |  |  |  |
 | `PDF_CHROMIUM_EXECUTABLE_PATH` | OPTIONAL |  |  |  |  |  |  |  |  |
 
 ### studio — ELSATIA Studio

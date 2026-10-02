@@ -23,7 +23,7 @@ export default async function AbonnementRequisPage() {
         <h1>ELSATIA Colors n’est pas activé</h1>
         <p>L’organisation <strong>{organisation}</strong> ne dispose pas actuellement d’un droit d’usage Colors actif. Cette situation est distincte de vos habilitations personnelles.</p>
         <div className="denied-actions">
-          <a className="primary" href={compteUrl}>Voir les produits ELSATIA</a>
+          {compteUrl && <a className="primary" href={compteUrl}>Voir les produits ELSATIA</a>}
           <form action={deconnexionAction}><button type="submit">Se déconnecter</button></form>
         </div>
       </section>

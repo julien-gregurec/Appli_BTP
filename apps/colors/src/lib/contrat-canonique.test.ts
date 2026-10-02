@@ -66,12 +66,28 @@ describe("contrat canonique ELSATIA", () => {
       roleCode: "future_role",
       urlLocale: "http://localhost:3090",
       urlPreview: "https://future-preview.example",
-      urlProduction: "https://future.example",
+      urlProduction: "https://future.elsatia.fr",
       icone: null,
       estAdminPlateforme: false,
     };
     expect(urlApplication(application, "local")).toBe(application.urlLocale);
     expect(urlApplication(application, "preview")).toBe(application.urlPreview);
     expect(urlApplication(application, "production")).toBe(application.urlProduction);
+  });
+
+  /* A-08 (satellites Preview readiness V2) : aucune bascule silencieuse entre environnements. */
+  it("ne sert jamais une URL de Production depuis une Preview, ni l'inverse", async () => {
+    const { urlApplication, environnementApplications } = await import("@/lib/routes-applications");
+    const base = {
+      applicationCode: "gestion_pro", nom: "GP", roleCode: "gestion_pro_admin", icone: null, estAdminPlateforme: false,
+      urlLocale: "http://localhost:3000", urlPreview: "https://app.elsatia.fr", urlProduction: "https://gp-git-main.vercel.app",
+    };
+    expect(urlApplication(base, "preview")).toBeNull();
+    expect(urlApplication(base, "production")).toBeNull();
+    expect(urlApplication({ ...base, urlPreview: null }, "preview")).toBeNull();
+    expect(urlApplication(base, null)).toBeNull();
+    expect(environnementApplications({ ELSATIA_APPLICATION_ENV: "recette" })).toBeNull();
+    expect(environnementApplications({ VERCEL_ENV: "preview" })).toBeNull();
+    expect(environnementApplications({ ELSATIA_APPLICATION_ENV: "preview" })).toBe("preview");
   });
 });
