@@ -345,11 +345,13 @@ export const SEEDS = [
     path: "scripts/perf/memory/seed-affectations.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (capacité mémoire du planning, tenant A de la fixture perf)",
-    idempotent: true,
+    // Les affectations sont remplacées à chaque passage, mais l'historique et les notifications
+    // posés par les triggers s'accumulent : pas rejouable à l'identique (harnais V9).
+    idempotent: false,
     harness: {
       setup: [{ seed: "perf-fixture" }],
       run: [{ sql: "scripts/perf/memory/seed-affectations.sql" }],
-      runs: 2,
+      runs: 1,
     },
   },
   {
@@ -372,15 +374,16 @@ export const SEEDS = [
     path: "scripts/perf/rentabilite_charge.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (charge « rentabilité », qualification GP residual data correctness)",
-    // Rejouable par le cycle charge → purge (même état final après chaque exécution).
-    idempotent: true,
+    // Cycle charge → purge exécuté ; compteurs de numérotation et cache du tableau de bord
+    // avancent à chaque cycle : pas rejouable à l'identique (harnais V9).
+    idempotent: false,
     harness: {
       setup: [PARITE_GOTRUE, ISOLATION_MULTITENANT],
       run: [
         { inline: "\\set entreprise 'a0000000-0000-0000-0000-000000000001'\n\\set n 200\n\\ir scripts/perf/rentabilite_charge.sql" },
         { sql: "scripts/perf/rentabilite_charge_purge.sql" },
       ],
-      runs: 2,
+      runs: 1,
     },
     bypass: {
       capacite_personnes_bypass: "Jeu de charge : salariés de test au-delà de la capacité de l'offre, `set` de session sur base jetable, superutilisateur uniquement.",
@@ -496,6 +499,15 @@ export const SEEDS = [
     // équipement Lot 2 hors plan) : ne se charge que sur une base au train V6 construite depuis V3
     // par upgrade-v6-v7.sh (utilise le complément V5 → V6), jamais sur une base fraîche V7.
     target: "qualification d'upgrade V6 → V7 (base V6 avec historique V3 → V4 → V5 → V6, jamais une base fraîche V7)",
+    coveredBy: "upgrade-harness",
+  },
+  {
+    id: "upgrade-complement-v9",
+    path: "scripts/local-postgres-bootstrap/upgrade_v8_v9_seed_complement.sql",
+    classification: "CI_ONLY",
+    // Écrit l'état d'une base V8 + 813 (entreprise créée par la plateforme sans membre, contrat Pro
+    // mensuel) : ne se charge que sur la base historisée de upgrade-v8-v9.sh, jamais sur une base V9.
+    target: "qualification d'upgrade V8 (+ 813) → V9 (base V8 historisée depuis V3, jamais une base fraîche V9)",
     coveredBy: "upgrade-harness",
   },
   {

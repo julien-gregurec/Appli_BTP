@@ -5,6 +5,14 @@
 \set ON_ERROR_STOP on
 begin;
 set local session_replication_role = replica;
+-- Train V9 : les codes d'identification (QR) des ressources purgées partent avec elles — sinon
+-- la purge laissait des codes orphelins (contrôle code_identification_orphelin du harnais des seeds).
+delete from public.codes_identification ci using public.chantiers c
+ where ci.type_ressource = 'chantier' and ci.ressource_id = c.id and c.nom like 'Charge rentabilité V1 - %';
+delete from public.codes_identification ci using public.employes e
+ where ci.type_ressource = 'employe' and ci.ressource_id = e.id and e.numero_inscription like 'CHARGE-RENT-V1-%';
+delete from public.codes_identification ci using public.articles_stock a
+ where ci.type_ressource = 'article' and ci.ressource_id = a.id and a.reference = 'CHR-STK-01';
 delete from public.pointages where tache = 'CHARGE-RENT-V1';
 delete from public.affectations where tache like 'CHARGE-RENT-V1 #%';
 delete from public.notes_frais where reference like 'CHR-NDF-%';
