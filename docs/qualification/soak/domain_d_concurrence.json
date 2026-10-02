@@ -1,0 +1,110 @@
+{
+ "D1_numerotation": {
+  "n": 400,
+  "p50": 209.3,
+  "p95": 440.4,
+  "max": 672.3,
+  "errors": 0,
+  "avgBytes": 0,
+  "codes": {
+   "204": 400
+  },
+  "factures": 400,
+  "numeros_distincts": 400,
+  "numerotees": 400,
+  "compteur_delta": 400,
+  "verdict": "PASS"
+ },
+ "D2_paiements_concurrents": {
+  "n": 32,
+  "p50": 50.7,
+  "p95": 70.7,
+  "max": 70.9,
+  "errors": 30,
+  "avgBytes": 92,
+  "codes": {
+   "200": 2,
+   "400:P0001:Le paiement dépasse le reste dû (0.00)": 30
+  },
+  "paiements": 2,
+  "somme": 120,
+  "montant_paye": 120,
+  "ttc": 120,
+  "statut": "payee",
+  "verdict": "PASS"
+ },
+ "D3_double_clic_paiement": {
+  "n": 2,
+  "p50": 11.2,
+  "p95": 11.2,
+  "max": 11.2,
+  "errors": 0,
+  "avgBytes": 38,
+  "codes": {
+   "200": 2
+  },
+  "paiements_identiques_enregistres": 2,
+  "verdict": "DEGRADATION (doublon accepté, borné par le reste dû)"
+ },
+ "D4_devis_vers_facture": {
+  "n": 16,
+  "p50": 47.3,
+  "p95": 57.6,
+  "max": 57.6,
+  "errors": 15,
+  "avgBytes": 212,
+  "codes": {
+   "200": 1,
+   "400:P0001:Ce devis est déjà facturé, au moins en partie (déjà 5894.00 ": 15
+  },
+  "factures_creees": 1,
+  "verdict": "PASS"
+ },
+ "D5_acomptes_plafond": {
+  "n": 16,
+  "p50": 45.6,
+  "p95": 53,
+  "max": 53,
+  "errors": 15,
+  "avgBytes": 183,
+  "codes": {
+   "200": 1,
+   "400:P0001:Ce document (160.80) dépasserait le montant contractuel du d": 15
+  },
+  "acomptes": 1,
+  "verdict": "PASS"
+ },
+ "D6_avoirs_doublon": {
+  "n": 16,
+  "p50": 33.6,
+  "p95": 40.2,
+  "max": 40.2,
+  "errors": 15,
+  "avgBytes": 103,
+  "codes": {
+   "200": 1,
+   "400:P0001:avoir_existant:c834a75a-35c4-4681-b760-936fa8bccda8": 15
+  },
+  "avoirs": 1,
+  "verdict": "PASS"
+ },
+ "D7_relance_reclamer": {
+  "n": 20,
+  "p50": 15.5,
+  "p95": 19.8,
+  "max": 19.8,
+  "errors": 0,
+  "avgBytes": 6,
+  "codes": {
+   "200": 20
+  },
+  "verrous_obtenus": 1,
+  "verdict": "PASS"
+ },
+ "D8_cache_dashboard": {
+  "ecart_total": 0,
+  "ecart_encaisse": 0,
+  "verdict": "PASS"
+ },
+ "deadlocks_pendant_campagne": 0
+}
