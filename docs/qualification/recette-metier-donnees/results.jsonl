@@ -178,3 +178,8 @@
 {"ts":"2026-10-02T23:55:59.120Z","parcours":"S4 Facturation","nom":"Envoi email facture : contenu mentionne numéro et montant","statut":"PASS","detail":"Objet"}
 {"ts":"2026-10-02T23:56:00.787Z","parcours":"S4 Facturation","nom":"Paiement de la facture en retard → payée","statut":"PASS","detail":"payee 3971.00"}
 {"ts":"2026-10-02T23:56:00.788Z","parcours":"S4 Facturation","nom":"Erreurs console/serveur (facturation)","statut":"PASS","detail":""}
+{"ts":"2026-10-02T23:59:03.663Z","parcours":"S4 Facturation","nom":"Correctif B16 : facture depuis devis à remise globale 5 % = montants du devis au centime","statut":"PASS","detail":"attendu 4976.53/541.99/5518.52 devis 4976.53/541.99/5518.52 facture 4976.53/541.99/5518.52"}
+{"ts":"2026-10-02T23:59:09.358Z","parcours":"S4 Facturation","nom":"Correctif B17 : double clic sur l'enregistrement d'un paiement → un seul paiement","statut":"PASS","detail":"paiements=1 payé=1000.00 payee_partiel Ce paiement vient d'être enregistré (double envoi ignoré)"}
+{"ts":"2026-10-02T23:59:09.363Z","parcours":"S4 Facturation","nom":"Paiement direct en base au-delà du reste dû refusé (verrou base)","statut":"PASS","detail":"Le paiement dépasse le reste dû (4518.52 €)"}
+{"ts":"2026-10-02T23:59:10.943Z","parcours":"S4 Facturation","nom":"Deux paiements légitimes distincts le même jour restent possibles","statut":"PASS","detail":"payé=1500.00"}
+{"ts":"2026-10-02T23:59:10.944Z","parcours":"S4 Facturation","nom":"Erreurs console/serveur (correctifs facturation)","statut":"PASS","detail":""}

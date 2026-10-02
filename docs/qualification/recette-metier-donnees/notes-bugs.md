@@ -19,3 +19,6 @@
 - B14 P3 pointage 16:00→08:00 interprété en poste de nuit 16 h (anomalie critique signalée) — acceptable mais à confirmer
 - B15 P2 UX: compte Ouvrier activé avec pointage personnel désactivé par défaut (admin doit l'activer dans Accès)
 - départ < 15 min refusé (durée minimale) OK; double clic arrivée → 1 session OK
+- B16 P1 facture depuis devis ignore la remise globale (+238,93 € facturés) CORRIGÉ migr 187 (vérifié 5 % au centime)
+- B17 P1 double clic paiement → 2 paiements (6 000 € au lieu de 3 000 €) CORRIGÉ migr 188 (verrou facture + anti-doublon 30 s + plafond reste dû; Stripe exempté)
+- B18 P2 pas de passage automatique en retard quand échéance dépassée (statut manuel) ; relances uniquement CRM bêta
