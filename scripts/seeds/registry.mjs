@@ -102,6 +102,26 @@ export const SEEDS = [
     },
   },
   {
+    id: "pilote-satellites-preview",
+    path: "supabase/production/fixture_preview_satellites_pilote.sql",
+    classification: "PREVIEW",
+    target: "Preview via wrapper — après pilote-btp (habilitations Colors/Tools/Réserves, GP actif déterministe)",
+    idempotent: true,
+    harness: {
+      setup: [{ seed: "pilote-btp" }],
+      run: [{ sql: "supabase/production/fixture_preview_satellites_pilote.sql" }],
+      runs: 3,
+      check: [{ sql: "supabase/production/assertions_fixture_preview_satellites_pilote.sql" }],
+    },
+  },
+  {
+    id: "pilote-satellites-preview-assertions",
+    path: "supabase/production/assertions_fixture_preview_satellites_pilote.sql",
+    classification: "PREVIEW",
+    target: "Preview via wrapper (lecture seule, transaction annulée)",
+    coveredBy: "pilote-satellites-preview",
+  },
+  {
     id: "entreprise-test-5-ans",
     path: "supabase/production/seed_entreprise_test_5_ans.sql",
     classification: "PREVIEW",
