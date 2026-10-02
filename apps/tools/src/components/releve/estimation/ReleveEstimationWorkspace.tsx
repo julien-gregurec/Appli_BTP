@@ -351,6 +351,7 @@ const OuvragePrixCard = memo(function OuvragePrixCard({ ouvrage, prix, lignes, s
         }}>Retirer le prix</button>}
       </div>}
       {editable && editing && <PrixForm initial={prix?.donnees ?? null} unite={ouvrage.unite} onCancel={() => setEditing(false)}
+        coefficientsActifs={source.estimation.parametres.donnees.coefficientGeneral != null || Object.keys(source.estimation.parametres.donnees.coefficientsLots ?? {}).length > 0}
         onSave={(donnees) => run(() => ctx.repository.savePrix(source.planId, ouvrage.id, donnees), `Prix de « ${ouvrage.nom} » enregistré : montants recalculés par le serveur.`).then(() => setEditing(false))} />}
     </div>}
   </details>;
@@ -427,7 +428,9 @@ const draftOf = (c: PrixComposante): CompDraft => ({
   b: c.type === "main_d_oeuvre" ? numText(c.tauxHoraire) : "",
 });
 
-function PrixForm({ initial, unite, onCancel, onSave }: { initial: PrixDonnees | null; unite: OuvrageUnite; onCancel(): void; onSave(donnees: PrixDonnees): Promise<void> }) {
+function PrixForm({ initial, unite, onCancel, onSave, coefficientsActifs = false }: {
+  initial: PrixDonnees | null; unite: OuvrageUnite; onCancel(): void; onSave(donnees: PrixDonnees): Promise<void>; coefficientsActifs?: boolean;
+}) {
   const u = OUVRAGE_UNITE_LABELS[unite];
   const [comps, setComps] = useState<CompDraft[]>(initial ? initial.composantes.map(draftOf) : [{ type: "materiau", libelle: "", a: "", b: "" }]);
   // Vide = hérité (coefficient du lot, sinon général) ; toute valeur saisie, 1 compris, prime sur le lot et le général.
@@ -494,7 +497,7 @@ function PrixForm({ initial, unite, onCancel, onSave }: { initial: PrixDonnees |
       <label className={releveStyles.field}><span>Commentaire</span><input data-testid="est-f-commentaire" value={commentaire} maxLength={500} onChange={(event) => setCommentaire(event.target.value)} /></label>
     </div>
     <p className={draft.error ? styles.stale : styles.muted} data-testid="est-f-apercu">
-      {draft.error ?? `PU estimatif : ${pu === null ? "forfait seul" : formatPrixUnitaire(Number(pu) / 10000)} / ${u} HT${draft.donnees?.coefficient === undefined ? " (avant coefficient de lot ou général)" : ""}`}</p>
+      {draft.error ?? `PU estimatif : ${pu === null ? "forfait seul" : formatPrixUnitaire(Number(pu) / 10000)} / ${u} HT${coefficientsActifs && draft.donnees?.coefficient === undefined ? " (avant coefficient de lot ou général)" : ""}`}</p>
     <div className={styles.inlineActions}>
       <button type="submit" className={releveStyles.primary} data-testid="est-f-enregistrer" disabled={busy || !draft.donnees}>Enregistrer</button>
       <button type="button" className={releveStyles.secondary} onClick={onCancel}>Annuler</button>

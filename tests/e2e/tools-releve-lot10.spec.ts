@@ -239,7 +239,7 @@ test("Sous-totaux par lot, total chantier, types, heures ; exports CSV, JSON (co
   // JSON : contrat Gestion Pro de l'estimation (préparé, non transmis ; aucun devis).
   const [json] = await Promise.all([page.waitForEvent("download"), page.getByTestId("est-export-json").click()]);
   const gp = JSON.parse(readFileSync((await json.path())!, "utf8"));
-  expect(gp.contract).toEqual({ name: "elsatia.tools.estimation", version: "1.0.0" });
+  expect(gp.contract).toEqual({ name: "elsatia.tools.estimation", version: "1.1.0" });
   expect(gp.readiness).toEqual({ status: "contract-only", devis: "not-generated", documentsCommerciaux: "none" });
   expect(gp.montants).toEqual({ devise: "EUR", base: "HT", nature: "estimative" });
   expect(gp.perimetre.decideParGestionPro).toEqual(["prix_de_vente", "marge", "remise", "tva", "devis_final"]);
@@ -290,7 +290,8 @@ test("Corrections : montant automatique jamais écrasé, raison obligatoire, aut
   must(await ctx.a.rpc("tools_releve_estimation_prix_enregistrer", { p_plan_id: plans.e1, p_ouvrage_id: ouv.pli, p_donnees: { composantes: [{ type: "materiau", prixUnitaire: 9.5 }] } }));
   await page.reload();
   const perime = ligne(await ouvrir(page, plans.e1, "Plinthes"), ctx.sejour, "nouveau");
-  await expect(perime.getByTestId("est-ligne-montant")).toContainText("(a changé depuis la correction)");
+  await expect(perime.getByTestId("est-ligne-montant")).toContainText("(à revoir : a changé depuis la correction)");
+  await expect(perime.getByTestId("est-ligne-automatique")).toHaveAttribute("data-perime", "montant");
   await expect(page.getByTestId("est-anomalies").locator('[data-code="estimation_obsolete"]')).toHaveCount(1);
   // Retour au montant automatique : retrait tracé.
   await perime.getByTestId("est-retirer-correction").click();
@@ -535,3 +536,128 @@ for (const lignes of [100, 1000, 5000] as const) {
     expect(renderMs).toBeLessThan(90_000);
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Complément Lot 10 (migration 1402) : coefficients, hypothèses, travaux séparés, obsolescence sur quantité, GP 1.1.0.
+// Dernier test du fichier : les coefficients du relevé changent les montants de tous ses plans non figés ; ils sont
+// remis à zéro à la fin.
+test("Coefficients général / par lot (priorité ouvrage > lot > général), hypothèses, travaux séparés, obsolescence sur quantité, contrat GP 1.1.0", async ({ page }) => {
+  const e2 = uuid();
+  must(await ctx.a.from("tools_releves_etages").insert({ id: e2, releve_id: ctx.releveId, batiment_id: ctx.batimentId, nom: "R+1", niveau: 1, type_niveau: "etage", ordre: 1 }));
+  const p2 = await seedPlan(e2, {});
+  const k: Record<string, string> = { pei: uuid(), clo: uuid(), div: uuid(), dep: uuid(), eva: uuid() };
+  const saisie = (valeur: number) => ({ source: "saisie", valeur });
+  const etage = (extra: Record<string, unknown>) => ouvrage({ categorie: "autre", unite: "u", regle: saisie(1), etats: ["nouveau"], ...extra });
+  must(await ctx.a.rpc("tools_releve_ouvrages_importer", { p_plan_id: p2, p_ouvrages: [
+    { id: k.pei, donnees: etage({ nom: "Peinture N1", categorie: "peinture", unite: "m2", regle: saisie(20) }) },
+    { id: k.clo, donnees: etage({ nom: "Cloison N1", categorie: "cloisons", unite: "m2", regle: saisie(10) }) },
+    { id: k.div, donnees: etage({ nom: "Divers N1", regle: saisie(2) }) },
+    { id: k.dep, donnees: etage({ nom: "Dépose N1", categorie: "depose", etatTravaux: "a_deposer", etats: ["a_deposer"], regle: saisie(4) }) },
+    { id: k.eva, donnees: etage({ nom: "Évacuation N1", lot: "Lot A", regle: saisie(5) }) },
+  ] }));
+  must(await ctx.a.rpc("tools_releve_estimation_prix_importer", { p_plan_id: p2, p_prix: [
+    { ouvrageId: k.pei, donnees: { composantes: [{ type: "materiau", prixUnitaire: 10 }] } },
+    { ouvrageId: k.clo, donnees: { composantes: [{ type: "materiau", prixUnitaire: 20 }], coefficient: 1 } },
+    { ouvrageId: k.div, donnees: { composantes: [{ type: "autre", prixUnitaire: 50 }] } },
+    { ouvrageId: k.dep, donnees: { composantes: [{ type: "main_d_oeuvre", heuresParUnite: 0.5, tauxHoraire: 50 }] } },
+  ] }));
+  await signIn(page, EMAIL_A);
+  await page.goto(estUrl());
+  const p2s = planSection(page, p2);
+  await expect(carte(page, p2, "Peinture N1").getByTestId("est-ouvrage-total")).toHaveText("200,00 €");
+  // Saisie des coefficients et hypothèses au doigt (panneau en cartes).
+  const panel = page.getByTestId("est-parametres");
+  await panel.locator("summary").click();
+  await expect(panel).toContainText("Priorité : coefficient de l'ouvrage, sinon coefficient de son lot, sinon coefficient général (jamais cumulés).");
+  await panel.getByTestId("est-parametres-modifier").click();
+  await panel.getByTestId("est-p-general").fill("1,1");
+  await panel.locator('[data-testid="est-p-lot"][data-lot="Peinture"]').fill("1,2");
+  await panel.locator('[data-testid="est-p-lot"][data-lot="Plâtrerie – cloisons"]').fill("1,5");
+  await panel.getByTestId("est-p-hypotheses").fill("Site occupé, accès par escalier");
+  await panel.getByTestId("est-p-lot").first().fill("0");
+  await panel.getByTestId("est-p-enregistrer").click();
+  await expect(panel.getByTestId("est-p-erreur")).toContainText("Coefficient de lot : entre 0,01 et 10");
+  await panel.getByTestId("est-p-lot").first().fill("");
+  await panel.locator('[data-testid="est-p-lot"][data-lot="Peinture"]').fill("1,2");
+  const t0 = Date.now();
+  await panel.getByTestId("est-p-enregistrer").click();
+  await expect(message(page)).toHaveText("Coefficients et hypothèses enregistrés : estimation recalculée par le serveur (plans figés inchangés).");
+  perf.coefficientsRecalcul = Date.now() - t0;
+  await expect(panel.getByTestId("est-parametres-resume")).toHaveText("général × 1,1 · 2 lot(s) · hypothèses");
+  await expect(panel.getByTestId("est-parametres-hypotheses")).toHaveText("Site occupé, accès par escalier");
+  // Priorité : Peinture × 1,2 (lot) = 240 ; Cloison × 1 (ouvrage, prime sur le lot 1,5) = 200 ; Divers × 1,1 (général) = 110 ;
+  // Dépose 4 u × 0,5 h × 50 € × 1,1 (général) = 110.
+  await expect(carte(page, p2, "Peinture N1").getByTestId("est-ouvrage-total")).toHaveText("240,00 €");
+  await expect(carte(page, p2, "Peinture N1").getByTestId("est-coefficient")).toHaveText("× 1,2 (lot)");
+  await expect(carte(page, p2, "Cloison N1").getByTestId("est-ouvrage-total")).toHaveText("200,00 €");
+  await expect(carte(page, p2, "Cloison N1").getByTestId("est-coefficient")).toHaveCount(0);
+  await expect(carte(page, p2, "Divers N1").getByTestId("est-coefficient")).toHaveText("× 1,1 (général)");
+  await expect(carte(page, p2, "Divers N1").getByTestId("est-ouvrage-total")).toHaveText("110,00 €");
+  await expect(carte(page, p2, "Dépose N1").getByTestId("est-ouvrage-total")).toHaveText("110,00 €");
+  await expect(p2s.getByTestId("est-plan-total")).toHaveText("660,00 €");
+  const e = (await estimation(p2)) as unknown as { totaux: { montant: number }; prix: { ouvrageId: string; coefficientSource: string; coefficientApplique: number }[]; parametres: { revision: number } };
+  expect(e.totaux.montant).toBe(660);
+  expect(Object.fromEntries(e.prix.map((x) => [x.ouvrageId, `${x.coefficientSource}:${x.coefficientApplique}`]))).toEqual({ [k.pei]: "lot:1.2", [k.clo]: "ouvrage:1", [k.div]: "general:1.1", [k.dep]: "general:1.1" });
+  // Formulaire de prix : coefficient vide = hérité.
+  const pei = await ouvrir(page, p2, "Peinture N1");
+  await pei.getByTestId("est-prix-modifier").click();
+  await expect(pei.getByTestId("est-f-coefficient")).toHaveValue("");
+  await expect(pei.getByTestId("est-f-apercu")).toHaveText("PU estimatif : 10,00 € / m² HT (avant coefficient de lot ou général)");
+  await pei.getByRole("button", { name: "Annuler" }).click();
+  // Estimation séparée des travaux : à déposer seulement (tous les plans du relevé), puis travaux (créer + déposer + déplacer).
+  const { data: synthese } = must(await ctx.a.rpc("tools_releve_estimation_synthese", { p_releve_id: ctx.releveId, p_etat: "existant" }));
+  const lignesRel = (synthese as { estimation: Estimation }[]).flatMap((s) => s.estimation.lignes);
+  const somme = (etats: string[]) => lignesRel.filter((l) => etats.includes(l.etatProjet)).reduce((t, l) => t + (c(l.montantRetenu) ?? 0), 0);
+  await page.getByTestId("est-filtre-travaux").selectOption("a_deposer");
+  await expect(page.getByTestId("est-total-selection")).toHaveText(eur(somme(["a_deposer"])));
+  await expect(page.getByTestId("est-total-chantier")).toContainText(`Total de la sélection HT (estimation)${eur(somme(["a_deposer"]))}`);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("est-export-csv").click()]);
+  const rows = readFileSync((await dl.path())!, "utf8").replace(/^\uFEFF/, "").trim().split("\r\n");
+  expect(rows.slice(1, -1).every((r) => r.split(";")[10] === "À déposer")).toBe(true);
+  expect(rows.some((r) => r.includes(";Dépose N1;Quantité;À déposer;u;4,000;27,5;0,00;110,00;0,00;0,00;2,200;110,00;110,00;non;;;1,1;général;;"))).toBe(true);
+  await page.getByTestId("est-filtre-travaux").selectOption("travaux");
+  await expect(page.getByTestId("est-total-selection")).toHaveText(eur(somme(["nouveau", "a_deposer", "deplace"])));
+  await page.getByTestId("est-filtre-travaux").selectOption("tout");
+  await expect(page.getByTestId("est-total-selection")).toHaveCount(0);
+  // Traçabilité : correction motivée sur un ouvrage SANS prix, puis la QUANTITÉ change → obsolète (motif quantité).
+  const eva = await ouvrir(page, p2, "Évacuation N1");
+  const row = eva.locator(`[data-testid="est-ligne"][data-piece="etage"][data-etat="nouveau"][data-nature="quantite"]`);
+  await row.getByTestId("est-corriger").click();
+  await row.getByTestId("est-correction-valeur").fill("40");
+  await row.getByTestId("est-correction-raison").fill("Évacuation au forfait benne");
+  await row.getByTestId("est-correction-valider").click();
+  await expect(message(page)).toHaveText("Évacuation N1 corrigé : le montant automatique reste affiché à côté.");
+  const { data: hist } = must(await ctx.a.rpc("tools_releve_estimation_corrections", { p_plan_id: p2 }));
+  expect((hist as { valeurSource: Record<string, unknown> }[])[0].valeurSource).toMatchObject({ quantite: 5, unite: "u", montantCalcule: null });
+  must(await ctx.a.rpc("tools_releve_ouvrage_enregistrer", { p_plan_id: p2, p_id: k.eva, p_bibliotheque_id: null, p_donnees: etage({ nom: "Évacuation N1", lot: "Lot A", regle: saisie(6) }) }));
+  await page.reload();
+  const stale = (await ouvrir(page, p2, "Évacuation N1")).locator(`[data-testid="est-ligne"][data-piece="etage"][data-etat="nouveau"][data-nature="quantite"]`);
+  await expect(stale.getByTestId("est-ligne-automatique")).toHaveAttribute("data-perime", "quantite");
+  await expect(stale.getByTestId("est-ligne-montant")).toContainText("40,00 €");
+  await expect(stale.getByTestId("est-ligne-montant")).toContainText("(à revoir : quantité 5 u → 6 u depuis la correction)");
+  await expect(page.getByTestId("est-anomalies")).toContainText("la quantité a changé depuis la correction");
+  // Écriture concurrente : révision obsolète refusée, rien n'est écrasé. Autre tenant : rien de visible.
+  const concurrent = await ctx.a.rpc("tools_releve_estimation_parametres_enregistrer", { p_releve_id: ctx.releveId, p_donnees: { coefficientGeneral: 3 }, p_revision: 0 });
+  expect(concurrent.error?.code).toBe("PT409");
+  expect((await ctx.b.rpc("tools_releve_estimation_parametres", { p_releve_id: ctx.releveId })).error?.code).toBe("42501");
+  expect((await ctx.a.rpc("tools_releve_estimation_parametres_enregistrer", { p_releve_id: ctx.releveId, p_donnees: { acompte: 30 }, p_revision: e.parametres.revision })).error?.code).toBe("22023");
+  // Contrat Gestion Pro 1.1.0 : hypothèses, coefficients appliqués, valeur source, métadonnées de source ; aucun devis.
+  const [json] = await Promise.all([page.waitForEvent("download"), page.getByTestId("est-export-json").click()]);
+  const gp = JSON.parse(readFileSync((await json.path())!, "utf8"));
+  expect(gp.contract).toEqual({ name: "elsatia.tools.estimation", version: "1.1.0" });
+  expect(gp.perimetre.gestionProLibreDeRechiffrer).toBe(true);
+  expect(gp.source).toMatchObject({ application: "elsatia-tools", module: "releve-metre", releveId: ctx.releveId });
+  expect(gp.hypotheses.priorite).toEqual(["ouvrage", "lot", "general"]);
+  expect(gp.hypotheses.plans.find((h: { planRef: string }) => h.planRef === p2)).toMatchObject({ coefficientGeneral: "1.1", texte: "Site occupé, accès par escalier",
+    coefficientsLots: [{ lot: "Peinture", coefficient: "1.2" }, { lot: "Plâtrerie – cloisons", coefficient: "1.5" }] });
+  expect(gp.prix.find((x: { ouvrageRef: string }) => x.ouvrageRef === k.pei)).toMatchObject({ coefficient: "1.2", coefficientSaisi: null, coefficientSource: "lot", prixUnitaire: "12" });
+  expect(gp.lignes.find((l: { ouvrageRef: string }) => l.ouvrageRef === k.eva).correction).toMatchObject({ quantiteSource: "5.000", obsolete: true, motifObsolescence: "quantite", raison: "Évacuation au forfait benne" });
+  expect(JSON.stringify(gp)).not.toMatch(/"[^"]*(numeroDevis|facture|commande|signature|marge|remise|tva|ttc|prixVente|acompte|conditionsCommerciales)[^"]*"\s*:/i);
+  // Tablette : panneau des coefficients lisible, sans tableau ni débordement.
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await expect(page.locator("table")).toHaveCount(0);
+  expect(await sansDebordement(page)).toBe(true);
+  // Remise à zéro des coefficients (aucun effet sur un éventuel test suivant).
+  const { data: lu } = must(await ctx.a.rpc("tools_releve_estimation_parametres", { p_releve_id: ctx.releveId }));
+  must(await ctx.a.rpc("tools_releve_estimation_parametres_enregistrer", { p_releve_id: ctx.releveId, p_donnees: {}, p_revision: (lu as { revision: number }).revision }));
+});

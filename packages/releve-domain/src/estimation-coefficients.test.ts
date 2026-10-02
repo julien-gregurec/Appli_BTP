@@ -263,8 +263,9 @@ describe("contrat Gestion Pro 1.1.0 : ouvrages, quantités, prix simplifiés, hy
   it("hypothèses incohérentes refusées ; contrat 1.0.x sans hypothèses toujours recevable (rétro-compatibilité)", () => {
     expect(validateEstimationGpPayload({ ...payload, hypotheses: { ...payload.hypotheses, plans: [{ ...payload.hypotheses.plans[0], planRef: "inconnu" }] } })).toContain("hypothèses : plan inconnu inconnu");
     expect(validateEstimationGpPayload({ ...payload, hypotheses: { ...payload.hypotheses, plans: [{ ...payload.hypotheses.plans[0], coefficientGeneral: "11" }] } })[0]).toMatch(/coefficient général invalide/);
-    const { hypotheses: _h, ...v10 } = payload;
-    expect(validateEstimationGpPayload({ ...v10, contract: { name: "elsatia.tools.estimation", version: "1.0.0" } })).toEqual([]);
+    const v10: Record<string, unknown> = { ...payload, contract: { name: "elsatia.tools.estimation", version: "1.0.0" } };
+    delete v10.hypotheses;
+    expect(validateEstimationGpPayload(v10)).toEqual([]);
   });
 });
 
