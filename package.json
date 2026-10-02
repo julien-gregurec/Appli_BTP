@@ -40,6 +40,7 @@
     "preview:v9:ledger": "node scripts/preview/v9/check-ledger-v9.mjs",
     "preview:v9:plan": "node scripts/preview/v9/migration-plan-v9.mjs",
     "preview:v9:classify": "node scripts/preview/v9/classify-migrations-v9.mjs",
+    "preview:v9:backup-manifest": "node scripts/preview/v9/backup-manifest.mjs",
     "preview:v9:backup-check": "node scripts/preview/v9/backup-check.mjs",
     "preview:v9:env-scope": "node scripts/preview/v9/env-scope-check.mjs",
     "preview:v9:iban-k1": "node scripts/preview/v9/iban-k1-check.mjs",

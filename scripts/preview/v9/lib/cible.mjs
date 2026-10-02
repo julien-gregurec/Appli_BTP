@@ -74,8 +74,9 @@ export function evaluerCible({ ref, refLiee, environment, branche, urlsApp = [],
 
   // Environnement déclaré ou détecté.
   if (environment !== undefined && environment !== "preview") motifs.push(`environment=${environment} : seul « preview » est admis`);
-  for (const cle of ["VERCEL_ENV", "ELSATIA_APPLICATION_ENV", "ELSATIA_ENV", "APP_ENV", "NODE_ENV"]) {
-    if (String(env[cle] ?? "").trim().toLowerCase() === "production") motifs.push(`${cle}=production détecté : refus`);
+  const indicateurs = { VERCEL_ENV: env.VERCEL_ENV, ELSATIA_APPLICATION_ENV: env.ELSATIA_APPLICATION_ENV, ELSATIA_ENV: env.ELSATIA_ENV, NODE_ENV: env.NODE_ENV };
+  for (const [cle, valeur] of Object.entries(indicateurs)) {
+    if (String(valeur ?? "").trim().toLowerCase() === "production") motifs.push(`${cle}=production détecté : refus`);
   }
 
   // URL d'application : jamais un hôte de Production, jamais une URL qui contient la référence Production.
