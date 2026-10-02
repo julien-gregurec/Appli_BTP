@@ -5,6 +5,7 @@ const LIENS = [
   { href: "/mentions-legales", libelle: "Mentions légales" },
   { href: "/cgv", libelle: "CGV" },
   { href: "/cgu", libelle: "CGU" },
+  { href: "/dpa", libelle: "DPA" },
   { href: "/confidentialite", libelle: "Confidentialité" },
   { href: "/cookies", libelle: "Cookies" },
 ];

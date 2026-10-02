@@ -8,6 +8,7 @@ Le service **ELSATIA Gestion Pro** (ci-après « le Service »), accessible à l
 
 - **Julien GREGUREC**, entrepreneur individuel (EI), exerçant sous le nom commercial **ELSATIA** _(identité déclarée le 20-08-2026 ; à revérifier contre l'avis de situation SIRENE une fois l'immatriculation reçue, avant toute publication juridique définitive)_
 - Adresse : **9 rue du Maréchal Leclerc, 67860 Rhinau, France** _(adresse retenue pour l'immatriculation — à revérifier contre l'avis SIRENE une fois reçu, avant toute publication juridique définitive)_
+- Immatriculation : **850 559 873 R.C.S. Strasbourg**
 - SIRET : **[EDITEUR_SIRET]**
 - Mention de TVA : **[EDITEUR_MENTION_TVA]**
 - E-mail : **[EMAIL_SUPPORT]**

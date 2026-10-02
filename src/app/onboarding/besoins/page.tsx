@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { enregistrerBesoinsAction } from "@/app/actions/besoins";
 import { demarrerAbonnementAction } from "@/app/actions/abonnement";
+import { AcceptationConditions } from "@/components/AcceptationConditions";
 import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
 import { BRAND_NAME } from "@/lib/brand";
@@ -53,6 +54,7 @@ export default async function BesoinsPage({
                 <option value="annuel">Annuel · 2 mois offerts</option>
                 <option value="mensuel">Mensuel</option>
               </select>
+              <AcceptationConditions />
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>
             </form> : <Link href="/onboarding/demarrage" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Configurer mon espace sans paiement</Link>}
             <Link href="/onboarding/besoins" className="w-full rounded-md border px-3 py-2 text-center text-sm">

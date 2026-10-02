@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DocumentLegal } from "./DocumentLegal";
+import { IDENTITE_VENDEUR } from "@/lib/identite-vendeur";
 
 // Pages réellement servies par le composant (cf. src/app/*/page.tsx).
 const PAGES_SERVIES = [
   "mentions-legales.md",
   "cgv.md",
   "cgu.md",
+  "dpa-entreprises-clientes.md",
   "politique-confidentialite.md",
   "politique-cookies.md",
 ];
@@ -46,8 +48,10 @@ describe("DocumentLegal — substitution des jetons éditeur (ELSATIA-LEGAL-CONT
 
     expect(mentions).toContain("SIRET : **en cours de finalisation**");
     expect(mentions).toContain("Mention de TVA : **à confirmer**");
-    // Un repli ne doit jamais inventer un numéro ni un régime fiscal.
-    expect(mentions).not.toMatch(/\d{9}|\d{3} \d{3} \d{3}/);
+    // Un repli ne doit jamais inventer un numéro ni un régime fiscal. Seul le RCS, prouvé
+    // et porté par la source unique (src/lib/identite-vendeur.ts), est écrit en dur.
+    expect(mentions).toContain(IDENTITE_VENDEUR.rcs.valeur!);
+    expect(mentions.replace(IDENTITE_VENDEUR.rcs.valeur!, "")).not.toMatch(/\d{9}|\d{3} \d{3} \d{3}/);
     expect(mentions).not.toMatch(/non assujetti|TVA non applicable/i);
   });
 
