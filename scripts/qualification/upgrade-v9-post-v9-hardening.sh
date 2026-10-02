@@ -23,8 +23,8 @@
 set -uo pipefail
 SRC="${1:?base V9 peuplée}"
 FRESH="${2:?base fresh hardening}"
-GOTRUE_SQL="${3:?gotrue.sql (UPG_OUT/v7/gotrue.sql du harnais V9)}"
-CONTROLES="${4:?contrôles métier (upgrade_v7_v8_business_checks.sql ou upgrade_v8_v9_business_checks.sql)}"
+GOTRUE_SQL="$(realpath "${3:?gotrue.sql (UPG_OUT/v7/gotrue.sql du harnais V9)}")"
+CONTROLES="$(realpath "${4:?contrôles métier (upgrade_v7_v8_business_checks.sql ou upgrade_v8_v9_business_checks.sql)}")"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 BOOT="$REPO/scripts/local-postgres-bootstrap"
