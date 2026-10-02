@@ -74,10 +74,5 @@ export function accesDansSaFenetre(
     && (!acces.valide_jusqu_au || new Date(acces.valide_jusqu_au).getTime() > maintenant);
 }
 
-export function valeurDateHeureLocale(valeur: string | null): string {
-  if (!valeur) return "";
-  const date = new Date(valeur);
-  if (Number.isNaN(date.getTime())) return "";
-  const decalage = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - decalage).toISOString().slice(0, 16);
-}
+// valeurDateHeureLocale (rendu datetime-local dans le fuseau du SERVEUR) retirée en post-V9
+// (V9-01) : voir src/lib/date-heure-locale.ts et src/components/ChampDateHeure.tsx.

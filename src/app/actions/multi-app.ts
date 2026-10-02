@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { estCodeApplicationElsatia } from "@elsatia/application-access";
 import { estAdministrateurPlateformeMultiApp } from "@/lib/multi-app-server";
+import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -13,11 +14,20 @@ function retourEntreprise(entrepriseId: string, type: "succes" | "error", messag
   return `/plateforme/entreprises/${entrepriseId}/applications?${type}=${encodeURIComponent(message)}`;
 }
 
-function dateOptionnelle(formData: FormData, cle: string): string | null {
-  const valeur = String(formData.get(cle) ?? "").trim();
-  if (!valeur) return null;
-  const date = new Date(valeur);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+// V9-01 / V9-02 (post-V9) : heure murale + fuseau du navigateur (ChampDateHeure), convertie
+// explicitement ; une date saisie mais invalide est refusée au lieu de valoir « sans date »
+// (l'ancien `new Date(valeur)` lisait l'heure dans le fuseau du serveur et rabattait une
+// valeur invalide sur null, soit une habilitation sans fin).
+function fenetreValidite(formData: FormData, entrepriseId: string) {
+  const debut = lireDateHeureFormulaire(formData, "valide_du");
+  const fin = lireDateHeureFormulaire(formData, "valide_jusqu_au");
+  if (debut.statut === "invalide" || fin.statut === "invalide") {
+    redirect(retourEntreprise(entrepriseId, "error", "Date ou heure invalide"));
+  }
+  if (debut.iso && fin.iso && new Date(fin.iso) <= new Date(debut.iso)) {
+    redirect(retourEntreprise(entrepriseId, "error", "La fin de validité doit suivre le début"));
+  }
+  return { valideDu: debut.iso, valideJusquAu: fin.iso };
 }
 
 async function verifierAction(entrepriseId: string, applicationCode: string) {
@@ -39,11 +49,7 @@ export async function activerApplicationEntrepriseAction(
   formData: FormData,
 ) {
   await verifierAction(entrepriseId, applicationCode);
-  const valideDu = dateOptionnelle(formData, "valide_du");
-  const valideJusquAu = dateOptionnelle(formData, "valide_jusqu_au");
-  if (valideDu && valideJusquAu && new Date(valideJusquAu) <= new Date(valideDu)) {
-    redirect(retourEntreprise(entrepriseId, "error", "La fin de validité doit suivre le début"));
-  }
+  const { valideDu, valideJusquAu } = fenetreValidite(formData, entrepriseId);
   const supabase = await createClient();
   const { error } = await supabase.rpc("plateforme_activer_application_entreprise", {
     p_entreprise_id: entrepriseId,
@@ -84,11 +90,7 @@ export async function habiliterUtilisateurApplicationAction(
   if (!UUID.test(utilisateurId) || !ROLE.test(roleCode)) {
     redirect(retourEntreprise(entrepriseId, "error", "Utilisateur ou rôle invalide"));
   }
-  const valideDu = dateOptionnelle(formData, "valide_du");
-  const valideJusquAu = dateOptionnelle(formData, "valide_jusqu_au");
-  if (valideDu && valideJusquAu && new Date(valideJusquAu) <= new Date(valideDu)) {
-    redirect(retourEntreprise(entrepriseId, "error", "La fin de validité doit suivre le début"));
-  }
+  const { valideDu, valideJusquAu } = fenetreValidite(formData, entrepriseId);
   const supabase = await createClient();
   const { error } = await supabase.rpc("plateforme_habiliter_utilisateur_application", {
     p_utilisateur_id: utilisateurId,

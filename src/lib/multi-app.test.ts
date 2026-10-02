@@ -6,8 +6,8 @@ import {
   environnementApplications,
   libelleRoleApplication,
   urlApplication,
-  valeurDateHeureLocale,
 } from "@/lib/multi-app";
+import { valeurDateHeureDansFuseau } from "@/lib/date-heure-locale";
 import type { ApplicationElsatiaAutorisee } from "@elsatia/application-access";
 
 const application = (code: string, roleCode = `${code}_utilisateur`): ApplicationElsatiaAutorisee => ({
@@ -53,7 +53,7 @@ describe("ELSATIA Gestion Pro multi-app UI V1 — 20 scénarios", () => {
   });
 });
 
-describe("formatage des dates d’administration", () => {
-  it("laisse une valeur absente vide", () => expect(valeurDateHeureLocale(null)).toBe(""));
-  it("refuse une date invalide", () => expect(valeurDateHeureLocale("incorrecte")).toBe(""));
+describe("formatage des dates d’administration (contrat post-V9, src/lib/date-heure-locale.ts)", () => {
+  it("laisse une valeur absente vide", () => expect(valeurDateHeureDansFuseau(null, "Europe/Paris")).toBe(""));
+  it("refuse une date invalide", () => expect(valeurDateHeureDansFuseau("incorrecte", "Europe/Paris")).toBe(""));
 });

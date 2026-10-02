@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { activerApplicationEntrepriseAction, desactiverApplicationEntrepriseAction, habiliterUtilisateurApplicationAction, retirerHabilitationApplicationAction } from "@/app/actions/multi-app";
 import { chargerEntrepriseMultiApp, estAdministrateurPlateformeMultiApp } from "@/lib/multi-app-server";
-import { accesDansSaFenetre, valeurDateHeureLocale } from "@/lib/multi-app";
+import { accesDansSaFenetre } from "@/lib/multi-app";
+import { ChampDateHeure } from "@/components/ChampDateHeure";
 
 const champ = "mt-1 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#c9a24a] dark:border-neutral-700 dark:bg-neutral-950";
 
@@ -64,8 +65,8 @@ export default async function ApplicationsEntreprisePage({ params, searchParams 
                     <div className="flex gap-2">{!application.actif && <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] text-red-800">Catalogue inactif</span>}<span className={`rounded-full px-2 py-1 text-[11px] font-medium ${etat.classe}`}>{etat.libelle}</span></div>
                   </div>
                   <form action={activerApplicationEntrepriseAction.bind(null, entrepriseId, application.code)} className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-neutral-600">Valide à partir de<input name="valide_du" type="datetime-local" defaultValue={valeurDateHeureLocale(acces?.valide_du ?? null)} className={champ} /></label>
-                    <label className="text-xs text-neutral-600">Valide jusqu’au<input name="valide_jusqu_au" type="datetime-local" defaultValue={valeurDateHeureLocale(acces?.valide_jusqu_au ?? null)} className={champ} /></label>
+                    <ChampDateHeure name="valide_du" label="Valide à partir de" valeurIso={acces?.valide_du ?? null} labelClassName="text-xs text-neutral-600" className={champ} />
+                    <ChampDateHeure name="valide_jusqu_au" label="Valide jusqu’au" valeurIso={acces?.valide_jusqu_au ?? null} libelleSansValeur="Sans date de fin" labelClassName="text-xs text-neutral-600" className={champ} />
                     <button disabled={!application.actif} className="rounded-md bg-[#8a6a1f] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2">{accesDansSaFenetre(acces) ? "Mettre à jour les dates" : "Activer l’application"}</button>
                   </form>
                   {acces?.autorise && <form action={desactiverApplicationEntrepriseAction.bind(null, entrepriseId, application.code)} className="mt-2"><button className="w-full rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700">Désactiver sans supprimer les données</button></form>}
@@ -94,8 +95,8 @@ export default async function ApplicationsEntreprisePage({ params, searchParams 
                         <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">{application.nom}</h3><span className={`rounded-full px-2 py-1 text-[10px] ${etat.classe}`}>{etat.libelle}</span></div>
                         <form action={habiliterUtilisateurApplicationAction.bind(null, entrepriseId, utilisateur.id, application.code)} className="mt-3 grid gap-3 sm:grid-cols-2">
                           <label className="text-xs text-neutral-600 sm:col-span-2">Rôle applicatif<select name="role_code" required defaultValue={habilitation?.role_code ?? ""} className={champ}><option value="" disabled>Sélectionner un rôle</option>{roles.map((role) => <option key={role.code} value={role.code}>{role.nom}</option>)}</select></label>
-                          <label className="text-xs text-neutral-600">Valide à partir de<input name="valide_du" type="datetime-local" defaultValue={valeurDateHeureLocale(habilitation?.valide_du ?? null)} className={champ} /></label>
-                          <label className="text-xs text-neutral-600">Valide jusqu’au<input name="valide_jusqu_au" type="datetime-local" defaultValue={valeurDateHeureLocale(habilitation?.valide_jusqu_au ?? null)} className={champ} /></label>
+                          <ChampDateHeure name="valide_du" label="Valide à partir de" valeurIso={habilitation?.valide_du ?? null} labelClassName="text-xs text-neutral-600" className={champ} />
+                          <ChampDateHeure name="valide_jusqu_au" label="Valide jusqu’au" valeurIso={habilitation?.valide_jusqu_au ?? null} libelleSansValeur="Sans date de fin" labelClassName="text-xs text-neutral-600" className={champ} />
                           <button disabled={!roles.length || utilisateur.statut !== "actif"} className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45 dark:bg-white dark:text-neutral-950 sm:col-span-2">{habilitation?.autorise ? "Modifier le rôle ou les dates" : "Habiliter l’utilisateur"}</button>
                         </form>
                         {habilitation?.autorise && <form action={retirerHabilitationApplicationAction.bind(null, entrepriseId, utilisateur.id, application.code)} className="mt-2"><button className="w-full rounded-md border px-3 py-2 text-xs font-medium">Retirer l’habilitation</button></form>}

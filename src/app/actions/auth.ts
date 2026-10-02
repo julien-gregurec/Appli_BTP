@@ -3,6 +3,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { destinationDeconnexion } from "@/lib/auth/sortie";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
@@ -124,7 +125,7 @@ export async function loginAction(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function logoutAction() {
+export async function logoutAction(formData?: FormData) {
   if (isEmailLoginDisabled()) {
     redirect("/dashboard");
   }
@@ -138,7 +139,7 @@ export async function logoutAction() {
     redirect("/stock/borne?deconnexion=1");
   }
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect(destinationDeconnexion(formData));
 }
 
 /**

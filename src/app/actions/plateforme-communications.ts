@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 import {
   detecterFormatImage,
   validerCommunication,
@@ -59,14 +60,18 @@ export async function creerCommunicationAction(formData: FormData) {
     if (!controle.valide) echec(controle.message);
   }
 
+  const debut = lireDateHeureFormulaire(formData, "debutAt");
+  const fin = lireDateHeureFormulaire(formData, "finAt");
   const brouillon = {
     titre: String(formData.get("titre") ?? ""),
     texteCourt: String(formData.get("texteCourt") ?? ""),
     contenu: String(formData.get("contenu") ?? ""),
     type: String(formData.get("type") ?? "information"),
     priorite: String(formData.get("priorite") ?? "normale") as PrioriteCommunication,
-    debutAt: String(formData.get("debutAt") ?? new Date().toISOString()),
-    finAt: String(formData.get("finAt") ?? "").trim() === "" ? null : String(formData.get("finAt")),
+    // V9-01 (post-V9) : heures saisies dans le fuseau du navigateur, converties explicitement ;
+    // une valeur invalide reste invalide (validerCommunication la refuse).
+    debutAt: debut.statut === "valide" ? debut.iso : debut.statut === "vide" ? new Date().toISOString() : "invalide",
+    finAt: fin.statut === "valide" ? fin.iso : fin.statut === "vide" ? null : "invalide",
     modeAffichage: String(formData.get("modeAffichage") ?? "banniere") as ModeAffichage,
     frequence: String(formData.get("frequence") ?? "une_seule_fois") as FrequenceAffichage,
     canaux: formData.getAll("canaux").map((c) => String(c) as CanalCommunication),

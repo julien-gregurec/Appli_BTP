@@ -38,6 +38,9 @@ export function politiquesRateLimitPour(chemin: string, methode: string, authent
   if (chemin.startsWith("/auth/")) return [{ cle: "auth:callback", maximum: 30, fenetreSecondes: 600, portee: "ip" }];
   if (chemin.startsWith("/api/cron/")) return [{ cle: "api:cron", maximum: 60, fenetreSecondes: 60, portee: "ip" }];
   if (chemin === "/api/paie/import") return [{ cle: "api:payroll-import", maximum: 30, fenetreSecondes: 300, portee: "ip" }];
+  // SEC-5 (post-V9) : PDF de partage public, rendu par Chromium. Plafond par IP, connecté ou
+  // non (la page /imprimer/partage visitée par Chromium depuis le serveur reste hors plafond).
+  if (/^\/api\/documents\/partage\/[^/]+\/pdf$/.test(chemin)) return [{ cle: "api:shared-pdf", maximum: 20, fenetreSecondes: 600, portee: "ip" }];
   if (chemin.startsWith("/api/paiements-bancaires/powens/")) return [{ cle: "api:powens-callback", maximum: 60, fenetreSecondes: 60, portee: "ip" }];
   if (!authentifie && !(chemin.startsWith("/api/stripe/") || chemin.startsWith("/api/webhooks/"))) return [];
   if (chemin === "/api/referentiels/vehicules") return [{ cle: "reference:vehicles", maximum: 10, fenetreSecondes: 60, portee: authentifie ? "utilisateur" : "ip" }];

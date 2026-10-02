@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 
 const champ = (fd: FormData, nom: string) => String(fd.get(nom) ?? "").trim() || null;
 
@@ -36,14 +37,15 @@ export async function archiverEmailChantierAction(chantierId: string, fd: FormDa
   const objet = champ(fd, "objet");
   const expediteur = champ(fd, "expediteur");
   const apercu = champ(fd, "apercu");
-  const recuAt = champ(fd, "recu_at");
+  // V9-01 (post-V9) : date saisie dans le fuseau du navigateur, convertie explicitement.
+  const recuAt = lireDateHeureFormulaire(fd, "recu_at").iso;
   if (!objet || !recuAt) redirect(`/chantiers/${chantierId}/emails?error=${encodeURIComponent("Objet et date obligatoires")}`);
   const destinataires = (champ(fd, "destinataires") ?? "").split(/[;,]/).map((valeur) => valeur.trim()).filter(Boolean);
   const copie = (champ(fd, "copie") ?? "").split(/[;,]/).map((valeur) => valeur.trim()).filter(Boolean);
   const { error } = await supabase.from("emails_chantier").insert({
     entreprise_id: ctx.entrepriseId, chantier_id: chantierId, identifiant_externe: `manuel-${crypto.randomUUID()}`,
     direction: champ(fd, "direction") === "sortant" ? "sortant" : "entrant", expediteur,
-    destinataires, copie, objet, apercu, recu_at: new Date(recuAt).toISOString(),
+    destinataires, copie, objet, apercu, recu_at: recuAt,
   });
   if (error) redirect(`/chantiers/${chantierId}/emails?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerEmailChantierAction", error, "Impossible d’enregistrer cet email."))}`);
   revalidatePath(`/chantiers/${chantierId}/emails`);

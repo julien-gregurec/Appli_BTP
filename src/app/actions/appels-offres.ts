@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 
 function retour(type:"error"|"success",message:string):never{redirect(`/appels-offres?${type}=${encodeURIComponent(message)}`);}
 
@@ -12,10 +13,13 @@ export async function creerAppelOffresAction(formData:FormData){
   const titre=String(formData.get("titre")??"").trim();
   const reference=String(formData.get("reference")??"").trim()||`AO-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
   if(!titre)retour("error","Le titre est obligatoire");
+  // V9-01 (post-V9) : heure limite saisie dans le fuseau du navigateur, convertie explicitement.
+  const dateLimite=lireDateHeureFormulaire(formData,"date_limite");
+  if(dateLimite.statut==="invalide")retour("error","Date limite invalide");
   const montant=Number(String(formData.get("montant_estime_ht")??"").replace(",","."));
   const {error}=await supabase.from("appels_offres").insert({entreprise_id:ctx.entrepriseId,reference,titre,
     client_id:String(formData.get("client_id")??"")||null,chantier_id:String(formData.get("chantier_id")??"")||null,
-    source_url:String(formData.get("source_url")??"").trim()||null,date_limite:String(formData.get("date_limite")??"")||null,
+    source_url:String(formData.get("source_url")??"").trim()||null,date_limite:dateLimite.iso,
     montant_estime_ht:Number.isFinite(montant)?montant:null,notes:String(formData.get("notes")??"").trim()||null});
   if(error)retour("error",error.message);revalidatePath("/appels-offres");retour("success","Appel d’offres ajouté");
 }

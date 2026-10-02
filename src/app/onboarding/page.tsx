@@ -1,6 +1,7 @@
 import { activerCompteEmployeAction, createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { AcceptationConditions } from "@/components/AcceptationConditions";
+import { SortieOnboarding } from "@/components/SortieOnboarding";
 import { estCodeOffreTarifaire, offreTarifaireParCle } from "@/lib/tarification";
 
 export default async function OnboardingPage({
@@ -19,6 +20,7 @@ export default async function OnboardingPage({
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
+        <SortieOnboarding />
         <div>
           <h1 className="text-xl font-semibold">Configurer votre accès</h1>
           <p className="text-sm text-neutral-500">

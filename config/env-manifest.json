@@ -6557,6 +6557,28 @@
       "example_required": false
     },
     {
+      "name": "PASSERELLE_AAL2_EMAILS",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Recette uniquement : adresses (séparées par des virgules) dont la passerelle locale émet la session en AAL2, pour atteindre /plateforme sans TOTP. Vide par défaut (sessions AAL1).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "PASSERELLE_DATABASE_URL",
       "applications": [
         "e2e"

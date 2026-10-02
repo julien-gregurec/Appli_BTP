@@ -8,6 +8,7 @@ import {
   type ModeAffichage,
   type TypeCommunication,
 } from "@elsatia/platform-support-comms";
+import { ChampDateHeure } from "@/components/ChampDateHeure";
 
 /**
  * Rédaction, ciblage et aperçu d'une communication.
@@ -166,14 +167,8 @@ export function CommunicationRedaction({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">Début de diffusion</span>
-          <input type="datetime-local" name="debutAt" className={`${champ} w-full`} required />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">Fin (facultatif)</span>
-          <input type="datetime-local" name="finAt" className={`${champ} w-full`} />
-        </label>
+        <ChampDateHeure name="debutAt" label="Début de diffusion" required labelClassName="grid gap-1 text-sm font-medium" className={`${champ} w-full font-normal`} />
+        <ChampDateHeure name="finAt" label="Fin (facultatif)" labelClassName="grid gap-1 text-sm font-medium" className={`${champ} w-full font-normal`} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

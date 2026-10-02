@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 import { construireLienMailto } from "@/lib/email";
 import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
 import { PRODUCT_NAME } from "@/lib/brand";
@@ -126,6 +127,9 @@ export async function changerStatutInterventionAction(id: string, statut: string
 
 export async function creerAppelAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
+  // V9-01 (post-V9) : rappel saisi dans le fuseau du navigateur, converti explicitement.
+  const rappel = lireDateHeureFormulaire(formData, "a_rappeler_at");
+  if (rappel.statut === "invalide") retourErreur("/crm", "Date de rappel invalide");
   const supabase = await createClient();
   const { error } = await supabase.from("appels_contacts").insert({
     entreprise_id: ctx.entrepriseId,
@@ -134,7 +138,7 @@ export async function creerAppelAction(formData: FormData) {
     sens: texte(formData, "sens") || "sortant",
     objet: texte(formData, "objet"),
     compte_rendu: optionnel(formData, "compte_rendu"),
-    a_rappeler_at: optionnel(formData, "a_rappeler_at"),
+    a_rappeler_at: rappel.iso,
     created_by: ctx.userId,
   });
   if (error) retourErreur("/crm", error.message);

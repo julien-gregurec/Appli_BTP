@@ -1,5 +1,11 @@
 -- ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 — PROPOSITION NON NUMÉROTÉE
 --
+-- ÉTAT POST-V9 (ELSATIA POST-V9 HARDENING V1) : les sections 5, 6 et 8 (9 fonctions
+-- `*_service` : comptage Stripe, relances, push) sont PORTÉES par
+-- supabase/migrations/20261002001301_post_v9_service_role_fonctions_manquantes_v1.sql.
+-- Ne pas les re-porter. La section 7 (paie_import_*) reste volontairement NON portée
+-- (SEC-6, DECISION_REQUIRED). Voir docs/qualification/ELSATIA_POST_V9_HARDENING_V1.md.
+--
 -- Ce fichier n'est PAS une migration : il ne porte aucun numéro et ne doit pas
 -- être copié tel quel dans supabase/migrations. Le numéro s'alloue depuis le
 -- train canonique au moment de l'intégration (dernier numéro du train + 1).

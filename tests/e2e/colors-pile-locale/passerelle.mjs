@@ -44,6 +44,12 @@ const CLE_PUBLIQUE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const CLE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DOSSIER_STOCKAGE = process.env.PASSERELLE_STOCKAGE ?? path.resolve("stockage-recette");
 let dureeJeton = Number(process.env.PASSERELLE_DUREE_JETON_S ?? 3600);
+/**
+ * Recette uniquement : adresses dont la session est émise en AAL2 (MFA réputée validée), pour
+ * atteindre les écrans /plateforme gardés par la MFA sans rejouer un TOTP. Vide par défaut :
+ * sans cette variable, toutes les sessions restent AAL1 (comportement historique).
+ */
+const EMAILS_AAL2 = new Set((process.env.PASSERELLE_AAL2_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
 /** Fenêtre de réutilisation d'un jeton de rafraîchissement déjà tourné (GoTrue : 10 s). */
 const FENETRE_REUTILISATION_MS = 10_000;
 
@@ -138,7 +144,8 @@ function emettreSession(u, sessionId) {
   const exp = maintenant + dureeJeton;
   const access_token = signerJwt({
     aud: "authenticated", exp, iat: maintenant, iss: `http://${HOTE}:${PORT}/auth/v1`, sub: u.id,
-    email: u.email, role: "authenticated", aal: "aal1", session_id: sessionId, is_anonymous: false,
+    email: u.email, role: "authenticated", aal: EMAILS_AAL2.has(String(u.email ?? "").toLowerCase()) ? "aal2" : "aal1",
+    session_id: sessionId, is_anonymous: false,
     app_metadata: u.raw_app_meta_data ?? {}, user_metadata: u.raw_user_meta_data ?? {},
   });
   return {

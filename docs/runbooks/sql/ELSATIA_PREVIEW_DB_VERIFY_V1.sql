@@ -35,7 +35,7 @@ begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (389, '20261002001113')),
+attendu_train(nb, derniere) as (values (391, '20261002001302')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -601,6 +601,33 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not has_function_privilege('authenticated', 'public.chiffres_bancaires_rechiffrer_lot(text,text,jsonb)', 'execute')
            and not has_function_privilege('authenticated', 'public.cles_bancaires_etat()', 'execute')
            and not has_table_privilege('authenticated', 'public.cles_chiffrement_bancaire', 'select'), true
+  union all
+  -- 39 (post-V9 hardening) : 9 RPC de service appelées par le code (décompte Stripe, relances,
+  -- nouveau lien, push), service_role SEUL (…1002 1301) ; garde SEC-4 de l'entreprise active
+  -- (…1002 1302). Résolution par to_regprocedure : sur une base antérieure, échec propre.
+  select 39, 'Post-V9 : RPC de service présentes (service_role seul) et garde SEC-4 (20261002001301-1302)',
+         '9/9 fonctions service_role seul, garde entreprise active activée',
+         concat_ws(', ',
+           (select count(*) from (values ('public.compter_comptes_application_service(uuid)'), ('public.relances_auto_parametres_service()'),
+              ('public.relances_auto_candidats_service(uuid,text,integer)'), ('public.relance_document_service(uuid,text,uuid)'),
+              ('public.relance_nouveau_lien_partage_service(uuid,text,uuid,text,timestamptz)'),
+              ('public.push_notifications_en_attente_service(timestamptz,integer)'), ('public.push_preparer_notification_service(uuid)'),
+              ('public.push_marquer_notification_envoyee_service(uuid)'), ('public.push_supprimer_abonnement_service(uuid,uuid)')) f(sig)
+            where coalesce(has_function_privilege('service_role', to_regprocedure(f.sig), 'execute'), false)
+              and not coalesce(has_function_privilege('authenticated', to_regprocedure(f.sig), 'execute'), true)
+              and not coalesce(has_function_privilege('anon', to_regprocedure(f.sig), 'execute'), true))::text || '/9 fonctions',
+           (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D'
+              and tgname = 'utilisateurs_entreprise_active_garde')::text || '/1 garde'),
+         (select count(*) from (values ('public.compter_comptes_application_service(uuid)'), ('public.relances_auto_parametres_service()'),
+            ('public.relances_auto_candidats_service(uuid,text,integer)'), ('public.relance_document_service(uuid,text,uuid)'),
+            ('public.relance_nouveau_lien_partage_service(uuid,text,uuid,text,timestamptz)'),
+            ('public.push_notifications_en_attente_service(timestamptz,integer)'), ('public.push_preparer_notification_service(uuid)'),
+            ('public.push_marquer_notification_envoyee_service(uuid)'), ('public.push_supprimer_abonnement_service(uuid,uuid)')) f(sig)
+          where coalesce(has_function_privilege('service_role', to_regprocedure(f.sig), 'execute'), false)
+            and not coalesce(has_function_privilege('authenticated', to_regprocedure(f.sig), 'execute'), true)
+            and not coalesce(has_function_privilege('anon', to_regprocedure(f.sig), 'execute'), true)) = 9
+           and (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D'
+                  and tgname = 'utilisateurs_entreprise_active_garde') = 1, true
 )
 select controle, attendu, observe, ok, bloquant
 from controles
