@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { destinationInterneSure } from "@/lib/security/redirects";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -26,10 +27,9 @@ const chemin = "/paiements-bancaires";
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const erreur = (message: string): never => redirect(`${chemin}?error=${encodeURIComponent(message)}`);
 const succes = (message: string): never => redirect(`${chemin}?success=${encodeURIComponent(message)}`);
-const retourAutorise = (formData: FormData) => {
-  const retour = texte(formData, "retour");
-  return retour.startsWith("/") && !retour.startsWith("//") && !retour.includes(":") ? retour : chemin;
-};
+// Red team V1 RT-01 (résiduel, train V9) : le contrôle « / sans // ni : » laissait passer
+// `/\evil.com`, que le navigateur résout en `//evil.com` (redirection ouverte). Validateur commun.
+const retourAutorise = (formData: FormData) => destinationInterneSure(texte(formData, "retour"), chemin);
 const redirigerMessage = (retour: string, type: "error" | "success", message: string): never =>
   redirect(`${retour}${retour.includes("?") ? "&" : "?"}${type}=${encodeURIComponent(message)}`);
 

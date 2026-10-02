@@ -4,6 +4,7 @@ import { validerJustificatif } from "@/lib/expenses/files";
 import { sha256 } from "@/lib/expenses/integrity";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { destinationInterneSure } from "@/lib/security/redirects";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
       await supabase.storage.from("documents-paie").remove([chemin]);
       throw new Error(erreurInsertion.message);
     }
-    const destination = retour.startsWith("/") && !retour.startsWith("//") ? retour : "/paie";
+    // Red team V1 RT-01 (résiduel, train V9) : `/\evil.com` passait le contrôle « / sans // ».
+    const destination = destinationInterneSure(retour, "/paie");
     return NextResponse.redirect(new URL(`${destination}${destination.includes("?") ? "&" : "?"}success=${encodeURIComponent("Pièce jointe privée ajoutée")}`, request.url), 303);
   } catch (error) {
     console.error("Échec d'import d'un document de paie", error);
