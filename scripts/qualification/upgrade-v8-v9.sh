@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Train canonique V9 — qualification d'UPGRADE V8 → V9 avec données réalistes.
+# Train canonique V9 FINAL — qualification d'UPGRADE depuis la base canonique réelle V8 + hotfix 813
+# (372 migrations, état du ledger de la Preview hébergée) vers la V9 finale, avec données réalistes.
 # Rapport : docs/qualification/ELSATIA_CANONICAL_TRAIN_V9_CONVERGENCE_V1.md §6.
 # Dérivé de upgrade-v7-v8.sh (train V8), inchangé dans son principe.
 #
@@ -32,6 +33,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 BOOT="$REPO/scripts/local-postgres-bootstrap"
 DERNIERE_V7="20260928000701"
 DERNIERE_V8="20260928000812"
+SOCLE="20261002000813"   # hotfix 813 original (de50245a) : dernière migration de la base canonique
 OUT="${UPG_OUT:-$(mktemp -d)}"; mkdir -p "$OUT"; chmod 777 "$OUT"
 
 psql_db() { su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d $1"; }
@@ -48,7 +50,7 @@ UPG_ARRET_APRES_V7=1 UPG_OUT="$OUT/v7" "$REPO/scripts/qualification/upgrade-v7-v
   || { echo "FAIL base V7"; tail -20 "$OUT/base-v7.log"; exit 1; }
 grep -E "migrations|Arrêt" "$OUT/base-v7.log" | sed 's/^/  /'
 
-echo "== 2. Données de l'ère V7, puis migrations V8 =="
+echo "== 2. Données de l'ère V7, puis migrations V8 et hotfix 813 (base canonique) =="
 charger "complément V7→V8" < "$BOOT/upgrade_v7_v8_seed_complement.sql"
 m8=0
 for f in "$REPO"/supabase/migrations/*.sql; do
@@ -59,6 +61,8 @@ done
 total=$(su postgres -c "psql -X -At -d $DB -c 'select 1'" >/dev/null; ls "$REPO"/supabase/migrations/*.sql | awk -F/ '{print $NF}' | cut -d_ -f1 | awk -v d="$DERNIERE_V8" '$0 <= d' | wc -l)
 echo "  $m8 migrations V8 appliquées (train V8 : $total)"
 [ "$m8" = 12 ] && [ "$total" = 371 ] || { echo "attendu 12 migrations V8, 371 au total"; exit 1; }
+appliquer "$DB" "$REPO/supabase/migrations/${SOCLE}_plateforme_annuaire_lecture_pure.sql"
+echo "  ✓ hotfix ${SOCLE} (base canonique : 372 migrations)"
 
 PASSE="${UPG_PASSE:-historique}"
 case "$PASSE" in historique|volumetrique) ;; *) echo "UPG_PASSE inconnue : $PASSE"; exit 1 ;; esac
@@ -76,15 +80,15 @@ echo "== 4. Instantané avant =="
 UPGRADE_SNAPSHOT_V8=1 UPGRADE_SNAPSHOT_V9=1 python3 "$BOOT/upgrade_snapshot.py" "$DB" "$OUT/avant.json"
 su postgres -c "psql -X -q -At -d $DB -c 'select count(*) from auth.users'" | sed 's/^/  utilisateurs : /'
 
-echo "== 5. Migrations V9 =="
+echo "== 5. Migrations V9 finale (> $SOCLE) =="
 m=0
 for f in "$REPO"/supabase/migrations/*.sql; do
   v="$(basename "$f" | cut -d_ -f1)"
-  [[ "$v" > "$DERNIERE_V8" ]] || continue
+  [[ "$v" > "$SOCLE" ]] || continue
   appliquer "$DB" "$f"; m=$((m+1)); echo "  ✓ $(basename "$f")"
 done
 echo "  $m migrations V9 appliquées, 0 erreur"
-[ "$m" = 13 ] || { echo "attendu 13 migrations V9"; exit 1; }
+[ "$m" = 17 ] || { echo "attendu 17 migrations V9 finale"; exit 1; }
 
 echo "== 6. Instantané après + comparaison =="
 UPGRADE_SNAPSHOT_V8=1 UPGRADE_SNAPSHOT_V9=1 python3 "$BOOT/upgrade_snapshot.py" "$DB" "$OUT/apres.json" --colonnes-de "$OUT/avant.json"

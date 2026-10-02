@@ -28,7 +28,7 @@ import sys
 db, avant_p, apres_p = sys.argv[1:4]
 avant, apres = json.load(open(avant_p)), json.load(open(apres_p))
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-DERNIERE_V8 = "20260928000812"
+DERNIERE_V8 = "20261002000813"  # socle canonique : V8 + hotfix 813 (nom conservé)
 
 
 def psql(sql):

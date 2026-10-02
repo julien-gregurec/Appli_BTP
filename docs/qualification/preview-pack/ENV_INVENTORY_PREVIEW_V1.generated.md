@@ -6,7 +6,7 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 133 | 19 | 88 | 26 | 1 | 11 | 20 | 12 |
+| gestion_pro | 135 | 21 | 88 | 26 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
@@ -17,6 +17,7 @@
 
 | Variable | Classe | Public | Secret | Build | Preview-only | Valeur imposée preview | Valeurs admises | Interdite preview | Condition |
 |---|---|---|---|---|---|---|---|---|---|
+| `ABONNEMENTS_LIVE_OUVERTURE_CONFIRMEE` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `ABONNEMENTS_PUBLICS_OUVERTS` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `BANK_DATA_ENCRYPTION_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
 | `ELSATIA_APPLICATION_ENV` | REQUIRED |  |  | oui |  | `preview` | local, test, preview, production |  |  |
@@ -25,6 +26,7 @@
 | `FEATURE_BOUTIQUE_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `FEATURE_CRONS_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `FEATURE_RELANCES_AUTO_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
+| `LEGAL_TVA_REGIME_CONFIRME` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `NEXT_PUBLIC_APP_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_COLORS_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | REQUIRED | oui |  | oui |  |  |  |  |  |
