@@ -155,7 +155,7 @@ test("db : sonde RLS — UUID strict (aucune injection), transaction en lecture 
 });
 
 test("db : RPC service-role only — accord à authenticated, absence, service_role manquant", () => {
-  assert.equal(RPC_SERVICE_SEULEMENT.length, 39); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201) + 2 (V6 : RGPD contrats V2, …0928 501) ; V7 : inchangé (Relevé Lot 7 : aucune RPC service-role only) ; + 2 (V8 : webhook d'application Per-App …0928 804, fin de webhook Stripe …0928 808)
+  assert.equal(RPC_SERVICE_SEULEMENT.length, 50); // 20 (V3) + 13 (V4 : ordre Stripe, identité Studio) + 2 (V5 : réabonnement, …0928 201) + 2 (V6 : RGPD contrats V2, …0928 501) ; V7 : inchangé ; + 2 (V8 : webhook d'application Per-App …0928 804, fin de webhook Stripe …0928 808) ; + 11 (V9 : RGPD export V1, migration 20261002001201)
   assert.match(sqlServiceSeulement(), /unnest\(array\['reserver_evenement_abonnement_service'/);
   const r = evaluerServiceSeulement("a|f|f|t|1\nb|f|t|t|1\nc|f|f|f|0\nd|f|f|f|1\n");
   assert.deepEqual(r.map((x) => x.ok), [true, false, false, false]);

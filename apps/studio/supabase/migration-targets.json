@@ -32,7 +32,8 @@
       "20260929150000_studio_invitations.sql",
       "20260929160000_studio_post_h_guard_rgpd.sql",
       "20260929170000_studio_identity_handoff_seq_guard_v1.sql",
-      "20260929180000_studio_incident_control.sql"
+      "20260929180000_studio_incident_control.sql",
+      "20260929100000_studio_rgpd_export.sql"
     ]
   }
 }

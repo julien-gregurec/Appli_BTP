@@ -12,7 +12,13 @@ export {
   AUDIENCE_PATTERN,
   UUID_PATTERN,
 } from "./subject";
-export { createIdentityIssuer, type IdentityIssuer, type IssueHandoffInput, type IssueLifecycleInput } from "./issuer";
+export {
+  createIdentityIssuer,
+  type IdentityIssuer,
+  type IssueHandoffInput,
+  type IssueLifecycleInput,
+  type IssueExportRequestInput,
+} from "./issuer";
 export { createIdentityVerifier, type IdentityVerifier } from "./verifier";
 export {
   createStudioIdentityBroker,

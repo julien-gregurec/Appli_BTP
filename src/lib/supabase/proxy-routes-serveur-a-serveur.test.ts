@@ -55,6 +55,8 @@ describe("proxy Gestion Pro — routes serveur à serveur sans session", () => {
     ["/api/tools/monetization/portal", "POST"],
     ["/api/tools/monetization/apple/verify", "POST"],
     ["/api/tools/monetization/google/verify", "POST"],
+    ["/api/cron/rgpd-export", "POST"],
+    ["/api/cron/rgpd-export", "GET"],
   ])("%s (%s) n'est pas redirigée vers /login et n'interroge pas l'Auth par cookie", async (chemin, method) => {
     const reponse = await updateSession(requete(chemin, method));
     expect(estRedirectionLogin(reponse)).toBe(false);
@@ -64,6 +66,11 @@ describe("proxy Gestion Pro — routes serveur à serveur sans session", () => {
   it("témoin : une page applicative sans session reste redirigée vers /login", async () => {
     const reponse = await updateSession(requete("/dashboard", "GET"));
     expect(estRedirectionLogin(reponse)).toBe(true);
+  });
+
+  it("témoin : les routes d'export RGPD utilisateur exigent une session (pas d'exemption)", async () => {
+    expect(estRedirectionLogin(await updateSession(requete("/api/rgpd/exports", "POST")))).toBe(true);
+    expect(estRedirectionLogin(await updateSession(requete("/api/rgpd/exports/00000000-0000-0000-0000-000000000000/telechargement", "GET")))).toBe(true);
   });
 
   it("témoin : un préfixe voisin non listé n'hérite pas de l'exemption", async () => {
