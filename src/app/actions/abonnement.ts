@@ -9,6 +9,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { peutGererAbonnementSuspendu } from "@/lib/acces-support-abonnement";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/commercialisation-abonnements";
+import { exigerAcceptationConditions } from "@/lib/acceptation-documents-legaux";
 import {
   AbonnementStripeDejaRattache,
   ajouterOptionIAAbonnement,
@@ -71,6 +72,14 @@ export async function demarrerAbonnementAction(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
+
+  // Aucune souscription payante sans acceptation, par ce souscripteur et dans ce
+  // parcours, des CGU / CGV / DPA en vigueur (preuve append-only en base).
+  const acceptation = await exigerAcceptationConditions(supabase, formData, ctx.entrepriseId, "souscription_abonnement");
+  if (!acceptation.ok) {
+    const separateur = retourErreur.includes("?") ? "&" : "?";
+    redirect(`${retourErreur}${separateur}error=${encodeURIComponent(acceptation.message)}`);
+  }
 
   let destination: string;
   try {

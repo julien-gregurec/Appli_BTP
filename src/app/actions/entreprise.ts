@@ -8,6 +8,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireAcceptationFormulaire, messageLectureAcceptation } from "@/lib/documents-legaux-versions";
 
 function champ(formData: FormData, nom: string) {
   const valeur = String(formData.get(nom) ?? "").trim();
@@ -50,13 +51,22 @@ export async function createEntrepriseAction(formData: FormData) {
     redirect("/login");
   }
 
-  // Bootstrap atomique côté base (entreprise + poste Admin/Gérant + membre + droits + entreprise active).
-  const { error } = await supabase.rpc("creer_entreprise_bootstrap", {
+  // Aucune entreprise sans acceptation explicite des CGU / CGV / DPA en vigueur
+  // (ELSATIA-LEGAL-CONSENT-COMMERCIALIZATION-PACK-V1). La case n'est jamais pré-cochée.
+  const acceptation = lireAcceptationFormulaire(formData);
+  if (!acceptation.ok) {
+    redirect(`/onboarding?error=${encodeURIComponent(messageLectureAcceptation(acceptation))}`);
+  }
+
+  // Bootstrap atomique côté base (entreprise + poste Admin/Gérant + membre + droits + entreprise
+  // active) ET preuve d'acceptation dans la même transaction : un refus n'en laisse aucune trace.
+  const { error } = await supabase.rpc("creer_entreprise_avec_acceptation", {
     p_nom: nom,
     p_siret: siret,
     p_adresse: adresse,
     p_code_postal: codePostal,
     p_ville: ville,
+    p_documents: acceptation.documents,
   });
   if (error) {
     redirect(`/onboarding?error=${encodeURIComponent(messageErreurUtilisateur("createEntrepriseAction:bootstrap", error, "Impossible de créer l’entreprise. Vérifiez les informations saisies."))}`);

@@ -1,5 +1,6 @@
 import { activerCompteEmployeAction, createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { AcceptationConditions } from "@/components/AcceptationConditions";
 import { estCodeOffreTarifaire, offreTarifaireParCle } from "@/lib/tarification";
 
 export default async function OnboardingPage({
@@ -133,6 +134,7 @@ export default async function OnboardingPage({
               />
             </div>
           </div>
+          <AcceptationConditions id="acceptation-creation-entreprise" />
           <button
             type="submit"
             className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white"
