@@ -42,3 +42,11 @@ begin
     execute format('grant select, insert, update, delete on public.%I to authenticated', v_table);
   end loop;
 end $$;
+
+-- Fonctions utilisées dans les politiques RLS : elles étaient exécutables via
+-- le droit PUBLIC par défaut de PostgreSQL, retiré par la nouvelle exposition.
+-- Sans elles, toute lecture protégée échoue (« permission denied for function
+-- est_membre_actif »). Les fonctions de recalcul et les déclencheurs restent
+-- fermés : ils s'exécutent déjà avec les droits de leur propriétaire.
+grant execute on function public.est_membre_actif(uuid) to authenticated;
+grant execute on function public.entreprise_sans_membres(uuid) to authenticated;
