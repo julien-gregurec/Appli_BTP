@@ -1,0 +1,18 @@
+import { contexte, fermer, q1, entrepriseId, COMPTES, capture } from "./lib.mjs";
+const eid = await entrepriseId();
+const ctx = await contexte("gerant"); const page = await ctx.newPage();
+page.on("response", r => { if (r.request().method()==="POST") console.log("POST", r.status(), r.url()); });
+await page.goto("/planning");
+const f = page.locator("main form", { has: page.getByRole("button", { name: "Ajouter au planning" }) });
+await f.locator('input[role="combobox"]').fill("Rénovation maison");
+console.log("options:", await page.getByRole("option").allTextContents());
+await page.getByRole("option", { name: /Rénovation maison Durand/ }).first().click();
+console.log("hidden chantier_id:", await f.locator('input[name="chantier_id"]').inputValue());
+await f.locator('[name="date"]').fill("2026-10-05"); await f.locator('[name="heures"]').fill("8");
+const e = await q1("select id from employes where entreprise_id=$1 and email=$2", [eid, COMPTES.salarie.email]);
+await f.locator(`input[name="employe_ids"][value="${e.id}"]`).check();
+await f.getByRole("button", { name: "Ajouter au planning" }).click(); await page.waitForTimeout(3000);
+console.log("url", page.url());
+console.log((await page.locator("main").innerText()).replace(/\s+/g," ").slice(0,300));
+await capture(page, "debug-planning");
+await ctx.close(); await fermer();
