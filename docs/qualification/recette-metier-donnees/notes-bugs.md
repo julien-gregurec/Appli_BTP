@@ -1,0 +1,21 @@
+- B01 P1 droits implicites (migration 184) CORRIGÉ
+- B02 P2 client sans nom ni société accepté (creerClientAction/modifierClientAction) CORRIGÉ
+- B03 P3 logo: contrôle sur type MIME déclaré seulement
+- Ouvrages = module BETA masqué en V3 (hors périmètre)
+- B01b P1 fonctions RLS est_membre_actif/entreprise_sans_membres non exécutables (nouvelle exposition) CORRIGÉ migr 184
+- B04 P0 chantiers: aucune politique permissive en écriture depuis migr 081 → création/modif chantier impossible pour tous (gérant inclus) CORRIGÉ migr 185 (à confirmer en prod)
+- B05 P1 devis à montant négatif (qté négative, remise>100%) CORRIGÉ actions/devis.ts
+- B06 P3 dates ISO sur documents imprimés CORRIGÉ DocumentImprimable
+- B07 P3 chantier fin<début accepté CORRIGÉ creerChantierAction
+- B08 P2 TVA non ventilée par taux sur devis/factures imprimés (mention légale art. 242 nonies A CGI à valider) NON CORRIGÉ
+- B09 P3 prospect reste "prospect" après acceptation de devis
+- B10 P1 produit: acompte/situation/avoir/relances uniquement dans modules BETA masqués (facturation-avancee, crm)
+- B11 P2 TRANSITIONS_FACTURES envoyee→annulee sans avoir (à tester)
+- Pas de numérotation de pages (Page x/y) sur PDF 4 pages
+- devis brouillon imprimé "DEVIS BROUILLON" sans numéro : OK
+- Données copiées : src/app/(app)/outillage/[id]/page 2.tsx (fichier copie)
+- B12 P2 pointage oublié: doublons/chevauchements même jour acceptés (heures comptées 2×) CORRIGÉ migr 186
+- B13 P2 UX: pointages oubliés à valider rangés dans « Anciennes saisies d'heures » repliées; carte sans motif salarié, sans statut ni niveau d'anomalie, date ISO
+- B14 P3 pointage 16:00→08:00 interprété en poste de nuit 16 h (anomalie critique signalée) — acceptable mais à confirmer
+- B15 P2 UX: compte Ouvrier activé avec pointage personnel désactivé par défaut (admin doit l'activer dans Accès)
+- départ < 15 min refusé (durée minimale) OK; double clic arrivée → 1 session OK
