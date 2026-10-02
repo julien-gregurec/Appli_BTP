@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerSyntheseInventaire } from "@/lib/inventaires";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { chargerLignesInventaire } from "@/lib/stock-donnees";
 import { reponseXlsx } from "@/lib/xlsx";
 
 type Article = { reference: string; designation: string; unite: string };
@@ -25,18 +26,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const supabase = await createClient();
-  const [{ data: inventaire, error: erreurInventaire }, { data: lignes, error: erreurLignes }] = await Promise.all([
+  // Rapport comptable : toutes les lignes, lues en entier page par page.
+  const [{ data: inventaire, error: erreurInventaire }, lignes] = await Promise.all([
     supabase.from("inventaires").select("numero,date_inventaire,statut,commentaire,valide_at").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
-    supabase.rpc("lignes_inventaire_avec_prix", {
-      p_entreprise_id: contexte.entrepriseId,
-      p_inventaire_id: id,
-    }),
+    chargerLignesInventaire(supabase, contexte.entrepriseId, id, true).then((data) => ({ data, error: null }), (error: Error) => ({ data: null, error })),
   ]);
+  const erreurLignes = lignes.error;
   if (erreurInventaire || erreurLignes) return Response.json({ error: erreurInventaire?.message ?? erreurLignes?.message }, { status: 503 });
   if (!inventaire) return Response.json({ error: "Inventaire introuvable" }, { status: 404 });
   if (inventaire.statut !== "valide") return Response.json({ error: "L’inventaire doit être validé avant son export comptable" }, { status: 409 });
 
-  const details = ((lignes ?? []) as LignePrix[]).map((ligne) => {
+  const details = ((lignes.data ?? []) as LignePrix[]).map((ligne) => {
     const article: Article = {
       reference: String(ligne.reference ?? ""),
       designation: String(ligne.designation ?? ""),

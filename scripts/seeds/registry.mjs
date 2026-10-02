@@ -276,6 +276,55 @@ export const SEEDS = [
       runs: 2,
     },
   },
+  // Train V9 : jeux de charge des lots qualifiés après V8 (pointages > 1 000, rentabilité,
+  // mémoire Next), classés et exécutés sur base fraîche par le harnais.
+  {
+    id: "perf-pointages-mois",
+    path: "scripts/perf/pointages_mois_charge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (ELSATIA_GP_POINTAGES_FACTURE_FIX_V1 : pointages d'un mois > 1 000)",
+    bypass: {
+      capacite_personnes_bypass: "Fixture locale, superutilisateur : salariés de charge au-delà de la capacité de l'offre du tenant de test.",
+    },
+    // Jeu de CHARGE synthétique (codes d'identification orphelins après rechargement, assumés) : exécuté par src/lib/pointages-gestion.integration.test.ts sur PostgREST réel, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
+  },
+  {
+    id: "perf-rentabilite",
+    path: "scripts/perf/rentabilite_charge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (ELSATIA_RENTABILITE_DATA_CORRECTNESS_V1 : rentabilité > 1 000 lignes)",
+    bypass: {
+      capacite_personnes_bypass: "Fixture locale, superutilisateur : salariés de charge au-delà de la capacité de l'offre du tenant de test.",
+    },
+    // Jeu de CHARGE synthétique (devis / factures engagés SANS ligne, montants posés sur l'en-tête) : exécuté par src/lib/rentabilite.integration.test.ts sur PostgREST réel, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
+  },
+  {
+    id: "perf-rentabilite-purge",
+    path: "scripts/perf/rentabilite_charge_purge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (retire le jeu perf-rentabilite)",
+    bypass: {
+      session_replication_role: "Base de test uniquement : triggers d'immuabilité (factures émises, stock) neutralisés le temps de la purge du seul jeu de charge, dans une transaction.",
+    },
+    // Purge du jeu de charge rentabilité (laisse des codes d'identification orphelins) : exécutée entre deux volumes du banc rentabilité, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
+  },
+  {
+    id: "perf-memory-affectations",
+    path: "scripts/perf/memory/seed-affectations.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (ELSATIA_NEXT_MEMORY_CAPACITY_V1 : semaine de planning réaliste sur la fixture perf)",
+    // Supprime puis recrée ses affectations : chaque passage ajoute historique et notifications
+    // (comportement métier des triggers) — non idempotent au sens du harnais, exécuté une fois.
+    idempotent: false,
+    harness: {
+      setup: [{ seed: "perf-fixture" }],
+      run: [{ sql: "scripts/perf/memory/seed-affectations.sql" }],
+      runs: 1,
+    },
+  },
   {
     id: "e2e-reserves",
     path: "scripts/e2e/prepare-reserves-v3-recipe.sql",
@@ -433,6 +482,19 @@ export const SEEDS = [
     // V7 construite depuis V3 par upgrade-v7-v8.sh, jamais sur une base fraîche V8.
     target: "qualification d'upgrade V7 → V8 (base V7 avec historique V3 → V4 → V5 → V6 → V7, jamais une base fraîche V8)",
     coveredBy: "upgrade-harness",
+  },
+  {
+    id: "upgrade-complement-v9",
+    path: "scripts/local-postgres-bootstrap/upgrade_v8_v9_seed_complement.sql",
+    classification: "CI_ONLY",
+    // Écrit l'état d'une base V8 (factures brouillon non modifiables par B4, IBAN chiffrés au format v1
+    // sans identifiant de clé, compteurs de l'ancienne politique de connexion), après les jeux Finance
+    // et GP résiduel : ne se charge que dans upgrade-v8-v9.sh, jamais sur une base fraîche V9.
+    target: "qualification d'upgrade V8 → V9 (base V8 avec historique V3 → V8, jamais une base fraîche V9)",
+    coveredBy: "upgrade-harness",
+    bypass: {
+      session_replication_role: "Base d'upgrade jetable : données de l'ère V8 écrites à leur état (brouillons, chiffrés v1) sans rejouer leur cycle de vie.",
+    },
   },
   {
     id: "upgrade-complement-v4",

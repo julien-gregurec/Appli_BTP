@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { ReceptionScanner } from "@/components/ReceptionScanner";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 export default async function ReceptionPage() {
   const ctx = await getContexteEntreprise();
@@ -17,8 +18,7 @@ export default async function ReceptionPage() {
     supabase.from("articles_stock").select("id, reference, designation, code_barres, unite")
       .eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("designation"),
     supabase.rpc("receptions_lignes_ouvertes", { p_entreprise_id: ctx.entrepriseId }),
-    supabase.from("chantiers").select("id, nom").eq("entreprise_id", ctx.entrepriseId)
-      .not("statut", "in", "(archive,annule,termine)").order("nom"),
+    lireOptionsChantiers(supabase, ctx.entrepriseId, { statutsExclus: ["archive", "annule", "termine"] }).then((data) => ({ data })),
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
     supabase.from("outils").select("id,reference,designation").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu,rebut)").order("designation"),
   ]);

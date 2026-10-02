@@ -1,4 +1,5 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { chiffrerAvecTrousseau, dechiffrerAvecTrousseau, indexAveugleIban, lireTrousseauBancaire } from "@/lib/banking-keyring";
 
 export type TypeOrdreBancaire = "salaire" | "note_frais" | "fournisseur";
 
@@ -47,31 +48,25 @@ export function bicEstValide(valeur: string) {
   return /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(normaliserBic(valeur));
 }
 
-function cleChiffrement() {
-  const valeur = process.env.BANK_DATA_ENCRYPTION_KEY?.trim();
-  if (!valeur) throw new Error("La clé BANK_DATA_ENCRYPTION_KEY n’est pas configurée");
-  const cle = /^[0-9a-f]{64}$/i.test(valeur) ? Buffer.from(valeur, "hex") : Buffer.from(valeur, "base64");
-  if (cle.length !== 32) throw new Error("BANK_DATA_ENCRYPTION_KEY doit contenir exactement 32 octets");
-  return cle;
-}
-
+// Chiffrement IBAN / BIC : trousseau versionné (src/lib/banking-keyring.ts). Relu à chaque
+// appel : une rotation de variables d'environnement prend effet sans état en mémoire.
 export function chiffrerDonneeBancaire(valeur: string) {
-  const iv = randomBytes(12);
-  const chiffreur = createCipheriv("aes-256-gcm", cleChiffrement(), iv);
-  const contenu = Buffer.concat([chiffreur.update(valeur, "utf8"), chiffreur.final()]);
-  return ["v1", iv.toString("base64url"), chiffreur.getAuthTag().toString("base64url"), contenu.toString("base64url")].join(":");
+  return chiffrerAvecTrousseau(lireTrousseauBancaire(), valeur);
 }
 
 export function dechiffrerDonneeBancaire(valeur: string) {
-  const [version, iv, tag, contenu] = valeur.split(":");
-  if (version !== "v1" || !iv || !tag || !contenu) throw new Error("Donnée bancaire chiffrée invalide");
-  const dechiffreur = createDecipheriv("aes-256-gcm", cleChiffrement(), Buffer.from(iv, "base64url"));
-  dechiffreur.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([dechiffreur.update(Buffer.from(contenu, "base64url")), dechiffreur.final()]).toString("utf8");
+  return dechiffrerAvecTrousseau(lireTrousseauBancaire(), valeur);
 }
 
+/**
+ * Empreinte de l'IBAN stockée en `iban_hash`. Format v2 : index aveugle HMAC sous la clé
+ * active (la base en déduit `iban_hash_cle` depuis le chiffré). Mode de compatibilité v1 :
+ * SHA-256 historique, pour qu'un retour arrière du code reste possible.
+ */
 export function empreinteIban(iban: string) {
-  return createHash("sha256").update(normaliserIban(iban)).digest("hex");
+  const trousseau = lireTrousseauBancaire();
+  if (trousseau.formatEcriture === "v1") return createHash("sha256").update(normaliserIban(iban)).digest("hex");
+  return indexAveugleIban(trousseau, normaliserIban(iban));
 }
 
 export function finIban(iban: string) {
@@ -82,12 +77,18 @@ export function powensEstConfigure() {
   return Boolean(process.env.POWENS_API_BASE_URL && process.env.POWENS_CLIENT_ID && process.env.POWENS_CLIENT_SECRET && process.env.POWENS_WEBVIEW_BASE_URL && process.env.NEXT_PUBLIC_APP_URL);
 }
 
-function secretEtatBancaire() {
-  return process.env.BANK_DATA_ENCRYPTION_KEY || process.env.POWENS_CLIENT_SECRET || "";
+// Signature de l'état de paiement (valide 7 jours). Clé dédiée BANK_OAUTH_STATE_HMAC_KEY ;
+// les replis historiques restent acceptés À LA VÉRIFICATION (états déjà émis) et ne servent à
+// signer que si la clé dédiée est absente. Ainsi la rotation des clés de chiffrement bancaire
+// n'invalide aucun état en cours.
+function secretsEtatBancaire() {
+  return [process.env.BANK_OAUTH_STATE_HMAC_KEY, process.env.BANK_DATA_ENCRYPTION_KEY, process.env.POWENS_CLIENT_SECRET]
+    .map((valeur) => valeur?.trim() ?? "")
+    .filter(Boolean);
 }
 
 export function creerEtatPaiementBancaire(lotId: string, entrepriseId: string) {
-  const secret = secretEtatBancaire();
+  const [secret] = secretsEtatBancaire();
   if (!secret) throw new Error("Signature bancaire non configurée");
   const corps = Buffer.from(JSON.stringify({ lotId, entrepriseId, expireAt: Date.now() + 7 * 24 * 60 * 60_000 })).toString("base64url");
   const signature = createHmac("sha256", secret).update(corps).digest("base64url");
@@ -95,13 +96,15 @@ export function creerEtatPaiementBancaire(lotId: string, entrepriseId: string) {
 }
 
 export function verifierEtatPaiementBancaire(etat: string) {
-  const secret = secretEtatBancaire();
+  const secrets = secretsEtatBancaire();
   const [corps, signature] = etat.split(".");
-  if (!secret || !corps || !signature) return null;
-  const attendu = createHmac("sha256", secret).update(corps).digest("base64url");
+  if (!secrets.length || !corps || !signature) return null;
   const a = Buffer.from(signature);
-  const b = Buffer.from(attendu);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  const signe = secrets.some((secret) => {
+    const b = Buffer.from(createHmac("sha256", secret).update(corps).digest("base64url"));
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
+  if (!signe) return null;
   try {
     const valeur = JSON.parse(Buffer.from(corps, "base64url").toString("utf8")) as { lotId?: string; entrepriseId?: string; expireAt?: number };
     if (!valeur.lotId || !valeur.entrepriseId || !valeur.expireAt || valeur.expireAt < Date.now()) return null;

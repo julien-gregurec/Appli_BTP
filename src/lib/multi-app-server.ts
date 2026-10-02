@@ -101,21 +101,20 @@ export async function urlReservesPourUtilisateur(entrepriseId: string): Promise<
 
 export async function chargerCatalogueApplications(): Promise<ApplicationPlateforme[]> {
   const supabase = await createClient();
-  const [{ data: applications, error }, { data: acces }, { data: habilitations }] = await Promise.all([
+  // Compteurs calculés en base (plateforme_applications_compteurs) : les deux
+  // tables lues en entier ici étaient plafonnées à 1 000 lignes par PostgREST.
+  const [{ data: applications, error }, { data: compteurs, error: erreurCompteurs }] = await Promise.all([
     supabase.from("applications_elsatia").select("code,nom,description,actif,ordre,url_locale,url_preview,url_production,icone,statut_produit").order("ordre"),
-    supabase.from("acces_applications_entreprises").select("application_code,entreprise_id,autorise,valide_du,valide_jusqu_au"),
-    supabase.from("habilitations_applications_utilisateurs").select("application_code,utilisateur_id,autorise,valide_du,valide_jusqu_au"),
+    supabase.rpc("plateforme_applications_compteurs"),
   ]);
   if (error) throw new Error("Catalogue d’applications indisponible");
-  const maintenant = Date.now();
-  const actif = (ligne: { autorise: boolean; valide_du: string | null; valide_jusqu_au: string | null }) => ligne.autorise
-    && (!ligne.valide_du || new Date(ligne.valide_du).getTime() <= maintenant)
-    && (!ligne.valide_jusqu_au || new Date(ligne.valide_jusqu_au).getTime() > maintenant);
+  if (erreurCompteurs) throw new Error("Compteurs d’applications indisponibles");
+  const parCode = (compteurs ?? {}) as Record<string, { entreprises: number; utilisateurs: number }>;
 
   return ((applications ?? []) as ApplicationCatalogue[]).map((application) => ({
     ...application,
-    entreprisesAutorisees: (acces ?? []).filter((ligne) => ligne.application_code === application.code && actif(ligne)).length,
-    utilisateursHabilites: (habilitations ?? []).filter((ligne) => ligne.application_code === application.code && actif(ligne)).length,
+    entreprisesAutorisees: Number(parCode[application.code]?.entreprises ?? 0),
+    utilisateursHabilites: Number(parCode[application.code]?.utilisateurs ?? 0),
   }));
 }
 

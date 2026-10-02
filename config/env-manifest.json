@@ -638,12 +638,14 @@
     {
       "id": "F-DR-BANK-KEY-VERSIONING",
       "severity": "P0",
-      "status": "open",
+      "status": "fixed",
       "variables": [
-        "BANK_DATA_ENCRYPTION_KEY"
+        "BANK_DATA_ENCRYPTION_KEY",
+        "BANK_DATA_ENCRYPTION_KEYS",
+        "BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID"
       ],
-      "text": "AES-256-GCM avec format chiffré « v1 » sans identifiant de clé : aucune rotation simple, perte = IBAN/BIC illisibles à jamais.",
-      "next_step": "Lot cryptographie séparé : key versioning (id de clé dans le chiffré), fenêtre à deux clés, rechiffrement."
+      "text": "Corrigé par ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1 : trousseau versionné (BANK_DATA_ENCRYPTION_KEYS + BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID), format v2:<clé>:A256GCM avec en-tête authentifié, registre des clés en base (empreinte HMAC, jamais la clé), rechiffrement par lots reprenable (npm run bank-keys), garde SQL contre toute écriture sous clé retirée/compromise. La clé historique reste k1 (format v1 toujours lisible).",
+      "next_step": "Exploitation : attester k1 (bank-keys register --key-id k1) sur chaque environnement, puis appliquer la procédure de rotation du rapport §5 selon la politique de rotation. Toute clé retirée reste au coffre DR tant qu'une sauvegarde qui en dépend est dans la période de rétention."
     },
     {
       "id": "F-DR-VOLUME-PASSPHRASE",
@@ -794,11 +796,12 @@
       "severity": "P1",
       "status": "detected",
       "variables": [
+        "BANK_OAUTH_STATE_HMAC_KEY",
         "BANK_DATA_ENCRYPTION_KEY",
         "POWENS_CLIENT_SECRET"
       ],
-      "text": "La signature de l'état de paiement bancaire réutilise BANK_DATA_ENCRYPTION_KEY, avec repli sur POWENS_CLIENT_SECRET.",
-      "next_step": "Variable dédiée future BANK_OAUTH_STATE_HMAC_KEY (états valides 7 jours) : double vérification pendant 7 jours, puis retrait des replis. Cryptographie NON modifiée dans ce lot."
+      "text": "La signature de l'état de paiement bancaire utilise BANK_OAUTH_STATE_HMAC_KEY si elle est définie ; sinon BANK_DATA_ENCRYPTION_KEY puis POWENS_CLIENT_SECRET (comportement historique). La vérification accepte les trois (états émis valables 7 jours).",
+      "next_step": "Poser BANK_OAUTH_STATE_HMAC_KEY sur chaque environnement, attendre 7 jours, puis retirer les replis du vérificateur (src/lib/banking.ts, secretsEtatBancaire)."
     },
     {
       "id": "F-LEGAL-IDENTITY-VARS",
@@ -1686,15 +1689,132 @@
       "build_time": false,
       "runtime": true,
       "category": "encryption",
-      "description": "Clé AES-256-GCM (32 octets, hex ou base64) qui chiffre IBAN/BIC. Le format chiffré « v1 » ne porte AUCUN identifiant de clé : pas de rotation simple. Sert aussi de clé HMAC de l'état de paiement bancaire (repli sur POWENS_CLIENT_SECRET si absente).",
+      "description": "Clé historique k1 du chiffrement IBAN/BIC (AES-256-GCM, 32 octets, hex ou base64). Lit les valeurs « v1:… » (sans identifiant) et alimente k1 du trousseau si BANK_DATA_ENCRYPTION_KEYS ne la déclare pas (si elle la déclare, les deux doivent être identiques, sinon refus). Seule, elle reproduit exactement le comportement d'avant la V1 (écriture v1). Repli de signature de l'état de paiement si BANK_OAUTH_STATE_HMAC_KEY est absente.",
       "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": true,
       "example_required": true,
-      "dr_note": "Perdue : IBAN/BIC illisibles à jamais, non recréable. Deux dépositaires + registre DR. Rotation impossible sans key versioning (lot crypto séparé).",
+      "dr_note": "Perdue : toute valeur encore sous k1 (format v1 ou v2:k1) est illisible à jamais. Deux dépositaires + coffre DR. Après rotation et retrait de k1 (bank-keys retire), la conserver scellée au coffre DR tant qu'une sauvegarde contenant des données sous k1 reste dans la période de rétention ; bank-keys verify détecte une restauration sans elle (CLE_MANQUANTE).",
       "finding_ids": [
         "F-DR-BANK-KEY-VERSIONING",
+        "F-HMAC-BANK-STATE-FALLBACK"
+      ]
+    },
+    {
+      "name": "BANK_DATA_ENCRYPTION_KEYS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "required_when": "dès la première rotation de clé bancaire (k2 et suivantes)",
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Trousseau de chiffrement IBAN/BIC : « k2:<clé>,k1:<clé> » (identifiants k1…k999999, clés de 32 octets en hex ou base64). Toutes les clés listées servent au déchiffrement ; seule BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID chiffre. Défini ⇒ écritures au format v2:<clé>:A256GCM. Doublons, clés identiques sous deux identifiants ou k1 différente de BANK_DATA_ENCRYPTION_KEY ⇒ refus (échec fermé).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": true,
+      "example_required": true,
+      "dr_note": "Chaque clé encore référencée par une donnée ou par une sauvegarde en rétention est vitale. Le registre public.cles_chiffrement_bancaire (dans chaque sauvegarde) porte l'empreinte HMAC de chaque clé : bank-keys verify prouve qu'un trousseau restauré est le bon.",
+      "value_pattern": "^\\s*k[1-9][0-9]{0,5}:[A-Za-z0-9+/=]{43,64}(\\s*,\\s*k[1-9][0-9]{0,5}:[A-Za-z0-9+/=]{43,64})*\\s*$",
+      "finding_ids": [
+        "F-DR-BANK-KEY-VERSIONING"
+      ]
+    },
+    {
+      "name": "BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "required_when": "obligatoire dès que le trousseau contient plusieurs clés",
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Identifiant (k1, k2…) de la clé qui chiffre les nouvelles écritures IBAN/BIC. Doit être présente dans le trousseau et correspondre à la clé « active » du registre en base (bank-keys status : ACTIVE_DIVERGENTE sinon).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^k[1-9][0-9]{0,5}$",
+      "example_value": "k2",
+      "finding_ids": [
+        "F-DR-BANK-KEY-VERSIONING"
+      ]
+    },
+    {
+      "name": "BANK_DATA_ENCRYPTION_WRITE_FORMAT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "required_when": "uniquement pour un retour arrière du code vers une version antérieure à la V1",
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Format des nouvelles écritures bancaires : v2 (défaut avec BANK_DATA_ENCRYPTION_KEYS) ou v1 (défaut avec la seule clé historique ; autorisé seulement si la clé active est k1). v1 + bank-keys rotate rend toutes les données relisibles par le code d'avant la V1.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "v1",
+        "v2"
+      ],
+      "example_value": "v2",
+      "finding_ids": [
+        "F-DR-BANK-KEY-VERSIONING"
+      ]
+    },
+    {
+      "name": "BANK_OAUTH_STATE_HMAC_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "required_when": "dès que les paiements bancaires sont activés (recommandé ; sinon repli historique)",
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "banking",
+      "description": "Clé HMAC dédiée à la signature de l'état de retour Powens (valide 7 jours). Découple la rotation des clés de chiffrement bancaire de la signature des états. Absente ⇒ repli sur BANK_DATA_ENCRYPTION_KEY puis POWENS_CLIENT_SECRET.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "finding_ids": [
         "F-HMAC-BANK-STATE-FALLBACK"
       ]
     },
@@ -7215,6 +7335,254 @@
       "category": "tooling",
       "description": "Secret HS256 éphémère de la storage-api locale du drill Storage DR V2, généré à chaque exécution par scripts/dr/v2/storage_drill.sh. Jamais une clé réelle.",
       "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_CONCURRENCE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : nombre maximal de navigateurs Chromium vivants par instance pour la génération de PDF ; défaut 2 (1 sous 1 Go de mémoire).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_FILE_MAX",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : nombre maximal de demandes PDF en attente au-delà de la concurrence ; défaut 10 (au-delà : 503 + Retry-After).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_ATTENTE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : attente maximale d'une demande PDF dans la file, en ms ; défaut 20000.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DUREE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : durée maximale d'une génération PDF, en ms ; défaut 35000 (arrêt forcé du navigateur au-delà).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DELAI_FERMETURE_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : délai accordé à la fermeture propre de Chromium avant arrêt forcé, en ms ; défaut 3000.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_CHROMIUM_EXECUTABLE",
+      "applications": [
+        "gestion_pro",
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Chemin d'un Chromium local pour la génération PDF de Gestion Pro et le banc de capacité (scripts/perf/capacity) ; défaut : binaire embarqué. Banc local uniquement. DECISION_REQUIRED:V9-PDF-CHROMIUM-NOM : Réserves lit PDF_CHROMIUM_EXECUTABLE_PATH (nom à harmoniser).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ANCIEN_MONTAGE",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Contre-preuve du banc de capacité PDF (scripts/perf/capacity/pdf-enfant.mjs) : « 1 » relance Chromium comme avant le correctif. Jamais posé hors banc.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "MEM_SAMPLER_DIR",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Répertoire de travail de l'échantillonneur mémoire (scripts/perf/memory/sampler.cjs, chargé par --require) : mesures et commandes gc/snap. Banc local uniquement.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL du PostgREST réel (max_rows = 1000) du banc d'exactitude GP (src/lib/test-support/banc-postgrest.ts) ; absent : suites PostgREST ignorées.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_DB",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Nom de la base PostgreSQL locale du banc d'exactitude GP (vérité superutilisateur) ; absent : suites PostgREST ignorées.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_ANON",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé anon du banc d'exactitude GP (jeton local de test) ; défaut : jeton du profil.",
+      "fail_mode": "default",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,

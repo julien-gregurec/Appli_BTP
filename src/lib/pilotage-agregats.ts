@@ -1,0 +1,104 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Indicateurs de pilotage calculés en base (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1,
+// migration 20261002001109) : jsonb non plafonné par `max_rows`, visibilité RLS
+// reproduite. En cas d'erreur, une exception : la page affiche « indisponible »
+// plutôt qu'un total partiel.
+
+const nombre = (valeur: unknown) => Number(valeur ?? 0);
+
+async function rpc<T>(supabase: SupabaseClient, nom: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.rpc(nom, args);
+  if (error || data === null || data === undefined) throw new Error(`${nom} indisponible : ${error?.message ?? "réponse vide"}`);
+  return data as T;
+}
+
+export type SynthesePaie = { nb: number; indemnitesDeplacement: number; primes: number; notesFrais: number; acomptes: number; nbAnomalies: number };
+
+export async function lireSynthesePaie(supabase: SupabaseClient, entrepriseId: string, periodeId: string, filtres: { statut?: string; recherche?: string; dossierId?: string | null }): Promise<SynthesePaie> {
+  const d = await rpc<Record<string, unknown>>(supabase, "paie_periode_synthese", {
+    p_entreprise_id: entrepriseId, p_periode_id: periodeId,
+    p_statut: filtres.statut || null, p_recherche: filtres.recherche?.replace(/[,()]/g, "") || null, p_dossier_id: filtres.dossierId ?? null,
+  });
+  return {
+    nb: nombre(d.nb),
+    indemnitesDeplacement: nombre(d.total_paniers) + nombre(d.total_trajets) + nombre(d.total_transports) + nombre(d.total_grands_deplacements),
+    primes: nombre(d.total_primes), notesFrais: nombre(d.total_notes_frais), acomptes: nombre(d.total_acomptes), nbAnomalies: nombre(d.nb_anomalies),
+  };
+}
+
+export type GroupeNotesFrais = { employeId: string | null; nom: string | null; nb: number; total: number; aVerifier: number };
+
+export async function lireSyntheseNotesFraisParEmploye(supabase: SupabaseClient, entrepriseId: string, filtres: { statut?: string; categorie?: string; chantierId?: string; employeId?: string }): Promise<GroupeNotesFrais[]> {
+  const lignes = await rpc<Array<Record<string, unknown>>>(supabase, "notes_frais_synthese_employes", {
+    p_entreprise_id: entrepriseId, p_statut: filtres.statut || null, p_categorie: filtres.categorie || null,
+    p_chantier_id: filtres.chantierId || null, p_employe_id: filtres.employeId || null,
+  });
+  return lignes.map((l) => ({ employeId: (l.employe_id as string | null) ?? null, nom: (l.nom as string | null) ?? null, nb: nombre(l.nb), total: nombre(l.total), aVerifier: nombre(l.a_verifier) }));
+}
+
+export type SyntheseCrm = { nbARelancer: number; resteAEncaisser: number; rappelsOuverts: number };
+
+export async function lireSyntheseCrm(supabase: SupabaseClient, entrepriseId: string): Promise<SyntheseCrm> {
+  const d = await rpc<Record<string, unknown>>(supabase, "gp_crm_synthese", { p_entreprise_id: entrepriseId });
+  return { nbARelancer: nombre(d.nb_a_relancer), resteAEncaisser: nombre(d.reste_a_encaisser), rappelsOuverts: nombre(d.rappels_ouverts) };
+}
+
+export type ChantierDashboard = { id: string; nom: string; statut: string; date_fin_prevue: string | null };
+export type DashboardChantiers = { parStatut: { statut: string; nb: number }[]; nbActifs: number; actifs: ChantierDashboard[]; nbEnRetard: number; enRetard: ChantierDashboard[] };
+
+export async function lireDashboardChantiers(supabase: SupabaseClient, entrepriseId: string, aujourdhui: string): Promise<DashboardChantiers> {
+  const d = await rpc<{ par_statut: { statut: string; nb: number }[]; nb_actifs: number; actifs: ChantierDashboard[]; nb_en_retard: number; en_retard: ChantierDashboard[] }>(supabase, "gp_dashboard_chantiers", { p_entreprise_id: entrepriseId, p_aujourdhui: aujourdhui, p_limite: 6 });
+  return { parStatut: d.par_statut.map((s) => ({ statut: s.statut, nb: nombre(s.nb) })), nbActifs: nombre(d.nb_actifs), actifs: d.actifs, nbEnRetard: nombre(d.nb_en_retard), enRetard: d.en_retard };
+}
+
+export type ArticleAlerte = { id: string; reference: string; designation: string; quantite_stock: number; seuil_alerte: number; unite: string };
+export type AlertesStock = { nb: number; nbRuptures: number; articles: ArticleAlerte[] };
+
+export async function lireAlertesStock(supabase: SupabaseClient, entrepriseId: string, limite = 50): Promise<AlertesStock> {
+  const d = await rpc<{ nb: number; nb_ruptures: number; articles: ArticleAlerte[] }>(supabase, "gp_alertes_stock", { p_entreprise_id: entrepriseId, p_limite: limite });
+  return { nb: nombre(d.nb), nbRuptures: nombre(d.nb_ruptures), articles: d.articles };
+}
+
+// Paie : page de dossiers et contenu d'export servis en base (visibilité
+// évaluée une fois, jsonb non plafonné).
+export async function lirePageDossiersPaie<T>(supabase: SupabaseClient, entrepriseId: string, periodeId: string, filtres: { statut?: string; recherche?: string; dossierId?: string | null }, limite: number, decalage: number): Promise<{ total: number; lignes: T[] }> {
+  const d = await rpc<{ total: number; lignes: T[] }>(supabase, "paie_periode_dossiers_page", {
+    p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_statut: filtres.statut || null,
+    p_recherche: filtres.recherche?.replace(/[,()]/g, "") || null, p_dossier_id: filtres.dossierId ?? null, p_limite: limite, p_decalage: decalage,
+  });
+  return { total: nombre(d.total), lignes: d.lignes };
+}
+
+export async function lireContenuExportPaie<D, P>(supabase: SupabaseClient, entrepriseId: string, periodeId: string, avecPieces: boolean): Promise<{ dossiers: D[]; pieces: P[] }> {
+  return rpc<{ dossiers: D[]; pieces: P[] }>(supabase, "paie_export_contenu", { p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_avec_pieces: avecPieces });
+}
+
+export type NoteFraisListe = { id: string; reference: string; date_frais: string | null; montant_ttc: number; devise: string | null; categorie: string | null; fournisseur: string | null; statut: string; statut_export: string | null; verrouille_at: string | null; lieu_hors_chantier: string | null; employe: { id: string; prenom: string; nom: string } | null; chantier: { nom: string } | null };
+
+/** Page de /notes-frais (curseur date_frais desc, id desc), visibilité RLS évaluée une fois. */
+export async function lirePageNotesFrais(supabase: SupabaseClient, entrepriseId: string, filtres: { statut?: string; categorie?: string; chantierId?: string; employeId?: string }, taille: number, curseur: { date: string | null; id: string } | null): Promise<{ lignes: NoteFraisListe[]; suivant: string | null }> {
+  const d = await rpc<{ lignes: NoteFraisListe[]; suite: boolean }>(supabase, "notes_frais_page", {
+    p_entreprise_id: entrepriseId, p_statut: filtres.statut || null, p_categorie: filtres.categorie || null, p_chantier_id: filtres.chantierId || null,
+    p_employe_id: filtres.employeId || null, p_limite: taille, p_avant_date: curseur?.date ?? null, p_avant_id: curseur?.id ?? null,
+  });
+  const derniere = d.lignes[d.lignes.length - 1];
+  return { lignes: d.lignes, suivant: d.suite && derniere ? `${derniere.date_frais ?? "null"}_${derniere.id}` : null };
+}
+
+export type AnomaliePaie = { id: string; dossier_id: string | null; niveau: string; code: string; description: string; justification: string | null; created_at: string };
+
+/** Anomalies ouvertes d'une période (par niveau), visibilité RLS évaluée une fois. */
+export async function lireAnomaliesPaie(supabase: SupabaseClient, entrepriseId: string, periodeId: string, dossierId: string | null, limite: number): Promise<AnomaliePaie[]> {
+  return rpc<AnomaliePaie[]>(supabase, "paie_anomalies_page", { p_entreprise_id: entrepriseId, p_periode_id: periodeId, p_dossier_id: dossierId, p_limite: limite });
+}
+
+export type VehiculeAlerte = { id: string; immatriculation: string; marque: string; modele: string; kilometrage: number; controle_technique_echeance: string | null; assurance_echeance: string | null; prochain_entretien_date: string | null; prochain_entretien_km: number | null };
+export type OutilAlerte = { id: string; reference: string; designation: string; prochaine_verification: string | null };
+export type AlertesParc = { nbVehicules: number; vehicules: VehiculeAlerte[]; nbOutils: number; outils: OutilAlerte[] };
+
+/** Véhicules et outils qui produisent une alerte (échéance à `horizon` jours, km d'entretien atteint), nombre exact. */
+export async function lireAlertesParc(supabase: SupabaseClient, entrepriseId: string, aujourdhui: string, horizon = 30, limite = 200): Promise<AlertesParc> {
+  const d = await rpc<{ nb_vehicules: number; vehicules: VehiculeAlerte[]; nb_outils: number; outils: OutilAlerte[] }>(supabase, "gp_alertes_parc", { p_entreprise_id: entrepriseId, p_aujourdhui: aujourdhui, p_horizon_jours: horizon, p_limite: limite });
+  return { nbVehicules: nombre(d.nb_vehicules), vehicules: d.vehicules, nbOutils: nombre(d.nb_outils), outils: d.outils };
+}

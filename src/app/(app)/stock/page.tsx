@@ -5,6 +5,8 @@ import { creerArticleStockAction, importerStockAction } from "@/app/actions/stoc
 import { euros } from "@/lib/devis";
 import { StockMovementForm } from "@/components/StockMovementForm";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { chargerArticlesStock, indicateursStock } from "@/lib/stock-donnees";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const typeLabel: Record<string, string> = { entree: "Entrée", sortie: "Sortie chantier", ajustement_plus: "Ajustement +", ajustement_moins: "Ajustement -" };
@@ -36,20 +38,16 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const peutVoirPrix = permissions === null || permissions.includes("voir_prix_stock") || permissions.includes("gerer_prix_stock");
   const peutGererPrix = permissions === null || permissions.includes("gerer_prix_stock");
 
-  const articlesPromise = peutVoirPrix
-    ? sb.rpc("articles_stock_avec_prix", { p_entreprise_id: ctx.entrepriseId })
-    : sb.from("articles_stock")
-      .select("id,reference,designation,unite,quantite_stock,seuil_alerte,emplacement,marque,code_barres,actif")
-      .eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("designation");
-
-  const [{ data: articlesBruts }, { data: teintes }, { data: chantiers }, { data: mouvementsData }] = await Promise.all([
-    articlesPromise,
+  // Catalogue lu en entier (valeur du stock et alertes portent sur tous les
+  // articles actifs, pas sur les 1 000 premiers renvoyés par PostgREST).
+  const [articlesBruts, { data: teintes }, { data: chantiers }, { data: mouvementsData }] = await Promise.all([
+    chargerArticlesStock(sb, ctx.entrepriseId, peutVoirPrix),
     sb.from("article_teintes").select("id,article_id,nom,code_hex").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
-    sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
+    lireOptionsChantiers(sb,ctx.entrepriseId,{statutsExclus:[]}).then((data)=>({data})),
     sb.from("mouvements_stock").select("id,date,type,quantite,motif,article:articles_stock(reference,designation,unite),chantier:chantiers(nom),teinte:article_teintes(nom)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }).limit(30),
   ]);
 
-  const articles = ((articlesBruts ?? []) as Omit<Article, "teintes">[])
+  const articles = (articlesBruts as unknown as Omit<Article, "teintes">[])
     .map((article) => ({
       ...article,
       teintes: ((teintes ?? []) as Teinte[])
@@ -57,8 +55,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
         .map((teinte) => ({ id: teinte.id, nom: teinte.nom, code_hex: teinte.code_hex })),
     }));
   const mouvements = (mouvementsData ?? []) as Mouvement[];
-  const alertes = articles.filter((article) => Number(article.quantite_stock) <= Number(article.seuil_alerte));
-  const valeur = peutVoirPrix ? articles.reduce((total, article) => total + Number(article.quantite_stock) * Number(article.prix_achat_ht ?? 0), 0) : null;
+  const { alertes, valeur } = indicateursStock(articles, peutVoirPrix);
 
   return <main className="p-3 sm:p-8"><div className="mx-auto max-w-6xl space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">Stock</h1><p className="text-sm text-neutral-500">Catalogue, nuanciers, imports fournisseurs, inventaires et mouvements par scan.</p></div><Link href="/stock/reception" className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Réception / sortie par scan</Link></div>

@@ -8,21 +8,24 @@ type Step = { title: string; description: string; href: string; action: string; 
 export default async function DemarragePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  // Existence seulement (limit) : un `count: "exact"` sous RLS évaluait la
+  // policy de chaque ligne (secondes à 20 000 pointages) pour un simple « fait ».
   const [members, clients, quotes, jobs, timeEntries] = await Promise.all([
-    supabase.from("utilisateurs_entreprises").select("utilisateur_id", { count: "exact", head: true }).eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif"),
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("entreprise_id", ctx.entrepriseId),
-    supabase.from("devis").select("id", { count: "exact", head: true }).eq("entreprise_id", ctx.entrepriseId),
-    supabase.from("chantiers").select("id", { count: "exact", head: true }).eq("entreprise_id", ctx.entrepriseId),
-    supabase.from("sessions_pointage").select("id", { count: "exact", head: true }).eq("entreprise_id", ctx.entrepriseId),
+    supabase.from("utilisateurs_entreprises").select("utilisateur_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").limit(2),
+    supabase.from("clients").select("id").eq("entreprise_id", ctx.entrepriseId).limit(1),
+    supabase.from("devis").select("id").eq("entreprise_id", ctx.entrepriseId).limit(1),
+    supabase.from("chantiers").select("id").eq("entreprise_id", ctx.entrepriseId).limit(1),
+    supabase.from("sessions_pointage").select("id").eq("entreprise_id", ctx.entrepriseId).limit(1),
   ]);
+  const nombre = (resultat: { data: unknown[] | null }) => resultat.data?.length ?? 0;
 
   const steps: Step[] = [
     { title: "Vérifier l’entreprise", description: "Complétez le SIRET, l’adresse, le logo et les informations qui apparaîtront sur vos documents.", href: "/parametres", action: "Vérifier les paramètres", done: Boolean(ctx.entrepriseNom) },
-    { title: "Préparer l’équipe", description: "Invitez les collaborateurs puis attribuez à chacun un poste et les droits adaptés.", href: "/employes", action: "Gérer l’équipe", done: (members.count ?? 0) > 1 },
-    { title: "Créer un premier client", description: "Une fiche client centralise ses coordonnées, chantiers, devis et factures.", href: "/clients/nouveau", action: "Créer un client", done: (clients.count ?? 0) > 0 },
-    { title: "Établir un premier devis", description: "Ajoutez les prestations, contrôlez les totaux puis envoyez le document au client.", href: "/devis/nouveau", action: "Créer un devis", done: (quotes.count ?? 0) > 0 },
-    { title: "Ouvrir un chantier", description: "Associez le client, le devis accepté et les membres de l’équipe chargés des travaux.", href: "/chantiers/nouveau", action: "Créer un chantier", done: (jobs.count ?? 0) > 0 },
-    { title: "Tester le suivi du temps", description: "Vérifiez le pointage personnel, le chantier sélectionné et le circuit de validation.", href: "/pointage", action: "Ouvrir le pointage", done: (timeEntries.count ?? 0) > 0 },
+    { title: "Préparer l’équipe", description: "Invitez les collaborateurs puis attribuez à chacun un poste et les droits adaptés.", href: "/employes", action: "Gérer l’équipe", done: nombre(members) > 1 },
+    { title: "Créer un premier client", description: "Une fiche client centralise ses coordonnées, chantiers, devis et factures.", href: "/clients/nouveau", action: "Créer un client", done: nombre(clients) > 0 },
+    { title: "Établir un premier devis", description: "Ajoutez les prestations, contrôlez les totaux puis envoyez le document au client.", href: "/devis/nouveau", action: "Créer un devis", done: nombre(quotes) > 0 },
+    { title: "Ouvrir un chantier", description: "Associez le client, le devis accepté et les membres de l’équipe chargés des travaux.", href: "/chantiers/nouveau", action: "Créer un chantier", done: nombre(jobs) > 0 },
+    { title: "Tester le suivi du temps", description: "Vérifiez le pointage personnel, le chantier sélectionné et le circuit de validation.", href: "/pointage", action: "Ouvrir le pointage", done: nombre(timeEntries) > 0 },
   ];
   const completed = steps.filter((step) => step.done).length;
 

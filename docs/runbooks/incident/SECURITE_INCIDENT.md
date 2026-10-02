@@ -34,12 +34,13 @@ Principe : **créer le nouveau → déployer → vérifier → révoquer l'ancie
 | Clé secrète Supabase (`sb_secret_…`, `SUPABASE_SERVICE_ROLE_KEY`) | Dashboard → API keys : nouvelle clé, Vercel (GP, Réserves, Colors), redéploiement, **puis** suppression de l'ancienne | suspend TOUS les chemins service_role (webhooks, crons, RGPD) jusqu'au redéploiement |
 | Clé de signature JWT Supabase | Dashboard → JWT signing keys : nouvelle clé en attente → rotation → révocation | invalide toutes les sessions |
 | `STRIPE_SECRET_KEY` | Dashboard Stripe → Developers → API keys (roll) | 4 endpoints webhook : `STRIPE_WEBHOOK_*_SECRET` à régénérer endpoint par endpoint |
-| `BREVO_API_KEY`, `OPENAI_API_KEY`, `POWENS_CLIENT_SECRET`, Apple/Google | console du fournisseur | `POWENS_CLIENT_SECRET` sert aussi de repli HMAC (DR V2 §10) |
+| `BREVO_API_KEY`, `OPENAI_API_KEY`, `POWENS_CLIENT_SECRET`, Apple/Google | console du fournisseur | `POWENS_CLIENT_SECRET` sert encore de repli HMAC si `BANK_OAUTH_STATE_HMAC_KEY` est absente |
 | `CRON_SECRET`, `STUDIO_CRON_SECRET` | Vercel | les crons suivants échouent en 401 jusqu'au redéploiement |
 | Clés Studio (`STUDIO_AUTH_SERVICE_KEY`, `STUDIO_STORAGE_SERVICE_KEY`, `STUDIO_REDIS_URL`) | projet Supabase Studio / fournisseur Redis | redémarrer le worker |
 | Clés d'identité ELSATIA (JWKS, `ELSATIA_IDENTITY_*`) | procédure de publication JWKS (nouvelle clé publiée avant retrait) | sinon le passage vers Studio échoue |
 | `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` | `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md` | fail-closed par conception |
-| `BANK_DATA_ENCRYPTION_KEY` | **NE PAS tourner naïvement** : rend les IBAN illisibles | procédure de re-chiffrement inexistante (DR V2 §10) → décision propriétaire |
+| `BANK_DATA_ENCRYPTION_KEY` / `BANK_DATA_ENCRYPTION_KEYS` (clés IBAN/BIC) | **jamais par remplacement** : ajout d'une nouvelle clé kN au trousseau, activation, rechiffrement (`npm run bank-keys`) | procédure « compromission de clé » : `docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md` §10 (nouvelle clé, désactivation de l'ancienne, rechiffrement, audit). Remplacer la valeur rend les IBAN illisibles |
+| `BANK_OAUTH_STATE_HMAC_KEY` | Vercel | états Powens en cours (7 jours) : garder l'ancienne valeur dans un repli le temps de leur expiration |
 
 Après rotation : `npm run verify:secrets` (dépôt), sonde profonde `/api/health`.
 

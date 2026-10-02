@@ -4,13 +4,14 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { StockKioskForm } from "@/components/StockKioskForm";
 import { deconnecterCompteDepotAction } from "@/app/actions/auth";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 export default async function BorneStockPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string; deconnexion?: string; erreur?: string }> }) {
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const [{ data: chantiers }, { data: vehicules }, { data: outils }, { data: codes }, { data: entreprise }, { data: compteDepot }] = await Promise.all([
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).in("statut", ["accepte","a_preparer","en_attente_validation","en_commande_materiel","en_cours","en_pause"]).order("nom"),
+    lireOptionsChantiers(supabase, ctx.entrepriseId, { statutsExclus: [] }).then((data) => ({ data: data.filter((c) => ["accepte","a_preparer","en_attente_validation","en_commande_materiel","en_cours","en_pause"].includes(c.statut)) })),
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id",ctx.entrepriseId).in("statut",["actif","maintenance"]).order("immatriculation"),
     supabase.from("outils").select("id,reference,designation").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(hors_service,perdu)').order("designation"),
     supabase.from("codes_identification").select("type_ressource,ressource_id,code").eq("entreprise_id",ctx.entrepriseId).eq("actif",true).in("type_ressource",["chantier","vehicule","outil"]),

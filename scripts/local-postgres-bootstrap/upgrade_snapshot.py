@@ -96,6 +96,23 @@ if os.environ.get("UPGRADE_SNAPSHOT_V8") == "1":
         "reserves_annuaire_publication", "reserves_evenements_notifications",
     ]
 
+# Train V9 (ELSATIA_CANONICAL_TRAIN_V9_CONVERGENCE_V1 §6) : ajoutés seulement quand
+# UPGRADE_SNAPSHOT_V9=1 (harnais upgrade-v8-v9.sh) ; les harnais V3 → V8 rejouent leurs chiffres.
+if os.environ.get("UPGRADE_SNAPSHOT_V9") == "1":
+    TABLES_METIER += [
+        # Chiffrement bancaire (rotation des clés) : données chiffrées existantes.
+        "coordonnees_bancaires", "ordres_virements", "lots_virements",
+        # Agrégats GP (exactitude > 1 000) : sources lues par les nouvelles RPC.
+        "paiements", "inventaires", "lignes_inventaire", "journal_ia", "verifications_zone_pointage",
+        "periodes_paie", "dossiers_paie_salaries", "anomalies_paie", "pieces_jointes_paie",
+        "vehicules", "outils", "releves_kilometrage", "mouvements_outillage", "appels_contacts",
+    ]
+    TABLES_SONDE_RLS += [
+        "coordonnees_bancaires", "ordres_virements", "sessions_pointage", "verifications_zone_pointage",
+        "mouvements_stock", "articles_stock", "vehicules", "outils", "journal_ia", "dossiers_paie_salaries",
+        "documents_chantier", "sous_traitants_chantiers", "permissions_poste",
+    ]
+
 
 def psql(db, sql):
     out = subprocess.run(
@@ -165,11 +182,15 @@ def main():
         from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname in ('public','platform') order by 1;""")
 
-    utilisateurs = lignes(db, """
+    # Train V9 : UPGRADE_SNAPSHOT_SANS_SONDE=1 (passe volumétrique de upgrade-v8-v9.sh) désactive la
+    # sonde : sous `authenticated`, les policies sont évaluées ligne à ligne sur des tables de 20 000+
+    # lignes (plusieurs minutes par cellule). La sonde complète est faite par la passe historique.
+    utilisateurs = [] if os.environ.get("UPGRADE_SNAPSHOT_SANS_SONDE") == "1" else lignes(db, """
       select ue.utilisateur_id||'|'||ue.entreprise_id from public.utilisateurs_entreprises ue
        order by ue.entreprise_id, ue.utilisateur_id;""")
     probe = {}
-    for u in utilisateurs:
+
+    def sonder(u):
         uid, ent = u.split("|")
         sql = ["begin;", "set local role authenticated;",
                f"""select set_config('request.jwt.claims', '{{"sub":"{uid}","role":"authenticated"}}', true);""",
@@ -183,7 +204,15 @@ def main():
             if "|" in l:
                 t, n = l.split("|")
                 res[t] = int(n)
-        probe[uid] = res
+        return uid, res
+
+    # Sondes indépendantes (transactions annulées, lecture seule) : exécutées en parallèle
+    # (UPGRADE_SNAPSHOT_JOBS ; défaut 4 sous UPGRADE_SNAPSHOT_V9=1, sinon 1 = comportement historique) ; résultat identique.
+    from concurrent.futures import ThreadPoolExecutor
+    jobs = os.environ.get("UPGRADE_SNAPSHOT_JOBS") or ("4" if os.environ.get("UPGRADE_SNAPSHOT_V9") == "1" else "1")
+    with ThreadPoolExecutor(max_workers=int(jobs)) as pool:
+        for uid, res in pool.map(sonder, utilisateurs):
+            probe[uid] = res
 
     json.dump({"base": db, "row_counts": counts, "colonnes": colonnes, "checksums": checksums,
                "rls_tables": rls_tables, "policies": policies, "rls_probe": probe,

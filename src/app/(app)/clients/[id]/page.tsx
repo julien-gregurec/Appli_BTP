@@ -6,9 +6,13 @@ import { nomClient, statutChantier, CLIENT_TYPES, CLIENT_STATUTS } from "@/lib/c
 import { euros, statutDevis } from "@/lib/devis";
 import { statutFacture } from "@/lib/factures";
 import { ExclusionRelanceClient } from "@/components/ExclusionRelanceClient";
+import { lireChantiersClient, lireCurseur, lireSyntheseClient, type SyntheseClient } from "@/lib/fiches-agregats";
 
-export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const TAILLE_PAGE_CHANTIERS = 50;
+
+export default async function ClientDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ chantiers_apres?: string }> }) {
   const { id } = await params;
+  const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
@@ -21,19 +25,24 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   if (!client) notFound();
 
-  const { data: chantiers } = await supabase
-    .from("chantiers")
-    .select("id, reference_interne, nom, statut, ville")
-    .eq("client_id", id)
-    .order("created_at", { ascending: false });
-
-  const [{ data: devis }, { data: factures }] = await Promise.all([
-    supabase.from("devis").select("id, numero, statut, date_emission, montant_ttc").eq("client_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("factures").select("id, numero, statut, date_emission, montant_ttc, montant_paye").eq("client_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
+  // Totaux calculés en base (gp_client_synthese) : un client peut dépasser
+  // 1 000 factures, que PostgREST tronquait sans erreur. Listes bornées :
+  // 5 derniers devis / factures, chantiers paginés par curseur.
+  const curseurChantiers = lireCurseur(messages.chantiers_apres);
+  const [synthese, pageChantiers, { data: devis }, { data: factures }] = await Promise.all([
+    lireSyntheseClient(supabase, ctx.entrepriseId, id).catch((err): SyntheseClient | null => {
+      console.error("[client] synthèse indisponible", err instanceof Error ? err.message : err);
+      return null;
+    }),
+    lireChantiersClient(supabase, ctx.entrepriseId, id, TAILLE_PAGE_CHANTIERS, curseurChantiers),
+    supabase.from("devis").select("id, numero, statut, date_emission, montant_ttc").eq("client_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(5),
+    supabase.from("factures").select("id, numero, statut, date_emission, montant_ttc, montant_paye").eq("client_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(5),
   ]);
-  const totalFacture = (factures ?? []).filter((facture) => facture.statut !== "annulee").reduce((total, facture) => total + Number(facture.montant_ttc ?? 0), 0);
-  const totalPaye = (factures ?? []).reduce((total, facture) => total + Number(facture.montant_paye ?? 0), 0);
-  const resteDu = Math.max(0, totalFacture - totalPaye);
+  const chantiers = pageChantiers.lignes;
+  const totalFacture = synthese?.totalFacture ?? null;
+  const totalPaye = synthese?.totalPaye ?? null;
+  const resteDu = totalFacture === null || totalPaye === null ? null : Math.max(0, totalFacture - totalPaye);
+  const montant = (valeur: number | null) => (valeur === null ? "indisponible" : euros(valeur));
 
   const typeLabel = CLIENT_TYPES.find((t) => t.cle === client.type)?.libelle ?? client.type;
   const statutLabel = CLIENT_STATUTS.find((s) => s.cle === client.statut)?.libelle ?? client.statut;
@@ -96,13 +105,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <section className="space-y-3">
           <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Situation financière</h2><Link href={`/devis/nouveau?client=${id}`} className="text-sm text-neutral-600 hover:underline dark:text-neutral-400">+ Nouveau devis</Link></div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Facturé</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalFacture)}</div></div>
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono text-lg font-semibold text-green-700 dark:text-green-400">{euros(totalPaye)}</div></div>
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Reste dû</div><div className="mt-1 font-mono text-lg font-semibold text-amber-700 dark:text-amber-400">{euros(resteDu)}</div></div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Facturé</div><div className="mt-1 font-mono text-lg font-semibold">{montant(totalFacture)}</div></div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono text-lg font-semibold text-green-700 dark:text-green-400">{montant(totalPaye)}</div></div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Reste dû</div><div className="mt-1 font-mono text-lg font-semibold text-amber-700 dark:text-amber-400">{montant(resteDu)}</div></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Derniers devis</div>{devis?.length ? <div className="space-y-1">{devis.slice(0, 5).map((item) => { const st = statutDevis(item.statut); return <Link key={item.id} href={`/devis/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun devis.</p>}</div>
-            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Dernières factures</div>{factures?.length ? <div className="space-y-1">{factures.slice(0, 5).map((item) => { const st = statutFacture(item.statut); return <Link key={item.id} href={`/factures/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucune facture.</p>}</div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Derniers devis{synthese ? ` (${synthese.nbDevis} au total)` : ""}</div>{devis?.length ? <div className="space-y-1">{devis.map((item) => { const st = statutDevis(item.statut); return <Link key={item.id} href={`/devis/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun devis.</p>}</div>
+            <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Dernières factures{synthese ? ` (${synthese.nbFactures} au total)` : ""}</div>{factures?.length ? <div className="space-y-1">{factures.map((item) => { const st = statutFacture(item.statut); return <Link key={item.id} href={`/factures/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucune facture.</p>}</div>
           </div>
         </section>
 
@@ -139,6 +148,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 </tbody>
               </table>
             </div>
+          )}
+          {(curseurChantiers || pageChantiers.suivant) && (
+            <nav aria-label="Pagination des chantiers" className="flex items-center justify-between text-sm">
+              {curseurChantiers ? <Link href={`/clients/${id}`} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">← Plus récents</Link> : <span />}
+              {pageChantiers.suivant ? <Link href={`/clients/${id}?${new URLSearchParams({ chantiers_apres: pageChantiers.suivant })}`} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">Plus anciens →</Link> : <span />}
+            </nav>
           )}
         </section>
       </div>

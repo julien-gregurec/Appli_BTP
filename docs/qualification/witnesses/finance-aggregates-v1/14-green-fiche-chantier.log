@@ -1,0 +1,15 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes : totaux du gros chantier exacts 373ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes : totaux du gros chantier exacts 284ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes : totaux du gros chantier exacts 285ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes : totaux du gros chantier exacts 448ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes : totaux du gros chantier exacts 1047ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 7ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  01:41:41
+   Duration  2.80s (transform 102ms, setup 0ms, import 162ms, tests 2.45s, environment 0ms)
+

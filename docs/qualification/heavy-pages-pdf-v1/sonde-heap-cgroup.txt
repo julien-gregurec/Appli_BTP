@@ -1,0 +1,9 @@
+# Sonde : plafond de heap V8 vs limite cgroup v1 (Node v22.22.0, hôte 16094 Mo, 2026-10-01T14:16:43+00:00)
+| limite cgroup | réglage | process.constrainedMemory() | heap_size_limit V8 |
+|---:|---|---:|---:|
+| 512 Mo | aucun | 512 Mo | 8195 Mo |
+| 512 Mo | NODE_OPTIONS=--max-old-space-size=256 | 512 Mo | 259 Mo |
+| 1024 Mo | aucun | 1024 Mo | 8204 Mo |
+| 1024 Mo | NODE_OPTIONS=--max-old-space-size=512 | 1024 Mo | 524 Mo |
+| 2048 Mo | aucun | 2048 Mo | 8216 Mo |
+| 2048 Mo | NODE_OPTIONS=--max-old-space-size=1024 | 2048 Mo | 1048 Mo |

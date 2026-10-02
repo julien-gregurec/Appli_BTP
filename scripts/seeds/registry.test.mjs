@@ -27,7 +27,9 @@ const ACTIVE_CLASSES = new Set(["ACTIVE", "CI_ONLY", "PREVIEW", "PRODUCTION_TOOL
 // ou upgrade-v6-v7.sh (base V6) : le complément suppose un état antérieur au train courant, jamais une base fraîche.
 // "dr-v2-drill" : exécuté par scripts/dr/v2/drill.sh (`npm run dr:verify`) sur des bases jetables
 // elsatia_dr_v2_* dérivées de la base du harnais d'upgrade (docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md).
-const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness", "dr-v2-drill"]);
+// "banc-integration" (train V9) : jeu de charge exécuté par un test d'intégration Vitest sur PostgREST
+// réel (src/lib/*.integration.test.ts), avec ses propres assertions d'exactitude.
+const EXTERNAL_COVERAGE = new Set(["infrastructure", "pgtap", "studio-ci", "non-executable-sans-passerelle", "upgrade-harness", "dr-v2-drill", "banc-integration"]);
 
 // Où vivent les scripts de données, et à quoi ils ressemblent.
 const DISCOVERY = [
@@ -178,7 +180,10 @@ test("aucun script SQL actif n'insère un document déjà engagé avant ses lign
     commandes_fournisseurs: /'(envoyee|confirmee|recue|recue_partiel)'/,
   };
   // Squelettes pgTAP d'isolation : documents engagés sans aucune ligne, jamais complétés ensuite.
-  const exempt = new Set(["pgtap-isolation"]);
+  // Train V9 : même cas pour le jeu de charge rentabilité (montants posés sur l'en-tête, aucune
+  // ligne de devis ni de facture insérée, ni avant ni après — vérifié ci-dessous).
+  const exempt = new Set(["pgtap-isolation", "perf-rentabilite"]);
+  assert.doesNotMatch(read(seedById("perf-rentabilite").path), /insert\s+into\s+public\.lignes_(devis|factures)\b/i);
   const offenders = [];
   for (const seed of SEEDS.filter((item) => ACTIVE_CLASSES.has(item.classification) && !exempt.has(item.id))) {
     if (!/\.(sql|inc)$/.test(seed.path)) continue;

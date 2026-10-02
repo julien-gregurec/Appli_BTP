@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient } from "@/lib/chantier-statuts";
 import { FactureEditor } from "@/components/FactureEditor";
+import { lireOptionsChantiers, lireOptionsClients } from "@/lib/fiches-agregats";
 
 export default async function ModifierFacturePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,8 +13,8 @@ export default async function ModifierFacturePage({ params }: { params: Promise<
   const [{ data: facture }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }] = await Promise.all([
     supabase.from("factures").select("id, client_id, chantier_id, type, date_emission, date_echeance, notes_client, notes_internes, statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
     supabase.from("lignes_factures").select("designation, description, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva").eq("facture_id", id).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("chantiers").select("id, nom, client_id").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
+    lireOptionsClients(supabase, ctx.entrepriseId).then((data) => ({ data })),
+    lireOptionsChantiers(supabase,ctx.entrepriseId,{statutsExclus:[],tri:"recent"}).then((data)=>({data})),
     supabase.from("prestations_catalogue").select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("designation"),
   ]);
   if (!facture) notFound();

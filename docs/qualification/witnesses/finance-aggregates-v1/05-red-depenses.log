@@ -1,0 +1,58 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ❯ src/lib/depenses-totaux.postgrest.test.ts (6 tests | 3 failed) 9641ms
+     × 1462 pièces : total TTC, réglé et nombre exacts 1642ms
+     × 5000 pièces : total TTC, réglé et nombre exacts 1602ms
+     × 20000 pièces : total TTC, réglé et nombre exacts 1784ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 pièces : total TTC, réglé et nombre exacts
+AssertionError: expected 1000 to be 1462 // Object.is equality
+
+- Expected
++ Received
+
+- 1462
++ 1000
+
+ ❯ src/lib/depenses-totaux.postgrest.test.ts:14:27
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 pièces : total TTC, réglé et nombre exacts
+AssertionError: expected 1000 to be 5000 // Object.is equality
+
+- Expected
++ Received
+
+- 5000
++ 1000
+
+ ❯ src/lib/depenses-totaux.postgrest.test.ts:14:27
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/lib/depenses-totaux.postgrest.test.ts > totaux /depenses — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 pièces : total TTC, réglé et nombre exacts
+AssertionError: expected 1000 to be 20000 // Object.is equality
+
+- Expected
++ Received
+
+- 20000
++ 1000
+
+ ❯ src/lib/depenses-totaux.postgrest.test.ts:14:27
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  00:29:13
+   Duration  9.97s (transform 80ms, setup 0ms, import 137ms, tests 9.64s, environment 0ms)
+

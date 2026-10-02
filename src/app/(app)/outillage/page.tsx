@@ -2,7 +2,10 @@ import { importerOutilsAction } from "@/app/actions/outillage";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { OUTIL_CATEGORIES, OUTIL_ETATS, OUTIL_STATUTS } from "@/lib/outillage";
 import { createClient } from "@/lib/supabase/server";
+import { lirePageCroissante, lireSyntheseParc, type SyntheseParc } from "@/lib/fiches-agregats";
 import { Lien as Link } from "@/components/Lien";
+
+const TAILLE_PAGE = 200;
 
 type EmployeLie = { prenom: string; nom: string };
 type ChantierLie = { nom: string };
@@ -22,29 +25,37 @@ type OutilListe = {
 };
 
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_DATE_FR = new Intl.DateTimeFormat("fr-FR");
 const dateFr = (date: string | null) => date
-  ? new Intl.DateTimeFormat("fr-FR").format(new Date(`${date}T12:00:00`))
+  ? FORMAT_DATE_FR.format(new Date(`${date}T12:00:00`))
   : "—";
 
 export default async function OutillagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{ error?: string; success?: string; apres?: string }>;
 }) {
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("outils")
-    .select("id,reference,designation,categorie,marque,modele,statut,etat,prochaine_verification,employe:employes(prenom,nom),chantier:chantiers(nom)")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("reference");
+  // Compteurs du bandeau en base (gp_parc_synthese) et liste paginée par
+  // curseur sur reference : la liste complète, plafonnée à 1 000 par PostgREST,
+  // faisait compter et afficher un parc tronqué.
+  const aujourdhuiIso = new Date().toISOString().slice(0, 10);
+  const [page, synthese] = await Promise.all([
+    lirePageCroissante<Record<string, unknown>>(supabase
+      .from("outils")
+      .select("id,reference,designation,categorie,marque,modele,statut,etat,prochaine_verification,employe:employes(prenom,nom),chantier:chantiers(nom)")
+      .eq("entreprise_id", ctx.entrepriseId), "reference", TAILLE_PAGE, messages.apres ?? null),
+    lireSyntheseParc(supabase, ctx.entrepriseId, aujourdhuiIso).catch((err): SyntheseParc | null => { console.error("[parc] synthèse indisponible", err instanceof Error ? err.message : err); return null; }),
+  ]);
+  const data = page.lignes;
 
   const outils = (data ?? []) as OutilListe[];
   const aujourdHui = new Date().toISOString().slice(0, 10);
   const verificationEchue = (date: string | null) => Boolean(date && date <= aujourdHui);
-  const alertes = outils.filter((outil) => verificationEchue(outil.prochaine_verification)).length;
-  const alertesHorsService = outils.filter((outil) => outil.statut === "hors_service").length;
 
   const affectation = (outil: OutilListe) => {
     if (["hors_service", "rebut"].includes(outil.statut)) return "Indisponible";
@@ -60,7 +71,7 @@ export default async function OutillagePage({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Outillage</h1>
-            <p className="text-sm text-neutral-500">{outils.length} outil(s) · {alertes} vérification(s) échue(s) · {alertesHorsService} décision(s) réparation/rebut</p>
+            <p className="text-sm text-neutral-500">{synthese ? `${synthese.outils.nb} outil(s) · ${synthese.outils.alertes} vérification(s) échue(s) · ${synthese.outils.horsService}` : "Compteurs indisponibles ·"} décision(s) réparation/rebut</p>
           </div>
           <Link href="/outillage/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
             + Nouvel outil
@@ -140,6 +151,12 @@ export default async function OutillagePage({
               </table>
             </div>
           </>
+        )}
+        {(messages.apres || page.suivant) && (
+          <nav aria-label="Pagination" className="mb-20 flex items-center justify-between text-sm">
+            {messages.apres ? <Link href="/outillage" className="rounded-md border px-3 py-2">← Début de la liste</Link> : <span />}
+            {page.suivant ? <Link href={`/outillage?${new URLSearchParams({ apres: page.suivant })}`} className="rounded-md border px-3 py-2">Suite →</Link> : <span />}
+          </nav>
         )}
       </div>
     </main>

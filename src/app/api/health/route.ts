@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { codeHttpSante, evaluerSante, type RapportSantePublic } from "@elsatia/incident-control";
 import { lecteurEtatIncident } from "@/lib/incident/etat";
 import { controlesSanteGestionPro, profondeurDemandee } from "@/lib/incident/sante";
+import { etatFilePdf } from "@/lib/pdf/generer";
 
 // Santé de Gestion Pro : réponse publique sans secret (noms de contrôles + ok/ko/non_configure).
 // 503 uniquement en OUTAGE (base ou Auth injoignable, ou application coupée) pour les sondes.
@@ -31,7 +32,9 @@ export async function GET(request: Request) {
     if (profondeur === "publique") cachePublic = { rapport, expire: Date.now() + 5_000 };
   }
   return NextResponse.json(
-    { application: "gestion_pro", profondeur, ...rapport },
+    // Profondeur complète (CRON_SECRET) : occupation de la file PDF de CETTE instance
+    // (compteurs, durées, navigateurs vivants) — ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1.
+    { application: "gestion_pro", profondeur, ...rapport, ...(profondeur === "complete" ? { pdf: etatFilePdf() } : {}) },
     { status: codeHttpSante(rapport), headers: { "Cache-Control": "no-store" } },
   );
 }

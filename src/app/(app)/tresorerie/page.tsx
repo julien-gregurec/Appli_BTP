@@ -2,11 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
 import { projectionHebdomadaire, type FluxTresorerie } from "@/lib/tresorerie";
+import { chargerDonneesTresorerie, indicateursTresorerie } from "@/lib/tresorerie-donnees";
 import { Lien as Link } from "@/components/Lien";
 
 const JOUR = 86_400_000;
 const iso = (date: Date) => date.toISOString().slice(0, 10);
-const dateFr = (date: Date) => new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(date);
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_JOUR_MOIS = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" });
+const dateFr = (date: Date) => FORMAT_JOUR_MOIS.format(date);
 const ajouterMois = (date: Date, mois: number) => { const jour = date.getDate(); const cible = new Date(date.getFullYear(), date.getMonth() + mois, 1, 12); const dernierJour = new Date(cible.getFullYear(), cible.getMonth() + 1, 0, 12).getDate(); cible.setDate(Math.min(jour, dernierJour)); return cible; };
 const relation = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 const nomPersonne = (personne: { nom: string | null; prenom?: string | null; societe?: string | null } | null) => personne?.societe || [personne?.prenom, personne?.nom].filter(Boolean).join(" ") || personne?.nom || null;
@@ -15,23 +19,12 @@ export default async function TresoreriePage() {
   const ctx = await getContexteEntreprise(); const supabase = await createClient();
   const maintenant = new Date(); const aujourdHui = new Date(`${iso(maintenant)}T12:00:00`);
   const depuis30Jours = iso(new Date(aujourdHui.getTime() - 29 * JOUR));
-  const [{ data: factures }, { data: depenses }, { data: encaissements }, { data: decaissements }, { data: charges }, { data: avoirs }] = await Promise.all([
-    supabase.from("factures").select("id,numero,date_emission,date_echeance,montant_ttc,montant_paye,statut,client:clients!factures_client_id_fkey(nom,prenom,societe),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId),
-    supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,date_echeance,montant_ttc,montant_regle,statut,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId),
-    supabase.from("paiements").select("montant,date,facture:factures!inner(entreprise_id)").eq("facture.entreprise_id",ctx.entrepriseId).gte("date",depuis30Jours),
-    supabase.from("reglements_fournisseurs").select("montant,date,depense:depenses_fournisseurs!inner(entreprise_id)").eq("depense.entreprise_id",ctx.entrepriseId).gte("date",depuis30Jours),
-    supabase.from("charges_recurrentes").select("id,libelle,periodicite,montant_ht,montant_tva,prochaine_echeance,date_fin,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId).eq("actif",true),
-    supabase.from("factures").select("facture_origine_id,montant_ttc").eq("entreprise_id",ctx.entrepriseId).eq("type","avoir").neq("statut","annulee").not("facture_origine_id","is",null),
-  ]);
-  const avoirsParFacture=new Map<string,number>();for(const a of avoirs??[]){if(!a.facture_origine_id)continue;avoirsParFacture.set(a.facture_origine_id,(avoirsParFacture.get(a.facture_origine_id)??0)+Number(a.montant_ttc));}
-  const resteNetFacture=(f:{id:string;montant_ttc:number;montant_paye:number})=>Number(f.montant_ttc)-Number(f.montant_paye)+(avoirsParFacture.get(f.id)??0);
-  const entrees30=(encaissements??[]).reduce((s,x)=>s+Number(x.montant),0),sorties30=(decaissements??[]).reduce((s,x)=>s+Number(x.montant),0);
-  const aEncaisser=(factures??[]).filter(f=>!["payee","annulee","avoir_emis","brouillon"].includes(f.statut)).reduce((s,f)=>s+Math.max(0,resteNetFacture(f)),0);
-  const aPayer=(depenses??[]).filter(d=>!["payee","annulee"].includes(d.statut)).reduce((s,d)=>s+Math.max(0,Number(d.montant_ttc)-Number(d.montant_regle)),0);
+  const donnees = await chargerDonneesTresorerie(supabase, ctx.entrepriseId, depuis30Jours);
+  const { entrees30, sorties30, aEncaisser, aPayer, facturesOuvertes, depensesOuvertes, resteNetFacture } = indicateursTresorerie(donnees);
   const flux: FluxTresorerie[]=[];
-  for(const f of factures??[]){if(["payee","annulee","avoir_emis","brouillon"].includes(f.statut))continue;const resteNet=resteNetFacture(f);const client=relation(f.client as {nom:string|null;prenom:string|null;societe:string|null}|{nom:string|null;prenom:string|null;societe:string|null}[]|null);const chantier=relation(f.chantier as {nom:string}|{nom:string}[]|null);if(resteNet>0)flux.push({date:f.date_echeance??f.date_emission,montant:resteNet,type:"entree",source:"facture_client",reference:f.numero,libelle:"Facture client à encaisser",tiers:nomPersonne(client),chantier:chantier?.nom,href:`/factures/${f.id}`});else if(resteNet<0)flux.push({date:f.date_echeance??f.date_emission,montant:-resteNet,type:"sortie",source:"facture_client",reference:f.numero,libelle:"Avoir à rembourser au client",tiers:nomPersonne(client),chantier:chantier?.nom,href:`/factures/${f.id}`});}
-  for(const d of depenses??[]){if(["payee","annulee"].includes(d.statut))continue;const reste=Math.max(0,Number(d.montant_ttc)-Number(d.montant_regle));const fournisseur=relation(d.fournisseur as {nom:string}|{nom:string}[]|null);const chantier=relation(d.chantier as {nom:string}|{nom:string}[]|null);if(reste)flux.push({date:d.date_echeance??d.date_piece,montant:reste,type:"sortie",source:"facture_fournisseur",reference:d.numero_piece,libelle:"Facture fournisseur à payer",tiers:fournisseur?.nom,chantier:chantier?.nom,href:`/depenses/${d.id}`});}
-  for(const charge of charges??[]){let date=new Date(`${charge.prochaine_echeance}T12:00:00`);const fin=charge.date_fin?Date.parse(`${charge.date_fin}T12:00:00`):Infinity;const fournisseur=relation(charge.fournisseur as {nom:string}|{nom:string}[]|null);const chantier=relation(charge.chantier as {nom:string}|{nom:string}[]|null);for(let i=0;i<4&&date.getTime()<=fin;i++){flux.push({date:iso(date),montant:Number(charge.montant_ht)+Number(charge.montant_tva),type:"sortie",source:"charge_recurrente",reference:null,libelle:charge.libelle,tiers:fournisseur?.nom,chantier:chantier?.nom,href:"/charges"});const mois=charge.periodicite==="mensuelle"?1:charge.periodicite==="trimestrielle"?3:12;date=ajouterMois(date,mois);}}
+  for(const f of facturesOuvertes){const resteNet=resteNetFacture(f);const client=relation(f.client as {nom:string|null;prenom:string|null;societe:string|null}|{nom:string|null;prenom:string|null;societe:string|null}[]|null);const chantier=relation(f.chantier as {nom:string}|{nom:string}[]|null);if(resteNet>0)flux.push({date:f.date_echeance??f.date_emission,montant:resteNet,type:"entree",source:"facture_client",reference:f.numero,libelle:"Facture client à encaisser",tiers:nomPersonne(client),chantier:chantier?.nom,href:`/factures/${f.id}`});else if(resteNet<0)flux.push({date:f.date_echeance??f.date_emission,montant:-resteNet,type:"sortie",source:"facture_client",reference:f.numero,libelle:"Avoir à rembourser au client",tiers:nomPersonne(client),chantier:chantier?.nom,href:`/factures/${f.id}`});}
+  for(const d of depensesOuvertes){const reste=Math.max(0,Number(d.montant_ttc)-Number(d.montant_regle));const fournisseur=relation(d.fournisseur as {nom:string}|{nom:string}[]|null);const chantier=relation(d.chantier as {nom:string}|{nom:string}[]|null);if(reste)flux.push({date:d.date_echeance??d.date_piece,montant:reste,type:"sortie",source:"facture_fournisseur",reference:d.numero_piece,libelle:"Facture fournisseur à payer",tiers:fournisseur?.nom,chantier:chantier?.nom,href:`/depenses/${d.id}`});}
+  for(const charge of donnees.charges){let date=new Date(`${charge.prochaine_echeance}T12:00:00`);const fin=charge.date_fin?Date.parse(`${charge.date_fin}T12:00:00`):Infinity;const fournisseur=relation(charge.fournisseur as {nom:string}|{nom:string}[]|null);const chantier=relation(charge.chantier as {nom:string}|{nom:string}[]|null);for(let i=0;i<4&&date.getTime()<=fin;i++){flux.push({date:iso(date),montant:Number(charge.montant_ht)+Number(charge.montant_tva),type:"sortie",source:"charge_recurrente",reference:null,libelle:charge.libelle,tiers:fournisseur?.nom,chantier:chantier?.nom,href:"/charges"});const mois=charge.periodicite==="mensuelle"?1:charge.periodicite==="trimestrielle"?3:12;date=ajouterMois(date,mois);}}
   const projection=projectionHebdomadaire(flux,iso(aujourdHui));const maxFlux=Math.max(1,...projection.flatMap(s=>[s.entrees,s.sorties]));
   const attendu90=projection.reduce((s,x)=>s+x.entrees,0),aPayer90=projection.reduce((s,x)=>s+x.sorties,0);
   return <main className="p-8"><div className="mx-auto max-w-6xl space-y-6"><div><h1 className="text-xl font-semibold">Trésorerie prévisionnelle</h1><p className="text-sm text-neutral-500">Flux réalisés sur 30 jours et échéances attendues sur 90 jours.</p></div>

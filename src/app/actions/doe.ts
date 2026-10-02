@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireContenuDoe, type ContenuDoe } from "@/lib/fiches-agregats";
 
 export async function genererDoeAction(chantierId: string) {
   const ctx = await getContexteEntreprise();
@@ -18,21 +19,23 @@ export async function genererDoeAction(chantierId: string) {
     .eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!chantier) redirect("/chantiers");
 
-  const [{ data: documents }, { data: mouvements }, { data: derniere }] = await Promise.all([
-    supabase.from("documents_chantier").select("id,nom,categorie,created_at").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
-    supabase.from("mouvements_stock").select("article_id").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("type", "sortie"),
+  // Contenu complet en une RPC (gp_doe_contenu) : les lectures PostgREST
+  // plafonnées à 1 000 lignes figeaient un manifeste incomplet sans erreur.
+  // Une erreur de lecture refuse de figer plutôt que de figer un DOE partiel.
+  const [contenu, { data: derniere }] = await Promise.all([
+    lireContenuDoe(supabase, ctx.entrepriseId, chantierId).catch((err): ContenuDoe | null => {
+      console.error("[doe] contenu indisponible", err instanceof Error ? err.message : err);
+      return null;
+    }),
     supabase.from("doe_generations").select("version").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
-  const articles = [...new Set((mouvements ?? []).map((mouvement) => mouvement.article_id).filter(Boolean))];
-  const { data: fiches } = articles.length
-    ? await supabase.from("fiches_techniques_articles").select("id,article_id,titre,type_document,version").eq("entreprise_id", ctx.entrepriseId).in("article_id", articles)
-    : { data: [] };
+  if (!contenu) redirect(`/chantiers/${chantierId}/doe?error=${encodeURIComponent("Contenu du DOE indisponible : réessayez.")}`);
   const version = Number(derniere?.version ?? 0) + 1;
   const manifeste = {
     chantier: { id: chantier.id, reference: chantier.reference_interne, nom: chantier.nom },
-    documents: documents ?? [],
-    articles,
-    fiches_techniques: fiches ?? [],
+    documents: contenu.documents.map(({ id, nom, categorie, created_at }) => ({ id, nom, categorie, created_at })),
+    articles: contenu.articleIds,
+    fiches_techniques: contenu.fichesTechniques.map(({ id, article_id, titre, type_document, version }) => ({ id, article_id, titre, type_document, version })),
     genere_at: new Date().toISOString(),
   };
   const { error } = await supabase.from("doe_generations").insert({

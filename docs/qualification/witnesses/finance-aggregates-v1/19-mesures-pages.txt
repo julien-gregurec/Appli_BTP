@@ -1,0 +1,23 @@
+MESURE f1000 /pointage/gestion?mois=2026-03 ttfb=1347ms commit=1928ms total=6962ms html=92Ko
+MESURE f1000 /tresorerie ttfb=589ms commit=770ms total=1532ms html=91Ko
+MESURE f1000 /depenses ttfb=2121ms commit=2271ms total=3291ms html=78Ko
+MESURE f1000 /stock ttfb=1213ms commit=1351ms total=2380ms html=94Ko
+MESURE f1000 /planning?semaine=2026-03-02 ttfb=2809ms commit=3026ms total=4822ms html=191Ko
+MESURE f1000 /chantiers/f1000ca0-0000-0000-0000-000000000001 ttfb=1569ms commit=1869ms total=2487ms html=68Ko
+MESURE f1462 /pointage/gestion?mois=2026-03 ttfb=1645ms commit=2328ms total=10536ms html=124Ko
+MESURE f1462 /tresorerie ttfb=834ms commit=1136ms total=2303ms html=122Ko
+MESURE f1462 /depenses ttfb=3140ms commit=3303ms total=4444ms html=76Ko
+MESURE f1462 /stock ttfb=1715ms commit=1872ms total=3244ms html=130Ko
+MESURE f1462 /planning?semaine=2026-03-02 ttfb=4469ms commit=4663ms total=6940ms html=274Ko
+MESURE f1462 /chantiers/f1462ca0-0000-0000-0000-000000000001 ttfb=1985ms commit=2362ms total=3234ms html=87Ko
+MESURE f5000 /pointage/gestion?mois=2026-03 ttfb=5268ms commit=7266ms total=87569ms html=354Ko
+MESURE f5000 /tresorerie ttfb=2103ms commit=3001ms total=7158ms html=398Ko
+MESURE f5000 /depenses ttfb=8781ms commit=9212ms total=10231ms html=74Ko
+MESURE f5000 /stock ttfb=5823ms commit=5942ms total=10720ms html=393Ko
+MESURE f5000 /planning?semaine=2026-03-02 ttfb=23527ms commit=24035ms total=33487ms html=836Ko
+MESURE f5000 /chantiers/f5000ca0-0000-0000-0000-000000000001 ttfb=1494ms commit=11702ms total=14622ms html=231Ko
+  3 passed (3.7m)
+MESURE f1000 /planning?semaine=2026-03-02 ttfb=3357ms total=5777ms html=191Ko
+MESURE f1462 /planning?semaine=2026-03-02 ttfb=4448ms total=7937ms html=274Ko
+MESURE f5000 /planning?semaine=2026-03-02 ttfb=13246ms total=38432ms html=836Ko
+  3 passed (1.0m)

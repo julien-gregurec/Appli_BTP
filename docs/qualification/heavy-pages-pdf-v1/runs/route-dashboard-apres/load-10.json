@@ -1,0 +1,27 @@
+{
+  "users": 10,
+  "scenario": "dashboard",
+  "think": 1000,
+  "durationS": 122.714,
+  "erreursVU": [],
+  "routes": {
+    "/dashboard": {
+      "n": 334,
+      "p50": 1799,
+      "p95": 2484,
+      "p99": 2787,
+      "max": 3381,
+      "status": {
+        "200": 334
+      },
+      "kbMoyen": 202
+    }
+  },
+  "total": {
+    "n": 334,
+    "rps": 2.72,
+    "p50": 1799,
+    "p95": 2484,
+    "p99": 2787
+  }
+}

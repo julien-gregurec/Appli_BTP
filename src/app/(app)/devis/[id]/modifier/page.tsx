@@ -6,6 +6,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { nomClient } from "@/lib/chantier-statuts";
 import { DevisEditor } from "@/components/DevisEditor";
 import { iaEstActive } from "@/lib/preview-features";
+import { lireOptionsChantiers, lireOptionsClients } from "@/lib/fiches-agregats";
 
 export default async function ModifierDevisPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,8 +17,8 @@ export default async function ModifierDevisPage({ params }: { params: Promise<{ 
   const [{ data: devis }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }, { data: pieces }] = await Promise.all([
     supabase.from("devis").select("id, client_id, chantier_id, date_validite, remise_globale, notes_client, statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
     supabase.from("lignes_devis").select("id, designation, description, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva").eq("devis_id", id).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("chantiers").select("id, nom, client_id").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
+    lireOptionsClients(supabase, ctx.entrepriseId).then((data) => ({ data })),
+    lireOptionsChantiers(supabase,ctx.entrepriseId,{statutsExclus:[],tri:"recent"}).then((data)=>({data})),
     supabase.from("prestations_catalogue").select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("designation"),
     supabase.from("pieces_jointes_devis").select("id, nom_original, legende, type_media").eq("devis_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at"),
   ]);

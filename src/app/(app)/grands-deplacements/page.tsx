@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
 import { creerGrandDeplacementAction, transitionGrandDeplacementAction } from "@/app/actions/grands-deplacements";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const input = "mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -14,7 +15,7 @@ export default async function GrandsDeplacementsPage({ searchParams }: { searchP
   const [{ data: entreprise }, { data: employe }, { data: chantiers }, { data: missions }] = await Promise.all([
     supabase.from("entreprises").select("mode_grand_deplacement,bareme_grand_deplacement_annee").eq("id", ctx.entrepriseId).single(),
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle(),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+    lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})),
     supabase.from("grands_deplacements").select("id,date_debut,date_fin,destination,mode_calcul,zone_logement,nombre_repas,nombre_nuits,montant_calcule,budget_manuel,statut,distance_aller_km,transport_public_aller_minutes,eligibilite_standard,justification_eligibilite,employe:employes(prenom,nom),chantier:chantiers(nom),notes_frais(montant_ttc,statut)").eq("entreprise_id", ctx.entrepriseId).order("date_debut", { ascending: false }).limit(200),
   ]);
   const modeForfait = entreprise?.mode_grand_deplacement === "forfait_urssaf";
