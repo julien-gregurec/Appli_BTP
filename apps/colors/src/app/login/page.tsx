@@ -54,7 +54,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="auth-foot no-account">
             Pas encore d’accès&nbsp;? Colors est ouvert sur habilitation de votre organisation pendant la phase pilote.
             {" "}
-            <a href={compteUrl}>Ouvrir le compte ELSATIA</a> pour demander l’accès à un administrateur.
+            {compteUrl ? <><a href={compteUrl}>Ouvrir le compte ELSATIA</a> pour demander l’accès à un administrateur.</> : "Demandez l’accès à un administrateur de votre organisation."}
           </p>
         </form>
       </section>

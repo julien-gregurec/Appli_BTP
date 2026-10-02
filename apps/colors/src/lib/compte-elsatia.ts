@@ -14,8 +14,21 @@
  * jamais servi à un utilisateur final.
  */
 
+import { urlNavigationSure } from "@elsatia/application-access";
+import { environnementApplications } from "@/lib/routes-applications";
+
 export const URL_COMPTE_PAR_DEFAUT = "http://localhost:3000/abonnement";
 
-export function urlCompteElsatia(): string {
-  return process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? URL_COMPTE_PAR_DEFAUT;
+/**
+ * A-08 (satellites Preview readiness V2) : l'URL est validée pour l'environnement courant
+ * (`ELSATIA_APPLICATION_ENV`). En Preview, une URL de Production (`app.elsatia.fr`) ou locale
+ * est écartée ; en Production, seule une URL canonique `*.elsatia.fr` est servie ; un
+ * environnement inconnu n'en sert aucune. `null` : le lien n'est pas affiché — jamais une
+ * bascule silencieuse vers un autre environnement. Le repli localhost ne vaut qu'en local.
+ */
+export function urlCompteElsatia(): string | null {
+  const environnement = environnementApplications();
+  const declaree = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL?.trim();
+  const brute = declaree || (environnement === "local" ? URL_COMPTE_PAR_DEFAUT : null);
+  return urlNavigationSure(brute, environnement);
 }

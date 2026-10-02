@@ -86,9 +86,9 @@ describe("contrat des variables publiques", () => {
   });
 
   /*
-   * Le point qui rend la garde utile par défaut, et sa seule divergence assumée avec
-   * `environnementApplications()` : celle-ci ramène l'inconnu à `local` pour choisir des URL de
-   * catalogue, ce qui est sans danger ; une garde qui ferait de même se désarmerait elle-même.
+   * Le point qui rend la garde utile par défaut. `environnementApplications()` ne produit, elle,
+   * AUCUN lien pour une valeur inconnue (A-08, fail closed) ; une garde qui ramènerait l'inconnu
+   * à un mode non bloquant se désarmerait elle-même.
    */
   it("traite un build qui ne se déclare pas comme un build publié", () => {
     expect(resoudreMode({})).toBe("production");

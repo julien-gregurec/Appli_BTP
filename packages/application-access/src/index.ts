@@ -208,3 +208,6 @@ export const LIBELLES_STATUT_COMMERCIAL: Record<StatutCommercial, string> = {
   cancelled: "Abonnement résilié",
   suspended: "Suspendu",
 };
+
+// ── Navigation inter-applications tenant compte de l'environnement (A-08) ──────
+export * from "./navigation";

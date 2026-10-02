@@ -78,7 +78,7 @@ const envsSains = () => ({
   gp: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc, NEXT_PUBLIC_APP_URL: "https://gp.vercel.app", NEXT_PUBLIC_COLORS_URL: "https://colors.vercel.app", TOOLS_APP_URL: "https://tools.vercel.app", TOOLS_ALLOWED_ORIGINS: "https://tools.vercel.app,capacitor://localhost", STRIPE_SECRET_KEY: fauxStripe("test"), TOOLS_STORE_ENVIRONMENT: "sandbox" },
   colors: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc, NEXT_PUBLIC_COLORS_URL: "https://colors.vercel.app/", NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://gp.vercel.app/abonnement" },
   tools: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, NEXT_PUBLIC_TOOLS_URL: "https://tools.vercel.app", NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://gp.vercel.app" },
-  reserves: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_ANON_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc },
+  reserves: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc },
 });
 const erreurs = (c) => c.filter((x) => x.niveau === "error").map((x) => x.code);
 
@@ -86,11 +86,23 @@ test("croisés : une Preview cohérente ne produit aucune erreur", () => {
   assert.deepEqual(erreurs(controlesCroises(envsSains(), { manifest })), []);
 });
 
+test("croisés A-07 : Réserves encore sous l'alias hérité = avertissement, jamais une erreur", () => {
+  const envs = envsSains();
+  envs.reserves.NEXT_PUBLIC_SUPABASE_ANON_KEY = envs.reserves.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  delete envs.reserves.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const constats = controlesCroises(envs, { manifest });
+  assert.deepEqual(erreurs(constats), []);
+  assert.ok(constats.some((c) => c.code === "X-PUBLIC-KEY-ALIAS" && c.niveau === "warning"));
+  envs.reserves.NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_" + "r".repeat(20);
+  assert.ok(erreurs(controlesCroises(envs, { manifest })).includes("X-PUBLIC-KEY"), "alias divergent des autres applications");
+});
+
 test("croisés : chaque incohérence est détectée sans exposer de valeur", () => {
   const cas = [
     [(e) => { e.colors.NEXT_PUBLIC_SUPABASE_URL = `https://${"b".repeat(20)}.supabase.co`; }, "X-SUPABASE-SSO"],
     [(e) => { e.gp.NEXT_PUBLIC_SUPABASE_URL = `https://${PROD}.supabase.co`; }, "X-SUPABASE-PRODUCTION"],
-    [(e) => { e.reserves.NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_" + "q".repeat(20); }, "X-PUBLIC-KEY"],
+    [(e) => { e.reserves.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_" + "q".repeat(20); }, "X-PUBLIC-KEY"],
+    [(e) => { e.reserves.NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_" + "q".repeat(20); }, "X-PUBLIC-KEY-ALIAS"],
     [(e) => { e.colors.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_" + "t".repeat(24); }, "X-SERVICE-KEY"],
     [(e) => { e.colors.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL = "https://autre.vercel.app/abonnement"; }, "X-URL-ACCOUNT"],
     [(e) => { e.tools.NEXT_PUBLIC_TOOLS_BILLING_API_URL = "https://autre.vercel.app"; }, "X-URL-TOOLS-BILLING"],
