@@ -34,7 +34,7 @@ if [ "${SKIP_DB:-0}" != 1 ]; then
   for spec in $LISTE; do IFS=: read k n e j <<<"$spec"
     su postgres -c "psql -X -q -d $DB -v k=$k -v n=$n -v e=$e -v jours=$j -f $REPO/scripts/perf/soak/volume_tenant.sql" | grep tenant; done
   su postgres -c "psql -X -q -d $DB -v k=22 -v jours=120 -f $REPO/scripts/perf/soak/affectations_tenant.sql" | tail -1
-  P -d $DB -c "\"update auth.users set encrypted_password = extensions.crypt('PiloteTest!2026', extensions.gen_salt('bf', 4)), email_confirmed_at = now(), instance_id = '00000000-0000-0000-0000-000000000000', confirmation_token = '', recovery_token = '', email_change_token_new = '', email_change = '' where email like '%@perf.invalid' or email like '%@soak.invalid'\""
+  P -d $DB -c "\"update auth.users set encrypted_password = extensions.crypt('PiloteTest!2026', extensions.gen_salt('bf', 4)), email_confirmed_at = now(), instance_id = '00000000-0000-0000-0000-000000000000', confirmation_token = '', recovery_token = '', email_change_token_new = '', email_change = '', created_at = coalesce(created_at, now()), updated_at = coalesce(updated_at, now()), phone_change = coalesce(phone_change,''), phone_change_token = coalesce(phone_change_token,''), email_change_token_current = coalesce(email_change_token_current,''), reauthentication_token = coalesce(reauthentication_token,'') where email like '%@perf.invalid' or email like '%@soak.invalid'\""
 fi
 pkill -f "gotrue serve" 2>/dev/null || true; for p in $(pgrep -x postgrest); do grep -q postgrest-3001 /proc/$p/cmdline && kill $p; done
 (source $B/gotrue.env.sh; cd $B; nohup ./gotrue serve > $B/gotrue_serve.log 2>&1 &)

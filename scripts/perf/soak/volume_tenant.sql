@@ -43,7 +43,7 @@ from sg.users u, sg.p p where pu.id = u.id;
 create table sg.postes as select gen_random_uuid() id, nom from (values ('Dirigeant'),('Chef d''équipe'),('Ouvrier')) v(nom);
 insert into public.postes (id, entreprise_id, nom) select id, p.ent, nom from sg.postes, sg.p p;
 insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
-select p.ent, po.id, pd.cle, true from sg.postes po, sg.p p, public.permissions_disponibles pd;
+select p.ent, po.id, pd.cle, true from sg.postes po, sg.p p, public.permissions_disponibles pd where pd.cle <> 'mode_compte_depot';
 
 -- Salariés : E (les 5 premiers liés aux comptes).
 create table sg.emp as

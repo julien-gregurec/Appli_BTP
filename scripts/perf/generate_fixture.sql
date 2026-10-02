@@ -140,7 +140,10 @@ insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, a
 select e.id, p.id, pd.cle, true
 from fx.postes p
 join fx.entreprises e on e.seq = p.entreprise_seq
-cross join public.permissions_disponibles pd;
+cross join public.permissions_disponibles pd
+-- Jamais le mode « compte dépôt » (compte partagé de borne) : il redirige tout
+-- l'applicatif vers /stock/borne et fausserait toute mesure de page.
+where pd.cle <> 'mode_compte_depot';
 
 -- --------------------------------------------------------------------------
 -- 4. Salariés (employes) — 40 pour le tenant principal, 5 pour le secondaire.
