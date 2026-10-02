@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_RESERVES_URL ?? "http://localhost:3020"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_RESERVES_URL ?? "http://localhost:3040"),
   title: { default: "ELSATIA Réserves", template: "%s · ELSATIA Réserves" },
   description: "Réserves de chantier : constat, attribution, levée et validation",
   applicationName: "ELSATIA Réserves",

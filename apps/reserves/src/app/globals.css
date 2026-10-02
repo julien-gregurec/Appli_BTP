@@ -59,6 +59,10 @@ a { color: var(--ardoise-700); }
 }
 .barre .marque-texte { color: #fff; }
 .barre-org { font-size: 13px; opacity: 0.78; text-align: right; }
+/* Retour vers les autres applications ELSATIA (catalogue, URL validées pour l'environnement). */
+.barre-apps { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; }
+.barre-apps a { color: inherit; opacity: 0.85; text-decoration: underline; text-underline-offset: 3px; }
+.barre-apps a:hover, .barre-apps a:focus-visible { opacity: 1; }
 
 .navigation {
   display: flex; gap: 4px; overflow-x: auto; background: var(--ardoise-800);

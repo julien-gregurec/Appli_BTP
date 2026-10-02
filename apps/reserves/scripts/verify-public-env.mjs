@@ -6,7 +6,7 @@
  * REUSSIT — il fige `undefined`, donc les replis du code — et livre un Réserves cohérent mais
  * amputé en silence :
  *
- *  - `src/lib/invitations.ts` (`urlApplicationReserves`) replie sur `http://localhost:3020` :
+ *  - `src/lib/invitations.ts` (`urlApplicationReserves`) replie sur `http://localhost:3040` :
  *    chaque invitation envoyée par e-mail contient un lien mort pour son destinataire, sans
  *    qu'aucune étape du déploiement n'échoue ;
  *  - `src/app/layout.tsx` (`metadataBase`) replie sur la même origine locale ;
@@ -55,7 +55,7 @@ export const MODES_CONSULTATIFS = ["preview"];
  *                                     toujours une clé publishable, jamais une clé de service.
  * - `NEXT_PUBLIC_RESERVES_URL`        lue par `src/lib/invitations.ts` (`urlApplicationReserves`)
  *                                     et par `src/app/layout.tsx` (`metadataBase`). Son repli
- *                                     `http://localhost:3020` est correct en local et faux partout
+ *                                     `http://localhost:3040` est correct en local et faux partout
  *                                     ailleurs — chaque lien d'invitation envoyé par e-mail en
  *                                     hériterait, sans qu'aucun destinataire ne puisse deviner
  *                                     pourquoi le lien ne mène nulle part. C'est le repli que
@@ -254,7 +254,7 @@ export function formaterRapport({ mode, niveau, failures, warnings }) {
     lignes.push("Build interrompu avant `next build`.");
     if (failures.some((constat) => constat.reason !== RAISONS.formeSecrete)) {
       lignes.push("Un build publié sans ces variables réussirait silencieusement et livrerait des");
-      lignes.push("invitations pointant vers http://localhost:3020. Pour un build local ou de");
+      lignes.push("invitations pointant vers http://localhost:3040. Pour un build local ou de");
       lignes.push("recette, déclarer ELSATIA_APPLICATION_ENV=local.");
     }
     if (failures.some((constat) => constat.reason === RAISONS.formeSecrete)) {

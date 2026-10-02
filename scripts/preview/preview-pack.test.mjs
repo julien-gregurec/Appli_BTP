@@ -77,7 +77,7 @@ const svc = "sb_secret_" + "s".repeat(24);
 const envsSains = () => ({
   gp: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc, NEXT_PUBLIC_APP_URL: "https://gp.vercel.app", NEXT_PUBLIC_COLORS_URL: "https://colors.vercel.app", TOOLS_APP_URL: "https://tools.vercel.app", TOOLS_ALLOWED_ORIGINS: "https://tools.vercel.app,capacitor://localhost", STRIPE_SECRET_KEY: fauxStripe("test"), TOOLS_STORE_ENVIRONMENT: "sandbox" },
   colors: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc, NEXT_PUBLIC_COLORS_URL: "https://colors.vercel.app/", NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://gp.vercel.app/abonnement" },
-  tools: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, NEXT_PUBLIC_TOOLS_URL: "https://tools.vercel.app", NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://gp.vercel.app" },
+  tools: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, NEXT_PUBLIC_TOOLS_URL: "https://tools.vercel.app", NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://gp.vercel.app", NEXT_PUBLIC_TOOLS_GESTION_PRO_URL: "https://gp.vercel.app", NEXT_PUBLIC_TOOLS_COLORS_URL: "https://colors.vercel.app" },
   reserves: { NEXT_PUBLIC_SUPABASE_URL: url, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: pub, SUPABASE_SERVICE_ROLE_KEY: svc },
 });
 const erreurs = (c) => c.filter((x) => x.niveau === "error").map((x) => x.code);
@@ -106,6 +106,8 @@ test("croisés : chaque incohérence est détectée sans exposer de valeur", () 
     [(e) => { e.colors.SUPABASE_SERVICE_ROLE_KEY = "sb_secret_" + "t".repeat(24); }, "X-SERVICE-KEY"],
     [(e) => { e.colors.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL = "https://autre.vercel.app/abonnement"; }, "X-URL-ACCOUNT"],
     [(e) => { e.tools.NEXT_PUBLIC_TOOLS_BILLING_API_URL = "https://autre.vercel.app"; }, "X-URL-TOOLS-BILLING"],
+    [(e) => { e.tools.NEXT_PUBLIC_TOOLS_GESTION_PRO_URL = "https://app.elsatia.fr"; }, "X-URL-TOOLS-NAV-GP"],
+    [(e) => { e.tools.NEXT_PUBLIC_TOOLS_COLORS_URL = "https://autre.vercel.app"; }, "X-URL-TOOLS-NAV-COLORS"],
     [(e) => { e.gp.TOOLS_ALLOWED_ORIGINS = "capacitor://localhost"; }, "X-TOOLS-CORS"],
     [(e) => { e.gp.NEXT_PUBLIC_COLORS_URL = "https://ancien.vercel.app"; }, "X-URL-COLORS"],
     [(e) => { e.tools.NEXT_PUBLIC_TOOLS_RUNTIME = svc; }, "X-SECRET-IN-PUBLIC"],

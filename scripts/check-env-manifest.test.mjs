@@ -243,6 +243,24 @@ test("Réserves réel : le gabarit déclare le nom canonique que lit le code de 
   assert.equal("NEXT_PUBLIC_SUPABASE_ANON_KEY" in example, false, "le gabarit ne propage plus l'ancien nom");
 });
 
+test("preflight A-08 : en Preview, aucune URL de navigation ne vise la Production ELSATIA (*.elsatia.fr)", () => {
+  const manifest = manifestWith([
+    v("NEXT_PUBLIC_ELSATIA_ACCOUNT_URL", { applications: ["colors"], category: "url", url_class: "cross_app_link" }),
+    v("NEXT_PUBLIC_TOOLS_BILLING_API_URL", { applications: ["colors"], category: "url", url_class: "api_endpoint" }),
+    v("ELSATIA_IDENTITY_ISSUER", { applications: ["colors"], category: "url", url_class: "api_endpoint" }),
+    v("POWENS_API_BASE_URL", { applications: ["colors"], category: "url", url_class: "provider_base" }),
+  ]);
+  const run = (env, target = "preview") => runPreflight(manifest, env, { target, apps: ["colors"] }).findings;
+  assert.ok(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://app.elsatia.fr/abonnement" }), "PF-URL-PRODUCTION-IN-PREVIEW", "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL"));
+  assert.ok(has(run({ NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://APP.ELSATIA.FR" }), "PF-URL-PRODUCTION-IN-PREVIEW", "NEXT_PUBLIC_TOOLS_BILLING_API_URL"));
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://gp-git-main.vercel.app/abonnement" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://elsatia.fr.evil.example/x" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false, "suffixe trompeur : pas un hôte ELSATIA");
+  // Identifiant serveur (émetteur) et fournisseur tiers : hors règle de navigation.
+  assert.equal(has(run({ ELSATIA_IDENTITY_ISSUER: "https://app.elsatia.fr/identity", POWENS_API_BASE_URL: "https://x.elsatia.fr" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+  // En Production, l'hôte canonique est la norme.
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://app.elsatia.fr/abonnement" }, "production"), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+});
+
 test("preflight A-07 : l'alias hérité satisfait seul une variable requise (avertissement), deux valeurs divergentes bloquent", () => {
   const manifest = manifestWith([
     v("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", { applications: ["reserves"], required: true, category: "supabase_public", accepted_aliases: ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] }),

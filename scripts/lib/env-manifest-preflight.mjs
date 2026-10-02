@@ -45,7 +45,23 @@ function jwtRole(value) {
   }
 }
 
-function urlProblems(name, value, target, exceptions) {
+/*
+ * A-08 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2) : une Preview ne bascule jamais silencieusement
+ * vers la Production. En cible preview, une URL de navigation ou d'API publique (toutes classes
+ * sauf `provider_base` — fournisseurs tiers — et les points d'API purement serveur, ex. l'émetteur
+ * d'identité, qui est un identifiant et non une cible de navigation) ne peut pas viser un hôte
+ * `*.elsatia.fr`.
+ */
+const NAVIGATION_URL_CLASSES = new Set(["app_base", "auth_callback", "cross_app_link", "stripe_return", "origin_list"]);
+const estHoteProductionElsatia = (hote) => {
+  const h = hote.toLowerCase().replace(/\.$/, "");
+  return h === "elsatia.fr" || h.endsWith(".elsatia.fr");
+};
+function regleNavigationPreview(v) {
+  return NAVIGATION_URL_CLASSES.has(v.url_class) || (v.url_class === "api_endpoint" && v.name.startsWith("NEXT_PUBLIC_"));
+}
+
+function urlProblems(name, value, target, exceptions, verifierProduction = false) {
   const out = [];
   const pieces = value.split(",").map((s) => s.trim()).filter(Boolean);
   for (const piece of pieces) {
@@ -53,6 +69,9 @@ function urlProblems(name, value, target, exceptions) {
     let url;
     try { url = new URL(piece); } catch { out.push(["PF-URL-INVALID", "n'est pas une URL valide"]); continue; }
     if (LOCAL_HOST_RE.test(url.hostname)) out.push(["PF-URL-LOCALHOST", `adresse locale ou privée interdite en ${target}`]);
+    else if (verifierProduction && target === "preview" && estHoteProductionElsatia(url.hostname)) {
+      out.push(["PF-URL-PRODUCTION-IN-PREVIEW", "hôte de Production ELSATIA (*.elsatia.fr) dans une Preview : bascule Preview → Production interdite"]);
+    }
     else if (target === "production" && url.protocol === "http:") out.push(["PF-URL-INSECURE", "HTTPS obligatoire en production"]);
   }
   return out;
@@ -128,7 +147,7 @@ export function runPreflight(manifest, env, { target, apps, phase = "all" }) {
     if (v.allowed_values && !v.allowed_values.includes(value.trim())) err("PF-VALUE-NOT-ALLOWED", v.name, `valeur hors {${v.allowed_values.join(",")}}`);
     if (v.value_pattern && !new RegExp(v.value_pattern).test(value.trim())) err("PF-VALUE-FORMAT", v.name, "format inattendu (valeur non affichée)");
     if (v.url_class && ["preview", "production"].includes(target)) {
-      for (const [code, message] of urlProblems(v.name, value, target, v.local_origin_exceptions ?? [])) err(code, v.name, message);
+      for (const [code, message] of urlProblems(v.name, value, target, v.local_origin_exceptions ?? [], regleNavigationPreview(v))) err(code, v.name, message);
     }
     if (v.flag) {
       const normalized = value.trim().toLowerCase();

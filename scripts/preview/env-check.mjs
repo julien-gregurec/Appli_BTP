@@ -106,6 +106,9 @@ export function controlesCroises(envs, { refAttendue = REF_PREVIEW_AUTORISEE, ma
   memeOrigine("X-URL-ACCOUNT", "portail de compte Colors → GP", ["colors", "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
   memeOrigine("X-URL-TOOLS-BILLING", "API de facturation Tools → GP", ["tools", "NEXT_PUBLIC_TOOLS_BILLING_API_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
   memeOrigine("X-URL-TOOLS-RETURN", "retour Checkout Tools", ["gp", "TOOLS_APP_URL"], ["tools", "NEXT_PUBLIC_TOOLS_URL"]);
+  // A-08 : liens de navigation Tools → GP / Colors = origines Preview des applications visées.
+  memeOrigine("X-URL-TOOLS-NAV-GP", "lien Tools → Gestion Pro", ["tools", "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
+  memeOrigine("X-URL-TOOLS-NAV-COLORS", "lien Tools → Colors", ["tools", "NEXT_PUBLIC_TOOLS_COLORS_URL"], ["colors", "NEXT_PUBLIC_COLORS_URL"]);
   if (envs.gp && envs.tools && estDefinie(envs.gp.TOOLS_ALLOWED_ORIGINS) && estDefinie(envs.tools.NEXT_PUBLIC_TOOLS_URL)) {
     const liste = envs.gp.TOOLS_ALLOWED_ORIGINS.split(",").map((s) => origine(s)).filter(Boolean);
     const tools = origine(envs.tools.NEXT_PUBLIC_TOOLS_URL);

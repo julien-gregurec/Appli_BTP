@@ -7,7 +7,7 @@ import { RESERVES, connexion, deconnexionUI, jetonSupabase, rpc } from "./reserv
 /*
  * Recette cross-app Gestion Pro ↔ ELSATIA Réserves (intégration V1).
  *
- * Deux applications COMPILÉES (GP sur 3100, Réserves sur 3020), une pile Supabase locale
+ * Deux applications COMPILÉES (GP sur 3100, Réserves sur 3040), une pile Supabase locale
  * (passerelle au-dessus du vrai PostgreSQL, train complet). Décor :
  * tests/e2e/gp-reserves-pile-locale/preparer-base.sh.
  *
@@ -113,7 +113,7 @@ test("parcours complet GP → Réserves → levée → retour GP", async ({ page
 
   // ── 3. « Ouvrir dans Réserves » : lien issu du catalogue ─────────────────
   const lien = bloc(page).getByRole("link", { name: "Ouvrir dans Réserves" });
-  await expect(lien).toHaveAttribute("href", `http://localhost:3020/chantiers/${chantierReserves}`);
+  await expect(lien).toHaveAttribute("href", `http://localhost:3040/chantiers/${chantierReserves}`);
 
   // ── 4. Réserves : ce qui a été repris ─────────────────────────────────────
   await connexion(page, "admin-a@invalid.local", `/chantiers/${chantierReserves}`);

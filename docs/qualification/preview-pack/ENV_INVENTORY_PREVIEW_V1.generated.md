@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|---|---|---|
 | gestion_pro | 135 | 21 | 88 | 26 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
-| tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
+| tools | 9 | 2 | 3 | 4 | 0 | 8 | 0 | 9 |
 | reserves | 11 | 5 | 3 | 3 | 1 | 4 | 2 | 5 |
 | studio | 27 | 7 | 8 | 12 | 0 | 3 | 4 | 4 |
 | studio_worker | 15 | 3 | 1 | 11 | 0 | 1 | 2 | 1 |
@@ -171,6 +171,8 @@
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_TOOLS_BILLING_API_URL` | CONDITIONAL | oui |  | oui |  |  |  |  | dès que l'abonnement Tools est ouvert |
+| `NEXT_PUBLIC_TOOLS_COLORS_URL` | CONDITIONAL | oui |  | oui |  |  |  |  | pour afficher les liens inter-applications d'une Preview Tools |
+| `NEXT_PUBLIC_TOOLS_GESTION_PRO_URL` | CONDITIONAL | oui |  | oui |  |  |  |  | pour afficher les liens inter-applications d'une Preview Tools |
 | `ELSATIA_TOOLS_NATIVE` | OPTIONAL |  |  | oui |  |  | 1 |  |  |
 | `NEXT_PUBLIC_TOOLS_ENV` | OPTIONAL | oui |  | oui |  | `preview` | local, preview, production, native-dev, native-production |  |  |
 | `NEXT_PUBLIC_TOOLS_RUNTIME` | OPTIONAL | oui |  | oui |  |  | native, web |  |  |

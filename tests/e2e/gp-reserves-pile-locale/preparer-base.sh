@@ -41,4 +41,4 @@ echo "== décor GP ↔ Réserves =="
 psql_base < "$DEPOT/scripts/e2e/prepare-gp-reserves-integration.sql"
 psql_base < "$DEPOT/scripts/e2e/prepare-local-recipe.sql"
 
-echo "== OK : base $BASE prête. Démarrer la passerelle, Gestion Pro (3100) et Réserves (3020). =="
+echo "== OK : base $BASE prête. Démarrer la passerelle, Gestion Pro (3100) et Réserves (3040). =="
