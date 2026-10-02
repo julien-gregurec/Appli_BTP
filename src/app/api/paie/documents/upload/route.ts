@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { validerJustificatif } from "@/lib/expenses/files";
 import { sha256 } from "@/lib/expenses/integrity";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { destinationInterneSure } from "@/lib/security/redirects";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
       await supabase.storage.from("documents-paie").remove([chemin]);
       throw new Error(erreurInsertion.message);
     }
-    const destination = retour.startsWith("/") && !retour.startsWith("//") ? retour : "/paie";
+    // Security Residual V2 (train V9) : `/\\evil.com` résolu par new URL() vers https://evil.com.
+    const destination = destinationInterneSure(retour, "/paie");
     return NextResponse.redirect(new URL(`${destination}${destination.includes("?") ? "&" : "?"}success=${encodeURIComponent("Pièce jointe privée ajoutée")}`, request.url), 303);
   } catch (error) {
     console.error("Échec d'import d'un document de paie", error);

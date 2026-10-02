@@ -30,8 +30,10 @@ select ok(
 
 -- Les deux policies qui créent une persistance (appartenance, permissions de
 -- poste) utilisent désormais est_membre_actif_reel, plus est_membre_actif.
+-- (Train V9, migration 20261002001001 : la policy d'insertion « bootstrap ou
+-- invitation par un membre actif » est renommée « invitation par un membre actif ».)
 select ok(
-  (select with_check from pg_policies where schemaname = 'public' and tablename = 'utilisateurs_entreprises' and policyname = 'bootstrap ou invitation par un membre actif') like '%est_membre_actif_reel%',
+  (select with_check from pg_policies where schemaname = 'public' and tablename = 'utilisateurs_entreprises' and policyname = 'invitation par un membre actif') like '%est_membre_actif_reel%',
   'INSERT sur utilisateurs_entreprises est gaté par est_membre_actif_reel'
 );
 select ok(

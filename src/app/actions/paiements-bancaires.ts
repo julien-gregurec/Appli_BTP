@@ -7,6 +7,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { destinationInterneSure } from "@/lib/security/redirects";
 import {
   bicEstValide,
   chiffrerDonneeBancaire,
@@ -26,10 +27,8 @@ const chemin = "/paiements-bancaires";
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const erreur = (message: string): never => redirect(`${chemin}?error=${encodeURIComponent(message)}`);
 const succes = (message: string): never => redirect(`${chemin}?success=${encodeURIComponent(message)}`);
-const retourAutorise = (formData: FormData) => {
-  const retour = texte(formData, "retour");
-  return retour.startsWith("/") && !retour.startsWith("//") && !retour.includes(":") ? retour : chemin;
-};
+// Security Residual V2 (train V9) : `/\evil.com` passait l'ancien contrôle et sortait de l'origine.
+const retourAutorise = (formData: FormData) => destinationInterneSure(texte(formData, "retour"), chemin);
 const redirigerMessage = (retour: string, type: "error" | "success", message: string): never =>
   redirect(`${retour}${retour.includes("?") ? "&" : "?"}${type}=${encodeURIComponent(message)}`);
 
