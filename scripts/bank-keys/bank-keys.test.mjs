@@ -1,7 +1,7 @@
 // ELSATIA — Chiffrement bancaire : intégration PostgreSQL réelle de l'outil opérateur bank-keys.
 // Rapport : docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md (§11).
 //
-//   BANK_KEYS_IT_BASE=<base V8 migrée SANS 20260930000813> npm run test:bank-keys
+//   BANK_KEYS_IT_BASE=<base V8 migrée SANS 20261002001112> npm run test:bank-keys
 //
 // Chaque scénario clone la base modèle (createdb -T), y écrit des données HISTORIQUES (format v1,
 // exactement comme le code d'avant la V1), APPLIQUE la migration (upgrade réel), puis pilote la
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CLI = path.join(RACINE, "scripts/bank-keys/bank-keys.mjs");
-const MIGRATION = path.join(RACINE, "supabase/migrations/20260930000813_banking_encryption_key_rotation_v1.sql");
+const MIGRATION = path.join(RACINE, "supabase/migrations/20261002001112_banking_encryption_key_rotation_v1.sql");
 const BASE = process.env.BANK_KEYS_IT_BASE;
 
 const K1 = randomBytes(32).toString("base64");

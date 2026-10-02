@@ -1,6 +1,6 @@
 -- ELSATIA — Chiffrement bancaire : versionnement et rotation des clés (V1).
 -- Rapport : docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md.
--- Migration : 20260930000813_banking_encryption_key_rotation_v1.
+-- Migration : 20261002001112_banking_encryption_key_rotation_v1.
 --
 -- Données de test uniquement : les « chiffrés » ci-dessous respectent le FORMAT (en-tête,
 -- iv 12 o, tag 16 o) mais ne sont pas indéchiffrables par une vraie clé ; le déchiffrement

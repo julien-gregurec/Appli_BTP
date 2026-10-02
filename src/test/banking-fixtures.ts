@@ -1,5 +1,5 @@
 // Banc de test du chiffrement bancaire : IBAN fictifs et magasin mémoire qui reproduit la
-// sémantique des RPC de 20260930000813_banking_encryption_key_rotation_v1 (registre, garde,
+// sémantique des RPC de 20261002001112_banking_encryption_key_rotation_v1 (registre, garde,
 // curseur, compare-and-swap, lot atomique). Données de test uniquement.
 import { createHash } from "node:crypto";
 import {

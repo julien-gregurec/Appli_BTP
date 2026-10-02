@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930000813 (Banking key rotation (claude/dazzling-turing-2q77nn)), renuméroté 20261002001112
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ELSATIA — CHIFFREMENT BANCAIRE : VERSIONNEMENT ET ROTATION DES CLÉS (V1)
 --

@@ -2,7 +2,7 @@
 // par lots, reprenable. Rapport : docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md.
 //
 // Le moteur ne connaît ni la base ni la cryptographie : il reçoit un « magasin » (les RPC
-// service_role de la migration 20260930000813) et les primitives du trousseau
+// service_role de la migration 20261002001112) et les primitives du trousseau
 // (src/lib/banking-keyring.ts). Il est ainsi exécuté tel quel par l'outil opérateur
 // scripts/bank-keys/bank-keys.mjs, par Vitest (magasin mémoire) et par le test d'intégration
 // PostgreSQL. Ses rapports ne contiennent que des identifiants de clé, des compteurs et des
