@@ -12,6 +12,9 @@ function champ(formData: FormData, nom: string): string | null {
 
 export async function creerClientAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
+  if (!champ(formData, "nom") && !champ(formData, "societe")) {
+    redirect(`/clients/nouveau?error=${encodeURIComponent("Renseignez au moins un nom ou une société.")}`);
+  }
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -96,6 +99,9 @@ export async function creerClientRapideAction(
 
 export async function modifierClientAction(clientId: string, formData: FormData) {
   const ctx = await getContexteEntreprise();
+  if (!champ(formData, "nom") && !champ(formData, "societe")) {
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent("Renseignez au moins un nom ou une société.")}`);
+  }
   const supabase = await createClient();
 
   const { error } = await supabase

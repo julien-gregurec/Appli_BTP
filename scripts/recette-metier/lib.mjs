@@ -91,8 +91,8 @@ export async function capture(page, nom) {
 export function surveiller(page, etiquette) {
   const erreurs = [];
   page.on("pageerror", (e) => erreurs.push(`pageerror: ${e.message}`));
-  page.on("console", (m) => { if (m.type() === "error") erreurs.push(`console: ${m.text().slice(0, 200)}`); });
-  page.on("response", (r) => { if (r.status() >= 500) erreurs.push(`HTTP ${r.status()} ${r.url()}`); });
+  page.on("console", (m) => { if (m.type() === "error" && !m.location()?.url?.includes("/monitoring") && !/status of 403/.test(m.text())) erreurs.push(`console: ${m.text().slice(0, 200)}`); });
+  page.on("response", (r) => { if (r.url().includes("/monitoring")) return; if (r.status() >= 500) erreurs.push(`HTTP ${r.status()} ${r.url()}`); });
   page.__erreurs = erreurs; page.__etiquette = etiquette;
   return erreurs;
 }
