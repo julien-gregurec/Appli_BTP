@@ -151,7 +151,7 @@ test("Tools : « Envoyer vers Gestion Pro » — résumé (source, chantier, con
   await expect(resume).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("gp-resume-source")).toHaveText("Tools · Relevé & Métré");
   await expect(page.getByTestId("gp-resume-chantier")).toHaveText("Maison Lot 11");
-  await expect(page.getByTestId("gp-resume-contrat")).toHaveText("elsatia.tools.estimation 1.0.0");
+  await expect(page.getByTestId("gp-resume-contrat")).toHaveText("elsatia.tools.estimation 1.1.0"); // train V9 : Lot 10 1.1.0
   await expect(page.getByTestId("gp-resume-ouvrages")).toHaveText("4");
   await expect(page.getByTestId("gp-resume-lignes")).toHaveText("7 · 2 sans prix");
   await expect(page.getByTestId("gp-resume-montant")).toHaveText(montant("1 499,75 € HT"));

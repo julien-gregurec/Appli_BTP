@@ -42,7 +42,8 @@ const payload = {
 describe("envoi vers Gestion Pro : résumé, résultat, messages", () => {
   it("résumé avant envoi (source, version, ouvrages, montant estimatif HT, pièces jointes)", () => {
     expect(resumeEnvoiGp(payload)).toEqual({
-      contrat: "elsatia.tools.estimation 1.0.0", ouvrages: 3, lignes: 3, lignesSansPrix: 1, montantHt: "15.50", plans: 2, photos: 1, annotations: 2, anomalies: 0, revetements: 1,
+      // Train V9 : Lot 11 porté sur le Lot 10 1.1.0 (contrat émis = version courante du domaine).
+      contrat: `${ESTIMATION_GP_CONTRACT.name} ${ESTIMATION_GP_CONTRACT.version}`, ouvrages: 3, lignes: 3, lignesSansPrix: 1, montantHt: "15.50", plans: 2, photos: 1, annotations: 2, anomalies: 0, revetements: 1,
     });
   });
   it("résultat normalisé (numeric PostgREST éventuellement en chaîne) ; réponse illisible refusée", () => {
