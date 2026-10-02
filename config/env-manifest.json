@@ -7263,6 +7263,254 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false
+    },
+    {
+      "name": "PDF_CONCURRENCE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : nombre maximal de navigateurs Chromium vivants par instance pour la génération de PDF ; défaut 2 (1 sous 1 Go de mémoire).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_FILE_MAX",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : nombre maximal de demandes PDF en attente au-delà de la concurrence ; défaut 10 (au-delà : 503 + Retry-After).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_ATTENTE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : attente maximale d'une demande PDF dans la file, en ms ; défaut 20000.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DUREE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : durée maximale d'une génération PDF, en ms ; défaut 35000 (arrêt forcé du navigateur au-delà).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DELAI_FERMETURE_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Train V9 (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 §7.4) : délai accordé à la fermeture propre de Chromium avant arrêt forcé, en ms ; défaut 3000.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_CHROMIUM_EXECUTABLE",
+      "applications": [
+        "gestion_pro",
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Chemin d'un Chromium local pour la génération PDF de Gestion Pro et le banc de capacité (scripts/perf/capacity) ; défaut : binaire embarqué. Banc local uniquement. DECISION_REQUIRED:V9-PDF-CHROMIUM-NOM : Réserves lit PDF_CHROMIUM_EXECUTABLE_PATH (nom à harmoniser).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ANCIEN_MONTAGE",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Contre-preuve du banc de capacité PDF (scripts/perf/capacity/pdf-enfant.mjs) : « 1 » relance Chromium comme avant le correctif. Jamais posé hors banc.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "MEM_SAMPLER_DIR",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Répertoire de travail de l'échantillonneur mémoire (scripts/perf/memory/sampler.cjs, chargé par --require) : mesures et commandes gc/snap. Banc local uniquement.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL du PostgREST réel (max_rows = 1000) du banc d'exactitude GP (src/lib/test-support/banc-postgrest.ts) ; absent : suites PostgREST ignorées.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_DB",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Nom de la base PostgreSQL locale du banc d'exactitude GP (vérité superutilisateur) ; absent : suites PostgREST ignorées.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FINANCE_BENCH_ANON",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé anon du banc d'exactitude GP (jeton local de test) ; défaut : jeton du profil.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
     }
   ]
 }

@@ -6,7 +6,7 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 128 | 19 | 88 | 21 | 1 | 11 | 20 | 12 |
+| gestion_pro | 133 | 19 | 88 | 26 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
@@ -137,7 +137,12 @@
 | `IA_PLAFOND_QUOTIDIEN` *(dépréciée)* | OPTIONAL |  |  |  |  |  |  |  |  |
 | `NEXT_PUBLIC_SENTRY_DSN` | OPTIONAL | oui |  | oui |  |  |  |  |  |
 | `OPENAI_MODEL` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_ATTENTE_MAX_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `PDF_CHROMIUM_EXECUTABLE_PATH` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_CONCURRENCE` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_DELAI_FERMETURE_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_DUREE_MAX_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_FILE_MAX` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_DECISION_REF` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_MAX_ENTREPRISES` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_PLANIFICATEUR_MODE` | OPTIONAL |  |  |  |  |  |  |  |  |
