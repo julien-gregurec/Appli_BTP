@@ -283,56 +283,46 @@ export const SEEDS = [
     path: "scripts/perf/pointages_mois_charge.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (ELSATIA_GP_POINTAGES_FACTURE_FIX_V1 : pointages d'un mois > 1 000)",
-    idempotent: true,
     bypass: {
       capacite_personnes_bypass: "Fixture locale, superutilisateur : salariés de charge au-delà de la capacité de l'offre du tenant de test.",
     },
-    harness: {
-      setup: [ISOLATION_MULTITENANT],
-      run: [{ inline: "\\set entreprise a0000000-0000-0000-0000-000000000001\n\\set mois 2026-03\n\\set n 1462\n\\ir scripts/perf/pointages_mois_charge.sql" }],
-      runs: 2,
-    },
+    // Jeu de CHARGE synthétique (codes d'identification orphelins après rechargement, assumés) : exécuté par src/lib/pointages-gestion.integration.test.ts sur PostgREST réel, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
   },
   {
     id: "perf-rentabilite",
     path: "scripts/perf/rentabilite_charge.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (ELSATIA_RENTABILITE_DATA_CORRECTNESS_V1 : rentabilité > 1 000 lignes)",
-    idempotent: false,
     bypass: {
       capacite_personnes_bypass: "Fixture locale, superutilisateur : salariés de charge au-delà de la capacité de l'offre du tenant de test.",
     },
-    harness: {
-      setup: [ISOLATION_MULTITENANT],
-      run: [{ inline: "\\set entreprise a0000000-0000-0000-0000-000000000001\n\\set n 1462\n\\ir scripts/perf/rentabilite_charge.sql" }],
-      runs: 1,
-    },
+    // Jeu de CHARGE synthétique (devis / factures engagés SANS ligne, montants posés sur l'en-tête) : exécuté par src/lib/rentabilite.integration.test.ts sur PostgREST réel, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
   },
   {
     id: "perf-rentabilite-purge",
     path: "scripts/perf/rentabilite_charge_purge.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (retire le jeu perf-rentabilite)",
-    idempotent: true,
     bypass: {
       session_replication_role: "Base de test uniquement : triggers d'immuabilité (factures émises, stock) neutralisés le temps de la purge du seul jeu de charge, dans une transaction.",
     },
-    harness: {
-      setup: [{ seed: "perf-rentabilite" }],
-      run: [{ sql: "scripts/perf/rentabilite_charge_purge.sql" }],
-      runs: 2,
-    },
+    // Purge du jeu de charge rentabilité (laisse des codes d'identification orphelins) : exécutée entre deux volumes du banc rentabilité, pas par le harnais des seeds.
+    coveredBy: "banc-integration",
   },
   {
     id: "perf-memory-affectations",
     path: "scripts/perf/memory/seed-affectations.sql",
     classification: "CI_ONLY",
     target: "base locale jetable (ELSATIA_NEXT_MEMORY_CAPACITY_V1 : semaine de planning réaliste sur la fixture perf)",
-    idempotent: true,
+    // Supprime puis recrée ses affectations : chaque passage ajoute historique et notifications
+    // (comportement métier des triggers) — non idempotent au sens du harnais, exécuté une fois.
+    idempotent: false,
     harness: {
       setup: [{ seed: "perf-fixture" }],
       run: [{ sql: "scripts/perf/memory/seed-affectations.sql" }],
-      runs: 2,
+      runs: 1,
     },
   },
   {
