@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930000101 (Login rate limit agency (claude/gracious-curie-135pix)), renuméroté 20261002001113
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA — LOGIN RATE LIMIT NAT / AGENCY HARDENING V1
 --
 -- Le rate limit de connexion ne compte plus chaque POST /login par IP (une
