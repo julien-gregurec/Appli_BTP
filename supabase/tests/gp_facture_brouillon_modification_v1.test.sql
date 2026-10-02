@@ -4,7 +4,7 @@
 -- Avant correctif : `modifier_facture_brouillon` appelait directement
 -- recalc_totaux_facture, dont `authenticated` n'a plus le droit EXECUTE depuis
 -- 20260902000255 → « permission denied for function recalc_totaux_facture ».
--- Correctif : 20260930000102 (totaux recalculés par le trigger de lignes).
+-- Correctif : 20261002001106 (totaux recalculés par le trigger de lignes).
 --
 -- Matrice : brouillon modifiable (même entreprise, deux profils autorisés),
 -- totaux exacts ; autre entreprise refusée ; profils sans droit refusés ;

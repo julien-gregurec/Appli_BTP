@@ -80,7 +80,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     .order("created_at");
 
   // Heures planifiées / validées calculées en base (chantier_heures_synthese,
-  // 20260930000301) : un chantier peut dépasser 1 000 affectations ou pointages,
+  // 20261002001107) : un chantier peut dépasser 1 000 affectations ou pointages,
   // que PostgREST tronquerait sans erreur. Liste détaillée des pointages validés
   // paginée. En cas d'erreur : « indisponible », jamais un total partiel.
   const pagePointages = Math.max(1, Math.floor(Number(messages.page_pointages)) || 1);
@@ -98,7 +98,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
       : Promise.resolve([] as string[]),
   ]);
   // Totaux chiffrés (factures, dépenses, notes de frais) calculés en base et
-  // listes récentes bornées (chantier_synthese_chiffree, 20260930000401) :
+  // listes récentes bornées (chantier_synthese_chiffree, 20261002001108) :
   // PostgREST plafonnait ces listes à 1 000 lignes, et la lecture complète
   // (chantier_donnees_chiffrees) rendait toutes les pièces d'un gros chantier.
   // Documents : nombre exact et 6 plus récents en base, plans en tête.

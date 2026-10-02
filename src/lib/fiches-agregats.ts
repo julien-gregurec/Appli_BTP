@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Totaux des fiches client, sous-traitant, véhicule, outil et chantier calculés
-// en base (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1, migration 20260930000401) :
+// en base (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1, migration 20261002001108) :
 // les fonctions renvoient du jsonb, jamais plafonné par `max_rows`, avec la
 // visibilité RLS de chaque table. Une erreur est levée plutôt qu'un total
 // partiel : la page affiche alors « indisponible ».
@@ -194,7 +194,7 @@ export function borner<T>(lignes: T[] | null | undefined, limite: number): { lig
 
 // ---------------------------------------------------------------------------
 // Listes de choix complètes (gp_options_chantiers, gp_options_employes,
-// migration 20260930000404) : la lecture PostgREST triée par nom était tronquée
+// migration 20261002001111) : la lecture PostgREST triée par nom était tronquée
 // à 1 000 lignes et évaluait la RLS de chaque ligne avant d'en rendre une.
 // En cas d'erreur : liste vide (l'écran reste utilisable, sans choix faux).
 

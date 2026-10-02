@@ -15,7 +15,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
-  // Totaux calculés en base (rentabilite_chantier, 20260930000301) : un chantier
+  // Totaux calculés en base (rentabilite_chantier, 20261002001107) : un chantier
   // peut porter plus de 1 000 pointages, que PostgREST tronquerait sans erreur.
   const { data: chantier } = await supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!chantier) return { error: "Chantier introuvable." };

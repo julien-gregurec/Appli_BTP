@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930000301 (GP residual data correctness (claude/optimistic-hopper-0ytout)), renuméroté 20261002001107
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA-RENTABILITE-DATA-CORRECTNESS-V1 — rentabilité et heures chantier
 -- calculées par PostgreSQL.
 --

@@ -30,7 +30,7 @@ describe("modifier_facture_brouillon", () => {
   const { nom, corps } = derniereDefinition("modifier_facture_brouillon");
 
   it("n'appelle plus recalc_totaux_facture (permission denied sous authenticated)", () => {
-    expect(nom >= "20260930000102").toBe(true);
+    expect(nom >= "20261002001106").toBe(true);
     expect(corps).not.toMatch(/recalc_totaux_facture\s*\(/i);
   });
 

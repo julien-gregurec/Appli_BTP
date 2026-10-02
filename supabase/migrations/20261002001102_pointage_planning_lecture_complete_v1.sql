@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260928000814 (GP residual data correctness (claude/optimistic-hopper-0ytout)), renuméroté 20261002001102
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA-FINANCE-AGGREGATES-DATA-CORRECTNESS-V1 — pointage d'équipe et
 -- planning hebdomadaire lus en entier.
 --

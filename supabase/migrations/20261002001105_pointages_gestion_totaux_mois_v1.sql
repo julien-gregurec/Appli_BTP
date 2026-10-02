@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930000101 (GP residual data correctness (claude/optimistic-hopper-0ytout)), renuméroté 20261002001105
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA-GP-POINTAGES-FACTURE-FIX-V1 — B1 : totaux mensuels des pointages
 -- calculés en base.
 --

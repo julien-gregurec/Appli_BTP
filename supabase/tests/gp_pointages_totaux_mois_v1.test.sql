@@ -1,5 +1,5 @@
 -- ELSATIA-GP-POINTAGES-FACTURE-FIX-V1 — B1 : totaux mensuels des pointages
--- calculés en base (pointages_gestion_totaux_mois, 20260930000101).
+-- calculés en base (pointages_gestion_totaux_mois, 20261002001105).
 --
 -- Avant : /pointage/gestion additionnait côté Next les pointages reçus de
 -- PostgREST, plafonnés à max_rows = 1 000 → totaux faux au-delà (1 462

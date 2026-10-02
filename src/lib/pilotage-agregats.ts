@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Indicateurs de pilotage calculés en base (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1,
-// migration 20260930000402) : jsonb non plafonné par `max_rows`, visibilité RLS
+// migration 20261002001109) : jsonb non plafonné par `max_rows`, visibilité RLS
 // reproduite. En cas d'erreur, une exception : la page affiche « indisponible »
 // plutôt qu'un total partiel.
 

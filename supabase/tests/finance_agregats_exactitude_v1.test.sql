@@ -1,6 +1,6 @@
 -- ELSATIA-FINANCE-AGGREGATES-DATA-CORRECTNESS-V1 — les RPC qui remplacent les
--- lectures PostgREST plafonnées à 1 000 lignes (migrations 20260928000813 à
--- 20260928000816) rendent EXACTEMENT ce que les policies RLS laissaient lire,
+-- lectures PostgREST plafonnées à 1 000 lignes (migrations 20261002001101 à
+-- 20261002001104) rendent EXACTEMENT ce que les policies RLS laissaient lire,
 -- pour chaque profil du jeu multitenant : même nombre de lignes, mêmes sommes,
 -- mêmes jointures visibles (client, chantier, fournisseur, salarié), rien
 -- d'une autre entreprise, et aucune exécution par `anon`.

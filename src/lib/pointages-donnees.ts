@@ -13,7 +13,7 @@ export type PointagePlanning = { id: string; date: string; heures_normales: numb
 
 // Lecture complète en une RPC (jsonb, non plafonnée par `max_rows`, mêmes
 // filtres, colonnes, ordre et contrôles d'accès que les lectures RLS
-// d'origine, droits évalués une fois par salarié : migration 20260928000814).
+// d'origine, droits évalués une fois par salarié : migration 20261002001102).
 // Une erreur est levée : des heures calculées sur des lignes manquantes ne
 // doivent pas s'afficher.
 export async function chargerPointagesGestion(supabase: SupabaseClient, entrepriseId: string, periode: { debut: string; fin: string; debutIso: string; finIso: string }) {

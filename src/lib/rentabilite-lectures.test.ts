@@ -4,7 +4,7 @@
  * PostgREST plafonne toute réponse à max_rows = 1 000 lignes sans erreur.
  * Les écrans de rentabilité et la section heures de la fiche chantier ne
  * doivent plus additionner côté Next des lignes lues sans pagination : les
- * totaux viennent des RPC SQL (20260930000301), les listes détaillées sont
+ * totaux viennent des RPC SQL (20261002001107), les listes détaillées sont
  * paginées. Ces tests verrouillent les chemins corrigés et le comportement en
  * cas d'erreur (jamais de total partiel présenté comme exact).
  */

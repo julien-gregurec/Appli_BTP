@@ -12,7 +12,7 @@ type ChantierAffiche = { id: string; reference_interne: string | null; nom: stri
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
 // Totaux et marges calculés par PostgreSQL (RPC rentabilite_chantiers_*,
-// 20260930000301) : la page ne lit plus pointages, factures, dépenses… ligne à
+// 20261002001107) : la page ne lit plus pointages, factures, dépenses… ligne à
 // ligne (PostgREST les tronquait à 1 000 lignes sans erreur). Liste paginée.
 export default async function RentabilitePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { page: pageParam } = await searchParams;

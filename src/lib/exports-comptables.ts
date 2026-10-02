@@ -27,7 +27,7 @@ type Achat = { numero_piece: string; date_piece: string; date_echeance: string |
 type TvaCollectee = { date_emission: string; numero: string; taux_tva: number; base_ht: number; tva: number };
 
 // Chaque export est produit en base, en une seule valeur jsonb (RPC
-// `export_comptable_*`, migration 20260928000813) : il n'est donc jamais
+// `export_comptable_*`, migration 20261002001101) : il n'est donc jamais
 // plafonné par `max_rows` et porte toutes les lignes de la période, avec les
 // mêmes filtres et contrôles d'accès que les lectures RLS qu'il remplace.
 // ELSATIA-FINANCE-AGGREGATES-DATA-CORRECTNESS-V1.

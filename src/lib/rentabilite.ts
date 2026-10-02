@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Rentabilité des chantiers et heures de la fiche chantier, calculées par
- * PostgreSQL (migration 20260930000301_rentabilite_agregats_chantiers_v1).
+ * PostgreSQL (migration 20261002001107_rentabilite_agregats_chantiers_v1).
  *
  * PostgREST plafonne toute réponse à max_rows = 1 000 lignes SANS erreur :
  * additionner ici des pointages, factures, dépenses… lus sans pagination

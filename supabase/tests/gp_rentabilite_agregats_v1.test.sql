@@ -1,5 +1,5 @@
 -- ELSATIA-RENTABILITE-DATA-CORRECTNESS-V1 — rentabilité et heures chantier
--- calculées en base (20260930000301_rentabilite_agregats_chantiers_v1.sql).
+-- calculées en base (20261002001107_rentabilite_agregats_chantiers_v1.sql).
 --
 -- Avant : /rentabilite, l'analyse IA, le copilote et la fiche chantier
 -- additionnaient côté Next des lignes lues par PostgREST, plafonnées à

@@ -12,7 +12,7 @@ export type FactureChantier = { id: string; numero: string | null; statut: strin
 
 // Toutes les listes chiffrées du chantier en une RPC (jsonb, non plafonnée
 // par `max_rows`, mêmes colonnes, ordres et contrôles d'accès que les lectures
-// RLS d'origine : migration 20260928000815). Une lecture paginée côté Next
+// RLS d'origine : migration 20261002001103). Une lecture paginée côté Next
 // était exacte mais payait la policy de chaque ligne (108 s à 10 000 lignes).
 export async function chargerDonneesChiffreesChantier(supabase: SupabaseClient, entrepriseId: string, chantierId: string, droits: { heures: boolean; achats: boolean; notes: boolean }) {
   const { data, error } = await supabase.rpc("chantier_donnees_chiffrees", { p_entreprise_id: entrepriseId, p_chantier_id: chantierId, p_heures: droits.heures, p_achats: droits.achats, p_notes: droits.notes });

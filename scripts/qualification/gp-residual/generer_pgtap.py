@@ -2,7 +2,7 @@
 """Génère supabase/tests/gp_residuel_agregats_v1.test.sql (ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1).
 
 Parité stricte, profil par profil, entre chaque fonction SECURITY DEFINER des
-migrations 20260930000401-403 et le même calcul fait sous `authenticated` avec
+migrations 20261002001108-403 et le même calcul fait sous `authenticated` avec
 la RLS réelle des tables. Rejouer après toute modification :
     python3 scripts/qualification/gp-residual/generer_pgtap.py
 """
@@ -245,7 +245,7 @@ t("""select is(public.plateforme_applications_compteurs(),
   'plateforme : compteurs d''applications = lecture RLS de l''administrateur');""")
 
 ENTETE = f"""-- ELSATIA-GP-RESIDUAL-DATA-CORRECTNESS-V1 — parité RLS des agrégats résiduels
--- (migrations 20260930000401, 20260930000402, 20260930000403).
+-- (migrations 20261002001108, 20261002001109, 20261002001110).
 --
 -- FICHIER GÉNÉRÉ par scripts/qualification/gp-residual/generer_pgtap.py.
 --
