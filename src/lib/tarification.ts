@@ -7,6 +7,12 @@ export type CodeOffreTarifaire =
 
 export type PeriodiciteAbonnement = "mensuel" | "annuel";
 
+// Règle commerciale canonique : l'engagement annuel est facturé 10 mois
+// (2 mois offerts). Une nouvelle grille ne s'applique qu'aux nouveaux contrats :
+// les prix déjà contractés restent portés par leur Price Stripe et leur ligne
+// `abonnements_entreprises`, jamais réécrits automatiquement.
+export const MOIS_FACTURES_PAR_AN = 10;
+
 export type OffreTarifaire = {
   cle: CodeOffreTarifaire;
   palier: number;
@@ -82,7 +88,7 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     nom: "Mini",
     base: 79,
     prixMensuelCentimes: 7_900,
-    prixAnnuelCentimes: 94_800,
+    prixAnnuelCentimes: 79_000,
     comptesInclus: 3,
     administrateursInclus: 1,
     parCompteSup: 15,
@@ -97,7 +103,7 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     nom: "Pro",
     base: 249,
     prixMensuelCentimes: 24_900,
-    prixAnnuelCentimes: 298_800,
+    prixAnnuelCentimes: 249_000,
     comptesInclus: 15,
     administrateursInclus: 3,
     parCompteSup: 12,
@@ -112,7 +118,7 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     nom: "Business",
     base: 449,
     prixMensuelCentimes: 44_900,
-    prixAnnuelCentimes: 538_800,
+    prixAnnuelCentimes: 449_000,
     comptesInclus: 30,
     administrateursInclus: 6,
     parCompteSup: 9,
@@ -127,7 +133,7 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     nom: "Entreprise",
     base: 599,
     prixMensuelCentimes: 59_900,
-    prixAnnuelCentimes: 646_800,
+    prixAnnuelCentimes: 599_000,
     comptesInclus: 50,
     administrateursInclus: 10,
     parCompteSup: 9,

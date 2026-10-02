@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MOIS_FACTURES_PAR_AN,
   OFFRES_TARIFAIRES,
   SERVICES_MISE_EN_SERVICE,
   calculerTarifAbonnement,
@@ -17,7 +18,7 @@ describe("grille tarifaire", () => {
       ["entreprise", 59_900],
       ["sur_mesure", 69_900],
     ]);
-    expect(offreTarifaireParCle("entreprise").prixAnnuelCentimes).toBe(646_800);
+    expect(offreTarifaireParCle("entreprise").prixAnnuelCentimes).toBe(599_000);
     expect(offreTarifaireParCle("entreprise").populaire).toBe(true);
     expect(SERVICES_MISE_EN_SERVICE.map((service) => service.prixMinCentimes)).toEqual([
       199_000,
@@ -26,6 +27,16 @@ describe("grille tarifaire", () => {
       150_000,
       49_000,
       90_000,
+    ]);
+  });
+
+  it("facture l'annuel 10 mois pour les quatre offres commercialisées", () => {
+    expect(MOIS_FACTURES_PAR_AN).toBe(10);
+    expect(OFFRES_TARIFAIRES.filter((offre) => !offre.devisObligatoire).map((offre) => [offre.cle, offre.prixMensuelCentimes, offre.prixAnnuelCentimes])).toEqual([
+      ["mini", 7_900, 79_000],
+      ["pro", 24_900, 249_000],
+      ["business", 44_900, 449_000],
+      ["entreprise", 59_900, 599_000],
     ]);
   });
 

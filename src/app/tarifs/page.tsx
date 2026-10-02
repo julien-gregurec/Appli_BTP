@@ -2,8 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PiedLegal } from "@/components/PiedLegal";
 import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
-import { formatMontantCentimes, OFFRES_TARIFAIRES, OPTIONS_TARIFAIRES, SERVICES_MISE_EN_SERVICE } from "@/lib/tarification";
-import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
+import { formatMontantCentimes, MOIS_FACTURES_PAR_AN, OFFRES_TARIFAIRES, OPTIONS_TARIFAIRES, SERVICES_MISE_EN_SERVICE } from "@/lib/tarification";
+import { etatOuvertureCommerciale } from "@/lib/stripe-billing-config";
+
+// La règle d'ouverture commerciale dépend d'une date : la page est régénérée
+// toutes les 10 minutes au lieu d'être figée au build. La souscription reste de
+// toute façon revérifiée côté serveur au moment du Checkout.
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   title: "Tarifs — Liria Gestion Pro",
@@ -19,7 +24,7 @@ const BENEFICES: Record<string, string[]> = {
 };
 
 export default function TarifsPage() {
-  const paiementConfigure = stripeBillingEstConfigure();
+  const paiementConfigure = etatOuvertureCommerciale().ouvert;
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-12 dark:bg-neutral-950">
       <div className="mx-auto max-w-7xl">
@@ -42,7 +47,7 @@ export default function TarifsPage() {
                 {offre.devisObligatoire ? "Dès " : ""}{formatMontantCentimes(offre.prixMensuelCentimes)}
               </p>
               <p className="text-xs text-neutral-500">HT / mois</p>
-              {offre.cle === "entreprise" ? <p className="mt-1 text-xs font-medium text-green-700">539 € HT/mois en annuel (6 468 € HT/an)</p> : <p className="mt-1 text-xs text-neutral-500">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an</p>}
+              {offre.devisObligatoire ? <p className="mt-1 text-xs text-neutral-500">Annuel sur devis</p> : <p className="mt-1 text-xs font-medium text-green-700">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an en annuel · {MOIS_FACTURES_PAR_AN} mois facturés sur 12</p>}
               <ul className="mt-5 flex-1 space-y-2 text-sm">
                 <li>✓ {offre.cle === "entreprise" ? "40 salariés + 10 administrateurs" : `${offre.comptesInclus} comptes inclus`}</li>
                 <li>✓ {offre.operationsIAIncluses.toLocaleString("fr-FR")} opérations IA / mois</li>

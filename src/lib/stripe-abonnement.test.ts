@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ENV_PRIX_TEST, FakeStripe, PRIX_TEST } from "@/test/fake-stripe";
 import {
   calculerFacturationStockage,
+  creerSessionAbonnementStripe,
+  ligneOffreAbonnement,
+  offreDepuisPrix,
+  periodeAbonnement,
+  type StripeSubscription,
   prixOptionIAStripePour,
   prixStripePour,
   statutAbonnementDepuisStripe,
@@ -93,5 +99,66 @@ describe("facturation du stockage", () => {
       quotaGo: 25,
       periodicite: "annuel",
     })).toMatchObject({ depassementGo: 2, montantHt: 12, nombreMois: 12 });
+  });
+});
+
+describe("droits dérivés du Price facturé", () => {
+  const env = { NODE_ENV: "test", ...ENV_PRIX_TEST } as unknown as NodeJS.ProcessEnv;
+
+  it("résout l'offre depuis l'identifiant du Price, puis depuis ses métadonnées", () => {
+    expect(offreDepuisPrix(PRIX_TEST.price_business_a, env)).toEqual({ offre: "business", periodicite: "annuel" });
+    expect(offreDepuisPrix(PRIX_TEST.price_pro_a_v2, env)).toEqual({ offre: "pro", periodicite: "annuel" });
+    expect(offreDepuisPrix(PRIX_TEST.price_inconnu, env)).toBeNull();
+    expect(offreDepuisPrix(undefined, env)).toBeNull();
+  });
+
+  it("ignore les lignes d'options et lit la période sur les lignes (API basil)", () => {
+    const abonnement: StripeSubscription = {
+      id: "sub_1",
+      customer: "cus_1",
+      status: "active",
+      items: { data: [
+        { id: "si_ia", price: { id: "price_option_ia" }, current_period_start: 100, current_period_end: 200 },
+        { id: "si_base", price: PRIX_TEST.price_mini_m, current_period_start: 100, current_period_end: 200 },
+      ] },
+    };
+    expect(ligneOffreAbonnement(abonnement, env)?.ligne.id).toBe("si_base");
+    expect(periodeAbonnement(abonnement)).toEqual({ debut: 100, fin: 200 });
+    expect(periodeAbonnement({ ...abonnement, current_period_start: 1, current_period_end: 2 })).toEqual({ debut: 1, fin: 2 });
+  });
+});
+
+describe("session Checkout", () => {
+  function preparer() {
+    const stripe = new FakeStripe();
+    vi.stubGlobal("fetch", stripe.fetch);
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fictif");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://example.test");
+    vi.stubEnv("STRIPE_PRICE_PRO_ANNUEL", "price_pro_a");
+    return stripe;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("n'accorde l'essai qu'à la première souscription", async () => {
+    const stripe = preparer();
+    await creerSessionAbonnementStripe({ entrepriseId: "e1", customerId: "cus_1", offre: "pro", periodicite: "annuel", essai: true });
+    await creerSessionAbonnementStripe({ entrepriseId: "e1", customerId: "cus_1", offre: "pro", periodicite: "annuel", essai: false });
+    const [premiere, reactivation] = stripe.appelsVers("checkout/sessions");
+    expect(premiere.corps!.get("subscription_data[trial_period_days]")).toBe("30");
+    expect(reactivation.corps!.get("subscription_data[trial_period_days]")).toBeNull();
+    expect(premiere.corps!.get("line_items[0][price]")).toBe("price_pro_a");
+    expect(premiere.corps!.get("billing_address_collection")).toBe("required");
+    expect(premiere.corps!.get("automatic_tax[enabled]")).toBeNull();
+  });
+
+  it("déduplique un double clic sans bloquer une nouvelle tentative ultérieure", async () => {
+    const stripe = preparer();
+    const base = { entrepriseId: "e1", customerId: "cus_1", offre: "pro" as const, periodicite: "annuel" as const, essai: true };
+    await creerSessionAbonnementStripe({ ...base, maintenant: new Date("2026-10-02T10:00:00Z") });
+    await creerSessionAbonnementStripe({ ...base, maintenant: new Date("2026-10-02T10:05:00Z") });
+    await creerSessionAbonnementStripe({ ...base, maintenant: new Date("2026-10-02T11:00:00Z") });
+    const cles = stripe.appelsVers("checkout/sessions").map((appel) => appel.idempotence);
+    expect(cles[0]).toBe(cles[1]);
+    expect(cles[2]).not.toBe(cles[0]);
   });
 });

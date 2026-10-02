@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { parametresFiscauxCheckout, piedDeFactureStripe } from "@/lib/stripe-billing-config";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -28,18 +29,43 @@ export function calculerFacturationStockage(params: {
 type StripeErreur = { error?: { message?: string } };
 type StripeCustomer = { id: string };
 type StripeSession = { id: string; url: string | null };
+export type StripePrice = {
+  id?: string;
+  unit_amount?: number | null;
+  currency?: string;
+  recurring?: { interval?: string; interval_count?: number } | null;
+  metadata?: Record<string, string>;
+};
+export type StripeSubscriptionItem = {
+  id: string;
+  quantity?: number;
+  price?: StripePrice;
+  // Depuis l'API 2025-03-31 (basil), les bornes de période sont portées par les lignes.
+  current_period_start?: number;
+  current_period_end?: number;
+};
 export type StripeSubscription = {
   id: string;
+  object?: string;
   customer: string | { id: string };
   status: string;
+  created?: number;
+  // Présents sur les versions d'API antérieures à 2025-03-31 (basil).
   current_period_start?: number;
   current_period_end?: number;
   trial_end?: number | null;
   cancel_at?: number | null;
   cancel_at_period_end?: boolean;
+  canceled_at?: number | null;
+  ended_at?: number | null;
   metadata?: Record<string, string>;
-  items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
+  items?: { data?: StripeSubscriptionItem[] };
 };
+
+export const STATUTS_STRIPE_TERMINAUX = ["canceled", "incomplete_expired"] as const;
+export function statutStripeTerminal(statut: string) {
+  return (STATUTS_STRIPE_TERMINAUX as readonly string[]).includes(statut);
+}
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: {
@@ -101,6 +127,51 @@ export function prixStripePour(
   return variable ? environnement[variable] || null : null;
 }
 
+// Le droit accordé dépend du Price réellement facturé, jamais des métadonnées de
+// l'abonnement : le portail client Stripe change le Price sans toucher aux
+// métadonnées posées au Checkout. Résolution, dans l'ordre :
+// 1. identifiant du Price configuré dans l'environnement (grille courante ou historique) ;
+// 2. métadonnées `liria_offre` / `liria_periodicite` posées sur le Price Stripe
+//    (Prices historiques conservés pour les anciens contrats).
+export function offreDepuisPrix(
+  prix: StripePrice | undefined,
+  environnement: NodeJS.ProcessEnv = process.env,
+): { offre: OffreAbonnement; periodicite: PeriodiciteAbonnement } | null {
+  if (!prix?.id) return null;
+  for (const [offre, variables] of Object.entries(VARIABLES_PRIX) as Array<[OffreAbonnement, Record<PeriodiciteAbonnement, string>]>) {
+    for (const periodicite of PERIODICITES_ABONNEMENT) {
+      const valeur = environnement[variables[periodicite]];
+      if (valeur && valeur === prix.id) return { offre, periodicite };
+    }
+  }
+  const offre = prix.metadata?.liria_offre ?? "";
+  const periodicite = prix.metadata?.liria_periodicite ?? "";
+  if (estOffreAbonnement(offre) && estPeriodiciteAbonnement(periodicite)) return { offre, periodicite };
+  return null;
+}
+
+// Ligne de l'offre de base : la seule ligne dont le Price correspond à une offre.
+// Les lignes de comptes supplémentaires et d'option IA sont ignorées.
+export function ligneOffreAbonnement(abonnement: StripeSubscription, environnement: NodeJS.ProcessEnv = process.env) {
+  const lignes = (abonnement.items?.data ?? [])
+    .map((ligne) => ({ ligne, offre: offreDepuisPrix(ligne.price, environnement) }))
+    .filter((resultat): resultat is { ligne: StripeSubscriptionItem; offre: NonNullable<ReturnType<typeof offreDepuisPrix>> } => resultat.offre !== null);
+  if (lignes.length !== 1) return null;
+  return lignes[0];
+}
+
+export function periodeAbonnement(abonnement: StripeSubscription) {
+  const lignes = abonnement.items?.data ?? [];
+  const debut = abonnement.current_period_start
+    ?? Math.min(...lignes.map((ligne) => ligne.current_period_start ?? Infinity));
+  const fin = abonnement.current_period_end
+    ?? Math.max(...lignes.map((ligne) => ligne.current_period_end ?? -Infinity));
+  return {
+    debut: Number.isFinite(debut) ? debut : null,
+    fin: Number.isFinite(fin) ? fin : null,
+  };
+}
+
 export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
   const variables = [
     "STRIPE_SECRET_KEY",
@@ -159,12 +230,21 @@ export async function creerOuRecupererClientStripe(params: {
     .eq("id", params.entrepriseId)
     .single();
   if (error || !entreprise) throw new Error("Entreprise introuvable");
-  if (entreprise.stripe_customer_id) return entreprise.stripe_customer_id as string;
+  const pied = piedDeFactureStripe();
+  if (entreprise.stripe_customer_id) {
+    // Le pied de facture (identité vendeur, mention TVA, mention Test) est
+    // réaligné à chaque souscription : il peut avoir changé depuis la création.
+    await requeteStripe<StripeCustomer>(`customers/${encodeURIComponent(entreprise.stripe_customer_id)}`, {
+      corps: new URLSearchParams({ "invoice_settings[footer]": pied }),
+    });
+    return entreprise.stripe_customer_id as string;
+  }
 
   const corps = new URLSearchParams({
     name: entreprise.raison_sociale || entreprise.nom,
     email: params.email,
     "metadata[entreprise_id]": entreprise.id,
+    "invoice_settings[footer]": pied,
   });
   if (entreprise.adresse) corps.set("address[line1]", entreprise.adresse);
   if (entreprise.code_postal) corps.set("address[postal_code]", entreprise.code_postal);
@@ -189,6 +269,10 @@ export async function creerSessionAbonnementStripe(params: {
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  // L'essai gratuit n'est accordé qu'à la première souscription : une
+  // réactivation après résiliation est facturée immédiatement.
+  essai: boolean;
+  maintenant?: Date;
 }) {
   const prix = prixStripePour(params.offre, params.periodicite);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
@@ -206,23 +290,29 @@ export async function creerSessionAbonnementStripe(params: {
     "metadata[entreprise_id]": params.entrepriseId,
     "metadata[offre]": params.offre,
     "metadata[periodicite]": params.periodicite,
-    "subscription_data[trial_period_days]": String(DUREE_ESSAI_JOURS),
     "subscription_data[metadata][entreprise_id]": params.entrepriseId,
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
+    ...parametresFiscauxCheckout(),
   });
-  if (process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
-    corps.set("automatic_tax[enabled]", "true");
-  }
+  if (params.essai) corps.set("subscription_data[trial_period_days]", String(DUREE_ESSAI_JOURS));
+  // Fenêtre de 10 minutes : un double clic renvoie la même session, mais une
+  // nouvelle tentative plus tard (ou une réactivation le même jour) n'est pas
+  // bloquée par une clé d'idempotence encore valable 24 h chez Stripe.
+  const fenetre = Math.floor((params.maintenant ?? new Date()).getTime() / 600_000);
   return requeteStripe<StripeSession>("checkout/sessions", {
     corps,
-    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}`,
+    idempotence: `abonnement-checkout-${params.entrepriseId}-${params.offre}-${params.periodicite}-${params.essai ? "essai" : "direct"}-${fenetre}`,
   });
 }
 
 export async function creerSessionPortailStripe(customerId: string, returnUrl: string) {
+  const corps = new URLSearchParams({ customer: customerId, return_url: returnUrl });
+  // Configuration de portail versionnée (Prices autorisés pour upgrade/downgrade,
+  // résiliation en fin de période) créée par scripts/stripe-test/catalogue.mjs.
+  if (process.env.STRIPE_BILLING_PORTAL_CONFIGURATION) corps.set("configuration", process.env.STRIPE_BILLING_PORTAL_CONFIGURATION);
   return requeteStripe<StripeSession>("billing_portal/sessions", {
-    corps: new URLSearchParams({ customer: customerId, return_url: returnUrl }),
+    corps,
     idempotence: `abonnement-portail-${customerId}-${Date.now()}`,
   });
 }
@@ -273,6 +363,22 @@ export async function recupererAbonnementStripe(subscriptionId: string) {
   });
 }
 
+export async function recupererFactureStripe(invoiceId: string) {
+  return requeteStripe<{ id: string; status?: string; auto_advance?: boolean } & Record<string, unknown>>(`invoices/${encodeURIComponent(invoiceId)}`, {
+    methode: "GET",
+  });
+}
+
+// Filet de sécurité : une facture brouillon émise alors que la facturation réelle
+// n'est pas autorisée (identité vendeur ou régime TVA non confirmés) n'est jamais
+// finalisée ni envoyée automatiquement par Stripe.
+export async function suspendreFinalisationFacture(invoiceId: string) {
+  return requeteStripe<{ id: string }>(`invoices/${encodeURIComponent(invoiceId)}`, {
+    corps: new URLSearchParams({ auto_advance: "false" }),
+    idempotence: `abonnement-facture-suspendue-${invoiceId}`,
+  });
+}
+
 export async function changerOffreStripe(
   subscriptionId: string,
   offre: OffreAbonnement,
@@ -290,7 +396,7 @@ export async function changerOffreStripe(
       "metadata[offre]": offre,
       "metadata[periodicite]": periodicite,
     }),
-    idempotence: `abonnement-changement-${subscriptionId}-${offre}-${periodicite}`,
+    idempotence: `abonnement-changement-${subscriptionId}-${offre}-${periodicite}-${Date.now()}`,
   });
 }
 

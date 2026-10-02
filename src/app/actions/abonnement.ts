@@ -16,6 +16,7 @@ import {
   modifierOptionIAAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
+import { etatOuvertureCommerciale } from "@/lib/stripe-billing-config";
 
 async function verifierDroitAbonnement() {
   const ctx = await getContexteEntreprise();
@@ -42,9 +43,25 @@ export async function demarrerAbonnementAction(formData: FormData) {
   if (offre === "sur_mesure") {
     redirect(`${retourErreur}?error=${encodeURIComponent("L’offre Sur mesure nécessite un devis validé avant activation")}`);
   }
+  const separateurErreur = retourErreur.includes("?") ? "&" : "?";
+  // Règle d'ouverture commerciale : aucune souscription sans décision explicite.
+  const ouverture = etatOuvertureCommerciale();
+  if (!ouverture.ouvert) {
+    redirect(`${retourErreur}${separateurErreur}error=${encodeURIComponent("La souscription en ligne n’est pas encore ouverte")}`);
+  }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
+  const { data: entreprise } = await supabase
+    .from("entreprises")
+    .select("stripe_subscription_id,abonnement_statut")
+    .eq("id", ctx.entrepriseId)
+    .maybeSingle();
+  // Un abonnement Stripe non résilié se modifie dans le portail : un second
+  // Checkout créerait un deuxième abonnement facturé en parallèle.
+  if (entreprise?.stripe_subscription_id && entreprise.abonnement_statut !== "annule") {
+    redirect(`${retourErreur}${separateurErreur}error=${encodeURIComponent("Un abonnement est déjà actif : modifiez-le depuis le portail de facturation")}`);
+  }
 
   let destination: string;
   try {
@@ -57,13 +74,14 @@ export async function demarrerAbonnementAction(formData: FormData) {
       customerId,
       offre,
       periodicite,
+      // Essai gratuit uniquement à la première souscription.
+      essai: !entreprise?.stripe_subscription_id,
     });
     if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
     destination = session.url;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Souscription impossible";
-    const separateur = retourErreur.includes("?") ? "&" : "?";
-    redirect(`${retourErreur}${separateur}error=${encodeURIComponent(message)}`);
+    redirect(`${retourErreur}${separateurErreur}error=${encodeURIComponent(message)}`);
   }
   redirect(destination);
 }

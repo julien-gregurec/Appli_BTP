@@ -25,7 +25,7 @@ describe("prixAbonnementMensuel", () => {
   it("utilise le prix annuel propre à l'offre", () => {
     const p = prixAbonnementMensuel(3, mini);
     expect(REDUCTION_ANNUELLE).toBe(0);
-    expect(p.mensuelSiAnnuel).toBe(mini.prixAnnuelCentimes / 100 / 12);
+    expect(p.mensuelSiAnnuel).toBe(Math.round(mini.prixAnnuelCentimes / 12) / 100);
     expect(p.totalAnnuel).toBe(mini.prixAnnuelCentimes / 100);
   });
 });

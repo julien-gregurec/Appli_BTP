@@ -2,7 +2,7 @@ import Link from "next/link";
 import { enregistrerBesoinsAction } from "@/app/actions/besoins";
 import { demarrerAbonnementAction } from "@/app/actions/abonnement";
 import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
-import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
+import { etatOuvertureCommerciale } from "@/lib/stripe-billing-config";
 
 export default async function BesoinsPage({
   searchParams,
@@ -10,7 +10,7 @@ export default async function BesoinsPage({
   searchParams: Promise<{ error?: string; recommande?: string; nb?: string }>;
 }) {
   const { error, recommande, nb } = await searchParams;
-  const paiementConfigure = stripeBillingEstConfigure();
+  const paiementConfigure = etatOuvertureCommerciale().ouvert;
 
   // Écran de recommandation (après soumission du questionnaire).
   if (recommande) {
@@ -33,7 +33,7 @@ export default async function BesoinsPage({
               {" "}· pour {nbEmployes} salarié(s)
             </p>
             <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−20 %)</span>
+              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(2 mois offerts)</span>
             </p>
             <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
@@ -47,7 +47,7 @@ export default async function BesoinsPage({
               <input type="hidden" name="offre" value={offre.cle}/>
               <input type="hidden" name="retour_erreur" value={`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`}/>
               <select name="periodicite" defaultValue="annuel" className="w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
-                <option value="annuel">Annuel · −20 %</option>
+                <option value="annuel">Annuel · 2 mois offerts</option>
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>
