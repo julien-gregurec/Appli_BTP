@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 3020",
+    "dev": "next dev -p 3040",
     "verify:public-env": "node scripts/verify-public-env.mjs",
     "prebuild": "npm run verify:public-env && node ../../scripts/check-env-manifest.mjs --auto --app reserves",
     "build": "next build",
-    "start": "next start -p 3020",
+    "start": "next start -p 3040",
     "lint": "eslint src scripts next.config.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run"

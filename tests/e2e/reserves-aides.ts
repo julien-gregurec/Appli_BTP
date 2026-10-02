@@ -13,7 +13,7 @@ import {
  * elle : un vrai refus d'identifiants ou une vraie erreur métier échoue immédiatement.
  */
 
-export const RESERVES = process.env.E2E_RESERVES_URL ?? "http://127.0.0.1:3020";
+export const RESERVES = process.env.E2E_RESERVES_URL ?? "http://127.0.0.1:3040";
 
 const TENTATIVES = 3;
 

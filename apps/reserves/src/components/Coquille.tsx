@@ -10,18 +10,22 @@ import { estCompteIntervenant, peutInviterEntreprise } from "@/lib/acces-reserve
 import type { ContexteReserves } from "@/lib/contexte";
 import { BandeauAssistanceElsatia } from "@/components/BandeauAssistanceElsatia";
 import type { BandeauAssistance } from "@elsatia/platform-support-comms";
+import type { LienApplication } from "@/lib/selecteur-applications";
 
 export function Coquille({
   contexte,
   notificationsNonLues = 0,
   messagesNonLus = 0,
   bandeauAssistance = null,
+  applications = [],
   children,
 }: {
   contexte: ContexteReserves;
   notificationsNonLues?: number;
   messagesNonLus?: number;
   bandeauAssistance?: BandeauAssistance | null;
+  /** Autres applications ELSATIA ouvertes, URL déjà validées pour l'environnement (A-08). */
+  applications?: LienApplication[];
   children: ReactNode;
 }) {
   const intervenant = estCompteIntervenant(contexte.roleReserves);
@@ -35,6 +39,13 @@ export function Coquille({
       <ServiceWorkerReserves />
       <header className="barre">
         <Marque />
+        {applications.length > 0 && (
+          <nav className="barre-apps" aria-label="Applications ELSATIA">
+            {applications.map((application) => (
+              <a key={application.code} href={application.url} data-application={application.code}>{application.nom}</a>
+            ))}
+          </nav>
+        )}
         <div className="barre-org">
           {contexte.entrepriseNom}
           {/* La déconnexion purge d'abord ce que l'appareil garde en mémoire. */}

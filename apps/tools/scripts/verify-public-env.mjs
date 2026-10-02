@@ -87,7 +87,69 @@ export const REASONS = {
   notUrl: "n'est pas une URL http(s)",
   notHttps: "doit etre en https en build publie",
   secretShaped: "a la forme d'une cle de service (jamais publiable)",
+  unknownMode: "valeur inconnue (attendu : local, preview, production, native-dev ou native-production)",
+  platformMismatch: "ne correspond pas a l'environnement Vercel du build (VERCEL_ENV)",
+  productionHostInPreview: "pointe vers la Production ELSATIA (*.elsatia.fr) dans un build Preview",
+  notProductionHost: "n'est pas un hote canonique ELSATIA (*.elsatia.fr) dans un build Production",
+  navigationLinkHidden: "absente : le lien correspondant est masque dans cette Preview (jamais de repli Production)",
 };
+
+/*
+ * TOOLS_ENV + A-08 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2).
+ *
+ * - Une valeur de `NEXT_PUBLIC_TOOLS_ENV` presente mais inconnue BLOQUE, quel que soit le mode :
+ *   `site.ts::resolveToolsEnv` la traiterait comme « aucun lien », et une faute de frappe sur un
+ *   tableau de bord ne doit pas produire un build silencieusement ampute.
+ * - Sur Vercel, le mode declare doit correspondre a `VERCEL_ENV` : un build Preview qui ne se
+ *   declare pas `preview` serait un build Production servi sur une URL Preview (liens Production).
+ * - Dans un build Preview, aucune URL publique ne peut viser un hote `*.elsatia.fr` ; dans un
+ *   build Production, les liens d'application declares doivent viser un hote canonique.
+ */
+export const NAVIGATION_LINK_VARIABLES = ["NEXT_PUBLIC_TOOLS_GESTION_PRO_URL", "NEXT_PUBLIC_TOOLS_COLORS_URL"];
+const CROSS_ENVIRONMENT_URL_VARIABLES = [...NAVIGATION_LINK_VARIABLES, "NEXT_PUBLIC_TOOLS_BILLING_API_URL", "NEXT_PUBLIC_TOOLS_URL"];
+const PRODUCTION_MODES = ["production", "native-production"];
+
+export function isElsatiaProductionHost(host) {
+  const h = String(host).toLowerCase().replace(/\.$/, "");
+  return h === "elsatia.fr" || h.endsWith(".elsatia.fr");
+}
+
+function hostOf(value) {
+  try {
+    return new URL(value.trim()).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** Constats propres a l'environnement (mode et URLs inter-environnements). Jamais de valeur. */
+export function environmentFindings(env, mode) {
+  const failures = [];
+  const warnings = [];
+  const role = "navigation inter-applications et cloisonnement d'environnement";
+  const declared = typeof env.NEXT_PUBLIC_TOOLS_ENV === "string" ? env.NEXT_PUBLIC_TOOLS_ENV.trim() : "";
+  if (declared && !APP_ENVIRONMENTS.includes(declared)) {
+    failures.push({ name: "NEXT_PUBLIC_TOOLS_ENV", reason: REASONS.unknownMode, role });
+  }
+  const vercel = typeof env.VERCEL_ENV === "string" ? env.VERCEL_ENV.trim() : "";
+  if ((vercel === "preview" && mode !== "preview") || (vercel === "production" && !PRODUCTION_MODES.includes(mode))) {
+    failures.push({ name: "NEXT_PUBLIC_TOOLS_ENV", reason: REASONS.platformMismatch, role });
+  }
+  for (const name of CROSS_ENVIRONMENT_URL_VARIABLES) {
+    const value = env[name];
+    if (typeof value !== "string" || !value.trim()) {
+      if (mode === "preview" && NAVIGATION_LINK_VARIABLES.includes(name)) warnings.push({ name, reason: REASONS.navigationLinkHidden, role });
+      continue;
+    }
+    const host = hostOf(value);
+    if (!host) continue;
+    if (mode === "preview" && isElsatiaProductionHost(host)) failures.push({ name, reason: REASONS.productionHostInPreview, role });
+    if (PRODUCTION_MODES.includes(mode) && NAVIGATION_LINK_VARIABLES.includes(name) && !isElsatiaProductionHost(host)) {
+      failures.push({ name, reason: REASONS.notProductionHost, role });
+    }
+  }
+  return { failures, warnings };
+}
 
 /** Identique a `getAppEnvironment` de `src/lib/site.ts` : absente ou inconnue vaut `production`. */
 export function resolveBuildMode(env = process.env) {
@@ -171,6 +233,9 @@ export function evaluatePublicEnv(env = process.env, contract = PUBLIC_ENV_CONTR
      */
     if (level !== "skipped" || reason === REASONS.notUrl) warnings.push(finding);
   }
+  const environment = environmentFindings(env, mode);
+  failures.push(...environment.failures);
+  warnings.push(...environment.warnings);
   return { mode, level, failures, warnings, ok: failures.length === 0 };
 }
 

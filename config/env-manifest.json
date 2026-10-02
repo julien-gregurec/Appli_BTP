@@ -1050,8 +1050,8 @@
       "build_time": true,
       "runtime": true,
       "category": "env_indicator",
-      "description": "Indicateur d'environnement PUBLIC de Tools (local | preview | production | native-dev | native-production). Valeur par défaut quand absent ou inconnu : « production ». Second indicateur, distinct d'ELSATIA_APPLICATION_ENV qui n'est pas publique.",
-      "fail_mode": "default",
+      "description": "Indicateur d'environnement PUBLIC de Tools (local | preview | production | native-dev | native-production). Absent : « production » (build traité comme publié). Valeur inconnue : build REFUSÉ par apps/tools/scripts/verify-public-env.mjs et aucun lien inter-applications à l'exécution (fail closed, TOOLS_ENV — ELSATIA_SATELLITES_PREVIEW_READINESS_V2). Sur Vercel, doit correspondre à VERCEL_ENV : une Preview doit déclarer « preview ». Second indicateur, distinct d'ELSATIA_APPLICATION_ENV qui n'est pas publique.",
+      "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
@@ -1250,6 +1250,56 @@
       "example_required": true,
       "required_when": "dès que l'abonnement Tools est ouvert",
       "url_class": "api_endpoint"
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine de Gestion Pro pour les liens Tools → Gestion Pro (A-08, apps/tools/src/lib/site.ts::elsatiaAppUrls). Local : défaut http://localhost:3000 ; Preview : origine Preview OBLIGATOIRE pour afficher le lien, un hôte *.elsatia.fr est refusé au build ; Production : défaut origine canonique, une valeur hors *.elsatia.fr est refusée. Absente en Preview : lien masqué, jamais de repli vers la Production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "cross_app_link",
+      "required_when": "pour afficher les liens inter-applications d'une Preview Tools"
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_COLORS_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine de Colors pour les liens Tools → Colors (A-08, apps/tools/src/lib/site.ts::elsatiaAppUrls). Local : défaut http://localhost:3010 ; Preview : origine Preview OBLIGATOIRE pour afficher le lien, un hôte *.elsatia.fr est refusé au build ; Production : défaut origine canonique, une valeur hors *.elsatia.fr est refusée. Absente en Preview : lien masqué, jamais de repli vers la Production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "cross_app_link",
+      "required_when": "pour afficher les liens inter-applications d'une Preview Tools"
     },
     {
       "name": "TOOLS_APP_URL",

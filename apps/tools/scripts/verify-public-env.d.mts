@@ -35,7 +35,14 @@ export declare const REASONS: {
   notUrl: string;
   notHttps: string;
   secretShaped: string;
+  unknownMode: string;
+  platformMismatch: string;
+  productionHostInPreview: string;
+  notProductionHost: string;
+  navigationLinkHidden: string;
 };
+export declare const NAVIGATION_LINK_VARIABLES: string[];
+export declare function isElsatiaProductionHost(host: string): boolean;
 export declare function resolveBuildMode(env?: Record<string, string | undefined>): AppEnvironment;
 export declare function enforcementLevel(mode: AppEnvironment): EnforcementLevel;
 export declare function looksLikeServiceSecret(value: string): boolean;

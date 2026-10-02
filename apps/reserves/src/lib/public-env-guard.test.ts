@@ -4,13 +4,13 @@
  * Ce que ces tests fixent n'est pas un formatage mais un mode de défaillance. Next fige les
  * `NEXT_PUBLIC_*` dans le bundle au moment du build : un `next build` Production lancé sans elles
  * **réussit**, et chaque invitation envoyée par e-mail par `urlInvitation()` (`invitations.ts`)
- * contient alors un lien vers `http://localhost:3020` — mort pour son destinataire, sans qu'aucune
+ * contient alors un lien vers `http://localhost:3040` — mort pour son destinataire, sans qu'aucune
  * étape du déploiement n'ait échoué.
  *
  * Quatre propriétés sont vérifiées, dans cet ordre d'importance :
  *
  * 1. un build publié auquel manque une variable requise échoue ;
- * 2. une URL non https (dont `http://localhost:3020`, le repli réel du code) est refusée sur un
+ * 2. une URL non https (dont `http://localhost:3040`, le repli réel du code) est refusée sur un
  *    build publié, et seulement là ;
  * 3. un build local n'échoue pas pour autant ;
  * 4. aucun message produit ne contient jamais une valeur d'environnement.
@@ -147,12 +147,12 @@ describe("build publié", () => {
 
   /*
    * Le scénario réel de ce correctif : le repli du code (`urlApplicationReserves()`) est
-   * précisément `http://localhost:3020`. Sur un build publié, cette valeur doit être refusée
+   * précisément `http://localhost:3040`. Sur un build publié, cette valeur doit être refusée
    * exactement comme n'importe quelle autre URL http en clair — même si elle est syntaxiquement
    * valide — et acceptée sur un build local, là où elle est correcte.
    */
-  it("refuse http://localhost:3020 sur un build publié, et l'accepte en local", () => {
-    const clair = { ...COMPLET, NEXT_PUBLIC_RESERVES_URL: "http://localhost:3020" };
+  it("refuse http://localhost:3040 sur un build publié, et l'accepte en local", () => {
+    const clair = { ...COMPLET, NEXT_PUBLIC_RESERVES_URL: "http://localhost:3040" };
     expect(evaluerEnvPublic(clair).failures[0]).toMatchObject({
       name: "NEXT_PUBLIC_RESERVES_URL",
       reason: RAISONS.pasHttps,

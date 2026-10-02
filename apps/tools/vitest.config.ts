@@ -10,6 +10,8 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       // Domaine Relevé & Métré partagé (web, mobile, futur module natif) : même résolution que `tsconfig.json`.
       "@elsatia/releve-domain": fileURLToPath(new URL("../../packages/releve-domain/src/index.ts", import.meta.url)),
+      // Contrôle d'accès et navigation inter-applications (A-08) : même résolution que `tsconfig.json`.
+      "@elsatia/application-access": fileURLToPath(new URL("../../packages/application-access/src/index.ts", import.meta.url)),
     },
   },
 });
