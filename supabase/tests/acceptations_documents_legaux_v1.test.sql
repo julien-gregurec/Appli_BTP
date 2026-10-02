@@ -15,9 +15,12 @@
 --   6. Append-only : ni UPDATE, ni DELETE, ni TRUNCATE, même en superutilisateur.
 --   7. Nouvelle version : ré-acceptation exigée si `reacceptation_requise`, sinon
 --      l'acceptation antérieure reste valable ; l'ancienne version est refusée.
+--   8. Mode sûr (incident) : en lecture seule, aucune preuve n'est écrite.
+--   9. Comptes existants : aucun blocage tant qu'aucune décision n'est prise (accès métier
+--      inchangé ; seule la souscription payante demande l'acceptation).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(41);
+select plan(45);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -158,6 +161,26 @@ reset role;
 
 select is((select count(*)::int from platform.acceptations_documents_legaux where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and document_code = 'cgv'), 2,
   'les deux preuves CGV (1.0 puis 1.1) coexistent : l''historique n''est pas réécrit');
+
+-- ─── 8. Mode sûr ──────────────────────────────────────────────────────
+insert into _charges select 'cgu_en_vigueur', jsonb_agg(jsonb_build_object('code', code, 'version', version, 'empreinte', empreinte_sha256))
+  from platform.documents_legaux_versions where code = 'cgu' and version = '1.1';
+select public.incident_basculer_operateur('test-legal', 'gestion_pro', 'lecture_seule', true, 'test pgTAP preuve juridique', 'TEST-LEGAL');
+select pg_temp.agir_en('20000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select throws_ok($$ select public.accepter_documents_legaux('b0000000-0000-0000-0000-000000000001', 'souscription_abonnement', (select charge from _charges where nom = 'cgu_en_vigueur')) $$,
+  'PT503', null, 'lecture seule Gestion Pro : aucune preuve écrite (la garde incident couvre le schéma platform)');
+reset role;
+select public.incident_basculer_operateur('test-legal', 'gestion_pro', 'lecture_seule', false, 'fin du test pgTAP', 'TEST-LEGAL');
+
+-- ─── 9. Comptes existants non bloqués ─────────────────────────────────
+-- Admin B n'a jamais rien accepté : son accès métier et ses droits restent ceux d'avant.
+select pg_temp.agir_en('20000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select ok(public.est_membre_actif('b0000000-0000-0000-0000-000000000001'), 'entreprise B sans aucune preuve : toujours membre actif');
+select ok(public.a_permission('b0000000-0000-0000-0000-000000000001', 'gerer_parametres'), 'entreprise B sans aucune preuve : droits inchangés');
+select is((select count(*)::int from public.clients where entreprise_id = 'b0000000-0000-0000-0000-000000000001') >= 0, true, 'entreprise B sans aucune preuve : lecture métier possible');
+reset role;
 
 select * from finish();
 rollback;

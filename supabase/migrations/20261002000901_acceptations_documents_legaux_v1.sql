@@ -107,6 +107,15 @@ create trigger acceptations_documents_legaux_append_only_truncate
   before truncate on platform.acceptations_documents_legaux
   for each statement execute function platform._documents_legaux_immuables();
 
+-- Mode sûr (incident, migration 20260928000807) : `incident_installer_gardes()` ne couvre
+-- que le schéma public. Le journal de preuves, en `platform`, reçoit explicitement la même
+-- garde : en `lecture_seule` (globale ou Gestion Pro) aucune preuve n'est écrite, et en
+-- `app_coupee` aucune session utilisateur n'en écrit. La garde est inerte hors incident.
+drop trigger if exists incident_garde_ecriture on platform.acceptations_documents_legaux;
+create trigger incident_garde_ecriture
+  before insert or update or delete on platform.acceptations_documents_legaux
+  for each statement execute function public.incident_garde_ecriture('gestion_pro');
+
 -- Seed : versions en vigueur (empreintes = sha256 des fichiers docs/juridique au commit
 -- de cette migration ; contrôlées par src/lib/documents-legaux-versions.test.ts).
 insert into platform.documents_legaux_versions
