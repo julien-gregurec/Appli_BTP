@@ -252,6 +252,14 @@
       {
         "path": "scripts/incident/",
         "justification": "Drill d'incident LOCAL (npm run incident:drill, INCIDENT RESPONSE & SAFE MODE V1) : pile jetable GoTrue/PostgREST/Redis/mocks Stripe-Brevo sur 127.0.0.1, secrets générés pour le drill. Ses variables (PORT, NOM, INCIDENT_DRILL_*) sont propres au banc ; jamais déployé ni lu par une application."
+      },
+      {
+        "path": "scripts/perf/",
+        "justification": "Bancs de mesure locaux (capacité pages lourdes / PDF, échantillonneur mémoire : MEM_SAMPLER_DIR, ANCIEN_MONTAGE contre-preuve). Jamais déployés ni lus par une application. Train V9 (lot capacité beautiful-albattani)."
+      },
+      {
+        "path": "src/lib/test-support/",
+        "justification": "Banc PostgREST de qualification des agrégats (FINANCE_BENCH_*), importé uniquement par des tests Vitest. Jamais chargé par l'application. Train V9 (lot GP residual data correctness)."
       }
     ],
     "literal_prefixes": [
@@ -303,6 +311,10 @@
       {
         "name": "EMAIL_EXISTS",
         "justification": "Code d'erreur GoTrue / contrat d'identité, pas une variable."
+      },
+      {
+        "name": "GP_INACCESSIBLE",
+        "justification": "Code d'erreur (hint SQL) de l'import Tools → Gestion Pro (Relevé Lot 11, packages/releve-domain/src/gp-handoff.ts), pas une variable. Train V9."
       }
     ],
     "reference_only": [
@@ -7339,6 +7351,144 @@
       "category": "tooling",
       "description": "Secret HS256 éphémère de la storage-api locale du drill Storage DR V2, généré à chaque exécution par scripts/dr/v2/storage_drill.sh. Jamais une clé réelle.",
       "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_CONCURRENCE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "File de génération PDF (capacité, train V9) : générations simultanées par instance. Absent = 2.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_FILE_MAX",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "File de génération PDF : demandes en attente au-delà desquelles la génération est refusée (503). Absent = 10.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_ATTENTE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "File de génération PDF : attente maximale en file (ms). Absent = 20 000.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DUREE_MAX_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "File de génération PDF : durée maximale d'une génération avant arrêt forcé (ms). Absent = 35 000.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_DELAI_FERMETURE_MS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "File de génération PDF : délai de fermeture propre du navigateur avant SIGKILL (ms). Absent = 3 000.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "PDF_CHROMIUM_EXECUTABLE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Chemin d'un Chromium local pour la génération PDF (recette / banc). Absent = binaire @sparticuz/chromium.",
+      "fail_mode": "none",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
