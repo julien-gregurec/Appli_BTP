@@ -12,6 +12,7 @@
  *   node scripts/preview/v9/migration-plan-v9.mjs --write-doc
  *        → régénère docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md depuis la
  *          fixture du socle 372 (--check : 1 si le document dérive).
+ *   --resume : plan de REPRISE depuis un préfixe V9 partiel (373 → 388) laissé par un push interrompu.
  * Échoue (1) si le ledger n'est pas exactement le socle 372 (préfixe exact). Usage : 2.
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -60,7 +61,7 @@ export function executer(argv, { local = trainLocal(), log = console.log } = {})
   if (!fichier) { log("usage : migration-plan-v9.mjs <ledger> [--json] [--dry-run <fichier>] [--require-813-proof]"); return 2; }
   let plan;
   try {
-    plan = planMigration(lireLedger(readFileSync(fichier, "utf8")), local, { exigerPreuve813: Boolean(o["require-813-proof"]) });
+    plan = planMigration(lireLedger(readFileSync(fichier, "utf8")), local, { exigerPreuve813: Boolean(o["require-813-proof"]), reprise: Boolean(o.resume) });
   } catch (e) {
     if (!(e instanceof ErreurLedger) && e.code !== "ENOENT") throw e;
     log(`PLAN_REFUSED\n  ✖ ${e instanceof ErreurLedger ? e.message : "ledger introuvable"}`);

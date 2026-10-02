@@ -14,6 +14,7 @@
 #   scripts/preview/v9/v9-cutover.sh --out <dossier hors dépôt> --backup-manifest <manifeste.json>
 #        [--apply-preview --confirm-ref pgvvpqyjziyapbbkydmc]      # applique (sinon dry-run)
 #        [--verify-only]                                           # base déjà 389 : étapes 12 → 15
+#        [--resume-partial]                                        # reprise d'un push interrompu (ledger 373 → 388), cas A
 #        [--offline-ledger <export> [--offline-dry-run <sortie>]]  # simulation hors ligne (jamais d'application)
 #        [--local-harness]                                         # banc PostgreSQL local (ELSATIA_V9_HARNESS_DB)
 # Environnement (jamais écrit dans le dépôt, jamais affiché) :
@@ -34,7 +35,7 @@ for a in "$@"; do
   esac
 done
 
-OUT=""; BACKUP=""; APPLY=0; CONFIRM=""; VERIFY_ONLY=0; OFF_LEDGER=""; OFF_DRY=""; HARNESS=0
+OUT=""; BACKUP=""; APPLY=0; CONFIRM=""; VERIFY_ONLY=0; OFF_LEDGER=""; OFF_DRY=""; HARNESS=0; RESUME=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="${2:-}"; shift 2 ;;
@@ -45,6 +46,7 @@ while [ $# -gt 0 ]; do
     --offline-ledger) OFF_LEDGER="${2:-}"; shift 2 ;;
     --offline-dry-run) OFF_DRY="${2:-}"; shift 2 ;;
     --local-harness) HARNESS=1; shift ;;
+    --resume-partial) RESUME=1; shift ;;
     *) echo "REFUS : option inconnue $1" >&2; exit 2 ;;
   esac
 done
@@ -60,6 +62,7 @@ case "$OUT/" in "$REPO"/*) refus "--out doit être HORS du dépôt (exports et r
 [ -n "$OFF_LEDGER" ] && [ "$APPLY" = 1 ] && refus "--offline-ledger est une simulation : --apply-preview interdit"
 [ -n "$OFF_LEDGER" ] && [ "$HARNESS" = 1 ] && refus "--offline-ledger et --local-harness sont exclusifs"
 [ "$VERIFY_ONLY" = 1 ] && [ "$APPLY" = 1 ] && refus "--verify-only et --apply-preview sont exclusifs"
+[ "$VERIFY_ONLY" = 1 ] && [ "$RESUME" = 1 ] && refus "--verify-only et --resume-partial sont exclusifs"
 if [ "$APPLY" = 1 ] && [ "$CONFIRM" != "$REF_PREVIEW" ]; then refus "--apply-preview exige --confirm-ref $REF_PREVIEW (confirmation explicite de la cible)"; fi
 [ "$CONFIRM" = "$REF_PRODUCTION" ] && refus "--confirm-ref désigne la PRODUCTION"
 
@@ -67,6 +70,7 @@ MODE="dry-run"; [ "$APPLY" = 1 ] && MODE="apply"; [ "$VERIFY_ONLY" = 1 ] && MODE
 RAPPORT="$OUT/cutover-report.json"
 rm -f "$RAPPORT"
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" mode "\"$MODE\"" >/dev/null
+node "$V9/cutover-step.mjs" report-set "$RAPPORT" reprise "$([ "$RESUME" = 1 ] && echo true || echo false)" >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" harness "$([ "$HARNESS" = 1 ] && echo true || echo false)" >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" sha_canonique '"6392131aa02cecc9991358915963068de8292d24"' >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" sha_head "\"$(git -C "$REPO" rev-parse HEAD)\"" >/dev/null
@@ -152,13 +156,14 @@ if [ "$VERIFY_ONLY" = 1 ]; then verifier_apres; fi
 # ── 5-7 : ledger, préfixe, plan ────────────────────────────────────────────────────────────────
 etape 5 "lecture du ledger Preview (lecture seule)"
 lire_ledger "$OUT/ledger-avant.json" || stop "export du ledger impossible (connexion ? droits ?)"
-etape "6-7" "préfixe exact du socle 372 et migrations en attente"
-node "$V9/check-ledger-v9.mjs" "$OUT/ledger-avant.json" --expect pre --require-813-proof
+ATTENTE=pre; PLAN_ARGS=(--require-813-proof); [ "$RESUME" = 1 ] && { ATTENTE=reprise; PLAN_ARGS+=(--resume); }
+etape "6-7" "préfixe exact ($([ "$RESUME" = 1 ] && echo "préfixe V9 partiel, reprise" || echo "socle 372")) et migrations en attente"
+node "$V9/check-ledger-v9.mjs" "$OUT/ledger-avant.json" --expect "$ATTENTE" --require-813-proof
 c=$?
 if [ $c = 3 ]; then node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_avant '{"verdict":"PREVIEW_LEDGER_ALREADY_V9"}' >/dev/null; echo "Base déjà au train V9 : relancer avec --verify-only."; exit 3; fi
-[ $c = 0 ] || { node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_avant '{"verdict":"PREVIEW_LEDGER_DIVERGENCE"}' >/dev/null; stop "ledger Preview divergent : ne rien appliquer, décision humaine"; }
-node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_avant '{"verdict":"PREVIEW_LEDGER_PREFIX_OK","pending":17}' >/dev/null
-node "$V9/migration-plan-v9.mjs" "$OUT/ledger-avant.json" --require-813-proof | tee "$OUT/plan.md" || stop "plan de migration non prouvé"
+[ $c = 0 ] || { node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_avant '{"verdict":"PREVIEW_LEDGER_DIVERGENCE"}' >/dev/null; stop "ledger Preview non conforme à l'attente « $ATTENTE » : ne rien appliquer, décision humaine (ELSATIA_V9_PREVIEW_ROLLBACK.md)"; }
+node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_avant "{\"verdict\":\"$([ "$RESUME" = 1 ] && echo PREVIEW_LEDGER_PARTIAL_V9 || echo PREVIEW_LEDGER_PREFIX_OK)\"}" >/dev/null
+node "$V9/migration-plan-v9.mjs" "$OUT/ledger-avant.json" "${PLAN_ARGS[@]}" | tee "$OUT/plan.md"; [ "${PIPESTATUS[0]}" = 0 ] || stop "plan de migration non prouvé"
 
 # ── 8 : sauvegarde déclarée ────────────────────────────────────────────────────────────────────
 etape 8 "sauvegarde déclarée"
@@ -174,15 +179,15 @@ if [ $b != 0 ]; then
 fi
 
 # ── 9-10 : dry-run CLI et égalité avec le plan ─────────────────────────────────────────────────
-etape "9-10" "supabase db push --dry-run : exactement les 17 migrations du plan"
+etape "9-10" "supabase db push --dry-run : exactement les migrations du plan (17 depuis le socle)"
 if [ -n "$OFF_LEDGER" ]; then
   if [ -n "$OFF_DRY" ]; then cp "$OFF_DRY" "$OUT/dry-run.txt"; else echo "  · dry-run CLI non exécuté (hors ligne, --offline-dry-run absent)"; fi
 else
   $SUPABASE_BIN db push --linked --dry-run </dev/null > "$OUT/dry-run.txt" 2>&1 || { cat "$OUT/dry-run.txt"; stop "db push --dry-run en échec"; }
 fi
 if [ -f "$OUT/dry-run.txt" ]; then
-  node "$V9/migration-plan-v9.mjs" "$OUT/ledger-avant.json" --require-813-proof --dry-run "$OUT/dry-run.txt" || stop "le dry-run ne correspond pas EXACTEMENT au plan (17)"
-  node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.dry_run '{"ok":true,"nb":17}' >/dev/null
+  node "$V9/migration-plan-v9.mjs" "$OUT/ledger-avant.json" "${PLAN_ARGS[@]}" --dry-run "$OUT/dry-run.txt" || stop "le dry-run ne correspond pas EXACTEMENT au plan"
+  node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.dry_run '{"ok":true}' >/dev/null
 fi
 
 if [ "$APPLY" = 0 ]; then
@@ -194,7 +199,7 @@ if [ "$APPLY" = 0 ]; then
 fi
 
 # ── 11 : application (seulement --apply-preview) ───────────────────────────────────────────────
-etape 11 "application des 17 migrations sur la Preview"
+etape 11 "application des migrations du plan sur la Preview"
 garde || refus "garde de cible rejouée avant application : TARGET_REJECTED"
 [ -f "$OUT/dry-run.txt" ] || stop "aucun dry-run validé : application refusée"
 $SUPABASE_BIN --version 2>/dev/null | sed 's/^/  CLI Supabase : /'

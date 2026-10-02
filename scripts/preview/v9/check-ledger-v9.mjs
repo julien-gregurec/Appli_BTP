@@ -7,6 +7,7 @@
  *        [--require-813-proof] [--json]
  *   --expect pre  (défaut) : seul le socle Preview 372 (…0813 ORIGINALE) passe → PENDING_MIGRATIONS=17
  *   --expect post          : seul le train complet 389 (…1113) passe
+ *   --expect reprise       : seul un préfixe V9 partiel (373 → 388, push interrompu) passe
  *   --require-813-proof    : exige la preuve de contenu de 813 (export ELSATIA_V9_LEDGER_EXPORT.sql)
  * Contrôles : nombre, noms, ordre, doublons, trous, préfixe exact, 813 originale (et refus de la
  * reconstruction 23153716), migrations étrangères, checksum si l'export en porte, référence projet.
@@ -21,8 +22,8 @@ import { trainLocal } from "./lib/train.mjs";
 export function executer(argv, { local = trainLocal(), log = console.log } = {}) {
   const fichier = argv.find((a, i) => !a.startsWith("--") && !["--expect"].includes(argv[i - 1]));
   const o = lireOptions(argv);
-  const attente = o.expect === "post" ? "post" : o.expect === undefined || o.expect === "pre" ? "pre" : null;
-  if (!fichier || attente === null) { log("usage : check-ledger-v9.mjs <ledger> [--expect pre|post] [--require-813-proof] [--json]"); return 2; }
+  const attente = ["post", "reprise"].includes(o.expect) ? o.expect : o.expect === undefined || o.expect === "pre" ? "pre" : null;
+  if (!fichier || attente === null) { log("usage : check-ledger-v9.mjs <ledger> [--expect pre|post|reprise] [--require-813-proof] [--json]"); return 2; }
   let ledger;
   try { ledger = lireLedger(readFileSync(fichier, "utf8")); } catch (e) {
     log(`${VERDICT.LEDGER_DIVERGENCE}\n  ✖ [LEDGER-LECTURE] ${e instanceof ErreurLedger ? e.message : "fichier illisible"}`);

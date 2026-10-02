@@ -157,9 +157,11 @@ export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813
   else if (n > NB_SOCLE && n < NB_FINAL) verdict = VERDICT.LEDGER_V9_PARTIEL;
   else { verdict = VERDICT.LEDGER_DIVERGENCE; d("LEDGER-SOCLE", `ledger de ${n} migrations : ni le socle ${NB_SOCLE}, ni le train ${NB_FINAL}`); }
 
-  // Attente : « pre » n'admet que le socle 372 ; « post » n'admet que 389.
+  // Attente : « pre » n'admet que le socle 372 ; « post » n'admet que 389 ; « reprise » n'admet
+  // qu'un préfixe V9 partiel (373 → 388) laissé par un `db push` interrompu (rollback, cas A).
   let conforme;
   if (attente === "post") conforme = verdict === VERDICT.LEDGER_V9_COMPLET;
+  else if (attente === "reprise") conforme = verdict === VERDICT.LEDGER_V9_PARTIEL && enAttente.length === NB_FINAL - n;
   else conforme = verdict === VERDICT.LEDGER_PREFIXE_OK && enAttente.length === NB_A_APPLIQUER;
   if (verdict === VERDICT.LEDGER_PREFIXE_OK && enAttente.length !== NB_A_APPLIQUER) {
     d("LEDGER-PENDING", `${enAttente.length} migration(s) en attente (attendu ${NB_A_APPLIQUER})`);
@@ -180,10 +182,11 @@ export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813
 
 /**
  * Plan de migration (Phase D) : Preview actuelle → migrations à appliquer → état final.
- * Lève ErreurLedger si le ledger n'est pas EXACTEMENT le socle 372 (préfixe exact).
+ * Lève ErreurLedger si le ledger n'est pas EXACTEMENT le socle 372 (préfixe exact) — ou, avec
+ * `reprise`, un préfixe V9 partiel 373 → 388 (push interrompu, rollback cas A).
  */
-export function planMigration(ledger, local, opts = {}) {
-  const a = analyserLedger(ledger, local, { attente: "pre", ...opts });
+export function planMigration(ledger, local, { reprise = false, ...opts } = {}) {
+  const a = analyserLedger(ledger, local, { ...opts, attente: reprise ? "reprise" : "pre" });
   if (!a.conforme) {
     const detail = a.divergences.map((x) => `${x.code} ${x.detail}`).join(" ; ") || a.verdict;
     throw new ErreurLedger(`plan impossible : ${a.verdict} — ${detail}`);
@@ -191,10 +194,10 @@ export function planMigration(ledger, local, opts = {}) {
   const derniereLedger = a.derniereDistante;
   const anterieures = a.enAttente.filter((m) => m.version <= derniereLedger);
   const preuves = [
-    { code: "PLAN-POSTERIEURES", ok: anterieures.length === 0, message: `aucune migration à appliquer antérieure ou égale à ${derniereLedger} (813)` },
+    { code: "PLAN-POSTERIEURES", ok: anterieures.length === 0, message: `aucune migration à appliquer antérieure ou égale à ${derniereLedger}${reprise ? "" : " (813)"}` },
     { code: "PLAN-SANS-INCLUDE-ALL", ok: anterieures.length === 0, message: "`supabase db push` sans --include-all (toutes les versions en attente sont postérieures au ledger)" },
-    { code: "PLAN-HISTORIQUE-INTACT", ok: a.nbDistantes === NB_SOCLE && a.divergences.length === 0, message: `historique distant = ${NB_SOCLE} premières versions du train, aucune réécriture ni réparation de ledger` },
-    { code: "PLAN-NB", ok: a.enAttente.length === NB_A_APPLIQUER, message: `${a.enAttente.length} migration(s) à appliquer (attendu ${NB_A_APPLIQUER})` },
+    { code: "PLAN-HISTORIQUE-INTACT", ok: (reprise ? a.nbDistantes > NB_SOCLE && a.nbDistantes < NB_FINAL : a.nbDistantes === NB_SOCLE) && a.divergences.length === 0, message: `historique distant = ${a.nbDistantes} premières versions du train${reprise ? " (reprise d'un push interrompu)" : ""}, aucune réécriture ni réparation de ledger` },
+    { code: "PLAN-NB", ok: a.enAttente.length === (reprise ? NB_FINAL - a.nbDistantes : NB_A_APPLIQUER), message: `${a.enAttente.length} migration(s) à appliquer (attendu ${reprise ? NB_FINAL - a.nbDistantes : NB_A_APPLIQUER})` },
     { code: "PLAN-DERNIERE", ok: a.enAttente.at(-1)?.version === DERNIERE_FINALE, message: `dernière migration finale = ${a.enAttente.at(-1)?.version} (attendu ${DERNIERE_FINALE})` },
     { code: "PLAN-TOTAL", ok: a.nbDistantes + a.enAttente.length === NB_FINAL, message: `total final = ${a.nbDistantes + a.enAttente.length} (attendu ${NB_FINAL})` },
   ];
