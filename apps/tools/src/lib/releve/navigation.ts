@@ -14,6 +14,7 @@
  * | Plan 2D (Lot 5) | `/releves/plan?id=&etage=&zone=&piece=&plan=` (plan de l'étage, cadré sur une zone ou une pièce) |
  * | Métré (Lot 8) | `/releves/metre?id=&etat=&piece=` (synthèse chantier → pièce, revêtements, ajustements, exports) |
  * | Quantitatifs (Lot 9) | `/releves/quantitatifs?id=&etat=&niveau=` (ouvrages, takeoff, ajustements, anomalies, synthèse, exports CSV / GP) |
+ * | Estimation (Lot 10) | `/releves/estimation?id=&etat=&niveau=` (prix estimatifs HT, sous-totaux, corrections, comparaison, exports CSV / GP / impression) |
  */
 import { GALLERY_SCOPE_KINDS, isUuid, type GalleryScope, type SearchHit } from "@elsatia/releve-domain";
 
@@ -172,5 +173,28 @@ export function readQuantitatifsSelection(search: string): QuantitatifsSelection
   return {
     releveId, etat: etat === "projete" || etat === "as_built" ? etat : "existant",
     niveau: (QUANTITATIFS_NIVEAUX as readonly string[]).includes(niveau ?? "") ? (niveau as QuantitatifsSelection["niveau"]) : "ouvrage",
+  };
+}
+
+/** Lot 10 — Estimation simplifiée d'un relevé (HT) : état documenté et niveau de sous-total (lot par défaut). */
+export const RELEVE_ESTIMATION_PATH = "/releves/estimation";
+export type EstimationSelection = { releveId: string; etat: MetreSelection["etat"]; niveau: (typeof QUANTITATIFS_NIVEAUX)[number] };
+
+export function estimationHref(selection: { releveId: string; etat?: MetreSelection["etat"] | null; niveau?: EstimationSelection["niveau"] | null }): string {
+  const params = new URLSearchParams({ id: selection.releveId });
+  if (selection.etat && selection.etat !== "existant") params.set("etat", selection.etat);
+  if (selection.niveau && selection.niveau !== "lot") params.set("niveau", selection.niveau);
+  return `${RELEVE_ESTIMATION_PATH}?${params.toString()}`;
+}
+
+export function readEstimationSelection(search: string): EstimationSelection | null {
+  const params = new URLSearchParams(search);
+  const releveId = params.get("id");
+  if (!isUuid(releveId)) return null;
+  const etat = params.get("etat");
+  const niveau = params.get("niveau");
+  return {
+    releveId, etat: etat === "projete" || etat === "as_built" ? etat : "existant",
+    niveau: (QUANTITATIFS_NIVEAUX as readonly string[]).includes(niveau ?? "") ? (niveau as EstimationSelection["niveau"]) : "lot",
   };
 }
