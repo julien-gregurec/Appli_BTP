@@ -322,6 +322,80 @@ export const SEEDS = [
   },
   // Train V4 → V5 : jeu de la recette Playwright Relevé & Métré (releve_e2e_stack.sh, comptes GoTrue
   // remplacés ici par deux lignes auth.users ; mêmes variables psql ua / ub / ea).
+  // ── Train V9 : jeux de charge et recettes des lots post-V8 ──────────────────────────────
+  {
+    id: "e2e-releve-lot11",
+    path: "scripts/local-postgres-bootstrap/releve_lot11_gp_seed.sql",
+    classification: "CI_ONLY",
+    target: "recette e2e Relevé Lot 11 Tools → Gestion Pro (complément de releve_e2e_seed.sql, permissions GP des comptes A et B)",
+    idempotent: true,
+    harness: {
+      setup: [
+        PARITE_GOTRUE,
+        { seed: "pilote-btp" },
+        { inline: "insert into auth.users (id, email) values ('e2e0a000-0000-4000-8000-00000000000a', 'releve-a@example.test'), ('e2e0b000-0000-4000-8000-00000000000b', 'releve-b@example.test') on conflict do nothing;" },
+        { seed: "e2e-releve" },
+      ],
+      run: [{ sql: "scripts/local-postgres-bootstrap/releve_lot11_gp_seed.sql" }],
+      runs: 2,
+    },
+  },
+  {
+    id: "perf-memory-affectations",
+    path: "scripts/perf/memory/seed-affectations.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (capacité mémoire du planning, tenant A de la fixture perf)",
+    idempotent: true,
+    harness: {
+      setup: [{ seed: "perf-fixture" }],
+      run: [{ sql: "scripts/perf/memory/seed-affectations.sql" }],
+      runs: 2,
+    },
+  },
+  {
+    id: "perf-pointages-mois",
+    path: "scripts/perf/pointages_mois_charge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (charge « pointages d'un mois », qualification GP pointages & facture)",
+    idempotent: false,
+    harness: {
+      setup: [PARITE_GOTRUE, ISOLATION_MULTITENANT],
+      run: [{ inline: "\\set entreprise 'a0000000-0000-0000-0000-000000000001'\n\\set mois '2026-08'\n\\set n 200\n\\ir scripts/perf/pointages_mois_charge.sql" }],
+      runs: 1,
+    },
+    bypass: {
+      capacite_personnes_bypass: "Jeu de charge : salariés de test au-delà de la capacité de l'offre, `set` de session sur base jetable, superutilisateur uniquement.",
+    },
+  },
+  {
+    id: "perf-rentabilite",
+    path: "scripts/perf/rentabilite_charge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (charge « rentabilité », qualification GP residual data correctness)",
+    // Rejouable par le cycle charge → purge (même état final après chaque exécution).
+    idempotent: true,
+    harness: {
+      setup: [PARITE_GOTRUE, ISOLATION_MULTITENANT],
+      run: [
+        { inline: "\\set entreprise 'a0000000-0000-0000-0000-000000000001'\n\\set n 200\n\\ir scripts/perf/rentabilite_charge.sql" },
+        { sql: "scripts/perf/rentabilite_charge_purge.sql" },
+      ],
+      runs: 2,
+    },
+    bypass: {
+      capacite_personnes_bypass: "Jeu de charge : salariés de test au-delà de la capacité de l'offre, `set` de session sur base jetable, superutilisateur uniquement.",
+    },
+  },
+  {
+    id: "perf-rentabilite-purge",
+    path: "scripts/perf/rentabilite_charge_purge.sql",
+    classification: "CI_ONLY",
+    target: "base locale jetable (retrait du jeu de charge « rentabilité »)",
+    coveredBy: "perf-rentabilite",
+    bypass: {
+      session_replication_role: "Purge d'un jeu de charge sur base jetable : triggers métier (factures émises immuables, stock) neutralisés le temps d'une transaction locale (`set local`), superutilisateur uniquement.",
+    },
+  },
   {
     id: "e2e-releve",
     path: "scripts/local-postgres-bootstrap/releve_e2e_seed.sql",
