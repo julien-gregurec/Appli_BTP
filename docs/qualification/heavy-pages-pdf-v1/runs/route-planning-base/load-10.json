@@ -1,0 +1,27 @@
+{
+  "users": 10,
+  "scenario": "planning",
+  "think": 1000,
+  "durationS": 122.83,
+  "erreursVU": [],
+  "routes": {
+    "/planning": {
+      "n": 133,
+      "p50": 5990,
+      "p95": 7322,
+      "p99": 7537,
+      "max": 7603,
+      "status": {
+        "200": 133
+      },
+      "kbMoyen": 1252
+    }
+  },
+  "total": {
+    "n": 133,
+    "rps": 1.08,
+    "p50": 5990,
+    "p95": 7322,
+    "p99": 7537
+  }
+}

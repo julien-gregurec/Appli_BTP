@@ -53,6 +53,23 @@ export async function creerAffectationAction(formData: FormData) {
 // supprimer/recréer. ids_supplementaires liste les affectations d'autres employes (issues
 // de la meme saisie groupee) que l'utilisateur a explicitement cochees pour recevoir la
 // meme correction — jamais une propagation automatique, toujours un choix explicite.
+// ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 : variante « formulaire » de modifierAffectationAction.
+// Le planning rendait une action liée (`.bind(null, a.id)`) par affectation et par vue (mobile +
+// bureau) : Next chiffre et sérialise les arguments liés de CHACUNE à chaque rendu (380 pour une
+// semaine de 38 salariés). Ici l'action est unique et l'identifiant arrive en champ caché, validé
+// strictement. L'autorisation n'a jamais reposé sur le chiffrement des arguments liés : entreprise
+// du contexte + RLS, exactement comme pour `ids_supplementaires`, déjà transmis en clair.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export async function modifierAffectationFormAction(formData: FormData) {
+  const affectationId = String(formData.get("affectation_id") ?? "");
+  if (!UUID.test(affectationId)) {
+    const retour = champ(formData, "retour");
+    const destination = retour ? `/planning?semaine=${encodeURIComponent(retour)}` : "/planning";
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Affectation introuvable")}`);
+  }
+  return modifierAffectationAction(affectationId, formData);
+}
+
 export async function modifierAffectationAction(affectationId: string, formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

@@ -113,6 +113,34 @@ export async function supprimerPointageAction(pointageId: string, mois: string) 
   redirect(`/pointage?mois=${mois}`);
 }
 
+// ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 (patch préparé par ELSATIA_NEXT_MEMORY_CAPACITY_V1) :
+// variantes « formulaire » des deux actions voisines. /pointage/gestion rendait un formulaire par
+// pointage avec `.bind(null, id, statut, mois)` : Next chiffre et sérialise les arguments liés de
+// CHAQUE formulaire à CHAQUE rendu (3 000 actions liées, 3,5 Mo de HTML, ~4 s mesurés pour un mois
+// de 38 salariés). Ici l'action est unique et reçoit les mêmes valeurs en champs cachés, validées
+// strictement. L'autorisation n'a jamais reposé sur le chiffrement des arguments liés (entreprise
+// du contexte + RLS + RPC / permission vérifiées côté serveur, inchangé).
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function champsPointage(formData: FormData) {
+  const pointageId = String(formData.get("pointage_id") ?? "");
+  const moisBrut = String(formData.get("mois") ?? "");
+  const mois = /^\d{4}-\d{2}$/.test(moisBrut) ? moisBrut : new Date().toISOString().slice(0, 7);
+  if (!UUID.test(pointageId)) redirect(`/pointage?mois=${mois}&error=${encodeURIComponent("Pointage introuvable")}`);
+  return { pointageId, mois };
+}
+
+export async function validerPointageFormAction(formData: FormData) {
+  const { pointageId, mois } = champsPointage(formData);
+  const statut = formData.get("statut");
+  if (statut !== "valide" && statut !== "rejete") redirect(`/pointage?mois=${mois}&error=${encodeURIComponent("Statut de validation invalide")}`);
+  return validerPointageAction(pointageId, statut, mois, formData);
+}
+
+export async function supprimerPointageFormAction(formData: FormData) {
+  const { pointageId, mois } = champsPointage(formData);
+  return supprimerPointageAction(pointageId, mois);
+}
+
 export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(messageErreurUtilisateur("validerPointageAction",error,"Impossible de valider ce pointage."))}`);revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)}
 
 export async function creerMaFichePointageAdministrateurAction(){

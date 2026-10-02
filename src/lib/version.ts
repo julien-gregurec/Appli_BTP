@@ -18,13 +18,16 @@ export function informationsVersion(): InformationsVersion {
   };
 }
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1.
+const FORMAT_DATE_VERSION = new Intl.DateTimeFormat("fr-FR", {
+  dateStyle: "long",
+  timeStyle: "medium",
+  timeZone: "Europe/Paris",
+});
+
 export function formatDateVersion(value: string) {
   if (value === "indisponible") return value;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "long",
-    timeStyle: "medium",
-    timeZone: "Europe/Paris",
-  }).format(date);
+  return FORMAT_DATE_VERSION.format(date);
 }

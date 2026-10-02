@@ -3,6 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import {
+  construireAlertes,
+  lireEtatAlertes,
+  lireSourcesAlertes,
+  pageAlertes,
+  repartirAlertes,
+  TAILLE_PAGE_ALERTES,
+  type FiltreAlertes,
+  type PageAlertes,
+} from "@/lib/alertes-operationnelles";
 
 type ResultatAction = { ok: true } | { ok: false; error: string };
 
@@ -100,4 +111,43 @@ export async function deleguerAlerteOperationnelleAction(
   }
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+const FILTRES: FiltreAlertes[] = ["toutes", "mes_alertes", "deleguees_par_moi", "ignorees"];
+
+/**
+ * Suite du centre d'alertes, chargée à la demande (ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1) :
+ * mêmes alertes, mêmes droits et même état (ignorées, déléguées) que le tableau de bord, qui n'en
+ * envoie plus qu'un résumé et une première page. Lecture seule ; RLS et contexte d'entreprise
+ * inchangés.
+ */
+export async function chargerAlertesOperationnellesAction(
+  filtre: FiltreAlertes,
+  debut: number,
+  nombre: number = TAILLE_PAGE_ALERTES,
+): Promise<{ ok: true; page: PageAlertes } | { ok: false; error: string }> {
+  if (!FILTRES.includes(filtre) || !Number.isFinite(debut) || !Number.isFinite(nombre)) return { ok: false, error: "Demande invalide." };
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const autorise = (cle: string) => permissions === null || permissions.includes(cle);
+  const voir = {
+    devis: autorise("acces_devis"), factures: autorise("acces_factures"), stock: autorise("acces_stock"),
+    flotte: autorise("acces_flotte"), outillage: autorise("acces_outillage"), achats: autorise("acces_achats"),
+  };
+  if (!Object.values(voir).some(Boolean)) return { ok: false, error: "Accès refusé." };
+  const voirIndicateursFinanciers = permissions !== null && permissions.includes("voir_indicateurs_financiers");
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  const [sources, etat, { data: employeCompte }] = await Promise.all([
+    lireSourcesAlertes(supabase, ctx.entrepriseId, voir, aujourdhui),
+    permissions !== null ? lireEtatAlertes(supabase, ctx.entrepriseId, ctx.userId) : Promise.resolve({ masquages: [], delegations: [] }),
+    permissions !== null
+      ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const centre = repartirAlertes(construireAlertes(sources, aujourdhui, voirIndicateursFinanciers), etat);
+  const page = await pageAlertes(supabase, ctx.entrepriseId, centre, {
+    filtre, debut, nombre, employeCourantId: employeCompte?.id ?? null, utilisateurCourantId: ctx.userId,
+  });
+  return { ok: true, page };
 }

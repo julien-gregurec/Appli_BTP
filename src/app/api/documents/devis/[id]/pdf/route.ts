@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
-import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
+import { genererPdfDepuisUrl, nomFichierPdf, reponseErreurPdf } from "@/lib/pdf/generer";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,9 +22,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const url = new URL(`/imprimer/devis/${id}`, request.url);
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"));
-  } catch {
-    return NextResponse.json({ error: "Génération du PDF impossible" }, { status: 502 });
+    pdf = await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"), { signal: request.signal });
+  } catch (erreur) {
+    // File saturée → 503 (Retry-After), délai → 504 ; sinon statut historique.
+    return reponseErreurPdf(erreur, 502, "Génération du PDF impossible");
   }
 
   return new NextResponse(new Uint8Array(pdf), {
