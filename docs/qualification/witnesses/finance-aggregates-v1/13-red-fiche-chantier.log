@@ -1,0 +1,70 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes : totaux du gros chantier exacts 1008ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes : totaux du gros chantier exacts 1437ms
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes : totaux du gros chantier exacts 1949ms
+ × src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes : totaux du gros chantier exacts 6073ms
+   → expected [ 1000, 1000, 1000 ] to deeply equal [ 2500, 1667, 2500 ]
+ × src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes : totaux du gros chantier exacts 18170ms
+   → expected [ 1000, 1000, 1000 ] to deeply equal [ 10000, 6667, 10000 ]
+ ✓ src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > rien d'une autre entreprise 642ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes : totaux du gros chantier exacts
+AssertionError: expected [ 1000, 1000, 1000 ] to deeply equal [ 2500, 1667, 2500 ]
+
+- Expected
++ Received
+
+  [
+-   2500,
+-   1667,
+-   2500,
++   1000,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/chantier-donnees.postgrest.test.ts:26:86
+     24|       'n_nf', (select count(*) from notes_frais where entreprise_id = …
+     25|     const d = await chargerDonneesChiffreesChantier(clientBanc(prefixe…
+     26|     expect([d.pointages.length, d.facturesFournisseurs.length, d.notes…
+       |                                                                                      ^
+     27|     const t = totauxChantier(d);
+     28|     expect([t.totalFacture, t.totalPaye, t.totalHeures, t.totalHeuresR…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/chantier-donnees.postgrest.test.ts > fiche chantier — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes : totaux du gros chantier exacts
+AssertionError: expected [ 1000, 1000, 1000 ] to deeply equal [ 10000, 6667, 10000 ]
+
+- Expected
++ Received
+
+  [
+-   10000,
+-   6667,
+-   10000,
++   1000,
++   1000,
++   1000,
+  ]
+
+ ❯ src/lib/chantier-donnees.postgrest.test.ts:26:86
+     24|       'n_nf', (select count(*) from notes_frais where entreprise_id = …
+     25|     const d = await chargerDonneesChiffreesChantier(clientBanc(prefixe…
+     26|     expect([d.pointages.length, d.facturesFournisseurs.length, d.notes…
+       |                                                                                      ^
+     27|     const t = totauxChantier(d);
+     28|     expect([t.totalFacture, t.totalPaye, t.totalHeures, t.totalHeuresR…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  01:36:02
+   Duration  29.62s (transform 73ms, setup 0ms, import 136ms, tests 29.28s, environment 0ms)
+

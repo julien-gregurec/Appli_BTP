@@ -15,6 +15,12 @@ import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type Employe
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { lireAlertesParc, lireAlertesStock, lireDashboardChantiers, type AlertesParc, type AlertesStock, type DashboardChantiers } from "@/lib/pilotage-agregats";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
+
+// Alertes d’échéances (outillage, livraisons) : filtrées par date en base et
+// bornées ; au-delà, l’écran le signale.
+const LIMITE_ALERTES = 200;
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -27,6 +33,7 @@ export default async function DashboardPage() {
   const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  const dansJours = (jours: number) => { const d = new Date(`${aujourdhui}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + jours); return d.toISOString().slice(0, 10); };
   const septJoursAvantIso = new Date(new Date(aujourdhui).getTime() - 7 * 24 * 3600 * 1000).toISOString();
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
   // La base filtre elle-même les chantiers selon le choix de l'administrateur :
@@ -93,27 +100,31 @@ export default async function DashboardPage() {
     factures_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; montant_paye: number; date_echeance: string; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
     factures_mois?: Array<{ cle: string; total: number }> | null;
   };
-  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
+  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, parcResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
     voir.devis || voir.factures ? supabase.rpc("dashboard_indicateurs", { p_entreprise_id: ctx.entrepriseId, p_aujourdhui: aujourdhui }) : null,
-    voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
+    // Chantiers, alertes de stock : calculés en base (gp_dashboard_chantiers,
+    // gp_alertes_stock) — PostgREST tronquait ces lectures à 1 000 lignes.
+    voir.chantiers ? lireDashboardChantiers(supabase, ctx.entrepriseId, aujourdhui).catch((err): DashboardChantiers | null => { console.error("[dashboard] chantiers indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
     voir.planning ? requeteAffectations : null,
-    voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
-    voir.flotte ? supabase.from("vehicules").select("id, immatriculation, marque, modele, kilometrage, controle_technique_echeance, assurance_echeance, prochain_entretien_date, prochain_entretien_km").eq("entreprise_id", ctx.entrepriseId).in("statut", ["actif", "maintenance"]) : null,
-    voir.outillage ? supabase.from("outils").select("id, reference, designation, prochaine_verification").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu)") : null,
-    voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]) : null,
-    peutPointer && employeCompte ? supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom") : null,
+    voir.stock ? lireAlertesStock(supabase, ctx.entrepriseId, 50).catch((err): AlertesStock | null => { console.error("[dashboard] alertes stock indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
+    // Alertes du parc filtrées en base (gp_alertes_parc) : les véhicules étaient
+    // lus sans borne et les outils triés sous RLS.
+    voir.flotte || voir.outillage ? lireAlertesParc(supabase, ctx.entrepriseId, aujourdhui, 30, LIMITE_ALERTES).catch((err): AlertesParc | null => { console.error("[dashboard] alertes du parc indisponibles", err instanceof Error ? err.message : err); return null; }) : null,
+    voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]).lte("date_livraison_prevue", dansJours(3)).order("date_livraison_prevue").order("id").limit(LIMITE_ALERTES) : null,
+    peutPointer && employeCompte ? lireOptionsChantiers(supabase,ctx.entrepriseId).then((data)=>({data})) : null,
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
-    peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
+    // Effectif compté en base (gp_effectif_actif) : la lecture était plafonnée à 1 000.
+    peutVoirBriefing ? supabase.rpc("gp_effectif_actif", { p_entreprise_id: ctx.entrepriseId }) : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
     voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
   ]);
   const indicateurs = (dashboardIndicateursResult?.data ?? {}) as DashboardIndicateurs;
-  const chantiers = chantiersResult?.data ?? [];
-  const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
-  const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
+  const syntheseChantiers = chantiersResult ?? null;
+  const affectations = affectationsResult?.data ?? [], alertesStock = articlesResult ?? null, alertesParc = parcResult ?? null, vehicules = voir.flotte ? alertesParc?.vehicules ?? [] : [];
+  const outils = voir.outillage ? alertesParc?.outils ?? [] : [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
-  const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
+  const effectifActif = Number(employesActifsResult?.data ?? 0), congesAujourdhui = congesAujourdhuiResult?.data ?? [];
   const notifications = notificationsResult?.data ?? [];
   const relancesEnEchec = relancesEchecResult?.data ?? [];
 
@@ -121,8 +132,7 @@ export default async function DashboardPage() {
   const totalEncaisse = Number(indicateurs.factures_encaisse_total ?? 0);
   const resteAEncaisser = Math.max(0, totalFacture - totalEncaisse);
   const devisAcceptes = Number(indicateurs.devis_acceptes_total ?? 0);
-  const statutsActifs = ["accepte", "a_preparer", "en_attente_validation", "en_commande_materiel", "en_cours", "en_pause"];
-  const chantiersActifs = (chantiers ?? []).filter((c) => statutsActifs.includes(c.statut));
+  const chantiersActifs = syntheseChantiers?.actifs ?? [];
   const devisASuivre = indicateurs.devis_a_suivre ?? [];
   type Alerte = { id: string; domaine: string; niveau: "critique" | "attention"; titre: string; detail: string; href: string; date?: string };
   const alertes: Alerte[] = [];
@@ -152,9 +162,12 @@ export default async function DashboardPage() {
       href: estDevis ? `/devis/${relance.document_id}` : `/factures/${relance.document_id}`,
     });
   }
-  for (const article of articles ?? []) {
+  for (const article of alertesStock?.articles ?? []) {
     const stock = Number(article.quantite_stock), seuil = Number(article.seuil_alerte);
     if (stock <= seuil) alertes.push({ id: `stock-${article.id}`, domaine: "Stock", niveau: stock <= 0 ? "critique" : "attention", titre: `${article.reference} · ${article.designation}`, detail: `${stock} ${article.unite} disponible(s), seuil ${seuil}`, href: "/stock" });
+  }
+  if (alertesStock && alertesStock.nb > alertesStock.articles.length) {
+    alertes.push({ id: "stock-autres", domaine: "Stock", niveau: "attention", titre: `${alertesStock.nb - alertesStock.articles.length} autres articles sous le seuil`, detail: `${alertesStock.nb} alertes de stock au total, dont ${alertesStock.nbRuptures} rupture(s)`, href: "/stock" });
   }
   for (const vehicule of vehicules ?? []) {
     const nom = `${vehicule.immatriculation} · ${vehicule.marque} ${vehicule.modele}`;
@@ -166,6 +179,8 @@ export default async function DashboardPage() {
   for (const outil of outils ?? []) {
     if (outil.prochaine_verification) ajouterEcheance({ id: `outil-${outil.id}`, domaine: "Outillage", titre: `Vérification · ${outil.reference}`, detail: outil.designation, href: `/outillage/${outil.id}` }, outil.prochaine_verification);
   }
+  if (voir.flotte && alertesParc && alertesParc.nbVehicules > alertesParc.vehicules.length) alertes.push({ id: "flotte-autres", domaine: "Flotte", niveau: "attention", titre: `${alertesParc.nbVehicules - alertesParc.vehicules.length} autres véhicules à échéance`, detail: `${alertesParc.nbVehicules} véhicules concernés au total`, href: "/flotte" });
+  if (voir.outillage && alertesParc && alertesParc.nbOutils > alertesParc.outils.length) alertes.push({ id: "outillage-autres", domaine: "Outillage", niveau: "attention", titre: `${alertesParc.nbOutils - alertesParc.outils.length} autres vérifications d’outils`, detail: `${alertesParc.nbOutils} outils concernés au total`, href: "/outillage" });
   for (const commande of commandes ?? []) {
     if (commande.date_livraison_prevue) {
       const fournisseur = un(commande.fournisseur);
@@ -233,15 +248,14 @@ export default async function DashboardPage() {
   const lignesBriefing: LigneBriefing[] = [];
   if (peutVoirBriefing) {
     const absentsAujourdhui = new Set(congesAujourdhui.map((c) => c.employe_id)).size;
-    const presentsAujourdhui = Math.max(0, employesActifs.length - absentsAujourdhui);
-    if (employesActifs.length > 0) {
+    const presentsAujourdhui = Math.max(0, effectifActif - absentsAujourdhui);
+    if (effectifActif > 0) {
       lignesBriefing.push({
         niveau: absentsAujourdhui > 0 ? "attention" : "bon",
         texte: `${presentsAujourdhui} salarié${presentsAujourdhui > 1 ? "s" : ""} présent${presentsAujourdhui > 1 ? "s" : ""}${absentsAujourdhui > 0 ? `, ${absentsAujourdhui} absent${absentsAujourdhui > 1 ? "s" : ""}` : ""}`,
       });
     }
-    const chantiersEnRetard = (chantiers ?? [])
-      .filter((c): c is typeof c & { date_fin_prevue: string } => statutsActifs.includes(c.statut) && !!c.date_fin_prevue && c.date_fin_prevue < aujourdhui);
+    const chantiersEnRetard = (syntheseChantiers?.enRetard ?? []).filter((c): c is typeof c & { date_fin_prevue: string } => !!c.date_fin_prevue);
     for (const c of chantiersEnRetard.slice(0, 2)) {
       const jours = Math.round((Date.parse(`${aujourdhui}T12:00:00`) - Date.parse(`${c.date_fin_prevue}T12:00:00`)) / 86_400_000);
       lignesBriefing.push({ niveau: "critique", texte: `Chantier ${c.nom} : retard estimé ${jours} j` });
@@ -265,9 +279,9 @@ export default async function DashboardPage() {
       lignesBriefing.push({ niveau: "bon", texte: "Rien à signaler, tout est sous contrôle." });
     }
   }
-  const chantierGraphique = voir.chantiers ? [...new Set((chantiers ?? []).map((chantier) => chantier.statut))].map((statut) => {
+  const chantierGraphique = voir.chantiers ? (syntheseChantiers?.parStatut ?? []).map(({ statut, nb }) => {
     const presentation = statutChantier(statut);
-    return { label: presentation.libelle, value: (chantiers ?? []).filter((chantier) => chantier.statut === statut).length, color: presentation.couleur };
+    return { label: presentation.libelle, value: nb, color: presentation.couleur };
   }) : undefined;
   const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? (() => {
     const devisParMois = new Map((indicateurs.devis_mois ?? []).map((m) => [m.cle, Number(m.total)]));

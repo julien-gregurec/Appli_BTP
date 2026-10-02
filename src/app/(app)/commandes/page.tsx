@@ -3,16 +3,22 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
 import { statutCommande } from "@/lib/commandes";
 import { Lien as Link } from "@/components/Lien";
+import { lireCurseur, lirePageCurseur } from "@/lib/fiches-agregats";
 
-export default async function CommandesPage() {
+const TAILLE_PAGE = 100;
+
+export default async function CommandesPage({ searchParams }: { searchParams: Promise<{ apres?: string }> }) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: commandes } = await supabase
+  // Paginée par curseur : la liste complète était plafonnée à 1 000 commandes
+  // par PostgREST, sans le signaler.
+  const curseur = lireCurseur((await searchParams).apres);
+  const page = await lirePageCurseur(supabase
     .from("commandes_fournisseurs")
     .select("id, numero, statut, date_commande, montant_ttc, fournisseur:fournisseurs(nom), chantier:chantiers(nom)")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("date_commande", { ascending: false });
+    .eq("entreprise_id", ctx.entrepriseId), "date_commande", TAILLE_PAGE, curseur);
+  const commandes = page.lignes;
 
   const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
 
@@ -72,6 +78,12 @@ export default async function CommandesPage() {
             </tbody>
           </table>
         </div>
+        {(curseur || page.suivant) && (
+          <nav aria-label="Pagination des commandes" className="mb-20 flex items-center justify-between text-sm">
+            {curseur ? <Link href="/commandes" className="rounded-md border px-3 py-2">← Plus récentes</Link> : <span />}
+            {page.suivant ? <Link href={`/commandes?${new URLSearchParams({ apres: page.suivant })}`} className="rounded-md border px-3 py-2">Plus anciennes →</Link> : <span />}
+          </nav>
+        )}
       </div>
     </main>
   );

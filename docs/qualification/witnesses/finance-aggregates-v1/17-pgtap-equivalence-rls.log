@@ -1,0 +1,246 @@
+1..237
+10000000-0000-0000-0000-000000000001
+ok 1 - admin A — ventes : lignes
+ok 2 - admin A — ventes : TTC
+ok 3 - admin A — ventes : fiches client jointes
+ok 4 - admin A — règlements : lignes
+ok 5 - admin A — règlements : montant
+ok 6 - admin A — achats : lignes
+ok 7 - admin A — achats : TVA
+ok 8 - admin A — achats : chantiers joints
+ok 9 - admin A — TVA collectée : groupes facture × taux
+ok 10 - admin A — TVA collectée : TVA totale
+ok 11 - admin A — trésorerie : factures ouvertes
+ok 12 - admin A — trésorerie : avoirs par origine
+ok 13 - admin A — trésorerie : dépenses ouvertes
+ok 14 - admin A — trésorerie : encaissé
+ok 15 - admin A — trésorerie : décaissé
+ok 16 - admin A — trésorerie : chantiers joints
+ok 17 - admin A — /depenses : total TTC
+ok 18 - admin A — /depenses : réglé
+ok 19 - admin A — pointage équipe : pointages
+ok 20 - admin A — pointage équipe : heures
+ok 21 - admin A — pointage équipe : sessions
+ok 22 - admin A — pointage équipe : pointages joints aux sessions
+ok 23 - admin A — pointage équipe : contrôles GPS
+ok 24 - admin A — pointage équipe : chantiers joints
+ok 25 - admin A — planning : affectations
+ok 26 - admin A — planning : heures validées
+ok 27 - admin A — fiche chantier : factures
+ok 28 - admin A — fiche chantier : affectations
+ok 29 - admin A — fiche chantier : pointages
+ok 30 - admin A — fiche chantier : factures fournisseurs
+ok 31 - admin A — fiche chantier : notes de frais
+ok 32 - admin A — quota IA : opérations
+10000000-0000-0000-0000-000000000002
+ok 33 - ouvrier A — ventes : lignes
+ok 34 - ouvrier A — ventes : TTC
+ok 35 - ouvrier A — ventes : fiches client jointes
+ok 36 - ouvrier A — règlements : lignes
+ok 37 - ouvrier A — règlements : montant
+ok 38 - ouvrier A — achats : lignes
+ok 39 - ouvrier A — achats : TVA
+ok 40 - ouvrier A — achats : chantiers joints
+ok 41 - ouvrier A — TVA collectée : groupes facture × taux
+ok 42 - ouvrier A — TVA collectée : TVA totale
+ok 43 - ouvrier A — trésorerie : factures ouvertes
+ok 44 - ouvrier A — trésorerie : avoirs par origine
+ok 45 - ouvrier A — trésorerie : dépenses ouvertes
+ok 46 - ouvrier A — trésorerie : encaissé
+ok 47 - ouvrier A — trésorerie : décaissé
+ok 48 - ouvrier A — trésorerie : chantiers joints
+ok 49 - ouvrier A — /depenses : total TTC
+ok 50 - ouvrier A — /depenses : réglé
+ok 51 - ouvrier A — pointage équipe : pointages
+ok 52 - ouvrier A — pointage équipe : heures
+ok 53 - ouvrier A — pointage équipe : sessions
+ok 54 - ouvrier A — pointage équipe : pointages joints aux sessions
+ok 55 - ouvrier A — pointage équipe : contrôles GPS
+ok 56 - ouvrier A — pointage équipe : chantiers joints
+ok 57 - ouvrier A — planning : affectations
+ok 58 - ouvrier A — planning : heures validées
+ok 59 - ouvrier A — fiche chantier : factures
+ok 60 - ouvrier A — fiche chantier : affectations
+ok 61 - ouvrier A — fiche chantier : pointages
+ok 62 - ouvrier A — fiche chantier : factures fournisseurs
+ok 63 - ouvrier A — fiche chantier : notes de frais
+ok 64 - ouvrier A — quota IA : opérations
+10000000-0000-0000-0000-000000000003
+ok 65 - chef d'équipe A — ventes : lignes
+ok 66 - chef d'équipe A — ventes : TTC
+ok 67 - chef d'équipe A — ventes : fiches client jointes
+ok 68 - chef d'équipe A — règlements : lignes
+ok 69 - chef d'équipe A — règlements : montant
+ok 70 - chef d'équipe A — achats : lignes
+ok 71 - chef d'équipe A — achats : TVA
+ok 72 - chef d'équipe A — achats : chantiers joints
+ok 73 - chef d'équipe A — TVA collectée : groupes facture × taux
+ok 74 - chef d'équipe A — TVA collectée : TVA totale
+ok 75 - chef d'équipe A — trésorerie : factures ouvertes
+ok 76 - chef d'équipe A — trésorerie : avoirs par origine
+ok 77 - chef d'équipe A — trésorerie : dépenses ouvertes
+ok 78 - chef d'équipe A — trésorerie : encaissé
+ok 79 - chef d'équipe A — trésorerie : décaissé
+ok 80 - chef d'équipe A — trésorerie : chantiers joints
+ok 81 - chef d'équipe A — /depenses : total TTC
+ok 82 - chef d'équipe A — /depenses : réglé
+ok 83 - chef d'équipe A — pointage équipe : pointages
+ok 84 - chef d'équipe A — pointage équipe : heures
+ok 85 - chef d'équipe A — pointage équipe : sessions
+ok 86 - chef d'équipe A — pointage équipe : pointages joints aux sessions
+ok 87 - chef d'équipe A — pointage équipe : contrôles GPS
+ok 88 - chef d'équipe A — pointage équipe : chantiers joints
+ok 89 - chef d'équipe A — planning : affectations
+ok 90 - chef d'équipe A — planning : heures validées
+ok 91 - chef d'équipe A — fiche chantier : factures
+ok 92 - chef d'équipe A — fiche chantier : affectations
+ok 93 - chef d'équipe A — fiche chantier : pointages
+ok 94 - chef d'équipe A — fiche chantier : factures fournisseurs
+ok 95 - chef d'équipe A — fiche chantier : notes de frais
+ok 96 - chef d'équipe A — quota IA : opérations
+10000000-0000-0000-0000-000000000004
+ok 97 - conducteur A — ventes : lignes
+ok 98 - conducteur A — ventes : TTC
+ok 99 - conducteur A — ventes : fiches client jointes
+ok 100 - conducteur A — règlements : lignes
+ok 101 - conducteur A — règlements : montant
+ok 102 - conducteur A — achats : lignes
+ok 103 - conducteur A — achats : TVA
+ok 104 - conducteur A — achats : chantiers joints
+ok 105 - conducteur A — TVA collectée : groupes facture × taux
+ok 106 - conducteur A — TVA collectée : TVA totale
+ok 107 - conducteur A — trésorerie : factures ouvertes
+ok 108 - conducteur A — trésorerie : avoirs par origine
+ok 109 - conducteur A — trésorerie : dépenses ouvertes
+ok 110 - conducteur A — trésorerie : encaissé
+ok 111 - conducteur A — trésorerie : décaissé
+ok 112 - conducteur A — trésorerie : chantiers joints
+ok 113 - conducteur A — /depenses : total TTC
+ok 114 - conducteur A — /depenses : réglé
+ok 115 - conducteur A — pointage équipe : pointages
+ok 116 - conducteur A — pointage équipe : heures
+ok 117 - conducteur A — pointage équipe : sessions
+ok 118 - conducteur A — pointage équipe : pointages joints aux sessions
+ok 119 - conducteur A — pointage équipe : contrôles GPS
+ok 120 - conducteur A — pointage équipe : chantiers joints
+ok 121 - conducteur A — planning : affectations
+ok 122 - conducteur A — planning : heures validées
+ok 123 - conducteur A — fiche chantier : factures
+ok 124 - conducteur A — fiche chantier : affectations
+ok 125 - conducteur A — fiche chantier : pointages
+ok 126 - conducteur A — fiche chantier : factures fournisseurs
+ok 127 - conducteur A — fiche chantier : notes de frais
+ok 128 - conducteur A — quota IA : opérations
+10000000-0000-0000-0000-000000000005
+ok 129 - comptable A — ventes : lignes
+ok 130 - comptable A — ventes : TTC
+ok 131 - comptable A — ventes : fiches client jointes
+ok 132 - comptable A — règlements : lignes
+ok 133 - comptable A — règlements : montant
+ok 134 - comptable A — achats : lignes
+ok 135 - comptable A — achats : TVA
+ok 136 - comptable A — achats : chantiers joints
+ok 137 - comptable A — TVA collectée : groupes facture × taux
+ok 138 - comptable A — TVA collectée : TVA totale
+ok 139 - comptable A — trésorerie : factures ouvertes
+ok 140 - comptable A — trésorerie : avoirs par origine
+ok 141 - comptable A — trésorerie : dépenses ouvertes
+ok 142 - comptable A — trésorerie : encaissé
+ok 143 - comptable A — trésorerie : décaissé
+ok 144 - comptable A — trésorerie : chantiers joints
+ok 145 - comptable A — /depenses : total TTC
+ok 146 - comptable A — /depenses : réglé
+ok 147 - comptable A — pointage équipe : pointages
+ok 148 - comptable A — pointage équipe : heures
+ok 149 - comptable A — pointage équipe : sessions
+ok 150 - comptable A — pointage équipe : pointages joints aux sessions
+ok 151 - comptable A — pointage équipe : contrôles GPS
+ok 152 - comptable A — pointage équipe : chantiers joints
+ok 153 - comptable A — planning : affectations
+ok 154 - comptable A — planning : heures validées
+ok 155 - comptable A — fiche chantier : factures
+ok 156 - comptable A — fiche chantier : affectations
+ok 157 - comptable A — fiche chantier : pointages
+ok 158 - comptable A — fiche chantier : factures fournisseurs
+ok 159 - comptable A — fiche chantier : notes de frais
+ok 160 - comptable A — quota IA : opérations
+10000000-0000-0000-0000-000000000006
+ok 161 - dirigeant A — ventes : lignes
+ok 162 - dirigeant A — ventes : TTC
+ok 163 - dirigeant A — ventes : fiches client jointes
+ok 164 - dirigeant A — règlements : lignes
+ok 165 - dirigeant A — règlements : montant
+ok 166 - dirigeant A — achats : lignes
+ok 167 - dirigeant A — achats : TVA
+ok 168 - dirigeant A — achats : chantiers joints
+ok 169 - dirigeant A — TVA collectée : groupes facture × taux
+ok 170 - dirigeant A — TVA collectée : TVA totale
+ok 171 - dirigeant A — trésorerie : factures ouvertes
+ok 172 - dirigeant A — trésorerie : avoirs par origine
+ok 173 - dirigeant A — trésorerie : dépenses ouvertes
+ok 174 - dirigeant A — trésorerie : encaissé
+ok 175 - dirigeant A — trésorerie : décaissé
+ok 176 - dirigeant A — trésorerie : chantiers joints
+ok 177 - dirigeant A — /depenses : total TTC
+ok 178 - dirigeant A — /depenses : réglé
+ok 179 - dirigeant A — pointage équipe : pointages
+ok 180 - dirigeant A — pointage équipe : heures
+ok 181 - dirigeant A — pointage équipe : sessions
+ok 182 - dirigeant A — pointage équipe : pointages joints aux sessions
+ok 183 - dirigeant A — pointage équipe : contrôles GPS
+ok 184 - dirigeant A — pointage équipe : chantiers joints
+ok 185 - dirigeant A — planning : affectations
+ok 186 - dirigeant A — planning : heures validées
+ok 187 - dirigeant A — fiche chantier : factures
+ok 188 - dirigeant A — fiche chantier : affectations
+ok 189 - dirigeant A — fiche chantier : pointages
+ok 190 - dirigeant A — fiche chantier : factures fournisseurs
+ok 191 - dirigeant A — fiche chantier : notes de frais
+ok 192 - dirigeant A — quota IA : opérations
+10000000-0000-0000-0000-000000000001
+ok 193 - admin A sur B (inter-tenant) — ventes : lignes
+ok 194 - admin A sur B (inter-tenant) — ventes : TTC
+ok 195 - admin A sur B (inter-tenant) — ventes : fiches client jointes
+ok 196 - admin A sur B (inter-tenant) — règlements : lignes
+ok 197 - admin A sur B (inter-tenant) — règlements : montant
+ok 198 - admin A sur B (inter-tenant) — achats : lignes
+ok 199 - admin A sur B (inter-tenant) — achats : TVA
+ok 200 - admin A sur B (inter-tenant) — achats : chantiers joints
+ok 201 - admin A sur B (inter-tenant) — TVA collectée : groupes facture × taux
+ok 202 - admin A sur B (inter-tenant) — TVA collectée : TVA totale
+ok 203 - admin A sur B (inter-tenant) — trésorerie : factures ouvertes
+ok 204 - admin A sur B (inter-tenant) — trésorerie : avoirs par origine
+ok 205 - admin A sur B (inter-tenant) — trésorerie : dépenses ouvertes
+ok 206 - admin A sur B (inter-tenant) — trésorerie : encaissé
+ok 207 - admin A sur B (inter-tenant) — trésorerie : décaissé
+ok 208 - admin A sur B (inter-tenant) — trésorerie : chantiers joints
+ok 209 - admin A sur B (inter-tenant) — /depenses : total TTC
+ok 210 - admin A sur B (inter-tenant) — /depenses : réglé
+ok 211 - admin A sur B (inter-tenant) — pointage équipe : pointages
+ok 212 - admin A sur B (inter-tenant) — pointage équipe : heures
+ok 213 - admin A sur B (inter-tenant) — pointage équipe : sessions
+ok 214 - admin A sur B (inter-tenant) — pointage équipe : pointages joints aux sessions
+ok 215 - admin A sur B (inter-tenant) — pointage équipe : contrôles GPS
+ok 216 - admin A sur B (inter-tenant) — pointage équipe : chantiers joints
+ok 217 - admin A sur B (inter-tenant) — planning : affectations
+ok 218 - admin A sur B (inter-tenant) — planning : heures validées
+ok 219 - admin A sur B (inter-tenant) — fiche chantier : factures
+ok 220 - admin A sur B (inter-tenant) — fiche chantier : affectations
+ok 221 - admin A sur B (inter-tenant) — fiche chantier : pointages
+ok 222 - admin A sur B (inter-tenant) — fiche chantier : factures fournisseurs
+ok 223 - admin A sur B (inter-tenant) — fiche chantier : notes de frais
+ok 224 - admin A sur B (inter-tenant) — quota IA : opérations
+10000000-0000-0000-0000-000000000001
+ok 225 - admin A : au moins 30 mesures sur 32 portent sur des données non vides
+ok 226 - anon ne peut pas exécuter export_comptable_ventes
+ok 227 - anon ne peut pas exécuter export_comptable_reglements
+ok 228 - anon ne peut pas exécuter export_comptable_achats
+ok 229 - anon ne peut pas exécuter export_comptable_tva_collectee
+ok 230 - anon ne peut pas exécuter tresorerie_donnees
+ok 231 - anon ne peut pas exécuter depenses_fournisseurs_totaux
+ok 232 - anon ne peut pas exécuter pointages_equipe_periode
+ok 233 - anon ne peut pas exécuter planning_semaine
+ok 234 - anon ne peut pas exécuter chantier_donnees_chiffrees
+ok 235 - anon ne peut pas exécuter journal_ia_consommation
+ok 236 - authenticated peut exécuter export_comptable_tva_collectee
+ok 237 - authenticated peut exécuter chantier_donnees_chiffrees

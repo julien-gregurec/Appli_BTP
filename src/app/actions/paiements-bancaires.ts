@@ -176,11 +176,17 @@ export async function activerPowensAction() {
 
 type SourceVirement = { type: "bulletin" | "note" | "depense"; id: string };
 
+const MAX_SOURCES_LOT = 250;
+
+// Au-delà de MAX_SOURCES_LOT paiements cochés, le lot est refusé : il était
+// auparavant tronqué sans avertissement (paiements cochés absents du lot).
 function sourcesSelectionnees(formData: FormData): SourceVirement[] {
-  return formData.getAll("sources").flatMap((valeur) => {
+  const sources = formData.getAll("sources").flatMap((valeur) => {
     const [type, id] = String(valeur).split(":");
     return ["bulletin", "note", "depense"].includes(type) && /^[0-9a-f-]{36}$/i.test(id) ? [{ type: type as SourceVirement["type"], id }] : [];
-  }).slice(0, 250);
+  });
+  if (sources.length > MAX_SOURCES_LOT) erreur(`Un lot de virements est limité à ${MAX_SOURCES_LOT} paiements : ${sources.length} sélectionnés. Préparez plusieurs lots.`);
+  return sources;
 }
 
 export async function preparerLotVirementsAction(formData: FormData) {

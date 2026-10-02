@@ -8,6 +8,7 @@ import { BRAND_NAME } from "@/lib/brand";
 type Fil = { entreprise_id: string; entreprise_nom: string; dernier_at: string | null; non_lus: number; total: number };
 type Message = { id: string; cote: string; auteur_nom: string | null; contenu: string; created_at: string };
 
+const LIMITE_MESSAGES = 500;
 export default async function PlateformeSupportPage({ searchParams }: { searchParams: Promise<{ entreprise?: string; envoye?: string; lus?: string; error?: string }> }) {
   if (!(await estPlateformeAdmin())) notFound();
   const { entreprise, envoye, lus, error } = await searchParams;
@@ -18,12 +19,19 @@ export default async function PlateformeSupportPage({ searchParams }: { searchPa
   const actif = entreprise ?? null;
 
   let messages: Message[] = [];
+  let messagesAnciensMasques = false;
   let nomActif = "";
   let filActif: Fil | null = null;
   let contenuAutorise = false;
   if (actif) {
-    const { data, error: erreurLecture } = await supabase.rpc("plateforme_support_messages", { p_entreprise_id: actif });
-    messages = (data ?? []) as Message[];
+    // Les messages les PLUS RÉCENTS, remis dans l'ordre chronologique : la RPC
+    // (returns table, ordre croissant) était plafonnée à 1 000 lignes par
+    // PostgREST, qui gardait les plus anciens et masquait les derniers.
+    const { data, error: erreurLecture } = await supabase.rpc("plateforme_support_messages", { p_entreprise_id: actif })
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(LIMITE_MESSAGES + 1);
+    const recents = (data ?? []) as Message[];
+    messagesAnciensMasques = recents.length > LIMITE_MESSAGES;
+    messages = recents.slice(0, LIMITE_MESSAGES).reverse();
     contenuAutorise = !erreurLecture;
     filActif = fils.find((f) => f.entreprise_id === actif) ?? null;
     nomActif = filActif?.entreprise_nom ?? "";
@@ -79,6 +87,7 @@ export default async function PlateformeSupportPage({ searchParams }: { searchPa
                   </p>
                 )}
                 {contenuAutorise && <div className="flex flex-col gap-3">
+                  {messagesAnciensMasques && <p className="text-xs text-neutral-500">{LIMITE_MESSAGES} derniers messages affichés.</p>}
                   {messages.map((m) => {
                     const plateforme = m.cote === "plateforme";
                     return (

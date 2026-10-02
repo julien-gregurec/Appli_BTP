@@ -1,0 +1,117 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts (6 tests | 5 failed) 45952ms
+       × à encaisser, à payer et flux réalisés exacts 5546ms
+       × à encaisser, à payer et flux réalisés exacts 5778ms
+       × à encaisser, à payer et flux réalisés exacts 6182ms
+       × à encaisser, à payer et flux réalisés exacts 8773ms
+       × à encaisser, à payer et flux réalisés exacts 7865ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 500 lignes par table > à encaisser, à payer et flux réalisés exacts
+AssertionError: expected [] to have a length of 363 but got +0
+
+- Expected
++ Received
+
+- 363
++ 0
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts:22:41
+     20|         'sorties', (select coalesce(sum(r.montant), 0) from reglements…
+     21|       const resultat = indicateursTresorerie(await chargerDonneesTreso…
+     22|       expect(resultat.facturesOuvertes).toHaveLength(verite.n_factures…
+       |                                         ^
+     23|       expect(resultat.depensesOuvertes).toHaveLength(verite.n_depenses…
+     24|       expect([resultat.aEncaisser, resultat.aPayer, resultat.entrees30…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1000 lignes par table > à encaisser, à payer et flux réalisés exacts
+AssertionError: expected [] to have a length of 727 but got +0
+
+- Expected
++ Received
+
+- 727
++ 0
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts:22:41
+     20|         'sorties', (select coalesce(sum(r.montant), 0) from reglements…
+     21|       const resultat = indicateursTresorerie(await chargerDonneesTreso…
+     22|       expect(resultat.facturesOuvertes).toHaveLength(verite.n_factures…
+       |                                         ^
+     23|       expect(resultat.depensesOuvertes).toHaveLength(verite.n_depenses…
+     24|       expect([resultat.aEncaisser, resultat.aPayer, resultat.entrees30…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 1462 lignes par table > à encaisser, à payer et flux réalisés exacts
+AssertionError: expected [] to have a length of 1064 but got +0
+
+- Expected
++ Received
+
+- 1064
++ 0
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts:22:41
+     20|         'sorties', (select coalesce(sum(r.montant), 0) from reglements…
+     21|       const resultat = indicateursTresorerie(await chargerDonneesTreso…
+     22|       expect(resultat.facturesOuvertes).toHaveLength(verite.n_factures…
+       |                                         ^
+     23|       expect(resultat.depensesOuvertes).toHaveLength(verite.n_depenses…
+     24|       expect([resultat.aEncaisser, resultat.aPayer, resultat.entrees30…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 5000 lignes par table > à encaisser, à payer et flux réalisés exacts
+AssertionError: expected [] to have a length of 3636 but got +0
+
+- Expected
++ Received
+
+- 3636
++ 0
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts:22:41
+     20|         'sorties', (select coalesce(sum(r.montant), 0) from reglements…
+     21|       const resultat = indicateursTresorerie(await chargerDonneesTreso…
+     22|       expect(resultat.facturesOuvertes).toHaveLength(verite.n_factures…
+       |                                         ^
+     23|       expect(resultat.depensesOuvertes).toHaveLength(verite.n_depenses…
+     24|       expect([resultat.aEncaisser, resultat.aPayer, resultat.entrees30…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/lib/tresorerie-donnees.postgrest.test.ts > trésorerie — PostgREST réel (max_rows = 1000) vs PostgreSQL > 20000 lignes par table > à encaisser, à payer et flux réalisés exacts
+AssertionError: expected [] to have a length of 14545 but got +0
+
+- Expected
++ Received
+
+- 14545
++ 0
+
+ ❯ src/lib/tresorerie-donnees.postgrest.test.ts:22:41
+     20|         'sorties', (select coalesce(sum(r.montant), 0) from reglements…
+     21|       const resultat = indicateursTresorerie(await chargerDonneesTreso…
+     22|       expect(resultat.facturesOuvertes).toHaveLength(verite.n_factures…
+       |                                         ^
+     23|       expect(resultat.depensesOuvertes).toHaveLength(verite.n_depenses…
+     24|       expect([resultat.aEncaisser, resultat.aPayer, resultat.entrees30…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed (6)
+   Start at  00:25:26
+   Duration  46.36s (transform 118ms, setup 0ms, import 187ms, tests 45.95s, environment 0ms)
+
+
+real	0m47.522s
+user	0m2.553s
+sys	0m0.541s

@@ -4,6 +4,7 @@ import { materialiserChargeAction } from "@/app/actions/charges";
 import { ChargeRecurrenteForm } from "@/components/ChargeRecurrenteForm";
 import { DEPENSE_CATEGORIES } from "@/lib/depenses";
 import { euros } from "@/lib/devis";
+import { lireOptionsChantiers } from "@/lib/fiches-agregats";
 
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
@@ -14,7 +15,9 @@ export default async function ChargesPage({ searchParams }: { searchParams: Prom
   const [{ data: charges }, { data: fournisseurs }, { data: chantiers }] = await Promise.all([
     supabase.from("charges_recurrentes").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", contexte.entrepriseId).order("prochaine_echeance"),
     supabase.from("fournisseurs").select("id,nom").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("nom"),
-    supabase.from("chantiers").select("id,nom").eq("entreprise_id", contexte.entrepriseId).order("nom"),
+    // Chantiers ouverts seulement, comme les autres sélecteurs : la liste de
+    // tous les chantiers était plafonnée à 1 000 (ordre alphabétique).
+    lireOptionsChantiers(supabase,contexte.entrepriseId).then((data)=>({data})),
   ]);
   const champ = "rounded-md border px-3 py-2 text-sm dark:bg-neutral-900";
   const aujourdHui = new Date().toISOString().slice(0, 10);
