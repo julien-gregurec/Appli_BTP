@@ -7,7 +7,10 @@ import { Lien as Link } from "@/components/Lien";
 
 const JOUR = 86_400_000;
 const iso = (date: Date) => date.toISOString().slice(0, 10);
-const dateFr = (date: Date) => new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(date);
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_JOUR_MOIS = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" });
+const dateFr = (date: Date) => FORMAT_JOUR_MOIS.format(date);
 const ajouterMois = (date: Date, mois: number) => { const jour = date.getDate(); const cible = new Date(date.getFullYear(), date.getMonth() + mois, 1, 12); const dernierJour = new Date(cible.getFullYear(), cible.getMonth() + 1, 0, 12).getDate(); cible.setDate(Math.min(jour, dernierJour)); return cible; };
 const relation = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 const nomPersonne = (personne: { nom: string | null; prenom?: string | null; societe?: string | null } | null) => personne?.societe || [personne?.prenom, personne?.nom].filter(Boolean).join(" ") || personne?.nom || null;

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.10 /home/user/Appli_BTP
+
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > succès : résultat rendu, navigateur fermé, ligne de journal 8ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > concurrence plafonnée : jamais plus de N navigateurs vivants, file FIFO 113ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > saturation : file pleine → SaturationPdfError immédiate, sans lancer de navigateur 208ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > succès : PDF valide, aucun Chromium restant 380ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > attente trop longue en file → SaturationPdfError, la place n'est pas perdue 156ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > délai global : DelaiPdfError, navigateur fermé, place rendue 53ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > échec de la tâche (navigation) : erreur d'origine, navigateur fermé 6ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > annulation en cours : AnnulationPdfError, navigateur fermé ; le signal est transmis à la tâche 12ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > annulation en file : retirée de la file, aucun navigateur lancé pour elle 81ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > signal déjà annulé : refus immédiat 2ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > close() bloqué : la place est rendue après delaiFermetureMs (arrêt forcé) 35ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > délai pendant le lancement : le navigateur lancé en retard est fermé, place rendue 85ms
+ ✓ src/lib/pdf/file-pdf.test.ts > file PDF > réglages par variables d'environnement, avec valeurs par défaut sûres 1ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > concurrence réelle plafonnée à 2 navigateurs pour 6 PDF simultanés 704ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > délai : page qui ne répond pas → DelaiPdfError, Chromium tué 3021ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > échec de navigation (connexion refusée) : erreur, Chromium fermé 164ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > crash du navigateur (SIGKILL externe pendant la génération) : erreur, place rendue, aucun reste 297ms
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > annulation par l'appelant (client déconnecté) : AnnulationPdfError, Chromium tué 119ms
+stdout | src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > arrêt du serveur (SIGTERM) pendant une génération : aucun Chromium orphelin
+[pdf] arrêt SIGTERM : Chromium arrêté sans intervention
+
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > arrêt du serveur (SIGTERM) pendant une génération : aucun Chromium orphelin 395ms
+stdout | src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > arrêt du serveur (SIGKILL) pendant une génération : aucun Chromium orphelin
+[pdf] arrêt SIGKILL : Chromium arrêté sans intervention
+
+ ✓ src/lib/pdf/file-pdf.chromium.test.ts > file PDF — vrai Chromium > arrêt du serveur (SIGKILL) pendant une génération : aucun Chromium orphelin 484ms
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  13:57:44
+   Duration  6.02s (transform 292ms, setup 0ms, import 408ms, tests 6.34s, environment 0ms)
+

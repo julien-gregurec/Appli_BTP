@@ -1,0 +1,28 @@
+{
+  "users": 6,
+  "scenario": "pdf",
+  "think": 0,
+  "durationS": 188.572,
+  "erreursVU": [],
+  "routes": {
+    "/api/documents/devis/[id]/pdf": {
+      "n": 45,
+      "p50": 20697,
+      "p95": 29487,
+      "p99": 35058,
+      "max": 35058,
+      "status": {
+        "200": 43,
+        "503": 2
+      },
+      "kbMoyen": 1485
+    }
+  },
+  "total": {
+    "n": 45,
+    "rps": 0.24,
+    "p50": 20697,
+    "p95": 29487,
+    "p99": 35058
+  }
+}

@@ -38,9 +38,13 @@ export function formatEuro(value: number | string | null | undefined) {
   }).format(nombre);
 }
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_DATE_FR = new Intl.DateTimeFormat("fr-FR");
+
 export function formatDateFr(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("fr-FR").format(new Date(`${value}T12:00:00`));
+  return FORMAT_DATE_FR.format(new Date(`${value}T12:00:00`));
 }
 
 export function ancienneteEmploye(dateEntree: string | null | undefined, dateSortie?: string | null) {

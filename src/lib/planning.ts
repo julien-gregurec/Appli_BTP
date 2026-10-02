@@ -39,17 +39,34 @@ export function formatDateInput(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1 (un `new Intl.DateTimeFormat`
+// par appel retient de la mémoire native ICU jusqu'au GC).
+const FORMAT_HEURE = new Intl.DateTimeFormat("fr-FR", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const FORMAT_JOUR_COURT = new Intl.DateTimeFormat("fr-FR", {
+  weekday: "short",
+  day: "2-digit",
+  month: "2-digit",
+});
+
 export function formatHeure(value: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return FORMAT_HEURE.format(new Date(value));
 }
 
 export function formatJourCourt(date: Date) {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(date);
+  return FORMAT_JOUR_COURT.format(date);
 }
+
+// Types d'activité d'une affectation du planning des équipes (ordre d'affichage des listes).
+// Partagé entre la page (libellés) et le formulaire client « Modifier » : une seule copie.
+export const ACTIVITES_AFFECTATION: [string, string][] = [
+  ["chantier", "Chantier"],
+  ["bureau", "Bureau"],
+  ["depot", "Dépôt"],
+  ["visite_medicale", "Visite médicale"],
+  ["formation", "Formation"],
+  ["conge", "Congé / absence"],
+  ["autre", "Autre activité"],
+];

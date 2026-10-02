@@ -16,6 +16,9 @@ function ligneVide(): LigneCommande {
   return { designation: "", description: null, quantite: 1, unite: "u", prix_unitaire_ht: 0, taux_tva: 20 };
 }
 
+
+// Formateur construit une seule fois : voir ELSATIA_NEXT_MEMORY_CAPACITY_V1.
+const FORMAT_DATE_ISO_PARIS = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
 export function CommandeEditor({
   fournisseurs,
   chantiers,
@@ -30,7 +33,7 @@ export function CommandeEditor({
   const [fournisseursListe, setFournisseursListe] = useState(fournisseurs);
   const [fournisseurId, setFournisseurId] = useState("");
   const [chantierId, setChantierId] = useState("");
-  const [dateCommande, setDateCommande] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
+  const [dateCommande, setDateCommande] = useState(() => FORMAT_DATE_ISO_PARIS.format(new Date()));
   const [dateLivraison, setDateLivraison] = useState("");
   const [notes, setNotes] = useState("");
   const [lignes, setLignes] = useState<LigneCommande[]>([ligneVide()]);

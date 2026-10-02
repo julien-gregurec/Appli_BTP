@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  chargerAlertesOperationnellesAction,
   deleguerAlerteOperationnelleAction,
   ignorerAlerteOperationnelleAction,
   retablirAlerteOperationnelleAction,
 } from "@/app/actions/alertes";
 import { Lien as Link } from "@/components/Lien";
 import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type EmployeDelegable } from "@/lib/alertes-delegation";
+import type { FiltreAlertes, PageAlertes, ResumeAlertes } from "@/lib/alertes-operationnelles";
 
 export type AlerteOperationnelle = {
   id: string;
@@ -20,35 +22,76 @@ export type AlerteOperationnelle = {
   signature: string;
 };
 
+// ELSATIA_GP_HEAVY_PAGES_PDF_CAPACITY_V1 : le serveur envoie un RÉSUMÉ (compteurs exacts sur
+// toutes les alertes) et une PREMIÈRE PAGE ; la suite, les autres filtres et les alertes ignorées
+// sont chargés à la demande, par pages, avec les mêmes droits. Aucune alerte n'est perdue :
+// « Afficher plus » parcourt la liste complète, dans le même ordre qu'avant.
 type Props = {
-  alertes: AlerteOperationnelle[];
-  alertesIgnorees: AlerteOperationnelle[];
+  resume: ResumeAlertes;
+  premierePage: PageAlertes;
   domainesAutorisesDelegation?: string[];
   employesDelegables?: EmployeDelegable[];
-  delegations?: Record<string, DelegationAlerte>;
-  employeCourantId?: string | null;
-  utilisateurCourantId?: string;
 };
 
-type Filtre = "toutes" | "mes_alertes" | "deleguees_par_moi";
+type Filtre = Exclude<FiltreAlertes, "ignorees">;
+type Liste = { alertes: AlerteOperationnelle[]; delegations: Record<string, DelegationAlerte>; total: number };
+
+/** Ajoute une page à une liste déjà chargée, sans doublon (la liste peut avoir bougé entre-temps). */
+export function fusionnerPage(liste: Liste | undefined, page: PageAlertes): Liste {
+  if (!liste) return { alertes: page.alertes, delegations: page.delegations, total: page.total };
+  const dejaLa = new Set(liste.alertes.map((alerte) => alerte.id));
+  return {
+    alertes: [...liste.alertes, ...page.alertes.filter((alerte) => !dejaLa.has(alerte.id))],
+    delegations: { ...liste.delegations, ...page.delegations },
+    total: page.total,
+  };
+}
 
 export function CentreAlertesOperationnelles({
-  alertes,
-  alertesIgnorees,
+  resume,
+  premierePage,
   domainesAutorisesDelegation = [],
   employesDelegables = [],
-  delegations = {},
-  employeCourantId = null,
-  utilisateurCourantId,
 }: Props) {
   const [afficherIgnorees, setAfficherIgnorees] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, startTransition] = useTransition();
+  const [chargement, startChargement] = useTransition();
   const [alerteEnDelegation, setAlerteEnDelegation] = useState<AlerteOperationnelle | null>(null);
   const [filtre, setFiltre] = useState<Filtre>("toutes");
-  const nbCritiques = alertes.filter((alerte) => alerte.niveau === "critique").length;
-  const domaines = [...new Set(alertes.map((alerte) => alerte.domaine))];
-  const yADesDelegations = Object.keys(delegations).length > 0;
+  const [listes, setListes] = useState<Partial<Record<FiltreAlertes, Liste>>>(() => ({ toutes: fusionnerPage(undefined, premierePage) }));
+  // Rendu serveur rafraîchi (après une action) : la première page fait foi, les pages déjà
+  // chargées au-delà sont conservées (dédoublonnées) puis rechargées par `recharger`.
+  const [pageServeur, setPageServeur] = useState(premierePage);
+  if (pageServeur !== premierePage) {
+    setPageServeur(premierePage);
+    setListes((actuelles) => {
+      const suite = actuelles.toutes?.alertes.slice(pageServeur.alertes.length) ?? [];
+      const base = fusionnerPage(undefined, premierePage);
+      const ids = new Set(base.alertes.map((alerte) => alerte.id));
+      return { ...actuelles, toutes: { ...base, alertes: [...base.alertes, ...suite.filter((alerte) => !ids.has(alerte.id))], delegations: { ...actuelles.toutes?.delegations, ...base.delegations } } };
+    });
+  }
+  const nbCritiques = resume.critiques;
+  const yADesDelegations = resume.delegationsActives > 0;
+
+  function charger(cible: FiltreAlertes, debut: number, nombre?: number, remplacer = false) {
+    startChargement(async () => {
+      const resultat = await chargerAlertesOperationnellesAction(cible, debut, nombre);
+      if (!resultat.ok) {
+        setErreur(resultat.error);
+        return;
+      }
+      setListes((actuelles) => ({ ...actuelles, [cible]: fusionnerPage(remplacer ? undefined : actuelles[cible], resultat.page) }));
+    });
+  }
+
+  /** Après une action : chaque liste déjà ouverte est relue sur la longueur déjà affichée. */
+  function recharger() {
+    for (const [cible, liste] of Object.entries(listes) as [FiltreAlertes, Liste][]) {
+      charger(cible, 0, Math.max(liste.alertes.length, 1), true);
+    }
+  }
 
   function ignorer(alerte: AlerteOperationnelle) {
     setErreur(null);
@@ -59,6 +102,7 @@ export function CentreAlertesOperationnelles({
         alerte.titre,
       );
       if (!resultat.ok) setErreur(resultat.error);
+      else recharger();
     });
   }
 
@@ -67,21 +111,28 @@ export function CentreAlertesOperationnelles({
     startTransition(async () => {
       const resultat = await retablirAlerteOperationnelleAction(alerte.id);
       if (!resultat.ok) setErreur(resultat.error);
+      else recharger();
     });
   }
 
-  const alertesAffichees = useMemo(() => {
-    if (filtre === "mes_alertes") {
-      return alertes.filter((alerte) => employeCourantId && delegations[alerte.id]?.employeId === employeCourantId);
-    }
-    if (filtre === "deleguees_par_moi") {
-      return alertes.filter((alerte) => utilisateurCourantId && delegations[alerte.id]?.delegueParUserId === utilisateurCourantId);
-    }
-    return alertes;
-  }, [alertes, delegations, employeCourantId, filtre, utilisateurCourantId]);
+  function choisirFiltre(valeur: Filtre) {
+    setFiltre(valeur);
+    if (!listes[valeur]) charger(valeur, 0);
+  }
+
+  function basculerIgnorees() {
+    if (!afficherIgnorees && !listes.ignorees) charger("ignorees", 0);
+    setAfficherIgnorees((valeur) => !valeur);
+  }
+
+  const liste = listes[filtre];
+  const alertesAffichees = liste?.alertes ?? [];
+  const delegations = useMemo(() => ({ ...listes.toutes?.delegations, ...liste?.delegations }), [listes.toutes, liste]);
+  const resteAAfficher = liste ? liste.total - liste.alertes.length : 0;
+  const ignorees = listes.ignorees;
 
   return (
-    <section className={`rounded-md border p-4 ${alertes.length ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"}`}>
+    <section className={`rounded-md border p-4 ${resume.total ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Centre d’alertes opérationnelles</h2>
@@ -94,15 +145,15 @@ export function CentreAlertesOperationnelles({
             {nbCritiques} critique{nbCritiques > 1 ? "s" : ""}
           </span>
           <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-            {alertes.length - nbCritiques} à anticiper
+            {resume.total - nbCritiques} à anticiper
           </span>
-          {alertesIgnorees.length > 0 && (
+          {resume.ignorees > 0 && (
             <button
               type="button"
               className="rounded-full border border-neutral-300 bg-white px-2 py-1 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
-              onClick={() => setAfficherIgnorees((valeur) => !valeur)}
+              onClick={basculerIgnorees}
             >
-              {alertesIgnorees.length} ignorée{alertesIgnorees.length > 1 ? "s" : ""} · {afficherIgnorees ? "Masquer" : "Afficher"}
+              {resume.ignorees} ignorée{resume.ignorees > 1 ? "s" : ""} · {afficherIgnorees ? "Masquer" : "Afficher"}
             </button>
           )}
         </div>
@@ -119,7 +170,7 @@ export function CentreAlertesOperationnelles({
               key={valeur}
               type="button"
               aria-pressed={filtre === valeur}
-              onClick={() => setFiltre(valeur)}
+              onClick={() => choisirFiltre(valeur)}
               className={`rounded-full border px-2 py-1 ${filtre === valeur ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900" : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"}`}
             >
               {libelle}
@@ -130,7 +181,7 @@ export function CentreAlertesOperationnelles({
 
       {erreur && <p className="mt-3 rounded-md bg-red-100 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">{erreur}</p>}
 
-      {alertes.length ? (
+      {resume.total ? (
         alertesAffichees.length ? (
           <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
             {alertesAffichees.map((alerte) => {
@@ -186,7 +237,7 @@ export function CentreAlertesOperationnelles({
             })}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-neutral-500">Aucune alerte ne correspond à ce filtre.</p>
+          <p className="mt-3 text-sm text-neutral-500">{liste ? "Aucune alerte ne correspond à ce filtre." : "Chargement…"}</p>
         )
       ) : (
         <p className="mt-3 text-sm text-green-800 dark:text-green-300">
@@ -194,14 +245,31 @@ export function CentreAlertesOperationnelles({
         </p>
       )}
 
-      {afficherIgnorees && alertesIgnorees.length > 0 && (
+      {liste && liste.alertes.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-neutral-600 dark:text-neutral-400">
+          <span>{liste.alertes.length} affichée{liste.alertes.length > 1 ? "s" : ""} sur {liste.total}</span>
+          {resteAAfficher > 0 && (
+            <button
+              type="button"
+              disabled={chargement}
+              onClick={() => charger(filtre, liste.alertes.length)}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+            >
+              {chargement ? "Chargement…" : `Afficher ${Math.min(resteAAfficher, 30)} de plus`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {afficherIgnorees && resume.ignorees > 0 && (
         <div className="mt-4 border-t border-neutral-300 pt-3 dark:border-neutral-700">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Alertes ignorées pour mon compte</h3>
           <p className="mt-1 text-xs text-neutral-500">
             Une alerte ignorée réapparaît automatiquement si son niveau, sa date ou son contenu change.
           </p>
+          {!ignorees && <p className="mt-2 text-xs text-neutral-500">Chargement…</p>}
           <div className="mt-2 space-y-2">
-            {alertesIgnorees.map((alerte) => (
+            {(ignorees?.alertes ?? []).map((alerte) => (
               <div key={alerte.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 bg-white/60 p-3 text-sm opacity-80 dark:border-neutral-800 dark:bg-black/20">
                 <div>
                   <strong>{alerte.titre}</strong>
@@ -221,10 +289,20 @@ export function CentreAlertesOperationnelles({
               </div>
             ))}
           </div>
+          {ignorees && ignorees.total > ignorees.alertes.length && (
+            <button
+              type="button"
+              disabled={chargement}
+              onClick={() => charger("ignorees", ignorees.alertes.length)}
+              className="mt-2 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+            >
+              {chargement ? "Chargement…" : `Afficher plus (${ignorees.total - ignorees.alertes.length} restantes)`}
+            </button>
+          )}
         </div>
       )}
 
-      {domaines.length > 0 && <p className="mt-3 text-xs text-neutral-500">Domaines concernés : {domaines.join(" · ")}</p>}
+      {resume.domaines.length > 0 && <p className="mt-3 text-xs text-neutral-500">Domaines concernés : {resume.domaines.join(" · ")}</p>}
       <p className="mt-2 text-[11px] text-neutral-500">
         Ignorer ne supprime ni facture, ni échéance, ni donnée métier : cela masque seulement cette alerte pour votre utilisateur.
       </p>
@@ -235,6 +313,7 @@ export function CentreAlertesOperationnelles({
           employes={employesDelegables.filter((employe) => employe.permissions.includes(DOMAINE_VERS_PERMISSION_DELEGATION[alerteEnDelegation.domaine] ?? ""))}
           delegationActuelle={delegations[alerteEnDelegation.id]}
           onFermer={() => setAlerteEnDelegation(null)}
+          onDelegue={recharger}
         />
       )}
     </section>
@@ -246,11 +325,13 @@ function ModalDelegation({
   employes,
   delegationActuelle,
   onFermer,
+  onDelegue,
 }: {
   alerte: AlerteOperationnelle;
   employes: EmployeDelegable[];
   delegationActuelle?: DelegationAlerte;
   onFermer: () => void;
+  onDelegue: () => void;
 }) {
   const [employeId, setEmployeId] = useState(delegationActuelle?.employeId ?? "");
   const [commentaire, setCommentaire] = useState("");
@@ -301,6 +382,7 @@ function ModalDelegation({
         setErreur(resultat.error);
         return;
       }
+      onDelegue();
       onFermer();
     });
   }

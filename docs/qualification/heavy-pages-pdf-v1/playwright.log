@@ -1,0 +1,11 @@
+
+Running 6 tests using 1 worker
+
+  ✓  1 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:31:5 › dashboard : résumé exact, première page, « Afficher plus », ignorer puis rétablir (5.0s)
+  ✓  2 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:66:5 › dashboard : poids borné (≤ 30 alertes rendues côté serveur) (2.0s)
+  ✓  3 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:72:5 › planning : création groupée, formulaire « Modifier » à la demande, lot, enregistrement, suppression (10.1s)
+  ✓  4 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:115:5 › planning : vue mobile rendue depuis les mêmes données @responsive (2.6s)
+  ✓  5 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:124:5 › pointage/gestion : action unique de validation, anciennes saisies paginées (10.0s)
+  ✓  6 [desktop-chromium] › tests/e2e/gp-heavy-pages-capacity.spec.ts:146:5 › PDF : document produit, rafale bornée (200 ou 503 + Retry-After), aucun Chromium restant (6.3s)
+
+  6 passed (37.0s)

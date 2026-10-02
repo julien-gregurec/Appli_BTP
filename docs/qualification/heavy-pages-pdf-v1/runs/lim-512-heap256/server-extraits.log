@@ -1,0 +1,2 @@
+{"event":"memory_config","heapLimitMo":259,"limiteConteneurMo":512,"pdfConcurrence":2,"ok":true,"message":"plafond de heap V8 compatible avec la limite du conteneur"}
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
