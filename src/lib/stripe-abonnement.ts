@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { piedDeFactureAbonnement } from "@/lib/commercialisation-abonnements";
 import { offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
 import { calculerEssaiCheckout, essaiReabonnement, parametresEssaiCheckout, suffixeIdempotenceEssai, type EssaiCheckout } from "@/lib/stripe-essai-checkout";
 import { parcoursDepuisSubscription, subscriptionBloqueCheckout, type ParcoursAbonnement } from "@/lib/stripe-reabonnement";
@@ -370,6 +371,9 @@ export async function creerOuRecupererClientStripe(params: {
     name: entreprise.raison_sociale || entreprise.nom,
     email: params.email,
     "metadata[entreprise_id]": entreprise.id,
+    // P2 (train V9) : pied des factures d'abonnement = identité vendeur PROUVÉE
+    // (source unique IDENTITE_VENDEUR) ; mention « sans valeur » en Stripe Test.
+    "invoice_settings[footer]": piedDeFactureAbonnement(),
   });
   if (entreprise.adresse) corps.set("address[line1]", entreprise.adresse);
   if (entreprise.code_postal) corps.set("address[postal_code]", entreprise.code_postal);
@@ -387,6 +391,18 @@ export async function creerOuRecupererClientStripe(params: {
     .is("stripe_customer_id", null);
   if (miseAJourErreur) throw new Error(miseAJourErreur.message);
   return client.id;
+}
+
+/**
+ * P2 (train V9) — filet de sécurité Live : une facture brouillon créée alors que
+ * les prérequis légaux ne sont pas confirmés n'est jamais finalisée ni envoyée
+ * automatiquement par Stripe (`auto_advance=false`). Idempotent.
+ */
+export async function suspendreFinalisationFacture(invoiceId: string) {
+  return requeteStripe<{ id: string; auto_advance?: boolean }>(`invoices/${encodeURIComponent(invoiceId)}`, {
+    corps: new URLSearchParams({ auto_advance: "false" }),
+    idempotence: `abonnement-facture-suspendue-${invoiceId}`,
+  });
 }
 
 /**

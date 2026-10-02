@@ -182,8 +182,8 @@ select lives_ok($$select public.journaliser_evenement_stripe_ordre_service('abon
 select is((select decision || '|' || motif from public.stripe_evenements_ordre where stripe_event_id = 'evt_twe'), 'sans_effet|essai_fin_annoncee', 'trial_will_end : sans effet');
 select is(pg_temp.fin('f0000000-0000-0000-0000-000000000013'), date '2026-10-31', 'trial_will_end : essai inchangé');
 select is(public.appliquer_evenement_facture_abonnement_service('f0000000-0000-0000-0000-000000000013', 'evt_inv_paid', 'invoice.paid', pg_temp.t(60),
-  'in_tri_13a', 'paid', pg_temp.t(59), 'F-13', pg_temp.t(0), pg_temp.t(0) + interval '30 days', 0, 0, 0, 'eur', null, null)->>'decision', 'applique',
-  'invoice.paid (facture 0 € d''essai) : appliqué');
+  'in_tri_13a', 'paid', pg_temp.t(59), 'F-13', pg_temp.t(0), pg_temp.t(0) + interval '30 days', 0, 0, 0, 'eur', null, null)->>'decision', 'sans_effet',
+  'invoice.paid (facture 0 € d''essai) : trace de facture, sans effet sur l''accès (train V9, P7, migration 20261002001003 ; V8 : appliqué)');
 select is(pg_temp.fin('f0000000-0000-0000-0000-000000000013'), date '2026-10-31', 'invoice.paid : essai inchangé');
 select is(public.appliquer_evenement_facture_abonnement_service('f0000000-0000-0000-0000-000000000013', 'evt_inv_failed', 'invoice.payment_failed', pg_temp.t(70),
   'in_tri_13b', 'open', pg_temp.t(69), 'F-13b', pg_temp.t(0), pg_temp.t(0) + interval '30 days', 249, 49.8, 298.8, 'eur', null, null)->>'decision', 'applique',

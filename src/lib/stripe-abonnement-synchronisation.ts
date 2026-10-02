@@ -32,6 +32,23 @@ export function instantDepuisUnix(valeur?: number | null) {
   return valeur ? new Date(valeur * 1000).toISOString() : null;
 }
 
+/**
+ * P4 (train V9) — période de facturation courante. Depuis l'API Stripe
+ * 2025-03-31 (basil), `current_period_start` / `current_period_end` ne sont plus
+ * portés par la subscription mais par chaque ligne `items.data[]`. On lit le
+ * niveau subscription (API antérieures), puis la première ligne qui porte une
+ * période — même stratégie que `stripe-capacite-reconcile.ts` et
+ * `tools-monetization.ts`. Sans ce repli, l'échéance, la fin de période et la
+ * date d'annulation programmée étaient perdues (null) en basil.
+ */
+export function periodeFacturationSubscription(abonnement: Pick<StripeSubscription, "current_period_start" | "current_period_end" | "items">) {
+  const ligne = (abonnement.items?.data ?? []).find((i) => i.current_period_end != null || i.current_period_start != null);
+  return {
+    debut: abonnement.current_period_start ?? ligne?.current_period_start ?? null,
+    fin: abonnement.current_period_end ?? ligne?.current_period_end ?? null,
+  };
+}
+
 // B1 — un verrou remise occupé est un état transitoire (un autre évènement de la
 // MÊME subscription est en cours de traitement), pas une panne. On tente une
 // courte reprise en place ; si le verrou reste occupé, l'appelant renvoie un
@@ -142,6 +159,8 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
   const offre = facturee.offre;
   const periodicite = facturee.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);
+  // P4 (train V9) : période lue sur les lignes en API basil.
+  const periode = periodeFacturationSubscription(abonnement);
   // ACL canonique (migration 255) : `service_role` n'a plus d'écriture directe sur
   // `entreprises` (hors colonnes abonnement/stripe), `plans_abonnement`,
   // `abonnements_entreprises`. La synchronisation passe par une RPC SECURITY
@@ -158,11 +177,11 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
     p_statut: statut,
     p_offre: ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"].includes(offre || "") ? offre : null,
     p_periodicite: ["mensuel", "annuel"].includes(periodicite || "") ? periodicite : null,
-    p_echeance: dateDepuisUnix(abonnement.current_period_end),
+    p_echeance: dateDepuisUnix(periode.fin),
     p_essai_fin: dateDepuisUnix(abonnement.trial_end),
-    p_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
-    p_debut_periode: instantDepuisUnix(abonnement.current_period_start),
-    p_fin_periode: instantDepuisUnix(abonnement.current_period_end),
+    p_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || periode.fin) : null,
+    p_debut_periode: instantDepuisUnix(periode.debut),
+    p_fin_periode: instantDepuisUnix(periode.fin),
     p_stripe_event_id: evenement.id,
     p_stripe_event_type: evenement.type,
     p_stripe_event_created: instantDepuisUnix(evenement.created),
@@ -210,6 +229,35 @@ export async function synchroniserAbonnementCoordonne(
     );
     if (expiration) abonnementActuel = await recupererAbonnementStripe(subscriptionId);
     return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel, evenement);
+  } finally {
+    await libererVerrouRemise(admin, subscriptionId, verrou);
+  }
+}
+
+/**
+ * P5 (train V9, Stripe readiness) — relecture de RAPPROCHEMENT d'une subscription
+ * sans webhook reçu. Même chemin que `synchroniserAbonnementCoordonne` (verrou de
+ * la subscription, rattachement, RPC ordonnée avec filigrane), mais STRICTEMENT en
+ * lecture côté Stripe : la chaîne remise (réconciliation d'opération, expiration),
+ * qui peut écrire chez Stripe, n'est pas exécutée ; elle reste au webhook.
+ * Aucun Checkout, aucune ligne de facture, aucune écriture Stripe.
+ */
+export async function rapprocherAbonnementLectureSeule(
+  admin: SupabaseAdmin,
+  entrepriseId: string,
+  subscriptionId: string,
+  evenement: EvenementOrdonne,
+): Promise<string | null> {
+  const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `rapprochement:${empreinteEvenementStripe(evenement.id)}`);
+  try {
+    const abonnement = await recupererAbonnementStripe(subscriptionId);
+    const issue = await rattacherSubscription(admin, entrepriseId, abonnement);
+    if (issue === "remplacee" || issue === "terminale_ignoree") {
+      await journaliserSubscriptionIgnoree(admin, entrepriseId, evenement,
+        issue === "remplacee" ? "subscription_remplacee" : "subscription_terminale_non_rattachee");
+      return null;
+    }
+    return await synchroniserAbonnement(admin, entrepriseId, abonnement, evenement);
   } finally {
     await libererVerrouRemise(admin, subscriptionId, verrou);
   }

@@ -4,6 +4,7 @@ import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement,
 import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
 import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
 import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
+import { rapprocherAbonnementsStripe } from "@/lib/stripe-abonnement-rapprochement";
 import { creerPortPurgeSupabase, lireConfigPlanificateurPurge, planifierPurgesRgpd } from "@/lib/rgpd-purge-planificateur";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
@@ -99,6 +100,15 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
       resultats.push({ entrepriseId: entreprise.id, synchronise: false, raison: erreur instanceof Error ? erreur.message : "Erreur" });
     }
   }
+  // P5 (train V9) : rapprochement quotidien des abonnements sans webhook reçu —
+  // relecture Stripe en lecture seule, appliquée par la RPC ordonnée (filigrane,
+  // jamais de réactivation d'un abonnement terminal).
+  let rapprochement: Awaited<ReturnType<typeof rapprocherAbonnementsStripe>>;
+  try {
+    rapprochement = await rapprocherAbonnementsStripe(admin);
+  } catch (erreur) {
+    rapprochement = { erreur: erreur instanceof Error ? erreur.message : "Rapprochement impossible" };
+  }
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
@@ -124,7 +134,7 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   // (choix conservateur, double verrou). Activation soumise à décision propriétaire :
   // voir docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md.
   const purgeRgpd = await planifierPurgesRgpd(creerPortPurgeSupabase(admin), lireConfigPlanificateurPurge(process.env), new Date());
-  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes, purgeRgpd };
+  return { traitees: resultats.length, resultats, rapprochement, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes, purgeRgpd };
 }
 
 export async function GET(request: Request) {

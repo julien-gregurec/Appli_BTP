@@ -10,6 +10,7 @@ const deps = vi.hoisted(() => ({
   ajouterDepassementAppareilsFacture: vi.fn(),
   ajouterDepassementStockageFacture: vi.fn(),
   calculerDepassementAppareils: vi.fn(),
+  suspendreFinalisationFacture: vi.fn(async () => ({ id: "in_live", auto_advance: false })),
   acquerirVerrouRemise: vi.fn(async () => "verrou-test"),
   libererVerrouRemise: vi.fn(),
   lireOperationActiveRemiseServeur: vi.fn(async () => null),
@@ -36,6 +37,7 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   ajouterDepassementAppareilsFacture: deps.ajouterDepassementAppareilsFacture,
   ajouterDepassementStockageFacture: deps.ajouterDepassementStockageFacture,
   calculerDepassementAppareils: deps.calculerDepassementAppareils,
+  suspendreFinalisationFacture: deps.suspendreFinalisationFacture,
   appliquerCouponAbonnement: vi.fn(), couponActifDepuisAbonnement: vi.fn(), creerCouponRemise: vi.fn(), retirerCouponAbonnement: vi.fn(),
   observerRemiseDepuisAbonnement: deps.observerRemiseDepuisAbonnement,
 }));
@@ -565,5 +567,47 @@ describe("surface d'export de la route et module métier", () => {
     expect(source).not.toMatch(/whsec_/);
     expect(source).not.toMatch(/\bprice_[A-Za-z0-9]/);
     expect(source).not.toMatch(/unit_amount|montant_ht|montant_ttc/);
+  });
+});
+
+// Stripe readiness P2 (train canonique V9) : aucune facture finale Live sans
+// prérequis légaux confirmés (ouverture Live, identité vendeur, régime de TVA).
+describe("P2 — garde Live sur invoice.created", () => {
+  function factureCreee(livemode: boolean, status = "draft") {
+    return {
+      id: "evt_facture_creee", type: "invoice.created", livemode, created: 1_757_060_000,
+      data: { object: { id: "in_live", object: "invoice", status, billing_reason: "subscription_cycle", customer: "cus_test", subscription: "sub_test", metadata: { entreprise_id: ENTREPRISE } } },
+    };
+  }
+
+  it("Live, brouillon, prérequis non confirmés : auto_advance=false avant tout traitement", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "live");
+    const avertissement = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const response = await POST(request(factureCreee(true)));
+    expect(response.status).toBe(200);
+    expect(deps.suspendreFinalisationFacture).toHaveBeenCalledWith("in_live");
+    expect(avertissement).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ categorie: "facture_live_suspendue_prerequis_legaux" }));
+  });
+
+  it("Stripe Test : aucune suspension (qualification possible sans ouvrir le Live)", async () => {
+    const response = await POST(request(factureCreee(false)));
+    expect(response.status).toBe(200);
+    expect(deps.suspendreFinalisationFacture).not.toHaveBeenCalled();
+  });
+
+  it("Live, facture déjà finalisée : rien à suspendre", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "live");
+    await POST(request(factureCreee(true, "open")));
+    expect(deps.suspendreFinalisationFacture).not.toHaveBeenCalled();
+  });
+
+  it("échec de la suspension : réservation annulée, Stripe re-livrera", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "live");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    deps.suspendreFinalisationFacture.mockRejectedValueOnce(new Error("Stripe indisponible"));
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(factureCreee(true)));
+    expect(response.status).toBe(500);
+    expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
   });
 });

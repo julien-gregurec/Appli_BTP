@@ -11,6 +11,8 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   reconcilierAbonnementStripe,
 }));
 vi.mock("@/lib/relances-cron", () => ({ traiterRelancesAutomatiques }));
+const rapprocherAbonnementsStripe = vi.fn(async () => ({ traitees: 0, corrigees: 0, resultats: [] }));
+vi.mock("@/lib/stripe-abonnement-rapprochement", () => ({ rapprocherAbonnementsStripe }));
 
 const { GET } = await import("./route");
 
@@ -88,6 +90,7 @@ describe("cron abonnements — découplage des deux portes (RELANCES-AUTO-PROD-A
     const reponse = await GET(requeteAvecSecret());
     expect(reponse.status).toBe(200);
     expect(reconcilierAbonnementStripe).not.toHaveBeenCalled();
+    expect(rapprocherAbonnementsStripe).not.toHaveBeenCalled();
     expect(selectEntreprisesAppele).toBe(false);
     expect(rpcPaiePointageAppele).toBe(false);
     const corps = await reponse.json();
@@ -122,6 +125,9 @@ describe("cron abonnements — découplage des deux portes (RELANCES-AUTO-PROD-A
     expect(reponse.status).toBe(200);
     expect(selectEntreprisesAppele).toBe(true);
     expect(traiterRelancesAutomatiques).toHaveBeenCalledTimes(1);
+    // P5 (train V9) : le rapprochement quotidien fait partie des jobs historiques.
+    expect(rapprocherAbonnementsStripe).toHaveBeenCalledTimes(1);
+    expect((await reponse.json()).jobsHistoriques.rapprochement).toEqual({ traitees: 0, corrigees: 0, resultats: [] });
   });
 
   it("une erreur dans les jobs historiques (500) n'empêche pas les relances de s'être déjà exécutées", async () => {

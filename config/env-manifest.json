@@ -3728,6 +3728,82 @@
       }
     },
     {
+      "name": "ABONNEMENTS_LIVE_OUVERTURE_CONFIRMEE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Stripe Live uniquement (train V9, P3) : confirmation explicite de l'ouverture commerciale Live, en plus de ABONNEMENTS_PUBLICS_OUVERTS. FAIL-CLOSED : absent = Live fermé. Sans effet en Stripe Test.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Commerce",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      }
+    },
+    {
+      "name": "LEGAL_TVA_REGIME_CONFIRME",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Stripe Live uniquement (train V9, P2/P3) : confirmation explicite du régime de TVA par l'exploitant (et son comptable), distincte du texte affiché (NEXT_PUBLIC_LEGAL_TVA) et de STRIPE_AUTOMATIC_TAX_ENABLED. FAIL-CLOSED : absent = aucune facture finale Live, souscription Live fermée.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Juridique",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      }
+    },
+    {
       "name": "ELSATIA_ASSISTANCE_STRICTE",
       "applications": [
         "gestion_pro"

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, suspendreFinalisationFacture } from "@/lib/stripe-abonnement";
+import { prerequisLiveManquants } from "@/lib/commercialisation-abonnements";
 import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
@@ -305,6 +306,17 @@ export async function POST(request: Request) {
 
   let statutResultant: string | null = null;
   try {
+    // P2 (train V9) : en Live, aucune facture finale tant que les prérequis légaux
+    // (ouverture Live, identité vendeur, régime de TVA) ne sont pas confirmés. Une
+    // erreur ici annule la réservation : Stripe re-livre, la facture n'avance pas.
+    if (evenement.type === "invoice.created" && evenement.livemode && objet.status === "draft"
+      && prerequisLiveManquants().length > 0) {
+      await suspendreFinalisationFacture(objet.id);
+      console.warn("Facture Live suspendue : prérequis légaux non confirmés", {
+        categorie: "facture_live_suspendue_prerequis_legaux",
+        empreinte_evenement: empreinteEvenementStripe(evenement.id),
+      });
+    }
     if (evenement.type === "checkout.session.completed" && objet.mode === "subscription") {
       if (!entrepriseId) throw new Error("Entreprise absente de la session Stripe");
       const subscriptionId = identifiant(objet.subscription);
