@@ -25,6 +25,11 @@ select ent, 'Soak T' || k || ' (N=' || n || ')', 'SOAK T' || k || ' SAS', lpad((
   '1 rue du Soak', '67000', 'Strasbourg', '#0d1b2a', 'classique', 'DEC-SOAK', 'RCP-SOAK', 1.5, 'actif',
   now() - interval '5 years', 100000
 from sg.p;
+-- Commit immédiat : la création d'entreprise prend le compteur GLOBAL
+-- next_reference(null,'entreprise') ; le garder pendant toute la génération
+-- bloquerait toute autre création d'entreprise (constat SOAK V1, § E/P2).
+commit;
+begin;
 
 -- Utilisateurs : 1 admin (fixe) + 4 autres.
 create table sg.users as

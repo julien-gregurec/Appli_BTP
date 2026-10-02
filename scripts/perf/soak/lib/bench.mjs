@@ -9,7 +9,8 @@ const b64 = (o) => Buffer.from(typeof o === "string" ? o : JSON.stringify(o)).to
 export function jwt(sub, role = "authenticated", ttl = 3600) {
   const now = Math.floor(Date.now() / 1000);
   const head = b64({ alg: "HS256", typ: "JWT" });
-  const body = b64({ sub, role, aud: "authenticated", iat: now, exp: now + ttl, email: `${sub}@soak.invalid` });
+  // Clé service_role réelle de Supabase : AUCUN `sub` (auth.uid() doit rester nul).
+  const body = b64(sub ? { sub, role, aud: "authenticated", iat: now, exp: now + ttl, email: `${sub}@soak.invalid` } : { role, iat: now, exp: now + ttl });
   const sig = createHmac("sha256", SECRET).update(`${head}.${body}`).digest("base64url");
   return `${head}.${body}.${sig}`;
 }

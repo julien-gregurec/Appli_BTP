@@ -8,7 +8,7 @@ import { jwt, call, rpc, load, stats } from "./lib/bench.mjs";
 
 const CONC = Number(process.argv[2] ?? 32);
 const ENT = "e0000000-0000-4000-e000-000000000011", USER = "facc0000-0000-4000-e000-000000000011";
-const tok = jwt(USER), svc = jwt("00000000-0000-0000-0000-000000000000", "service_role");
+const tok = jwt(USER), svc = jwt(null, "service_role");
 const sql = (q) => execFileSync("su", ["postgres", "-c", `psql -X -At -d soak -c "${q.replace(/"/g, '\\"')}"`]).toString().trim();
 const deadlocks = () => Number(sql("select deadlocks from pg_stat_database where datname='soak'"));
 const codes = (rs) => rs.reduce((m, r) => { let c = String(r.status); try { const j = JSON.parse(r.text); if (r.status >= 400) c += ":" + (j.code ?? "") + ":" + String(j.message ?? "").slice(0, 60); } catch {} m[c] = (m[c] ?? 0) + 1; return m; }, {});
