@@ -182,11 +182,15 @@ def main():
         from pg_proc p join pg_namespace n on n.oid=p.pronamespace
        where n.nspname in ('public','platform') order by 1;""")
 
-    utilisateurs = lignes(db, """
+    # Train V9 : UPGRADE_SNAPSHOT_SANS_SONDE=1 (passe volumétrique de upgrade-v8-v9.sh) désactive la
+    # sonde : sous `authenticated`, les policies sont évaluées ligne à ligne sur des tables de 20 000+
+    # lignes (plusieurs minutes par cellule). La sonde complète est faite par la passe historique.
+    utilisateurs = [] if os.environ.get("UPGRADE_SNAPSHOT_SANS_SONDE") == "1" else lignes(db, """
       select ue.utilisateur_id||'|'||ue.entreprise_id from public.utilisateurs_entreprises ue
        order by ue.entreprise_id, ue.utilisateur_id;""")
     probe = {}
-    for u in utilisateurs:
+
+    def sonder(u):
         uid, ent = u.split("|")
         sql = ["begin;", "set local role authenticated;",
                f"""select set_config('request.jwt.claims', '{{"sub":"{uid}","role":"authenticated"}}', true);""",
@@ -200,7 +204,15 @@ def main():
             if "|" in l:
                 t, n = l.split("|")
                 res[t] = int(n)
-        probe[uid] = res
+        return uid, res
+
+    # Sondes indépendantes (transactions annulées, lecture seule) : exécutées en parallèle
+    # (UPGRADE_SNAPSHOT_JOBS ; défaut 4 sous UPGRADE_SNAPSHOT_V9=1, sinon 1 = comportement historique) ; résultat identique.
+    from concurrent.futures import ThreadPoolExecutor
+    jobs = os.environ.get("UPGRADE_SNAPSHOT_JOBS") or ("4" if os.environ.get("UPGRADE_SNAPSHOT_V9") == "1" else "1")
+    with ThreadPoolExecutor(max_workers=int(jobs)) as pool:
+        for uid, res in pool.map(sonder, utilisateurs):
+            probe[uid] = res
 
     json.dump({"base": db, "row_counts": counts, "colonnes": colonnes, "checksums": checksums,
                "rls_tables": rls_tables, "policies": policies, "rls_probe": probe,

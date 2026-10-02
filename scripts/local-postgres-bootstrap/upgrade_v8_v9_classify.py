@@ -12,9 +12,10 @@ tout écart est une PERTE ou un CHANGEMENT DE DROIT SILENCIEUX (code de sortie 1
                        attester) et journal_cles_chiffrement_bancaire, RLS active, aucun droit d'API ;
   R-V9-B4              modifier_facture_brouillon : EXECUTE réaffirmé authenticated seul (anon, public,
                        service_role retirés explicitement par …0930000102) ;
-  R-V9-RPC             fonction NOUVELLE : définie par une migration V9, SECURITY DEFINER ou fonction de
-                       service, search_path figé, jamais exécutable par anon ; classée authenticated
-                       (RPC applicative, parité RLS prouvée par pgTAP) ou service_role seul.
+  R-V9-RPC             fonction NOUVELLE : définie par une migration V9, search_path figé, jamais exécutable
+                       par anon ; classée authenticated (RPC applicative : SECURITY DEFINER à parité RLS
+                       prouvée par pgTAP, ou SECURITY INVOKER — la RLS de l'appelant s'applique telle
+                       quelle), service_role seul, ou interne (aucun rôle d'API).
 Rapport : docs/qualification/ELSATIA_CANONICAL_TRAIN_V9_CONVERGENCE_V1.md §6.
 """
 import glob
@@ -113,7 +114,7 @@ for l in psql("""select p.proname||'('||pg_get_function_identity_arguments(p.oid
                    coalesce(array_to_string(p.proconfig, ','), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                  where n.nspname = 'public';"""):
     k, secdef, conf = l.split("|")
-    attributs["public." + k] = (secdef == "t", "search_path" in conf)
+    attributs["public." + k] = (secdef in ("t", "true"), "search_path" in conf)
 classes = {"authenticated": [], "service_role": [], "interne": []}
 for k, l in sorted(fp.items()):
     if k in fa:
@@ -127,9 +128,9 @@ for k, l in sorted(fp.items()):
     if anon == "true":
         silencieux.append(f"fonction nouvelle exécutable par anon {k}")
     elif auth == "true":
-        if not (secdef and chemin) and nom != "modifier_facture_brouillon":
-            silencieux.append(f"RPC authenticated sans SECURITY DEFINER + search_path figé {k}")
-        classes["authenticated"].append(f"{nom} ({origine[nom]})")
+        if not chemin:
+            silencieux.append(f"RPC authenticated sans search_path figé {k}")
+        classes["authenticated"].append(f"{nom} ({origine[nom]}{'' if secdef else ', INVOKER'})")
     elif srv == "true":
         classes["service_role"].append(f"{nom} ({origine[nom]})")
     else:

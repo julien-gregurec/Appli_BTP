@@ -5,15 +5,23 @@
 #
 #   1. base V7 AVEC HISTORIQUE (V3 → V7, données de chaque ère) : upgrade-v7-v8.sh, arrêt après V7 ;
 #   2. données de l'ère V7 (upgrade_v7_v8_seed_complement.sql) → migrations V8 (12, total 371) ;
-#   3. données de l'ère V8 : jeux volumétriques des lots (finance-aggregates/seed.sql, gp-residual/seed.sql :
-#      500 → 20 000 lignes par chemin) + upgrade_v8_v9_seed_complement.sql (factures brouillon, IBAN v1,
-#      compteurs de l'ancienne politique de connexion) ;
+#   3. passe « volumetrique » seulement — données de l'ère V8 : jeux volumétriques des lots
+#      (finance-aggregates/seed.sql, gp-residual/seed.sql : 500 → 20 000 lignes par chemin) +
+#      upgrade_v8_v9_seed_complement.sql (factures brouillon, IBAN v1, compteurs de connexion historiques) ;
 #   4. instantané (UPGRADE_SNAPSHOT_V8=1 UPGRADE_SNAPSHOT_V9=1) → migrations V9 (> 20260928000812) → instantané ;
 #   5. comparaison (upgrade_compare.py) + classement de chaque écart par règle V9
 #      (upgrade_v8_v9_classify.py) ; schéma upgradé vs fresh V9 (pg_dump -s, ACL comprises) ;
-#   6. contrôles métier après upgrade (upgrade_v8_v9_business_checks.sql, pgTAP, annulé).
+#   6. contrôles métier après upgrade : passe « historique » = les 47 contrôles V8
+#      (upgrade_v7_v8_business_checks.sql) REJOUÉS sur la base V9 (garanties V8 conservées) ;
+#      passe « volumetrique » = upgrade_v8_v9_business_checks.sql (30 contrôles V9).
 #
-# Usage : scripts/qualification/upgrade-v8-v9.sh [base-upgrade] [base-fresh-v9]
+# Deux passes (UPG_PASSE) :
+#   historique   (défaut) jeu V3 → V8 (52 utilisateurs) : sonde RLS réelle complète (utilisateur × table) ;
+#   volumetrique  + jeux > 1 000 lignes : sans sonde (sous `authenticated` les policies sont évaluées ligne
+#                 à ligne sur 20 000+ lignes, plusieurs minutes par cellule) ; comptages, empreintes,
+#                 policies, droits, EXECUTE et contrôles métier V9.
+#
+# Usage : UPG_PASSE=historique|volumetrique scripts/qualification/upgrade-v8-v9.sh [base-upgrade] [base-fresh-v9]
 # Prérequis : PostgreSQL 16 local (peer auth `postgres`), python3, git, refs origin/integration/elsatia-canonical-train-v3…v7.
 set -uo pipefail
 
@@ -52,11 +60,17 @@ total=$(su postgres -c "psql -X -At -d $DB -c 'select 1'" >/dev/null; ls "$REPO"
 echo "  $m8 migrations V8 appliquées (train V8 : $total)"
 [ "$m8" = 12 ] && [ "$total" = 371 ] || { echo "attendu 12 migrations V8, 371 au total"; exit 1; }
 
-echo "== 3. Données de l'ère V8 =="
+PASSE="${UPG_PASSE:-historique}"
+case "$PASSE" in historique|volumetrique) ;; *) echo "UPG_PASSE inconnue : $PASSE"; exit 1 ;; esac
+echo "== 3. Données de l'ère V8 (passe $PASSE) =="
+if [ "$PASSE" = volumetrique ]; then
+export UPGRADE_SNAPSHOT_SANS_SONDE=1
 charger "jeu volumétrique Finance (F500 → F20000 + témoin)" < "$REPO/scripts/qualification/finance-aggregates/seed.sql"
 charger "jeu volumétrique GP résiduel (R500 → R20000 + témoin)" < "$REPO/scripts/qualification/gp-residual/seed.sql"
 charger "complément V8→V9 (factures brouillon, IBAN v1, rate limit historique)" < "$BOOT/upgrade_v8_v9_seed_complement.sql"
+fi
 su postgres -c "psql -X -q -d $DB -c 'analyze'" >/dev/null
+export UPGRADE_SNAPSHOT_JOBS="${UPGRADE_SNAPSHOT_JOBS:-4}"
 
 echo "== 4. Instantané avant =="
 UPGRADE_SNAPSHOT_V8=1 UPGRADE_SNAPSHOT_V9=1 python3 "$BOOT/upgrade_snapshot.py" "$DB" "$OUT/avant.json"
@@ -100,7 +114,10 @@ echo "== 8. Ledger =="
 su postgres -c "psql -X -q -At -d $DB -c \"select count(*) from information_schema.tables where table_schema='supabase_migrations'\"" | sed 's/^/  tables de ledger Supabase dans la base locale : /'
 
 echo "== 9. Contrôles métier après upgrade (pgTAP, transaction annulée) =="
-su postgres -c "psql -X -q -At -d $DB -f $BOOT/upgrade_v8_v9_business_checks.sql" > "$OUT/metier.tap" 2>&1
+CONTROLES="$BOOT/upgrade_v8_v9_business_checks.sql"
+[ "$PASSE" = historique ] && CONTROLES="$BOOT/upgrade_v7_v8_business_checks.sql"
+echo "  $(basename "$CONTROLES")"
+su postgres -c "psql -X -q -At -d $DB -f $CONTROLES" > "$OUT/metier.tap" 2>&1
 ok=$(grep -cE '^ok ' "$OUT/metier.tap"); ko=$(grep -cE '^not ok ' "$OUT/metier.tap"); err=$(grep -cE 'ERROR:' "$OUT/metier.tap")
 plan=$(grep -oE '^1\.\.[0-9]+' "$OUT/metier.tap" | cut -c4-)
 grep -E '^(not ok|ok)' "$OUT/metier.tap" | sed 's/^/  /'

@@ -178,7 +178,10 @@ test("aucun script SQL actif n'insère un document déjà engagé avant ses lign
     commandes_fournisseurs: /'(envoyee|confirmee|recue|recue_partiel)'/,
   };
   // Squelettes pgTAP d'isolation : documents engagés sans aucune ligne, jamais complétés ensuite.
-  const exempt = new Set(["pgtap-isolation"]);
+  // Train V9 : même cas pour le jeu de charge rentabilité (montants posés sur l'en-tête, aucune
+  // ligne de devis ni de facture insérée, ni avant ni après — vérifié ci-dessous).
+  const exempt = new Set(["pgtap-isolation", "perf-rentabilite"]);
+  assert.doesNotMatch(read(seedById("perf-rentabilite").path), /insert\s+into\s+public\.lignes_(devis|factures)\b/i);
   const offenders = [];
   for (const seed of SEEDS.filter((item) => ACTIVE_CLASSES.has(item.classification) && !exempt.has(item.id))) {
     if (!/\.(sql|inc)$/.test(seed.path)) continue;
