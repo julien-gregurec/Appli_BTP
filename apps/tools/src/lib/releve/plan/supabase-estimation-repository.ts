@@ -3,12 +3,14 @@
  *
  * Lecture : RPC `tools_releve_estimation_synthese` / `tools_releve_plan_estimation` (quantités du Lot 9 ET montants
  * calculés par le SERVEUR, ou figés avec le plan), `tools_releve_estimation_plans`, `tools_releve_estimation_corrections`,
- * `tools_releve_bibliotheque_prix`. Écriture : UNIQUEMENT les RPC de la migration 1401 (prix, import, bibliothèque,
- * corrections auditées) — aucun montant calculé envoyé par le client, aucune écriture directe.
+ * `tools_releve_bibliotheque_prix`, `tools_releve_estimation_parametres`. Écriture : UNIQUEMENT les RPC des migrations 1401
+ * (prix, import, bibliothèque, corrections auditées) et 1402 (coefficients et hypothèses du relevé) — aucun montant
+ * calculé envoyé par le client, aucune écriture directe.
  */
 import {
-  estimationSourceFromJson, planEstimationFromJson, planQuantitatifFromJson,
-  type BibliothequePrix, type EstimationCible, type EstimationCorrection, type EstimationSource, type MetreSyntheseEtat, type PlanEstimation, type PlanEtat,
+  estimationParametresFromJson, estimationSourceFromJson, planEstimationFromJson, planQuantitatifFromJson,
+  type BibliothequePrix, type EstimationCible, type EstimationCorrection, type EstimationParametres, type EstimationParametresDonnees, type EstimationSource,
+  type MetreSyntheseEtat, type PlanEstimation, type PlanEtat,
   type PlanQuantitatif, type PrixDonnees, type ReleveEstimationRepository,
 } from "@elsatia/releve-domain";
 import { ReleveRemoteError, type ReleveSupabaseClient } from "../supabase-repository";
@@ -16,7 +18,7 @@ import { ReleveRemoteError, type ReleveSupabaseClient } from "../supabase-reposi
 type RemoteError = { code?: string; message?: string; details?: string | null };
 
 function fail(action: string, error: RemoteError): never {
-  if (error.code === "42501" || error.code === "22023" || error.code === "23505" || error.code === "23514") {
+  if (error.code === "42501" || error.code === "22023" || error.code === "23505" || error.code === "23514" || error.code === "PT409" || error.code === "PT503") {
     throw new ReleveRemoteError(`${action} : ${error.message ?? "action refusée par le serveur."}`, error.code);
   }
   throw new ReleveRemoteError(`${action} impossible. Vérifiez votre connexion.`, error.code);
@@ -85,7 +87,12 @@ export class SupabaseEstimationRepository implements ReleveEstimationRepository 
   async corrections(planId: string): Promise<EstimationCorrection[]> {
     const { data, error } = await this.client.rpc("tools_releve_estimation_corrections", { p_plan_id: planId });
     if (error) fail("Chargement des corrections", error);
-    return ((data ?? []) as EstimationCorrection[]).map((c) => ({ ...c, valeurRetenue: Number(c.valeurRetenue), valeurCalculee: c.valeurCalculee === null ? null : Number(c.valeurCalculee) }));
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+    return ((data ?? []) as EstimationCorrection[]).map((c) => ({
+      ...c, valeurRetenue: Number(c.valeurRetenue), valeurCalculee: n(c.valeurCalculee),
+      valeurSource: c.valeurSource ? { ...c.valeurSource, quantite: n(c.valeurSource.quantite), prixUnitaire: n(c.valeurSource.prixUnitaire),
+        montantCalcule: n(c.valeurSource.montantCalcule), coefficient: n(c.valeurSource.coefficient) } : null,
+    }));
   }
 
   async bibliothequePrix(releveId: string): Promise<BibliothequePrix[]> {
@@ -103,5 +110,17 @@ export class SupabaseEstimationRepository implements ReleveEstimationRepository 
   async deleteBibliothequePrix(releveId: string, bibliothequeId: string): Promise<void> {
     const { error } = await this.client.rpc("tools_releve_bibliotheque_prix_supprimer", { p_releve_id: releveId, p_bibliotheque_id: bibliothequeId });
     if (error) fail("Retrait du prix de bibliothèque", error);
+  }
+
+  async parametres(releveId: string): Promise<EstimationParametres> {
+    const { data, error } = await this.client.rpc("tools_releve_estimation_parametres", { p_releve_id: releveId });
+    if (error) fail("Chargement des coefficients", error);
+    return estimationParametresFromJson(data);
+  }
+
+  async saveParametres(releveId: string, donnees: EstimationParametresDonnees, revision: number): Promise<EstimationParametres> {
+    const { data, error } = await this.client.rpc("tools_releve_estimation_parametres_enregistrer", { p_releve_id: releveId, p_donnees: donnees, p_revision: revision });
+    if (error) fail("Enregistrement des coefficients", error);
+    return estimationParametresFromJson(data);
   }
 }

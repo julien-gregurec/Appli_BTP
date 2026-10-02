@@ -58,6 +58,28 @@ describe("SupabaseEstimationRepository : RPC seulement, aucun montant calculé e
   });
 });
 
+describe("SupabaseEstimationRepository : coefficients et hypothèses (1402)", () => {
+  it("lecture / écriture par RPC dédiées, révision transmise, aucun montant envoyé", async () => {
+    const calls: Call[] = [];
+    const par = { donnees: { coefficientGeneral: 1.05, coefficientsLots: { Peinture: 1.2 }, hypotheses: "Site occupé" }, revision: "2", updatedAt: "2026-10-02T08:00:00Z", updatedBy: "u", priorite: ["ouvrage", "lot", "general"] };
+    const repo = new SupabaseEstimationRepository(fakeClient({
+      tools_releve_estimation_parametres: { data: par, error: null }, tools_releve_estimation_parametres_enregistrer: { data: { ...par, revision: 3 }, error: null },
+      tools_releve_estimation_corrections: { data: [{ id: "a", ouvrageId: "o", pieceId: null, etatProjet: "nouveau", nature: "quantite", valeurCalculee: "114.94", valeurRetenue: "100.00",
+        raison: "R", auteurId: "u", date: "d", retireLe: null, retirePar: null, raisonRetrait: null,
+        valeurSource: { quantite: "12.915", unite: "ml", prixUnitaire: "8.9000", montantCalcule: "114.94", coefficient: 1.2, coefficientSource: "lot" } }], error: null },
+    }, calls));
+    expect(await repo.parametres(R)).toMatchObject({ revision: 2, donnees: { coefficientGeneral: 1.05 } });
+    expect((await repo.saveParametres(R, { coefficientGeneral: 1.1 }, 2)).revision).toBe(3);
+    expect(calls[1]).toEqual({ name: "tools_releve_estimation_parametres_enregistrer", args: { p_releve_id: R, p_donnees: { coefficientGeneral: 1.1 }, p_revision: 2 } });
+    const [c] = await repo.corrections(P);
+    expect(c.valeurSource).toEqual({ quantite: 12.915, unite: "ml", prixUnitaire: 8.9, montantCalcule: 114.94, coefficient: 1.2, coefficientSource: "lot" });
+  });
+  it("écriture concurrente (PT409) et mode sûr (PT503) : message métier, rien d'écrasé", async () => {
+    const repo = new SupabaseEstimationRepository(fakeClient({ tools_releve_estimation_parametres_enregistrer: { data: null, error: { code: "PT409", message: "Paramètres modifiés ailleurs entre-temps : rien n'a été enregistré" } } }, []));
+    await expect(repo.saveParametres(R, {}, 0)).rejects.toThrow("Enregistrement des coefficients : Paramètres modifiés ailleurs entre-temps : rien n'a été enregistré");
+  });
+});
+
 describe("pièces jointes du contrat d'estimation", () => {
   it("photos (chemin, légende, pièce) et annotations (texte, pièce, cible), sans octet", () => {
     const media = { id: "m1", storagePath: "t/r/photos/m1.jpg", mimeType: "image/jpeg", commentaire: "Commentaire", etatDocumente: "initial", metadata: { priseLe: "2026-09-30T08:00:00Z" }, deletedAt: null } as unknown as PhotoMedia;

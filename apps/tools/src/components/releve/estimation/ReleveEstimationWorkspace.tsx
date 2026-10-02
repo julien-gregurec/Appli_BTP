@@ -9,18 +9,24 @@
  * Les montants sont CALCULÉS PAR LE SERVEUR (moteur déterministe, miroir exact du domaine) : quantité RETENUE du
  * quantitatif (pertes et arrondis du Lot 9 compris, jamais réappliqués) × prix structuré (matériau, main d'œuvre,
  * forfait, autre, coefficient). Un ouvrage sans prix reste exploitable en quantitatif. Toute correction garde le
- * montant automatique, le montant retenu, la raison, l'auteur et la date.
+ * montant automatique, le montant retenu, la raison, l'auteur et la date, ainsi que la quantité source : la correction
+ * devient obsolète si la quantité change.
+ *
+ * Coefficients facultatifs (migration 1402) : coefficient de l'ouvrage > coefficient de son lot > coefficient général,
+ * jamais cumulés. Ce ne sont ni des marges ni des remises.
  *
  * Tablette d'abord : cartes repliables, aucune table à défilement horizontal, cibles ≥ 40 px.
  */
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  agregerEstimation, allowedActions, breadcrumbFor, buildEstimationGpPayload, centimesText, comparerEstimations, decimalString, ETAT_PROJET_LABELS, estimationDetails,
-  estimationToCsv, formatHeures, formatMontant, formatPrixUnitaire, formatQuantiteOuvrage, METRE_SYNTHESE_ETAT_LABELS, METRE_SYNTHESE_ETATS, OUVRAGE_UNITE_LABELS,
-  PLAN_ETAT_LABELS, PRIX_ISSUE_MESSAGES, PRIX_TYPE_LABELS, PRIX_TYPES, prixAnomalie, prixTexte, prixUnitaireComposite, QUANTITATIF_NIVEAU_LABELS, QUANTITATIF_NIVEAUX,
-  scaled, syntheseCouts, toMilli, totalEstimation, ESTIMATION_ANOMALIE_LABELS,
-  type BibliothequeOuvrage, type BibliothequePrix, type EstimationComparaison, type EstimationGroupe, type EstimationLigne, type EstimationSource, type MetreSyntheseEtat,
+  agregerEstimation, allowedActions, breadcrumbFor, buildEstimationGpPayload, centimesText, COEFFICIENT_PRIORITE_TEXTE, COEFFICIENT_SOURCE_LABELS, comparerEstimations,
+  decimalString, ETAT_PROJET_LABELS, estimationDetails, estimationToCsv, filtrerParEtats, formatHeures, formatMontant, formatPrixUnitaire, formatQuantiteOuvrage, lotsDesOuvrages,
+  METRE_SYNTHESE_ETAT_LABELS, METRE_SYNTHESE_ETATS, OUVRAGE_UNITE_LABELS, PARAMETRES_ISSUE_MESSAGES, parametresAnomalie, PLAN_ETAT_LABELS, PRIX_ISSUE_MESSAGES,
+  PRIX_TYPE_LABELS, PRIX_TYPES, prixAnomalie, prixTexte, prixUnitaireComposite, QUANTITATIF_NIVEAU_LABELS, QUANTITATIF_NIVEAUX, scaled, syntheseCouts, toMilli,
+  totalEstimation, ESTIMATION_ANOMALIE_LABELS,
+  type BibliothequeOuvrage, type BibliothequePrix, type EstimationComparaison, type EstimationGroupe, type EstimationLigne, type EstimationParametres,
+  type EstimationParametresDonnees, type EstimationSource, type EtatProjet, type MetreSyntheseEtat,
   type OuvrageRecord, type OuvrageUnite, type PlanEtat, type PrixComposante, type PrixDonnees, type PrixOuvrage, type PrixType, type QuantitatifNiveau,
   type ReleveActorContext, type ReleveId, type ReleveService, type ReleveStructure,
 } from "@elsatia/releve-domain";
@@ -59,6 +65,17 @@ export function ReleveEstimationWorkspace() {
   </main>;
 }
 
+/** Estimation séparée des travaux : tout, travaux (créer + déposer + déplacer), ou un seul état projeté. */
+const FILTRES_TRAVAUX = [
+  { cle: "tout", libelle: "Tout", etats: [] as EtatProjet[] },
+  { cle: "travaux", libelle: "Travaux (créer, déposer, déplacer)", etats: ["nouveau", "a_deposer", "deplace"] as EtatProjet[] },
+  { cle: "nouveau", libelle: "À créer", etats: ["nouveau"] as EtatProjet[] },
+  { cle: "a_deposer", libelle: "À déposer", etats: ["a_deposer"] as EtatProjet[] },
+  { cle: "deplace", libelle: "À déplacer", etats: ["deplace"] as EtatProjet[] },
+  { cle: "existant", libelle: "Existant", etats: ["existant"] as EtatProjet[] },
+] as const;
+type FiltreTravaux = (typeof FILTRES_TRAVAUX)[number]["cle"];
+
 type Ctx = {
   releveId: ReleveId; structure: ReleveStructure; repository: SupabaseEstimationRepository; quantitatifs: SupabaseQuantitatifRepository; canEdit: boolean;
   setFeedback(message: string): void; refreshPlan(planId: string): Promise<void>;
@@ -82,6 +99,8 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   const releveId = selection.releveId as ReleveId;
   const [structure, setStructure] = useState<ReleveStructure | null>(null);
   const [sources, setSources] = useState<EstimationSource[] | null>(null);
+  const [parametres, setParametres] = useState<EstimationParametres | null>(null);
+  const [filtre, setFiltre] = useState<FiltreTravaux>("tout");
   const [feedback, setFeedback] = useState("");
   const [timing, setTiming] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -89,8 +108,8 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   useEffect(() => {
     let cancelled = false;
     const started = performance.now();
-    Promise.all([service.get(releveId), repository.synthese(releveId, selection.etat)])
-      .then(([loaded, synthese]) => { if (!cancelled) { setStructure(loaded); setSources(synthese); setTiming(Math.round(performance.now() - started)); } })
+    Promise.all([service.get(releveId), repository.synthese(releveId, selection.etat), repository.parametres(releveId)])
+      .then(([loaded, synthese, par]) => { if (!cancelled) { setStructure(loaded); setSources(synthese); setParametres(par); setTiming(Math.round(performance.now() - started)); } })
       .catch((error: unknown) => { if (!cancelled) setFeedback(error instanceof Error ? error.message : "Estimation non accessible."); });
     return () => { cancelled = true; };
   }, [service, repository, releveId, selection.etat]);
@@ -105,10 +124,17 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
   // Contexte stable : un changement de niveau ne re-rend pas les cartes de prix (plans mémoïsés).
   const ctx = useMemo<Ctx | null>(() => (structure ? { releveId, structure, repository, quantitatifs, canEdit, setFeedback, refreshPlan } : null),
     [releveId, structure, repository, quantitatifs, canEdit, refreshPlan]);
+  /** Après un changement de coefficients : tous les plans non figés sont recalculés par le serveur. */
+  const reloadAll = useCallback(async () => {
+    const [synthese, par] = await Promise.all([repository.synthese(releveId, selection.etat), repository.parametres(releveId)]);
+    setSources(synthese); setParametres(par);
+  }, [repository, releveId, selection.etat]);
   const details = useMemo(() => (structure && sources ? estimationDetails(structure, sources) : null), [structure, sources]);
-  const groupes = useMemo(() => (details ? agregerEstimation(details, selection.niveau) : null), [details, selection.niveau]);
+  const vus = useMemo(() => (details ? filtrerParEtats(details, FILTRES_TRAVAUX.find((f) => f.cle === filtre)?.etats ?? []) : null), [details, filtre]);
+  const groupes = useMemo(() => (vus ? agregerEstimation(vus, selection.niveau) : null), [vus, selection.niveau]);
   const total = useMemo(() => (details ? totalEstimation(details) : null), [details]);
-  if (!structure || !sources || !details || !groupes || !total || !ctx) return <p className={`shell ${releveStyles.feedback}`} role="status">{feedback || "Calcul de l'estimation…"}</p>;
+  const totalVu = useMemo(() => (vus ? totalEstimation(vus) : null), [vus]);
+  if (!structure || !sources || !details || !vus || !groupes || !total || !totalVu || !parametres || !ctx) return <p className={`shell ${releveStyles.feedback}`} role="status">{feedback || "Calcul de l'estimation…"}</p>;
 
   const crumbs = breadcrumbFor(structure, null);
   const couts = syntheseCouts(total);
@@ -158,7 +184,13 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
             {QUANTITATIF_NIVEAUX.map((niveau) => <option key={niveau} value={niveau}>{QUANTITATIF_NIVEAU_LABELS[niveau]}</option>)}
           </select>
         </label>
-        <button type="button" className={releveStyles.secondary} data-testid="est-export-csv" onClick={() => download(estimationToCsv(details), "text/csv;charset=utf-8", `${baseName}.csv`)}>Exporter CSV</button>
+        <label className={releveStyles.field}><span>Travaux</span>
+          <select data-testid="est-filtre-travaux" value={filtre} onChange={(event) => setFiltre(event.target.value as FiltreTravaux)}>
+            {FILTRES_TRAVAUX.map((f) => <option key={f.cle} value={f.cle}>{f.libelle}</option>)}
+          </select>
+        </label>
+        <button type="button" className={releveStyles.secondary} data-testid="est-export-csv" title={filtre === "tout" ? undefined : "Lignes du filtre de travaux seulement"}
+          onClick={() => download(estimationToCsv(vus), "text/csv;charset=utf-8", `${baseName}${filtre === "tout" ? "" : `-${filtre}`}.csv`)}>Exporter CSV</button>
         <button type="button" className={releveStyles.secondary} data-testid="est-export-json" disabled={exporting} title="Contrat de données vers Gestion Pro (préparé, non transmis ; aucun devis créé)"
           onClick={() => void exporterGp()}>Transfert GP (JSON)</button>
         <button type="button" className={releveStyles.secondary} data-testid="est-imprimer" onClick={() => {
@@ -177,11 +209,14 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
         <div className={styles.tile}><dt>Travaux sur existant</dt><dd data-testid="est-existant">{formatMontant(couts.existant)}</dd></div>
         <div className={styles.tile}><dt>Main d&apos;œuvre</dt><dd data-testid="est-heures">{formatHeures(total.heures)}</dd></div>
         <div className={styles.tile}><dt>Lignes</dt><dd data-testid="est-compteurs">{total.lignes} · {total.sansPrix} sans prix · {total.ajustees} corrigée(s)</dd></div>
+        {filtre !== "tout" && <div className={styles.tile}><dt>Sélection · {FILTRES_TRAVAUX.find((f) => f.cle === filtre)?.libelle}</dt><dd data-testid="est-total-selection">{formatMontant(totalVu.montant)}</dd></div>}
       </dl>
       <p className={q.chips} data-testid="est-par-type">
         {PRIX_TYPES.map((t) => <span key={t} className={q.chip} data-testid={`est-type-${t}`}>{PRIX_TYPE_LABELS[t]} {formatMontant(total.parType[t])}</span>)}
         {total.ecart !== BigInt(0) && <span className={q.chip} data-testid="est-ecart">Corrections {formatMontant(total.ecart)}</span>}
       </p>
+
+      <ParametresPanel ctx={ctx} parametres={parametres} sources={sources} onSaved={reloadAll} />
 
       {sources.length === 0 && <section className={styles.section}><h2>Aucun plan</h2>
         <p className={styles.muted}>Aucun étage n&apos;a de plan « {METRE_SYNTHESE_ETAT_LABELS[selection.etat]} ». L&apos;estimation se calcule sur les quantitatifs des plans.</p></section>}
@@ -196,10 +231,11 @@ function EstimationLoader({ service, actor, selection, onEtat, onNiveau }: {
       </details>}
 
       <section className={styles.section} aria-label="Sous-totaux" data-testid="est-synthese">
-        <h2>Sous-totaux par {QUANTITATIF_NIVEAU_LABELS[selection.niveau].toLowerCase()}</h2>
+        <h2>Sous-totaux par {QUANTITATIF_NIVEAU_LABELS[selection.niveau].toLowerCase()}{filtre !== "tout" ? ` · ${FILTRES_TRAVAUX.find((f) => f.cle === filtre)?.libelle.toLowerCase()}` : ""}</h2>
         {groupes.length === 0 ? <p className={styles.muted}>Aucune ligne : ajoutez des ouvrages dans les quantitatifs.</p>
           : groupes.map((groupe, index) => <GroupeCard key={groupe.cle} groupe={groupe} open={index === 0 && groupes.length <= 20} />)}
-        <p className={styles.levelTitle} data-testid="est-total-chantier"><strong>Total chantier HT (estimation)</strong><span className={styles.value}>{formatMontant(total.montant)}</span></p>
+        <p className={styles.levelTitle} data-testid="est-total-chantier"><strong>{filtre === "tout" ? "Total chantier HT (estimation)" : "Total de la sélection HT (estimation)"}</strong>
+          <span className={styles.value}>{formatMontant(totalVu.montant)}</span></p>
       </section>
 
       {sources.map((source) => <PlanPrix key={source.planId} source={source} ctx={ctx} />)}
@@ -284,7 +320,9 @@ const OuvragePrixCard = memo(function OuvragePrixCard({ ouvrage, prix, lignes, s
     if (l.nature === "quantite" && l.quantite !== null) qte += toMilli(l.quantite);
     if (l.montantRetenu !== null) montant += scaled(l.montantRetenu, 2);
   }
-  const pu = prix ? prixUnitaireComposite(prix.donnees) : null;
+  // PU affiché avec le coefficient RÉELLEMENT appliqué (ouvrage, lot ou général), comme le serveur.
+  const pu = prix ? prixUnitaireComposite({ ...prix.donnees, coefficient: prix.coefficientApplique ?? prix.donnees.coefficient }) : null;
+  const herite = prix && (prix.coefficientSource === "lot" || prix.coefficientSource === "general");
   const anomalies = source.estimation.anomalies.filter((a) => a.ouvrageId === ouvrage.id && a.gravite !== "info");
   return <details className={styles.piece} data-testid="est-ouvrage" data-ouvrage={ouvrage.id} data-code={ouvrage.code ?? undefined} data-print open={open}
     onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}>
@@ -294,6 +332,8 @@ const OuvragePrixCard = memo(function OuvragePrixCard({ ouvrage, prix, lignes, s
       <span className={styles.value} data-testid="est-ouvrage-total">{prix ? formatMontant(montant) : "sans prix"}</span>
       {!prix && <span className={styles.badge} data-testid="est-sans-prix">quantitatif seul</span>}
       {prix && prix.origine !== "saisie" && <span className={styles.badge}>{prix.origine === "bibliotheque" ? "bibliothèque" : "copié"}</span>}
+      {prix && prix.coefficientApplique !== null && (herite || prix.coefficientApplique !== 1) && <span className={styles.badge} data-testid="est-coefficient"
+        data-source={prix.coefficientSource ?? undefined}>× {decimalString(prix.coefficientApplique).replace(".", ",")} ({COEFFICIENT_SOURCE_LABELS[prix.coefficientSource ?? "aucun"]})</span>}
       {anomalies.length > 0 && <span className={styles.badge} data-tone="alerte">{anomalies.length} à vérifier</span>}
     </summary>
     {open && <div className={styles.pieceBody}>
@@ -327,7 +367,12 @@ function LigneRow({ ligne, ouvrage, source, ctx, editable, run }: {
       <small className={styles.muted}>{ligne.nature === "quantite" ? ` · ${formatQuantiteOuvrage(ligne.quantite === null ? null : toMilli(ligne.quantite), ligne.unite)}${ligne.prixUnitaire !== null ? ` × ${formatPrixUnitaire(ligne.prixUnitaire)}` : ""}` : ""}
         {ligne.heures !== null ? ` · ${formatHeures(toMilli(ligne.heures))}` : ""}</small></span>
     <span className={styles.value} data-testid="est-ligne-montant">{ligne.prixDefini || ligne.ajustement ? formatMontant(money(ligne.montantRetenu)) : "sans prix"}
-      {ligne.ajustement && <small className={ligne.ajustement.perime ? styles.stale : styles.muted}> · automatique {formatMontant(money(ligne.montantCalcule))}{ligne.ajustement.perime ? " (a changé depuis la correction)" : ""}</small>}
+      {ligne.ajustement && <small className={ligne.ajustement.perime ? styles.stale : styles.muted} data-testid="est-ligne-automatique" data-perime={ligne.ajustement.perime ? ligne.ajustement.motifPerime ?? "montant" : undefined}>
+        {" "}· automatique {formatMontant(money(ligne.montantCalcule))}{ligne.ajustement.perime
+          ? (ligne.ajustement.motifPerime === "quantite"
+            ? ` (à revoir : quantité ${formatQuantiteOuvrage(ligne.ajustement.quantiteSource === null || ligne.ajustement.quantiteSource === undefined ? null : toMilli(ligne.ajustement.quantiteSource), ligne.unite)} → ${formatQuantiteOuvrage(ligne.quantite === null ? null : toMilli(ligne.quantite), ligne.unite)} depuis la correction)`
+            : " (à revoir : a changé depuis la correction)")
+          : ""}</small>}
     </span>
     {editable && <span className={`${styles.inlineActions} ${styles.noPrint}`}>
       {(ligne.prixDefini || ligne.quantite !== null) && <button type="button" className={releveStyles.secondary} data-testid="est-corriger" onClick={() => setCorrecting(true)}>Corriger</button>}
@@ -385,7 +430,8 @@ const draftOf = (c: PrixComposante): CompDraft => ({
 function PrixForm({ initial, unite, onCancel, onSave }: { initial: PrixDonnees | null; unite: OuvrageUnite; onCancel(): void; onSave(donnees: PrixDonnees): Promise<void> }) {
   const u = OUVRAGE_UNITE_LABELS[unite];
   const [comps, setComps] = useState<CompDraft[]>(initial ? initial.composantes.map(draftOf) : [{ type: "materiau", libelle: "", a: "", b: "" }]);
-  const [coef, setCoef] = useState(numText(initial?.coefficient ?? 1));
+  // Vide = hérité (coefficient du lot, sinon général) ; toute valeur saisie, 1 compris, prime sur le lot et le général.
+  const [coef, setCoef] = useState(numText(initial?.coefficient));
   const [commentaire, setCommentaire] = useState(initial?.commentaire ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -408,9 +454,9 @@ function PrixForm({ initial, unite, onCancel, onSave }: { initial: PrixDonnees |
         composantes.push({ type: c.type, ...libelle, prixUnitaire: p });
       }
     }
-    const k = parseDecimal(coef, 4);
-    if (k === null) return { donnees: null, error: PRIX_ISSUE_MESSAGES.coefficient };
-    const donnees: PrixDonnees = { composantes, ...(k !== 1 ? { coefficient: k } : {}), ...(commentaire.trim() ? { commentaire: commentaire.trim() } : {}) };
+    const k = coef.trim() === "" ? null : parseDecimal(coef, 4);
+    if (coef.trim() !== "" && k === null) return { donnees: null, error: PRIX_ISSUE_MESSAGES.coefficient };
+    const donnees: PrixDonnees = { composantes, ...(k !== null ? { coefficient: k } : {}), ...(commentaire.trim() ? { commentaire: commentaire.trim() } : {}) };
     const issue = prixAnomalie(donnees);
     return issue ? { donnees: null, error: PRIX_ISSUE_MESSAGES[issue] } : { donnees, error: null };
   };
@@ -443,16 +489,92 @@ function PrixForm({ initial, unite, onCancel, onSave }: { initial: PrixDonnees |
       <button type="button" className={releveStyles.secondary} data-testid="est-f-ajouter" onClick={() => setComps([...comps, { type: "main_d_oeuvre", libelle: "", a: "", b: "" }])}>+ Composante</button>
     </div>}
     <div className={styles.grid}>
-      <label className={releveStyles.field}><span>Coefficient (1 = aucun)</span><input data-testid="est-f-coefficient" inputMode="decimal" value={coef} onChange={(event) => setCoef(event.target.value)} /></label>
+      <label className={releveStyles.field}><span>Coefficient de l&apos;ouvrage (vide = hérité du lot ou général)</span>
+        <input data-testid="est-f-coefficient" inputMode="decimal" placeholder="hérité" value={coef} onChange={(event) => setCoef(event.target.value)} /></label>
       <label className={releveStyles.field}><span>Commentaire</span><input data-testid="est-f-commentaire" value={commentaire} maxLength={500} onChange={(event) => setCommentaire(event.target.value)} /></label>
     </div>
     <p className={draft.error ? styles.stale : styles.muted} data-testid="est-f-apercu">
-      {draft.error ?? `PU estimatif : ${pu === null ? "forfait seul" : formatPrixUnitaire(Number(pu) / 10000)} / ${u} HT`}</p>
+      {draft.error ?? `PU estimatif : ${pu === null ? "forfait seul" : formatPrixUnitaire(Number(pu) / 10000)} / ${u} HT${draft.donnees?.coefficient === undefined ? " (avant coefficient de lot ou général)" : ""}`}</p>
     <div className={styles.inlineActions}>
       <button type="submit" className={releveStyles.primary} data-testid="est-f-enregistrer" disabled={busy || !draft.donnees}>Enregistrer</button>
       <button type="button" className={releveStyles.secondary} onClick={onCancel}>Annuler</button>
     </div>
   </form>;
+}
+
+// ── Coefficients et hypothèses du relevé ──────────────────────────────────────
+
+function ParametresPanel({ ctx, parametres, sources, onSaved }: { ctx: Ctx; parametres: EstimationParametres; sources: EstimationSource[]; onSaved(): Promise<void> }) {
+  const d = parametres.donnees;
+  const lots = useMemo(() => {
+    const presents = lotsDesOuvrages(sources.flatMap((s) => s.quantitatif.ouvrages));
+    for (const lot of Object.keys(d.coefficientsLots ?? {})) if (!presents.includes(lot)) presents.push(lot);
+    return presents;
+  }, [sources, d.coefficientsLots]);
+  const [editing, setEditing] = useState(false);
+  const [general, setGeneral] = useState(""); const [parLot, setParLot] = useState<Record<string, string>>({}); const [hyp, setHyp] = useState("");
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const ouvrir = () => {
+    setGeneral(numText(d.coefficientGeneral)); setHyp(d.hypotheses ?? "");
+    setParLot(Object.fromEntries(lots.map((lot) => [lot, numText(d.coefficientsLots?.[lot])]))); setError(""); setEditing(true);
+  };
+  const figes = sources.filter((s) => s.figeLe).length;
+  const fr = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `× ${decimalString(v).replace(".", ",")}`);
+  const enregistrer = async () => {
+    const g = general.trim() === "" ? null : parseDecimal(general, 4);
+    if (general.trim() !== "" && g === null) { setError(PARAMETRES_ISSUE_MESSAGES.coefficient_general); return; }
+    const coefficientsLots: Record<string, number> = {};
+    for (const [lot, text] of Object.entries(parLot)) {
+      if (text.trim() === "") continue;
+      const v = parseDecimal(text, 4);
+      if (v === null) { setError(`${lot} : ${PARAMETRES_ISSUE_MESSAGES.coefficient_lot}`); return; }
+      coefficientsLots[lot] = v;
+    }
+    const donnees: EstimationParametresDonnees = { ...(g !== null ? { coefficientGeneral: g } : {}), ...(Object.keys(coefficientsLots).length ? { coefficientsLots } : {}),
+      ...(hyp.trim() ? { hypotheses: hyp.trim() } : {}) };
+    const issue = parametresAnomalie(donnees);
+    if (issue) { setError(PARAMETRES_ISSUE_MESSAGES[issue]); return; }
+    setBusy(true); setError("");
+    try {
+      await ctx.repository.saveParametres(ctx.releveId, donnees, parametres.revision);
+      await onSaved();
+      setEditing(false);
+      ctx.setFeedback("Coefficients et hypothèses enregistrés : estimation recalculée par le serveur (plans figés inchangés).");
+    } catch (e) { setError(e instanceof Error ? e.message : "Enregistrement impossible."); } finally { setBusy(false); }
+  };
+  return <details className={styles.piece} data-testid="est-parametres" data-print>
+    <summary><strong>Coefficients et hypothèses</strong>
+      <span className={styles.muted} data-testid="est-parametres-resume">général {fr(d.coefficientGeneral)} · {Object.keys(d.coefficientsLots ?? {}).length} lot(s){d.hypotheses ? " · hypothèses" : ""}</span>
+    </summary>
+    <div className={styles.pieceBody}>
+      <p className={styles.muted}>{COEFFICIENT_PRIORITE_TEXTE} Un coefficient traduit une difficulté (accès, hauteur, site occupé…) : ce n&apos;est ni une marge ni une remise.
+        {figes > 0 ? ` ${figes} plan(s) figé(s) : leurs coefficients sont figés avec eux.` : ""}</p>
+      {!editing && <ul className={styles.rows}>
+        <li data-testid="est-parametres-general"><span>Coefficient général</span><span className={styles.value}>{fr(d.coefficientGeneral)}</span></li>
+        {lots.map((lot) => <li key={lot} data-testid="est-parametres-lot" data-lot={lot}><span>Lot · {lot}</span><span className={styles.value}>{fr(d.coefficientsLots?.[lot])}</span></li>)}
+        <li><span>Hypothèses</span><span className={styles.muted} data-testid="est-parametres-hypotheses">{d.hypotheses ?? "aucune"}</span></li>
+        {parametres.updatedAt && <li><span className={styles.muted}>Modifié le {new Date(parametres.updatedAt).toLocaleString("fr-FR")} · révision {parametres.revision}</span></li>}
+      </ul>}
+      {ctx.canEdit && !editing && <div className={`${styles.inlineActions} ${styles.noPrint}`}>
+        <button type="button" className={releveStyles.primary} data-testid="est-parametres-modifier" onClick={ouvrir}>Modifier</button></div>}
+      {editing && <form className={`${styles.form} ${styles.noPrint}`} data-testid="est-parametres-form" onSubmit={(event) => { event.preventDefault(); void enregistrer(); }}>
+        <div className={styles.grid}>
+          <label className={releveStyles.field}><span>Coefficient général (vide = aucun)</span>
+            <input data-testid="est-p-general" inputMode="decimal" placeholder="aucun" value={general} onChange={(event) => setGeneral(event.target.value)} /></label>
+          {lots.map((lot) => <label key={lot} className={releveStyles.field}><span>Lot · {lot}</span>
+            <input data-testid="est-p-lot" data-lot={lot} inputMode="decimal" placeholder="hérité du général" value={parLot[lot] ?? ""}
+              onChange={(event) => setParLot({ ...parLot, [lot]: event.target.value })} /></label>)}
+        </div>
+        <label className={releveStyles.field}><span>Hypothèses (transmises à Gestion Pro)</span>
+          <textarea data-testid="est-p-hypotheses" rows={3} maxLength={2000} value={hyp} onChange={(event) => setHyp(event.target.value)} /></label>
+        {error && <small className={releveStyles.fieldError} role="alert" data-testid="est-p-erreur">{error}</small>}
+        <div className={styles.inlineActions}>
+          <button type="submit" className={releveStyles.primary} data-testid="est-p-enregistrer" disabled={busy}>Enregistrer</button>
+          <button type="button" className={releveStyles.secondary} onClick={() => setEditing(false)}>Annuler</button>
+        </div>
+      </form>}
+    </div>
+  </details>;
 }
 
 // ── Bibliothèque : prix facultatifs ───────────────────────────────────────────
