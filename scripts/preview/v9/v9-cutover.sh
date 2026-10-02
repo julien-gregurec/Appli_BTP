@@ -186,7 +186,7 @@ fi
 if [ "$APPLY" = 0 ]; then
   echo
   echo "DRY-RUN TERMINÉ : rien n'a été appliqué. Plan : $OUT/plan.md"
-  node "$V9/cutover-step.mjs" report-set "$RAPPORT" verdict '"DRY_RUN_OK"' >/dev/null
+  node "$V9/cutover-step.mjs" report-set "$RAPPORT" verdict "\"$([ $b = 0 ] && echo DRY_RUN_OK || echo DRY_RUN_OK_SANS_SAUVEGARDE)\"" >/dev/null
   echo "CODE_DEPLOY_ALLOWED=false"
   exit 0
 fi

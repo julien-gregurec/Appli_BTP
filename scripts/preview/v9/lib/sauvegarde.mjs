@@ -65,7 +65,7 @@ export function verifierSauvegarde(manifeste, { racineDepot, local, maintenant =
   const artefacts = Array.isArray(manifeste?.artefacts) ? manifeste.artefacts : [];
   for (const [kind, def] of Object.entries(ARTEFACTS)) {
     const a = artefacts.find((x) => x.kind === kind);
-    if (!a) { c(def.niveau !== "REQUIRED", `BACKUP-${kind.toUpperCase()}`, `${def.libelle} : non déclaré`, def.niveau); continue; }
+    if (!a) { c(false, `BACKUP-${kind.toUpperCase()}`, `${def.libelle} : non déclaré${def.niveau === "REQUIRED" ? "" : " (non bloquant)"}`, def.niveau); continue; }
     const chemin = isAbsolute(String(a.path ?? "")) ? a.path : resolve(baseManifeste, String(a.path ?? ""));
     const rel = relative(racineDepot, chemin);
     if (!rel.startsWith("..") && !isAbsolute(rel)) { c(false, `BACKUP-${kind.toUpperCase()}`, `${def.libelle} : fichier DANS le dépôt (risque de commit) — le déplacer hors du dépôt`, def.niveau); continue; }
@@ -84,7 +84,7 @@ export function verifierSauvegarde(manifeste, { racineDepot, local, maintenant =
     }
     c(problemes.length === 0, `BACKUP-${kind.toUpperCase()}`, problemes.length ? `${def.libelle} : ${problemes.join(", ")}` : `${def.libelle} : ${st.size} octets${a.sha256 ? ", sha256 conforme" : ""}`, def.niveau);
   }
-  c(true, "BACKUP-PITR", manifeste?.dashboard_backup_id ? "identifiant de sauvegarde Supabase consigné" : "aucun identifiant de sauvegarde Supabase consigné (plan sans PITR : les dumps sont la seule restauration)", "OPTIONAL");
+  c(Boolean(manifeste?.dashboard_backup_id), "BACKUP-PITR", manifeste?.dashboard_backup_id ? "identifiant de sauvegarde Supabase consigné" : "aucun identifiant de sauvegarde Supabase consigné (plan sans PITR : les dumps sont la seule restauration)", "OPTIONAL");
 
   const bloquants = constats.filter((x) => !x.ok && x.niveau === "REQUIRED");
   return { ok: bloquants.length === 0, verdict: bloquants.length ? "BACKUP_MISSING" : "BACKUP_DECLARED_OK", constats };
