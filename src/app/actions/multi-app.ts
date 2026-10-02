@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { estCodeApplicationElsatia } from "@elsatia/application-access";
-import { estAdministrateurPlateformeMultiApp } from "@/lib/multi-app-server";
+import { estAdministrateurPlateformeMultiApp, estProprietairePlateforme } from "@/lib/multi-app-server";
+import { normaliserUrlPreview } from "@/lib/multi-app";
 import { lireDateHeureFormulaire } from "@/lib/date-heure-locale";
 import { createClient } from "@/lib/supabase/server";
 
@@ -121,4 +122,30 @@ export async function retirerHabilitationApplicationAction(
   if (error) redirect(retourEntreprise(entrepriseId, "error", "Retrait impossible"));
   revalider(entrepriseId);
   redirect(retourEntreprise(entrepriseId, "succes", "Habilitation retirée"));
+}
+
+/**
+ * A-11 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2) : URL Preview d'une application du catalogue.
+ * Propriétaire plateforme uniquement ; la RPC revérifie tout (propriétaire, AAL2, origine stricte,
+ * jamais une URL de Production) et journalise. Un administrateur d'entreprise ou un
+ * administrateur plateforme délégué n'atteint jamais la base.
+ */
+export async function definirUrlPreviewApplicationAction(applicationCode: string, formData: FormData) {
+  const retour = (type: "succes" | "error", message: string) =>
+    `/plateforme/applications?${type}=${encodeURIComponent(message)}`;
+  if (!(await estProprietairePlateforme())) {
+    redirect(retour("error", "Modification réservée au propriétaire de la plateforme ELSATIA"));
+  }
+  if (!estCodeApplicationElsatia(applicationCode)) redirect(retour("error", "Paramètres invalides"));
+  const normalisee = normaliserUrlPreview(String(formData.get("url_preview") ?? ""));
+  if (!normalisee.ok) redirect(retour("error", normalisee.motif));
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_definir_url_preview_application", {
+    p_code: applicationCode,
+    p_url: normalisee.url,
+  });
+  if (error) redirect(retour("error", error.message));
+  revalidatePath("/plateforme/applications");
+  redirect(retour("succes", normalisee.url ? `URL Preview de ${applicationCode} enregistrée` : `URL Preview de ${applicationCode} effacée`));
 }
