@@ -88,3 +88,21 @@ export function accesDansSaFenetre(
 
 // valeurDateHeureLocale (rendu datetime-local dans le fuseau du SERVEUR) retirée en post-V9
 // (V9-01) : voir src/lib/date-heure-locale.ts et src/components/ChampDateHeure.tsx.
+
+/**
+ * A-11 : normalisation et validation d'une `url_preview`, à l'identique de la RPC
+ * `plateforme_definir_url_preview_application` (migration 20261003000102), qui reste
+ * l'autorité. Sert à refuser tôt, avec un message clair, sans solliciter la base.
+ * Vide → effacement (`url: null`). Sinon : origine stricte `https://<projet>.vercel.app`.
+ */
+const ORIGINE_PREVIEW_VERCEL = /^https:\/\/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$/;
+
+export function normaliserUrlPreview(brute: string): { ok: true; url: string | null } | { ok: false; motif: string } {
+  const valeur = brute.trim().toLowerCase();
+  if (!valeur) return { ok: true, url: null };
+  const url = valeur.replace(/\/$/, "");
+  if (!ORIGINE_PREVIEW_VERCEL.test(url)) {
+    return { ok: false, motif: "URL Preview refusée : origine https://<projet>.vercel.app attendue, sans chemin, requête, port ni identifiants" };
+  }
+  return { ok: true, url };
+}

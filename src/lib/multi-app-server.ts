@@ -18,6 +18,13 @@ export async function estAdministrateurPlateformeMultiApp(): Promise<boolean> {
   return !error && data === true;
 }
 
+/** A-11 : propriétaire plateforme (seul habilité à modifier une URL système du catalogue). */
+export async function estProprietairePlateforme(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("est_plateforme_proprietaire");
+  return !error && data === true;
+}
+
 export type ApplicationPlateforme = ApplicationCatalogue & {
   entreprisesAutorisees: number;
   utilisateursHabilites: number;
