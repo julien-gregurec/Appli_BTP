@@ -251,7 +251,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   if (r.code !== 0) ko("DB-RLS", "smoke structurel", r.stderr.trim().split("\n").at(-1));
   else {
     const mesures = Object.fromEntries(r.stdout.trim().split("\n").map((s) => s.split("|")).map(([k, n]) => [k, Number(n)]));
-    const attendu = { tables_public_sans_rls: 0, tables_rls_sans_policy: null, anon_ecriture_public: 0, buckets_publics: 1, buckets_total: 19 };
+    const attendu = { tables_public_sans_rls: 0, tables_rls_sans_policy: null, anon_ecriture_public: 0, buckets_publics: 1, buckets_total: 20 }; // train V9 : + rgpd-exports (privé)
     for (const [k, n] of Object.entries(mesures)) {
       const a = attendu[k];
       if (a === null || a === undefined) log(ligne("info", "DB-RLS", k, String(n)));

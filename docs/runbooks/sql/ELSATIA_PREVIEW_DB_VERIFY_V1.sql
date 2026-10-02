@@ -28,6 +28,8 @@
 -- (…0928 806, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1). Contrôles 34-37 (train canonique V8) :
 -- mode sûr et convergence (…0928 807-808, 811), Relevé Lots 8-9 (…0928 809-810), red team V2
 -- (…0928 805), recalcul des devis par instruction (…0928 812).
+-- Contrôle 38 (train canonique V9) : Legal Consent (…1002 901), Security Residual V2 (…1002 1001),
+-- Stripe readiness P1 / P7 (…1002 1002-1003), import Tools → GP (…1002 1116), export RGPD (…1002 1201-1203).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
@@ -94,7 +96,9 @@ buckets_attendus(id) as (
          ('documents-employes'), ('notes-frais'), ('notes-frais-exports'), ('bulletins-paie'),
          ('fiches-techniques'), ('documents-paie'), ('messagerie-medias'), ('devis-medias'),
          ('colors-seaux'), ('reserves-photos'), ('reserves-plans'), ('communications-elsatia'),
-         ('studio-originals'), ('studio-renders'), ('tools-releves')
+         ('studio-originals'), ('studio-renders'), ('tools-releves'),
+         -- Train V9 : export RGPD asynchrone (20261002001201), bucket privé.
+         ('rgpd-exports')
 ),
 controles(ordre, controle, attendu, observe, ok, bloquant) as (
   select 1, 'migrations appliquées (registre CLI)', a.nb::text || ', dernière ' || a.derniere,
@@ -145,10 +149,10 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select string_agg(proname || '=' || exec_auth, ', ' order by proname) from fonction_exec), 'fonctions absentes'),
          coalesce((select bool_and(exec_auth) and count(*) = 2 from fonction_exec), false), true
   union all
-  select 7, 'buckets Storage', '19 attendus (dont tools-releves, V4), seul entreprise-assets public',
-         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id)::text || '/19 présents, publics : '
+  select 7, 'buckets Storage', '20 attendus (dont tools-releves, V4 ; rgpd-exports, V9), seul entreprise-assets public',
+         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id)::text || '/20 présents, publics : '
            || coalesce((select string_agg(id, ', ') from storage.buckets where public), 'aucun'),
-         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id) = 19
+         (select count(*) from storage.buckets b join buckets_attendus a on a.id = b.id) = 20
            and (select coalesce(array_agg(id::text), '{}') from storage.buckets where public) = array['entreprise-assets'], true
   union all
   select 8, 'catalogue applications_elsatia', 'colors, drone, gestion_pro, reserves, tools',
@@ -270,8 +274,9 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and to_regclass('public.reserves_contacts') is not null, true
   union all
   -- Train V8 : + 4 tables sous RLS (Lot 8 …0928 809 : métré, ajustements ; Lot 9 …0928 810 : ouvrages,
-  -- bibliothèque, ajustements de quantitatif) → 15.
-  select 22, 'Tools Relevé & Métré (601-801) : non commercial', 'Relevé Pro de référence (inclut Tools Pro), garde d''entitlement, 15 tables RLS',
+  -- bibliothèque, ajustements de quantitatif) → 15. Train V9 : + 4 (Lot 10, …1002 1114-1115 :
+  -- prix estimatifs, bibliothèque de prix, corrections d'estimation, paramètres) → 19.
+  select 22, 'Tools Relevé & Métré (601-801) : non commercial', 'Relevé Pro de référence (inclut Tools Pro), garde d''entitlement, 19 tables RLS',
          concat_ws(', ',
            coalesce((select etat from releve_pro), 'releve_pro ABSENTE'),
            case when exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
@@ -281,7 +286,7 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
          coalesce((select etat = 'releve_pro:reference:inclut tools_pro' from releve_pro), false)
            and exists (select 1 from pg_trigger where not tgisinternal and tgname = 'tools_releve_metre_non_commercial')
            and (select count(*) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
-                 and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity) = 15, true
+                 and c.relname like 'tools\_releves%' and c.relname <> 'tools_releves_plans' and c.relrowsecurity) = 19, true
   union all
   select 23, 'Identité Studio (20260927100000) : fermée, inerte (Studio OFF)', 'tables RLS sans droit d''API ; 0 sujet émis',
          concat_ws(', ',
@@ -580,6 +585,36 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not exists (select 1 from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and tgname = 'recalc_devis_apres_ligne')
            and to_regprocedure('public.trg_recalc_devis_instruction()') is not null
            and not has_function_privilege('authenticated', 'public.trg_recalc_devis_instruction()', 'execute'), true
+  union all
+  -- 38 (train V9) : lots post-V8 (ELSATIA_CANONICAL_TRAIN_V9_CONVERGENCE_V1). Sécurité 1001 (aucune
+  -- policy « entreprise sans membres »), Stripe 1002 (prix contractuel / périodicité) et 1003 (facture
+  -- d'essai 0 €), Legal Consent 901 (registre des acceptations fermé à anon / authenticated, accès par RPC), export RGPD 1201-1203
+  -- (catalogue complet, sections RH retirées, session d'assistance refusée), import Tools → GP 1116.
+  select 38, 'Train V9 : sécurité, Stripe, Legal Consent, export RGPD, import Tools → GP (901, 1001-1203)',
+         '0 policy sans-membres ; P1 + P7 ; acceptations fermées à l''API ; catalogue RGPD complet ; export JSON borné ; import GP gardé',
+         concat_ws(', ',
+           (select count(*) from pg_policies where schemaname = 'public'
+              and (coalesce(qual, '') || coalesce(with_check, '')) ilike '%entreprise_sans_membres%')::text || ' policy sans-membres',
+           (select count(*) from information_schema.tables t where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
+              and not exists (select 1 from platform.rgpd_export_catalogue c where c.table_nom = t.table_name))::text || ' table(s) hors catalogue RGPD',
+           case when (select prosrc from pg_proc where oid = 'public.exporter_donnees_entreprise(uuid)'::regprocedure) like '%export_rgpd_section_autorisee%'
+                 and (select prosrc from pg_proc where oid = 'public.exporter_donnees_entreprise(uuid)'::regprocedure) like '%est_acces_support_actif%'
+                then 'export JSON borné' else 'export JSON NON BORNÉ' end),
+         (select count(*) from pg_policies where schemaname = 'public'
+            and (coalesce(qual, '') || coalesce(with_check, '')) ilike '%entreprise_sans_membres%') = 0
+           and (select prosrc from pg_proc where oid = 'public.synchroniser_abonnement_stripe_service(uuid,text,text,text,text,text,date,date,timestamptz,timestamptz,timestamptz)'::regprocedure)
+                 like '%v_contrat_periodicite is not distinct from p_periodicite%'
+           and (select prosrc from pg_proc where oid = 'public.appliquer_evenement_facture_abonnement_service(uuid,text,text,timestamptz,text,text,timestamptz,text,timestamptz,timestamptz,numeric,numeric,numeric,text,text,text)'::regprocedure)
+                 like '%facture_essai_sans_montant%'
+           and not has_table_privilege('anon', 'platform.acceptations_documents_legaux', 'select,insert,update,delete')
+           and not has_table_privilege('authenticated', 'platform.acceptations_documents_legaux', 'select,insert,update,delete')
+           and not exists (select 1 from information_schema.tables t where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
+                 and not exists (select 1 from platform.rgpd_export_catalogue c where c.table_nom = t.table_name))
+           and (select prosrc from pg_proc where oid = 'public.exporter_donnees_entreprise(uuid)'::regprocedure) like '%export_rgpd_section_autorisee%'
+           and (select prosrc from pg_proc where oid = 'public.exporter_donnees_entreprise(uuid)'::regprocedure) like '%est_acces_support_actif%'
+           and (select bool_and(c.relrowsecurity) and count(*) = 4 from pg_class c where c.relnamespace = 'public'::regnamespace
+                 and c.relname in ('gp_tools_imports', 'gp_tools_imports_lignes', 'gp_tools_imports_journal', 'gp_tools_correspondances_ouvrages'))
+           and not has_function_privilege('anon', 'public.gp_tools_importer_estimation(uuid,text,jsonb)', 'execute'), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

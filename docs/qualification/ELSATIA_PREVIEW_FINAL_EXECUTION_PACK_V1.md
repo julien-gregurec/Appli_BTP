@@ -2,7 +2,7 @@
 
 > **Train canonique V8 (2026-09-30)** — ce pack s'exécute désormais sur la ref V8
 > officielle `integration/elsatia-canonical-train-v8` @ `53b4bc7` (publiée le 2026-09-30, ex-`claude/sleepy-cannon-6je2vo`, même commit ; exécution gardée : `ELSATIA_V8_PREVIEW_OPERATOR_HANDOFF_V2.md`) : **<!--train:nb-->395<!--/train:nb--> migrations, dernière `<!--train:derniere-->20261002001203<!--/train:derniere-->`**, DB verify
-> **<!--train:controles-->37<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
+> **<!--train:controles-->38<!--/train:controles--> contrôles** (14-17 : politique RGPD des contrats, TRUNCATE refusé sur factures/contrats,
 > gardes Réserves R-01..R-05, export RGPD complet ; 18 : Stripe ordre + essai borné ; 19-23 : garde-fous V4 —
 > commandes fournisseurs RGPD, dette RGPD résiduelle, GP ↔ Réserves, Relevé & Métré non commercial,
 > identité Studio inerte ; 24-26 : garde-fous V5 — réabonnement Stripe, Réserves hôte suspendu en
@@ -63,7 +63,7 @@ Règles absolues, contrôlées par les scripts **avant tout réseau** :
 | `scripts/preview/lib/preview-guard.mjs` | Garde-fous communs (réf. Preview, Production refusée, Stripe test, origines HTTPS) |
 | `scripts/preview/env-inventory.mjs` | Inventaire depuis le manifeste (hors ligne) |
 | `scripts/preview/env-check.mjs` | Preflight manifeste **+ cohérence entre applications** (hors ligne) |
-| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->37<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
+| `scripts/preview/db-verify.mjs` | Vérification base : registre des migrations, <!--train:controles-->38<!--/train:controles--> contrôles (nombre lu dans le SQL), préflight sécurité, RLS structurelle, RPC service-role only, sonde RLS fonctionnelle (lecture seule forcée) |
 | `scripts/preview/http-smoke.mjs` | Smoke HTTP anonyme des 5 apps (GET/OPTIONS, redirections non suivies) |
 | `scripts/preview/stripe-test-verify.mjs` | Stripe Test : endpoints, événements, portail, prix (GET uniquement) |
 | `scripts/preview/storage-smoke.mjs` | Buckets, drapeaux public, refus anonyme ; `--write` = safe-run dépôt/lecture signée/suppression |
