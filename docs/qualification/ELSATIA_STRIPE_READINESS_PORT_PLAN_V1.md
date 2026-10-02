@@ -5,7 +5,20 @@
 - Branche source : `claude/elegant-turing-b4ewbp`
 - SHA source : `b9eb1bf` (base `4d92ddb` = `main`, 178 migrations)
 
-## Verdict
+## Verdict courant (mise à jour du 2 octobre 2026, après décisions propriétaire)
+
+**CANONICAL_BASE_813_REQUIRED**
+
+Toutes les décisions sont prises (§ 9). Le portage reste bloqué pour une seule raison : la base canonique qui contient `20261002000813_plateforme_annuaire_lecture_pure.sql` n'est pas disponible pour comparaison.
+
+Contrôle refait après `git fetch --prune` : cette migration est absente des 362 branches distantes. Elle n'apparaît pas non plus dans l'historique (`git log --all`). Or, d'après la décision 1, la migration 813 doit précéder toute nouvelle migration, et la Preview hébergée est à 372/372. Les nouvelles migrations du portage (P1, éventuellement P5 et P7) ne peuvent donc être ni numérotées ni comparées tant que cette base n'est pas poussée.
+
+Ce qui ne dépend pas de 813 (code applicatif P2, P3, P4, harness P6) pourrait techniquement être préparé sur V8. La consigne reste pourtant « aucun portage pour l'instant ».
+
+**Condition de levée** : pousser sur le dépôt distant la branche canonique `V8 → 813`, puis l'intégration de `20261002000901` (Legal Consent). Le verdict passera alors à `READY_FOR_PORT_ON_CANONICAL_BASE`, après une comparaison rapide de 813 avec les fichiers Billing (l'annuaire ne devrait pas en toucher, à vérifier).
+
+### Verdict initial de l'analyse (conservé)
+
 
 **PORT_CONFLICTS_FOUND**
 
@@ -177,23 +190,33 @@ Migration 184 · `stripe-abonnement-synchro.ts` · `catalogue.mjs` · `preflight
 | `scripts/stripe-test/qualification.mjs` (source) | source d'inspiration pour P6 (fonction `rejouer()` re-signée, étapes 7, 9, 10, 11, 14), pas à porter comme fichier |
 | `scripts/stripe-test/catalogue.mjs` (source) | **à ne jamais exécuter** sur le compte Test V8 |
 
-## 9. Décisions propriétaire encore requises
+## 9. Décisions propriétaire (prises le 2 octobre 2026)
 
-1. **Base cible** : quelle branche porte la migration hébergée `20261002000813_plateforme_annuaire_lecture_pure.sql` et le compte 372 ? Elle doit être poussée sur le dépôt distant avant toute convergence, et l'ordre avec `20261002000901` (bold-allen) doit être fixé.
-2. **Règle d'ouverture (P3)** : garder le booléen `ABONNEMENTS_PUBLICS_OUVERTS`, ou y ajouter date d'ouverture, identité/TVA confirmées et ouverture explicite en Test ?
-3. **Régime TVA** : `NEXT_PUBLIC_LEGAL_TVA` est absente, régime non confirmé (runbook P1-6). Faut-il une variable de **confirmation** distincte du texte affiché ? Et que faire de `STRIPE_AUTOMATIC_TAX_ENABLED` ?
-4. **Garde de facture Live (P2)** : accepter `auto_advance=false` sur les brouillons tant que l'identité et la TVA ne sont pas confirmées ? Quelles variables d'identité exiger : SIRET seul (V8), ou adresse et mentions de paiement en plus ?
-5. **P1** : appliquer le prix du Price facturé (ou de la grille de la nouvelle périodicité) lors d'un changement de périodicité demandé par le client ?
-6. **Rattrapage d'un webhook manquant (P5)** : retenu ? Si oui, quelle règle de filigrane pour une relecture sans événement ?
-7. **Délai de grâce** : V8 conserve « suspension immédiate sur `payment_failed` » comme décision produit. À reconfirmer avant l'ouverture.
-8. **Double essai** : réglé dans V8 (reliquat de l'essai local). Plus de décision requise.
-9. **Prices d'environnement** encore à ×12 (runbook P1-1) : alignement des variables `STRIPE_PRICE_*_ANNUEL` Test ou Preview par l'opérateur. Action externe, hors portage.
+| # | Sujet | Décision | Conséquence pour le portage |
+|---|---|---|---|
+| 1 | Base cible et ordre | Référence fonctionnelle : V8 `53b4bc76`. Ordre : **V8 → `20261002000813` annuaire lecture pure → `20261002000901` acceptations légales → nouvelles migrations sécurité / Stripe**. Ne créer aucune migration tant que la base contenant 813 n'est pas disponible | Toute migration Stripe est numérotée strictement après `20261002000901` (ou après la dernière migration de la base canonique effective au moment du portage). Bloquant : 813 introuvable dans le dépôt |
+| 2 | Ouverture commerciale | Conserver `ABONNEMENTS_PUBLICS_OUVERTS`. En Live, le compléter par : ouverture commerciale explicite, identité vendeur confirmée, régime TVA confirmé. La qualification Stripe Test reste possible sans ouvrir le Live. Aucune date d'ouverture fixée | P3 : enrichir `abonnementsPublicsOuverts()` dans `src/lib/commercialisation-abonnements.ts`, sans second verrou. **Pas de condition de date** : la règle datée et `revalidate = 600` sur `/tarifs` sont abandonnés. Le mode est déterminé par la clé et par `STRIPE_WEBHOOK_EXPECTED_MODE`, déjà présents dans V8 |
+| 3 | TVA | Confirmation explicite, **distincte** du texte affiché. Ni un numéro de TVA, ni une mention légale, ni `STRIPE_AUTOMATIC_TAX_ENABLED` ne valent validation du régime. `STRIPE_AUTOMATIC_TAX_ENABLED` reste un paramètre technique indépendant. Aucun régime déduit | Nouvelle variable de confirmation booléenne, non affichée, à côté de `NEXT_PUBLIC_LEGAL_TVA`. Nom à aligner sur la convention V8 et à déclarer dans le manifeste d'environnement (`check-env-manifest`). `STRIPE_AUTOMATIC_TAX_ENABLED` n'est pas modifié |
+| 4 | Garde-fou Live P2 | **Accepté.** En Live, aucun Checkout ni aucune finalisation commerciale tant que les prérequis légaux configurés ne sont pas confirmés. Réutiliser l'identité ELSATIA de V8 ; pas de `LIRIA_VENDEUR_*` ; rien d'inventé | P2 : refus du Checkout en Live (via P3) et `auto_advance=false` sur `invoice.created` en Live si les prérequis ne sont pas confirmés. Identité lue depuis les sources V8 (`NEXT_PUBLIC_LEGAL_SIRET`, identité de marque `BRAND`/`BRAND_SERVER`, mentions juridiques). Pied de facture limité aux informations **déjà confirmées** |
+| 5 | P1 périodicité | **Accepté.** Périodicité et prix contractuel suivent le Price Stripe réellement facturé (Pro mensuel → Pro annuel = prix annuel canonique). Rien de rétroactif | Nouvelle migration `create or replace` de `synchroniser_abonnement_stripe_service` : « même contrat » = même offre **et** même périodicité. Aucune écriture de données dans la migration. pgTAP : mensuel → annuel, annuel → mensuel, offre et périodicité inchangées (prix historique conservé) |
+| 6 | P5 rattrapage | **Retenu.** Rapprochement quotidien idempotent : Stripe source de vérité, relecture de l'abonnement réel, passage par les protections d'ordre V8, jamais de réactivation d'un abonnement terminal, corrections journalisées, aucune double facturation | Fonction greffée sur `/api/cron/abonnements`, passant par `synchroniserAbonnementCoordonne` (RPC ordonnée) avec un type d'observation dédié (« relecture de rapprochement »). Lecture seule côté Stripe : aucune écriture, aucun Checkout, aucune ligne de facture. Journal dans le flux d'ordre existant. État commercial par application (804) jamais écrasé. Une migration est possible si la RPC doit accepter ce type d'observation (numérotée selon la décision 1) |
+| 7 | Délai de grâce | **Suspension immédiate** après un échec de paiement. Pas de délai de grâce | Aucun changement : comportement V8 conservé (« décision produit conservée ») |
+| 8 | P7 facture d'essai à 0 € | Contre-épreuve sur V8 d'abord. Si l'essai ne passe pas à tort en « actif », `ALREADY_SAFE`, aucun changement. Sinon, correctif minimal | pgTAP à écrire dans `billing_subscription_lifecycle_v1` : relecture `trialing` à t, puis `invoice.paid` 0 € à t+1 s, puis t+60 s. Correctif seulement si le défaut est reproduit |
+| 9 | Harness | Réutiliser le harness V8. N'ajouter que ce qui manque : rejeux, ordre inversé, événements tardifs, mensuel ↔ annuel, abonnement concurrent, paiement échoué, résiliation, Test Clock si pertinent. Pas de second moteur de catalogue ou de synchronisation | P6 : enrichir `scripts/qualification/stripe-ordering-test-mode.mjs` (garde-fous `--execute` / `--confirm-test` / `--entreprise` conservés), avec son test `node --test`. `scripts/stripe-test/*` et `src/lib/stripe-abonnement-synchro.ts` de la branche source ne sont **pas** portés |
+| 10 | Pour l'instant | Aucun portage, aucune migration, aucune Preview, aucune Production, aucun Stripe Live | Respecté : seul ce rapport est modifié |
 
-## 10. Proposition d'exécution (après accord)
+### Points résiduels (non bloquants, à traiter pendant le portage)
 
-1. Partir du train cible désigné (décision 1), sur une nouvelle branche.
-2. Porter P4, puis P1 (migration renumérotée à ce moment-là), avec leurs tests.
-3. Porter P2 et P3 selon les décisions 2 à 4, sur `commercialisation-abonnements.ts` et sur les variables `NEXT_PUBLIC_LEGAL_*`.
-4. Vérifier P7 par un pgTAP, puis corriger si le risque est reproduit.
-5. Porter P6 en enrichissant `stripe-ordering-test-mode.mjs` ; P5 seulement si la décision 6 est positive.
-6. Rejouer l'ensemble du § 7 et produire le rapport de qualification du lot sur la base cible.
+- **Identité vendeur.** Dans V8, seul le SIRET a une variable confirmée en production (selon le runbook de cutover). L'adresse et les mentions de paiement sont-elles déjà portées par les documents juridiques V8 ? À constater sur la base canonique, sans rien inventer. Si un élément exigé n'existe pas, le Live reste fermé (comportement voulu).
+- **Variables d'environnement.** Les `STRIPE_PRICE_*_ANNUEL` d'environnement encore à ×12 (runbook P1-1) relèvent d'une action opérateur, hors portage.
+
+## 10. Plan d'exécution (dès que la base 813 est disponible)
+
+1. Récupérer la branche canonique `V8 → 813 → 901`. Vérifier le ledger (372 migrations, puis 373 avec 901) et l'absence de recouvrement entre 813 et 901 d'une part, et les fichiers Billing d'autre part. Créer une nouvelle branche de portage depuis cette base.
+2. **P7, contre-épreuve d'abord** (pgTAP). Si `ALREADY_SAFE`, consigner sans rien changer ; sinon, correctif minimal.
+3. **P4** : repli de période sur les lignes (`items`), avec tests Vitest.
+4. **P1** : migration renumérotée après la dernière migration de la base, et pgTAP.
+5. **P3 + P2** : verrou Live enrichi, confirmation TVA distincte, garde `invoice.created` Live, pied de facture limité aux informations confirmées ; tests Vitest ; manifeste d'environnement.
+6. **P5** : rapprochement quotidien sur la RPC ordonnée, avec tests (relecture terminale, ancien événement, aucune écriture Stripe, état par application préservé).
+7. **P6** : enrichissement du harness V8 et de son test `node --test`, sans exécution réelle sans clé Test.
+8. Rejouer l'intégralité du § 7 et produire le rapport de qualification du lot.
