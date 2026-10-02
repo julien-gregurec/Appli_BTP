@@ -11,6 +11,8 @@
 //   gc              -> global.gc() complet (si --expose-gc), échantillon marqué
 //   snap:<label>    -> gc puis v8.writeHeapSnapshot(<dir>/heap-<label>-<pid>.heapsnapshot)
 "use strict";
+// Préchargement CommonJS (`node -r`) : require() est ici la seule forme possible.
+/* eslint-disable @typescript-eslint/no-require-imports */
 const dir = process.env.MEM_SAMPLER_DIR;
 if (dir) {
   const fs = require("node:fs");
