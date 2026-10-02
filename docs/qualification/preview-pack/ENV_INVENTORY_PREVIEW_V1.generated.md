@@ -6,7 +6,7 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 128 | 19 | 88 | 21 | 1 | 11 | 20 | 12 |
+| gestion_pro | 138 | 21 | 90 | 27 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
@@ -17,6 +17,7 @@
 
 | Variable | Classe | Public | Secret | Build | Preview-only | Valeur imposée preview | Valeurs admises | Interdite preview | Condition |
 |---|---|---|---|---|---|---|---|---|---|
+| `ABONNEMENTS_LIVE_OUVERTURE_CONFIRMEE` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `ABONNEMENTS_PUBLICS_OUVERTS` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `BANK_DATA_ENCRYPTION_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
 | `ELSATIA_APPLICATION_ENV` | REQUIRED |  |  | oui |  | `preview` | local, test, preview, production |  |  |
@@ -25,6 +26,7 @@
 | `FEATURE_BOUTIQUE_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `FEATURE_CRONS_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `FEATURE_RELANCES_AUTO_ENABLED` | REQUIRED |  |  |  |  | `false` |  |  |  |
+| `LEGAL_TVA_REGIME_CONFIRME` | REQUIRED |  |  |  |  | `false` |  |  |  |
 | `NEXT_PUBLIC_APP_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_COLORS_URL` | REQUIRED | oui |  | oui |  |  |  |  |  |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | REQUIRED | oui |  | oui |  |  |  |  |  |
@@ -45,7 +47,9 @@
 | `ELSATIA_IDENTITY_ISSUER` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé (GP émetteur et Studio vérificateur) |
 | `ELSATIA_IDENTITY_SIGNING_KEYS` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
 | `ELSATIA_STUDIO_EXCHANGE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
+| `ELSATIA_STUDIO_EXPORT_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
 | `ELSATIA_STUDIO_LIFECYCLE_URL` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
+| `ELSATIA_STUDIO_STORAGE_ORIGIN` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé |
 | `EMAIL_FROM_ADDRESS` | CONDITIONAL |  |  |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `EMAIL_PREVIEW_ALLOWLIST` | CONDITIONAL |  |  |  | oui |  |  |  | pour recevoir un e-mail applicatif en Preview ou en local |
 | `GOOGLE_PLAY_RTDN_AUDIENCE` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats Android Tools sont ouverts |
@@ -137,7 +141,13 @@
 | `IA_PLAFOND_QUOTIDIEN` *(dépréciée)* | OPTIONAL |  |  |  |  |  |  |  |  |
 | `NEXT_PUBLIC_SENTRY_DSN` | OPTIONAL | oui |  | oui |  |  |  |  |  |
 | `OPENAI_MODEL` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_ATTENTE_MAX_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_CHROMIUM_EXECUTABLE` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `PDF_CHROMIUM_EXECUTABLE_PATH` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_CONCURRENCE` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_DELAI_FERMETURE_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_DUREE_MAX_MS` | OPTIONAL |  |  |  |  |  |  |  |  |
+| `PDF_FILE_MAX` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_DECISION_REF` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_MAX_ENTREPRISES` | OPTIONAL |  |  |  |  |  |  |  |  |
 | `RGPD_PURGE_PLANIFICATEUR_MODE` | OPTIONAL |  |  |  |  |  |  |  |  |
