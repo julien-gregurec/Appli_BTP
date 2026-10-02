@@ -1,5 +1,5 @@
 /**
- * Lot 10 — Estimation simplifiée (miroir de la migration 20260930001401).
+ * Lot 10 — Estimation simplifiée (miroir des migrations 20260930001401 et 20260930001402).
  *
  * TOOLS = estimation simplifiée, HT, estimative ; GESTION PRO = chiffrage complet (prix de vente, marge, remise,
  * TVA, devis). Aucun numéro de devis, aucune facture, aucune commande, aucune signature, aucun workflow devis.
@@ -15,7 +15,9 @@
  *   composantes ; sous-totaux = sommes de lignes : aucun écart d'arrondi entre lignes et totaux ;
  * - une correction manuelle ne remplace jamais le montant automatique : elle porte le montant retenu, la raison,
  *   l'auteur et la date ; elle devient « obsolète » si le montant automatique change ;
- * - un ouvrage sans prix reste exploitable en quantitatif : il n'entre simplement pas dans le total estimé.
+ * - un ouvrage sans prix reste exploitable en quantitatif : il n'entre simplement pas dans le total estimé ;
+ * - (1402) coefficients facultatifs : ouvrage > lot > général (le plus précis l'emporte, jamais cumulés) ; une correction
+ *   mémorise sa valeur source et devient obsolète si la QUANTITÉ change ; hypothèses transmises à Gestion Pro.
  */
 
 import type { EtatProjet, MetreEtageSource, MetreStructure, MetreSyntheseEtat } from "./metre";
@@ -146,6 +148,11 @@ export type EstimationNature = "quantite" | "forfait";
 export type EstimationAjustementEntree = {
   readonly id: string; readonly ouvrageId: string; readonly pieceId: string | null; readonly etatProjet: EtatProjet; readonly nature?: EstimationNature;
   readonly valeurCalculee: number | null; readonly valeurRetenue: number; readonly raison: string; readonly auteurId?: string | null; readonly date?: string | null;
+  /**
+   * Quantité de la ligne au moment de la correction (valeur source, migration 1402). Présente : la correction devient
+   * obsolète si la quantité change, même à montant automatique égal. Absente (correction antérieure) : règle du 1401.
+   */
+  readonly quantiteSource?: number | null;
 };
 export type EstimationEntree = {
   readonly ouvrages: readonly Pick<OuvrageRecord, "id" | "etatTravaux">[];
@@ -157,8 +164,12 @@ export type EstimationEntree = {
 export type EstimationAjustement = {
   readonly id: string; readonly valeurCalculee: number | null; readonly valeurRetenue: number; readonly raison: string;
   readonly auteurId: string | null; readonly date: string | null;
-  /** Le montant automatique a changé depuis la correction : le montant retenu est à revoir. */
+  /** Le montant automatique OU la quantité ont changé depuis la correction : le montant retenu est à revoir. */
   readonly perime: boolean;
+  /** Quantité source (présente si la correction l'a mémorisée). */
+  readonly quantiteSource?: number | null;
+  /** Motif d'obsolescence : la quantité a changé (prioritaire) ou le montant automatique a changé. */
+  readonly motifPerime?: "quantite" | "montant" | null;
 };
 export type EstimationLigne = {
   readonly ouvrageId: string;
@@ -201,7 +212,9 @@ export function estimationAnomalieMessage(code: EstimationAnomalieCode, detail: 
     case "prix_invalide": return PRIX_ISSUE_MESSAGES[detail as PrixIssueCode] ?? PRIX_ISSUE_MESSAGES.invalide;
     case "prix_absent": return "Sans prix : l'ouvrage reste exploitable en quantitatif, il n'entre pas dans le total estimé.";
     case "quantite_non_calculable": return "Quantité non calculable : le coût de cette ligne ne peut pas être estimé.";
-    case "estimation_obsolete": return "Estimation obsolète : le montant automatique a changé depuis la correction, montant retenu à revoir.";
+    case "estimation_obsolete": return detail === "quantite_modifiee"
+      ? "Estimation obsolète : la quantité a changé depuis la correction, montant retenu à revoir."
+      : "Estimation obsolète : le montant automatique a changé depuis la correction, montant retenu à revoir.";
     case "ajustement_orphelin": return "Correction sans ligne correspondante (ouvrage, pièce ou prix disparu).";
   }
 }
@@ -286,7 +299,12 @@ export function evaluerEstimation(entree: EstimationEntree): EstimationResultat 
   }
   lignes.sort((a, b) => a.idx - b.idx || a.nat - b.nat || a.lo - b.lo);
 
-  const aj = (entree.ajustements ?? []).map((a) => ({ a, nature: a.nature ?? "quantite", pieceId: a.pieceId ?? null }));
+  const aj = (entree.ajustements ?? []).map((a) => {
+    // Miroir de `a.value ? 'quantiteSource'` : la clé présente suffit (valeur nulle comprise).
+    const suiviQte = Object.prototype.hasOwnProperty.call(a, "quantiteSource") && a.quantiteSource !== undefined;
+    const qs = typeof a.quantiteSource === "number" ? scaled(a.quantiteSource, 3) : null;
+    return { a, nature: a.nature ?? "quantite", pieceId: a.pieceId ?? null, suiviQte, qs };
+  });
   const key = (ouvrageId: string, pieceId: string | null, etat: string, nature: string) => `${ouvrageId}\u0000${pieceId ?? "\u0001"}\u0000${etat}\u0000${nature}`;
   const ajByKey = new Map<string, (typeof aj)[number]>();
   for (const item of aj) { const k = key(item.a.ouvrageId, item.pieceId, item.a.etatProjet, item.nature); if (!ajByKey.has(k)) ajByKey.set(k, item); }
@@ -306,10 +324,12 @@ export function evaluerEstimation(entree: EstimationEntree): EstimationResultat 
   const out: EstimationLigne[] = lignes.map((l) => {
     const match = ajByKey.get(key(l.ouvrageId, l.pieceId, l.etat, l.nature));
     const a = match?.a;
-    const perime = a ? (a.valeurCalculee === null || a.valeurCalculee === undefined ? l.mc !== null : l.mc === null || scaled(a.valeurCalculee, 2) !== l.mc || !exactCents(a.valeurCalculee)) : false;
+    const perimeMontant = a ? (a.valeurCalculee === null || a.valeurCalculee === undefined ? l.mc !== null : l.mc === null || scaled(a.valeurCalculee, 2) !== l.mc || !exactCents(a.valeurCalculee)) : false;
+    const perimeQte = !!a && !!match?.suiviQte && match.qs !== l.q;
+    const perime = perimeMontant || perimeQte;
     const mr = a ? scaled(a.valeurRetenue, 2) : l.mc;
     if (l.prixDefini && l.mc === null) anomalies.push({ idx: l.idx, ouvrageId: l.ouvrageId, pieceId: l.pieceId, etat: l.etat, nature: l.nature, code: "quantite_non_calculable", detail: "quantite", gravite: "avertissement" });
-    if (a && perime) anomalies.push({ idx: l.idx, ouvrageId: l.ouvrageId, pieceId: l.pieceId, etat: l.etat, nature: l.nature, code: "estimation_obsolete", detail: "ajustement_perime", gravite: "avertissement" });
+    if (a && perime) anomalies.push({ idx: l.idx, ouvrageId: l.ouvrageId, pieceId: l.pieceId, etat: l.etat, nature: l.nature, code: "estimation_obsolete", detail: perimeQte ? "quantite_modifiee" : "ajustement_perime", gravite: "avertissement" });
     if (mr !== null) { tMontant += mr; tEtat[l.etat] += mr; nChiffrees += 1; }
     if (!l.sansMontant) { tMat += l.mat; tMo += l.mo; tForf += l.forf; tAutre += l.autre; }
     if (a) { tEcart += (mr ?? N0) - (l.mc ?? N0); nAjustees += 1; } else if (!l.prixDefini) nSansPrix += 1;
@@ -319,7 +339,10 @@ export function evaluerEstimation(entree: EstimationEntree): EstimationResultat 
       quantite: l.q === null ? null : Number(l.q) / 1000, prixDefini: l.prixDefini, prixUnitaire: l.pu4 === null ? null : Number(l.pu4) / 10000,
       materiau: l.sansMontant ? null : cents(l.mat), mainOeuvre: l.sansMontant ? null : cents(l.mo), forfait: l.sansMontant ? null : cents(l.forf), autre: l.sansMontant ? null : cents(l.autre),
       heures: l.mh === null ? null : Number(l.mh) / 1000, montantCalcule: cents(l.mc),
-      ajustement: a ? { id: a.id ?? null, valeurCalculee: a.valeurCalculee ?? null, valeurRetenue: a.valeurRetenue, raison: a.raison ?? null, auteurId: a.auteurId ?? null, date: a.date ?? null, perime } as EstimationAjustement : null,
+      ajustement: a ? {
+        id: a.id ?? null, valeurCalculee: a.valeurCalculee ?? null, valeurRetenue: a.valeurRetenue, raison: a.raison ?? null, auteurId: a.auteurId ?? null, date: a.date ?? null, perime,
+        ...(match?.suiviQte ? { quantiteSource: a.quantiteSource ?? null, motifPerime: perimeQte ? "quantite" : perimeMontant ? "montant" : null } : {}),
+      } as EstimationAjustement : null,
       montantRetenu: cents(mr),
     };
   });
@@ -351,12 +374,139 @@ function exactCents(value: number): boolean {
   return !s.includes(".") || s.length - s.indexOf(".") - 1 <= 2;
 }
 
+// ── Coefficients et hypothèses (miroir de la migration 20260930001402) ───────
+//
+// Paramètres FACULTATIFS d'un relevé : coefficient général, coefficients par lot, texte d'hypothèses. PRIORITÉ (le plus
+// précis l'emporte, AUCUN CUMUL) : coefficient saisi sur le prix de l'ouvrage > coefficient du lot de l'ouvrage >
+// coefficient général > 1. Un coefficient n'est ni une marge ni une remise : il traduit une difficulté (accès, hauteur,
+// site occupé…). Le moteur d'estimation reçoit des prix « effectifs » : son arithmétique est inchangée.
+
+export const COEFFICIENT_SOURCES = ["ouvrage", "lot", "general", "aucun"] as const;
+export type CoefficientSource = (typeof COEFFICIENT_SOURCES)[number];
+export const COEFFICIENT_SOURCE_LABELS: Record<CoefficientSource, string> = { ouvrage: "ouvrage", lot: "lot", general: "général", aucun: "aucun" };
+/** Ordre de priorité, du plus fort au plus faible. */
+export const COEFFICIENT_PRIORITE = ["ouvrage", "lot", "general"] as const;
+export const COEFFICIENT_PRIORITE_TEXTE = "Priorité : coefficient de l'ouvrage, sinon coefficient de son lot, sinon coefficient général (jamais cumulés).";
+
+export const ESTIMATION_PARAMETRES_LIMITS = { lots: 50, lot: 80, hypotheses: 2000 } as const;
+export type EstimationParametresDonnees = {
+  readonly coefficientGeneral?: number | null;
+  readonly coefficientsLots?: Readonly<Record<string, number>> | null;
+  readonly hypotheses?: string | null;
+};
+export const PARAMETRES_ISSUE_CODES = ["invalide", "cle", "coefficient_general", "coefficients_lots", "lot", "coefficient_lot", "hypotheses"] as const;
+export type ParametresIssueCode = (typeof PARAMETRES_ISSUE_CODES)[number];
+export const PARAMETRES_ISSUE_MESSAGES: Record<ParametresIssueCode, string> = {
+  invalide: "Paramètres d'estimation invalides.",
+  cle: "Donnée inconnue : l'estimation Tools n'a qu'un coefficient général, des coefficients par lot et des hypothèses (marge, remise, TVA, acompte et conditions commerciales relèvent de Gestion Pro).",
+  coefficient_general: "Coefficient général : entre 0,01 et 10, quatre décimales au plus.",
+  coefficients_lots: "Coefficients par lot : 50 lots au plus.",
+  lot: "Lot : 1 à 80 caractères, sans espace au début ni à la fin.",
+  coefficient_lot: "Coefficient de lot : entre 0,01 et 10, quatre décimales au plus.",
+  hypotheses: "Hypothèses : 2 000 caractères au plus.",
+};
+
+/** Miroir exact de `tools_releve_estimation_parametres_anomalie` : premier défaut, `null` si valide. */
+export function parametresAnomalie(input: Json): ParametresIssueCode | null {
+  if (!isObject(input)) return "invalide";
+  if (Object.keys(input).some((k) => !["coefficientGeneral", "coefficientsLots", "hypotheses"].includes(k))) return "cle";
+  if (isPresent(input, "coefficientGeneral") && !decimalValide(input.coefficientGeneral, 4, 0.01, 10)) return "coefficient_general";
+  if (isPresent(input, "coefficientsLots")) {
+    const lots = input.coefficientsLots;
+    if (!isObject(lots) || Object.keys(lots).length > ESTIMATION_PARAMETRES_LIMITS.lots) return "coefficients_lots";
+    if (Object.keys(lots).some((k) => { const n = [...k].length; return n < 1 || n > ESTIMATION_PARAMETRES_LIMITS.lot || k.trim() !== k; })) return "lot";
+    if (Object.values(lots).some((v) => !decimalValide(v, 4, 0.01, 10))) return "coefficient_lot";
+  }
+  if (isPresent(input, "hypotheses") && (typeof input.hypotheses !== "string" || [...input.hypotheses].length > ESTIMATION_PARAMETRES_LIMITS.hypotheses)) return "hypotheses";
+  return null;
+}
+
+/** Paramètres d'un relevé tels que lus (ou figés avec un plan). `revision` 0 : jamais enregistrés. */
+export type EstimationParametres = {
+  readonly donnees: EstimationParametresDonnees;
+  readonly revision: number;
+  readonly updatedAt: string | null;
+  readonly updatedBy: string | null;
+  readonly priorite: readonly string[];
+};
+export const PARAMETRES_VIDES: EstimationParametres = { donnees: {}, revision: 0, updatedAt: null, updatedBy: null, priorite: [...COEFFICIENT_PRIORITE] };
+
+export function estimationParametresFromJson(raw: unknown): EstimationParametres {
+  if (!isObject(raw)) return PARAMETRES_VIDES;
+  const d = isObject(raw.donnees) ? (raw.donnees as EstimationParametresDonnees) : {};
+  return {
+    donnees: d, revision: Number(raw.revision ?? 0), updatedAt: (raw.updatedAt as string | null) ?? null, updatedBy: (raw.updatedBy as string | null) ?? null,
+    priorite: Array.isArray(raw.priorite) ? (raw.priorite as string[]) : [...COEFFICIENT_PRIORITE],
+  };
+}
+
+export type PrixEffectif = {
+  readonly ouvrageId: string;
+  /** Prix transmis au moteur : coefficient du lot ou général injecté si le prix n'en porte pas. */
+  readonly donnees: PrixDonnees;
+  /** Coefficient réellement appliqué (`null` : prix invalide, signalé par le moteur). */
+  readonly coefficientApplique: number | null;
+  readonly coefficientSource: CoefficientSource | null;
+};
+
+/**
+ * Miroir exact de `tools_releve_estimation_prix_effectifs` (fonction pure). Même ordre que `prix`. Paramètres invalides :
+ * ignorés (aucun coefficient de lot ni général).
+ */
+export function prixEffectifs(
+  ouvrages: readonly (Pick<OuvrageRecord, "id" | "categorie"> & { readonly lot?: string | null })[],
+  prix: readonly { readonly ouvrageId: string; readonly donnees: PrixDonnees }[],
+  parametres: EstimationParametresDonnees | null | undefined,
+): PrixEffectif[] {
+  const par: EstimationParametresDonnees = parametres && parametresAnomalie(parametres) === null ? parametres : {};
+  const lots = new Map<string, string>();
+  for (const o of ouvrages) if (!lots.has(o.id)) lots.set(o.id, ouvrageLot({ lot: typeof o.lot === "string" ? o.lot : undefined, categorie: o.categorie }));
+  const general = par.coefficientGeneral ?? null;
+  return prix.map((p) => {
+    if (prixAnomalie(p.donnees) !== null) return { ouvrageId: p.ouvrageId, donnees: p.donnees, coefficientApplique: null, coefficientSource: null };
+    if (p.donnees.coefficient !== null && p.donnees.coefficient !== undefined) {
+      return { ouvrageId: p.ouvrageId, donnees: p.donnees, coefficientApplique: p.donnees.coefficient, coefficientSource: "ouvrage" };
+    }
+    const lot = lots.get(p.ouvrageId);
+    const coefLot = lot !== undefined && par.coefficientsLots && Object.prototype.hasOwnProperty.call(par.coefficientsLots, lot) ? par.coefficientsLots[lot] : null;
+    if (coefLot !== null && coefLot !== undefined) return { ouvrageId: p.ouvrageId, donnees: { ...p.donnees, coefficient: coefLot }, coefficientApplique: coefLot, coefficientSource: "lot" };
+    if (general !== null) return { ouvrageId: p.ouvrageId, donnees: { ...p.donnees, coefficient: general }, coefficientApplique: general, coefficientSource: "general" };
+    return { ouvrageId: p.ouvrageId, donnees: p.donnees, coefficientApplique: 1, coefficientSource: "aucun" };
+  });
+}
+
+/** Estimation avec paramètres : résolution des coefficients, puis moteur (miroir du calcul d'un plan côté serveur). */
+export function evaluerEstimationAvecParametres(
+  entree: Omit<EstimationEntree, "ouvrages"> & { readonly ouvrages: readonly (Pick<OuvrageRecord, "id" | "etatTravaux" | "categorie"> & { readonly lot?: string | null })[] },
+  parametres: EstimationParametresDonnees | null | undefined,
+): EstimationResultat & { readonly prixEffectifs: PrixEffectif[] } {
+  const effectifs = prixEffectifs(entree.ouvrages, entree.prix ?? [], parametres);
+  return { ...evaluerEstimation({ ...entree, prix: effectifs }), prixEffectifs: effectifs };
+}
+
+/** Lots présents sur un ensemble d'ouvrages (ordre de première apparition) : proposés pour les coefficients par lot. */
+export function lotsDesOuvrages(ouvrages: readonly Pick<OuvrageRecord, "lot" | "categorie">[]): string[] {
+  const out: string[] = [];
+  for (const o of ouvrages) { const lot = ouvrageLot(o); if (!out.includes(lot)) out.push(lot); }
+  return out;
+}
+
+/** Estimation séparée des travaux : seules les lignes des états projetés demandés (ex. à créer, à déposer, à déplacer). */
+export function filtrerParEtats<T extends { readonly ligne: { readonly etatProjet: EtatProjet } }>(details: readonly T[], etats: readonly EtatProjet[]): T[] {
+  if (etats.length === 0 || etats.length === ETATS_PROJET.length) return [...details];
+  const set = new Set(etats);
+  return details.filter((d) => set.has(d.ligne.etatProjet));
+}
+
 // ── Estimation d'un plan (forme JSON du serveur) ──────────────────────────────
 
 export type PrixOrigine = "saisie" | "bibliotheque" | "copie";
 export type PrixOuvrage = {
   readonly ouvrageId: string; readonly donnees: PrixDonnees; readonly origine: PrixOrigine; readonly bibliothequeId: string | null;
   readonly revision: number; readonly updatedAt: string | null; readonly updatedBy: string | null;
+  /** Coefficient appliqué et sa provenance (migration 1402 ; absent d'une estimation figée avant elle : prix seul). */
+  readonly coefficientApplique: number | null;
+  readonly coefficientSource: CoefficientSource | null;
 };
 export type PlanEstimation = EstimationResultat & {
   readonly version: 1;
@@ -367,6 +517,8 @@ export type PlanEstimation = EstimationResultat & {
   readonly base: "HT";
   readonly devise: "EUR";
   readonly prix: readonly PrixOuvrage[];
+  /** Paramètres du relevé utilisés pour ce calcul (figés avec le plan au gel). */
+  readonly parametres: EstimationParametres;
   readonly fige?: boolean;
   readonly source?: "gel" | "calcul" | "recalcul_plan_fige_avant_lot10";
   readonly figeLe?: string | null;
@@ -384,11 +536,24 @@ export function planEstimationFromJson(raw: unknown): PlanEstimation {
   return {
     ...json,
     numero: Number(json.numero),
-    prix: (json.prix ?? []).map((p) => ({ ...p, revision: Number(p.revision), bibliothequeId: p.bibliothequeId ?? null, updatedAt: p.updatedAt ?? null, updatedBy: p.updatedBy ?? null })),
+    prix: (json.prix ?? []).map((p) => {
+      // Estimation figée avant la migration 1402 : le coefficient appliqué est celui du prix (aucun paramètre de relevé).
+      const avant1402 = p.coefficientSource === undefined;
+      const explicite = p.donnees?.coefficient !== null && p.donnees?.coefficient !== undefined;
+      return {
+        ...p, revision: Number(p.revision), bibliothequeId: p.bibliothequeId ?? null, updatedAt: p.updatedAt ?? null, updatedBy: p.updatedBy ?? null,
+        coefficientApplique: avant1402 ? (prixAnomalie(p.donnees) === null ? Number(p.donnees.coefficient ?? 1) : null) : num(p.coefficientApplique),
+        coefficientSource: avant1402 ? (prixAnomalie(p.donnees) === null ? (explicite ? "ouvrage" : "aucun") : null) : (p.coefficientSource ?? null),
+      };
+    }),
+    parametres: estimationParametresFromJson((json as { parametres?: unknown }).parametres),
     lignes: (json.lignes ?? []).map((l) => ({
       ...l, quantite: num(l.quantite), prixUnitaire: num(l.prixUnitaire), materiau: num(l.materiau), mainOeuvre: num(l.mainOeuvre), forfait: num(l.forfait),
       autre: num(l.autre), heures: num(l.heures), montantCalcule: num(l.montantCalcule), montantRetenu: num(l.montantRetenu),
-      ajustement: l.ajustement ? { ...l.ajustement, valeurCalculee: num(l.ajustement.valeurCalculee), valeurRetenue: Number(l.ajustement.valeurRetenue) } : null,
+      ajustement: l.ajustement ? {
+        ...l.ajustement, valeurCalculee: num(l.ajustement.valeurCalculee), valeurRetenue: Number(l.ajustement.valeurRetenue),
+        ...(l.ajustement.quantiteSource !== undefined ? { quantiteSource: num(l.ajustement.quantiteSource) } : {}),
+      } : null,
     })),
     anomalies: json.anomalies ?? [],
     totaux: {
@@ -628,7 +793,7 @@ const csvMilli = (m: bigint | null) => (m === null ? "" : milliText(m).replace("
 export const ESTIMATION_CSV_COLUMNS = [
   "Chantier", "Bâtiment", "Étage", "Zone", "Pièce", "Lot", "Catégorie", "Code", "Ouvrage", "Nature", "État projeté", "Unité", "Quantité retenue",
   "PU HT", "Matériau HT", "Main d'œuvre HT", "Forfait HT", "Autre HT", "Heures", "Montant automatique HT", "Montant retenu HT", "Corrigé",
-  "Raison de la correction", "Anomalies",
+  "Raison de la correction", "Anomalies", "Coefficient appliqué", "Origine du coefficient", "Quantité source (correction)", "Correction obsolète",
 ] as const;
 
 /** CSV (Excel FR : `;`, décimale virgule, BOM UTF-8), montants HT exacts ; dernière ligne : total chantier. */
@@ -646,17 +811,21 @@ export function estimationToCsv(details: readonly EstimationLigneDetail[]): stri
       l.heures === null ? "" : csvMilli(d.heuresMilli), csvMoney(d.calculeCentimes), csvMoney(d.retenuCentimes), l.ajustement ? "oui" : "non",
       l.ajustement?.raison ?? (l.prixDefini ? (d.calculeCentimes === null ? "Quantité non calculable" : "") : "Sans prix"),
       d.anomalies.map((a) => ESTIMATION_ANOMALIE_LABELS[a.code]).join(", "),
+      d.prix?.coefficientApplique === null || d.prix?.coefficientApplique === undefined ? "" : decimalString(d.prix.coefficientApplique).replace(".", ","),
+      d.prix?.coefficientSource ? COEFFICIENT_SOURCE_LABELS[d.prix.coefficientSource] : "",
+      l.ajustement?.quantiteSource === null || l.ajustement?.quantiteSource === undefined ? "" : csvMilli(toMilli(l.ajustement.quantiteSource)),
+      l.ajustement ? (l.ajustement.perime ? (l.ajustement.motifPerime === "quantite" ? "oui (quantité modifiée)" : "oui (montant modifié)") : "non") : "",
     ].map(csvCell).join(";"));
   }
   const total = totalEstimation(details);
   rows.push(["Total chantier HT (estimation)", "", "", "", "", "", "", "", "", "", "", "", "", "",
     csvMoney(total.parType.materiau), csvMoney(total.parType.main_d_oeuvre), csvMoney(total.parType.forfait), csvMoney(total.parType.autre),
-    csvMilli(total.heures), "", csvMoney(total.montant), "", "", ""].map(csvCell).join(";"));
+    csvMilli(total.heures), "", csvMoney(total.montant), "", "", "", "", "", "", ""].map(csvCell).join(";"));
   return `﻿${rows.join("\r\n")}\r\n`;
 }
 
 /** Contrat de transfert de l'estimation vers Gestion Pro — version EXPLICITE, semver. */
-export const ESTIMATION_GP_CONTRACT = { name: "elsatia.tools.estimation", version: "1.0.0" } as const;
+export const ESTIMATION_GP_CONTRACT = { name: "elsatia.tools.estimation", version: "1.1.0" } as const;
 /** Préparé, non branché : aucune écriture GP, aucun devis, aucun document commercial. */
 export const ESTIMATION_GP_READINESS = { status: "contract-only", devis: "not-generated", documentsCommerciaux: "none" } as const;
 /** Ce que Gestion Pro décide à partir de l'estimation (Tools ne les calcule jamais). */
@@ -670,11 +839,14 @@ export type EstimationGpPayload = {
   readonly contract: typeof ESTIMATION_GP_CONTRACT;
   readonly kind: "releve-metre/estimation";
   readonly readiness: typeof ESTIMATION_GP_READINESS;
-  readonly perimetre: { readonly tools: "estimation-simplifiee"; readonly decideParGestionPro: typeof ESTIMATION_GP_DECIDE_PAR_GESTION_PRO };
+  /** Gestion Pro reste libre de refaire tout le chiffrage : l'estimation Tools n'est qu'une base de travail. */
+  readonly perimetre: { readonly tools: "estimation-simplifiee"; readonly decideParGestionPro: typeof ESTIMATION_GP_DECIDE_PAR_GESTION_PRO; readonly gestionProLibreDeRechiffrer: true };
   readonly montants: { readonly devise: "EUR"; readonly base: "HT"; readonly nature: "estimative" };
   /** Même relevé, même état, mêmes plans (numéro, gel), mêmes quantités et mêmes montants retenus → même clé. */
   readonly idempotencyKey: string;
   readonly source: {
+    /** Métadonnées de source (1.1.0) : application, module, date d'export. */
+    readonly application: "elsatia-tools"; readonly module: "releve-metre"; readonly exporteLe: string;
     readonly releveId: string; readonly etat: MetreSyntheseEtat; readonly moteurs: { readonly quantitatif: "quantitatif-v1"; readonly estimation: "estimation-v1" };
     readonly plans: readonly { readonly etageId: string; readonly planId: string; readonly numero: number; readonly etat: PlanEtat; readonly libelle: string | null; readonly fige: boolean; readonly source: string }[];
   };
@@ -682,20 +854,30 @@ export type EstimationGpPayload = {
   readonly quantitatif: QuantitatifGpPayload;
   readonly pieces: readonly { readonly ref: string; readonly nom: string; readonly chemin: readonly string[]; readonly usage: string; readonly hauteurSousPlafondM: number | null; readonly surfaceSolM2: string | null; readonly perimetreUtileM: string | null }[];
   /** Prix estimatifs structurés par ouvrage (référence `quantitatif.ouvrages[].ref`). */
-  readonly prix: readonly { readonly ouvrageRef: string; readonly origine: PrixOrigine; readonly coefficient: string; readonly prixUnitaire: string | null; readonly forfait: Money;
+  /** Hypothèses et coefficients (1.1.0), par plan : paramètres du relevé utilisés (figés avec un plan figé). */
+  readonly hypotheses: {
+    readonly priorite: readonly string[]; readonly regle: string;
+    readonly plans: readonly { readonly planRef: string; readonly coefficientGeneral: string | null; readonly coefficientsLots: readonly { readonly lot: string; readonly coefficient: string }[];
+      readonly texte: string | null; readonly revision: number; readonly modifieLe: string | null; readonly modifiePar: string | null }[];
+  };
+  /** `coefficient` : coefficient APPLIQUÉ ; `coefficientSaisi` : celui du prix de l'ouvrage (1.1.0) ; `coefficientSource` : ouvrage / lot / général / aucun. */
+  readonly prix: readonly { readonly ouvrageRef: string; readonly origine: PrixOrigine; readonly coefficient: string; readonly coefficientSaisi: string | null; readonly coefficientSource: CoefficientSource | null;
+    readonly prixUnitaire: string | null; readonly forfait: Money;
     readonly composantes: readonly { readonly type: PrixType; readonly libelle: string | null; readonly prixUnitaire: string | null; readonly heuresParUnite: string | null; readonly tauxHoraire: string | null; readonly montant: string | null }[] }[];
   readonly lignes: readonly {
     readonly ref: string; readonly ouvrageRef: string; readonly quantiteRef: string | null; readonly nature: EstimationNature; readonly etatProjet: EtatProjet; readonly unite: OuvrageUnite;
     readonly quantite: string | null; readonly prixUnitaire: string | null;
     readonly montants: { readonly materiau: Money | null; readonly mainOeuvre: Money | null; readonly forfait: Money | null; readonly autre: Money | null };
     readonly heures: string | null; readonly montantCalcule: Money | null; readonly montantRetenu: Money | null;
-    readonly correction: { readonly raison: string; readonly auteurRef: string | null; readonly date: string | null; readonly montantCalcule: Money | null } | null;
+    readonly correction: { readonly raison: string; readonly auteurRef: string | null; readonly date: string | null; readonly montantCalcule: Money | null;
+      /** Valeur source (1.1.0) : quantité au moment de la correction ; `obsolete` si la quantité ou le montant automatique ont changé. */
+      readonly quantiteSource: string | null; readonly obsolete: boolean; readonly motifObsolescence: "quantite" | "montant" | null } | null;
     readonly emplacement: { readonly chantier: Ref; readonly batiment: Ref; readonly etage: Ref; readonly zone: Ref; readonly piece: Ref };
   }[];
   readonly totaux: {
     readonly total: Money; readonly parEtat: Record<EtatProjet, Money>; readonly parType: Record<PrixType, Money>; readonly ecartCorrections: Money; readonly heures: string;
     readonly parLot: readonly { readonly lot: string; readonly montant: Money }[];
-    readonly lignes: number; readonly lignesSansPrix: number;
+    readonly lignes: number; readonly lignesSansPrix: number; readonly correctionsObsoletes: number;
   };
   /** États projetés : coût dépose / neuf / déplacement / travaux sur existant. */
   readonly etatsProjetes: { readonly depose: Money; readonly neuf: Money; readonly deplacement: Money; readonly existant: Money; readonly total: Money };
@@ -713,6 +895,8 @@ export function buildEstimationGpPayload(input: {
   readonly releveId: string; readonly etat: MetreSyntheseEtat; readonly structure: MetreStructure; readonly sources: readonly EstimationSource[];
   readonly details: readonly EstimationLigneDetail[]; readonly metre?: readonly MetreEtageSource[];
   readonly photos?: readonly EstimationGpPhoto[]; readonly annotations?: readonly EstimationGpAnnotation[];
+  /** Horodatage d'export (ISO) ; par défaut maintenant. */
+  readonly exporteLe?: string;
 }): EstimationGpPayload {
   const { releveId, etat, structure, sources, details } = input;
   const qDetails: QuantitatifLigneDetail[] = [];
@@ -747,10 +931,16 @@ export function buildEstimationGpPayload(input: {
     };
   });
   const prix = sources.flatMap((s) => { const ids = new Set(s.quantitatif.ouvrages.map((o) => o.id)); return s.estimation.prix.filter((p) => ids.has(p.ouvrageId)); }).map((p) => {
-    const pu = prixUnitaireComposite(p.donnees);
+    // PU et forfait AVEC le coefficient appliqué (celui du moteur), coefficient saisi conservé à part.
+    const applique = p.coefficientApplique ?? p.donnees.coefficient ?? 1;
+    const effectif: PrixDonnees = { ...p.donnees, coefficient: applique };
+    const pu = prixUnitaireComposite(effectif);
     return {
-      ouvrageRef: p.ouvrageId, origine: p.origine, coefficient: decimalString(p.donnees.coefficient ?? 1), prixUnitaire: pu === null ? null : decimalString(Number(pu) / 10000),
-      forfait: centimesText(forfaitCentimes(p.donnees)),
+      ouvrageRef: p.ouvrageId, origine: p.origine, coefficient: decimalString(applique),
+      coefficientSaisi: p.donnees.coefficient === null || p.donnees.coefficient === undefined ? null : decimalString(p.donnees.coefficient),
+      coefficientSource: p.coefficientSource ?? null,
+      prixUnitaire: pu === null ? null : decimalString(Number(pu) / 10000),
+      forfait: centimesText(forfaitCentimes(effectif)),
       composantes: p.donnees.composantes.map((c) => ({
         type: c.type, libelle: c.libelle ?? null,
         prixUnitaire: c.type === "materiau" || c.type === "autre" ? decimalString(c.prixUnitaire) : null,
@@ -770,7 +960,12 @@ export function buildEstimationGpPayload(input: {
         forfait: l.forfait === null ? null : centimesText(d.parType.forfait), autre: l.autre === null ? null : centimesText(d.parType.autre),
       },
       heures: l.heures === null ? null : milliText(d.heuresMilli), montantCalcule: m2(d.calculeCentimes), montantRetenu: m2(d.retenuCentimes),
-      correction: l.ajustement ? { raison: l.ajustement.raison, auteurRef: l.ajustement.auteurId, date: l.ajustement.date, montantCalcule: l.ajustement.valeurCalculee === null ? null : centimesText(scaled(l.ajustement.valeurCalculee, 2)) } : null,
+      correction: l.ajustement ? {
+        raison: l.ajustement.raison, auteurRef: l.ajustement.auteurId, date: l.ajustement.date,
+        montantCalcule: l.ajustement.valeurCalculee === null ? null : centimesText(scaled(l.ajustement.valeurCalculee, 2)),
+        quantiteSource: l.ajustement.quantiteSource === null || l.ajustement.quantiteSource === undefined ? null : milliText(toMilli(l.ajustement.quantiteSource)),
+        obsolete: l.ajustement.perime, motifObsolescence: l.ajustement.perime ? (l.ajustement.motifPerime ?? "montant") : null,
+      } : null,
       emplacement: { chantier: d.chantier, batiment: d.batiment, etage: d.etage, zone: d.zone, piece: d.piece },
     };
   });
@@ -783,19 +978,32 @@ export function buildEstimationGpPayload(input: {
     quantite: r.quantite === null ? null : r.unite === "ml" ? mmToMText(r.quantite) : mm2ToM2Text(r.quantite), etatProjet: r.etatProjet,
   })));
   const plans = sources.map((s) => ({ etageId: s.etageId, planId: s.planId, numero: s.numero, etat: s.etat, libelle: s.libelle, fige: s.figeLe !== null, source: s.estimation.source ?? "calcul" }));
-  const empreinte = fnv1a(JSON.stringify(lignes.map((l) => [l.ref, l.quantite, l.montantRetenu])));
+  const hypotheses = {
+    priorite: [...COEFFICIENT_PRIORITE], regle: COEFFICIENT_PRIORITE_TEXTE,
+    plans: sources.map((s) => {
+      const par = s.estimation.parametres ?? PARAMETRES_VIDES;
+      const d = par.donnees;
+      return {
+        planRef: s.planId, coefficientGeneral: d.coefficientGeneral === null || d.coefficientGeneral === undefined ? null : decimalString(d.coefficientGeneral),
+        coefficientsLots: Object.entries(d.coefficientsLots ?? {}).map(([lot, coefficient]) => ({ lot, coefficient: decimalString(coefficient) })),
+        texte: d.hypotheses ?? null, revision: par.revision, modifieLe: par.updatedAt, modifiePar: par.updatedBy,
+      };
+    }),
+  };
+  // Hypothèses comprises : un texte ou un coefficient modifié donne une nouvelle clé (nouvelle version côté GP).
+  const empreinte = fnv1a(JSON.stringify([lignes.map((l) => [l.ref, l.quantite, l.montantRetenu]), hypotheses.plans.map((h) => [h.planRef, h.coefficientGeneral, h.coefficientsLots, h.texte])]));
   return {
     contract: ESTIMATION_GP_CONTRACT, kind: "releve-metre/estimation", readiness: ESTIMATION_GP_READINESS,
-    perimetre: { tools: "estimation-simplifiee", decideParGestionPro: ESTIMATION_GP_DECIDE_PAR_GESTION_PRO },
+    perimetre: { tools: "estimation-simplifiee", decideParGestionPro: ESTIMATION_GP_DECIDE_PAR_GESTION_PRO, gestionProLibreDeRechiffrer: true },
     montants: { devise: "EUR", base: "HT", nature: "estimative" },
     idempotencyKey: `${releveId}:${etat}:${plans.map((plan) => `${plan.planId}#${plan.numero}${plan.fige ? "F" : ""}`).sort().join(",")}:${empreinte}`,
-    source: { releveId, etat, moteurs: { quantitatif: "quantitatif-v1", estimation: "estimation-v1" }, plans },
-    quantitatif, pieces, prix, lignes,
+    source: { application: "elsatia-tools", module: "releve-metre", exporteLe: input.exporteLe ?? new Date().toISOString(), releveId, etat, moteurs: { quantitatif: "quantitatif-v1", estimation: "estimation-v1" }, plans },
+    hypotheses, quantitatif, pieces, prix, lignes,
     totaux: {
       total: centimesText(total.montant), ecartCorrections: centimesText(total.ecart), heures: milliText(total.heures),
       parEtat: { existant: centimesText(total.parEtat.existant), a_deposer: centimesText(total.parEtat.a_deposer), nouveau: centimesText(total.parEtat.nouveau), deplace: centimesText(total.parEtat.deplace) },
       parType: { materiau: centimesText(total.parType.materiau), main_d_oeuvre: centimesText(total.parType.main_d_oeuvre), forfait: centimesText(total.parType.forfait), autre: centimesText(total.parType.autre) },
-      parLot, lignes: total.lignes, lignesSansPrix: total.sansPrix,
+      parLot, lignes: total.lignes, lignesSansPrix: total.sansPrix, correctionsObsoletes: details.filter((d) => d.ligne.ajustement?.perime).length,
     },
     etatsProjetes: { depose: centimesText(couts.depose), neuf: centimesText(couts.neuf), deplacement: centimesText(couts.deplacement), existant: centimesText(couts.existant), total: centimesText(couts.total) },
     revetements, photos: [...(input.photos ?? [])], annotations: [...(input.annotations ?? [])],
@@ -809,8 +1017,11 @@ function fnv1a(text: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
-/** Clés interdites dans le contrat : Tools ne produit ni devis, ni facture, ni commande, ni prix de vente, ni TVA. */
-const COMMERCIAL_KEY = /"[^"]*(numeroDevis|devisNumero|numeroFacture|facture|commande|signature|marge|remise|prixVente|prix_vente|tauxTva|tva|ttc|statutDevis|accepte|refuse)[^"]*"\s*:/i;
+/**
+ * Clés interdites dans le contrat : Tools ne produit ni devis (numérotation, statut), ni facture, ni commande, ni prix de
+ * vente, ni TVA, ni marge, ni remise, ni acompte, ni conditions commerciales, ni signature client.
+ */
+const COMMERCIAL_KEY = /"[^"]*(numeroDevis|devisNumero|numeroFacture|facture|commande|signature|marge|remise|prixVente|prix_vente|tauxTva|tva|ttc|statutDevis|accepte|refuse|acompte|conditionsCommerciales|conditionsPaiement|conditionsReglement|escompte|echeancier)[^"]*"\s*:/i;
 
 /**
  * Contrôle d'un contrat reçu (côté Gestion Pro) : version majeure 1, montants HT décimaux exacts, références
@@ -822,7 +1033,7 @@ export function validateEstimationGpPayload(payload: unknown): string[] {
   const p = payload as Record<string, Json>;
   const contract = p.contract as Record<string, Json> | undefined;
   if (!isObject(contract) || contract.name !== ESTIMATION_GP_CONTRACT.name || typeof contract.version !== "string" || !/^1\.\d+\.\d+$/.test(contract.version)) issues.push("version de contrat non prise en charge");
-  if (COMMERCIAL_KEY.test(JSON.stringify(payload))) issues.push("donnée commerciale interdite (devis, facture, commande, marge, remise, TVA, prix de vente)");
+  if (COMMERCIAL_KEY.test(JSON.stringify(payload))) issues.push("donnée commerciale interdite (devis, facture, commande, marge, remise, TVA, acompte, conditions commerciales, prix de vente)");
   if (!isObject(p.readiness) || (p.readiness as Record<string, Json>).devis !== "not-generated") issues.push("aucun devis ne doit être généré par le contrat");
   if (!isObject(p.montants) || (p.montants as Record<string, Json>).base !== "HT") issues.push("montants HT attendus");
   const q = p.quantitatif;
@@ -841,7 +1052,22 @@ export function validateEstimationGpPayload(payload: unknown): string[] {
     if (!(ETATS_PROJET as readonly string[]).includes(l.etatProjet as string)) issues.push(`ligne ${String(l.ref)} : état projeté inconnu`);
   }
   const prix = Array.isArray(p.prix) ? (p.prix as Record<string, Json>[]) : [];
-  for (const x of prix) if (!ouvrageRefs.has(x.ouvrageRef)) issues.push(`prix : ouvrage inconnu ${String(x.ouvrageRef)}`);
+  const coef = (v: Json) => typeof v === "string" && /^\d+(\.\d{1,4})?$/.test(v) && Number(v) >= 0.01 && Number(v) <= 10;
+  for (const x of prix) {
+    if (!ouvrageRefs.has(x.ouvrageRef)) issues.push(`prix : ouvrage inconnu ${String(x.ouvrageRef)}`);
+    if (!coef(x.coefficient)) issues.push(`prix ${String(x.ouvrageRef)} : coefficient invalide`);
+  }
+  // 1.1.0 : hypothèses facultatives pour un contrat 1.0.x ; si présentes, plans connus et coefficients bornés.
+  if (p.hypotheses !== undefined) {
+    const h = p.hypotheses as Record<string, Json>;
+    const planRefs = new Set(isObject(p.source) && Array.isArray((p.source as Record<string, Json>).plans) ? ((p.source as Record<string, Json>).plans as Record<string, Json>[]).map((x) => x.planId) : []);
+    if (!isObject(h) || !Array.isArray(h.plans)) issues.push("hypothèses invalides");
+    else for (const x of h.plans as Record<string, Json>[]) {
+      if (!planRefs.has(x.planRef)) issues.push(`hypothèses : plan inconnu ${String(x.planRef)}`);
+      if (x.coefficientGeneral !== null && !coef(x.coefficientGeneral)) issues.push(`hypothèses ${String(x.planRef)} : coefficient général invalide`);
+      for (const l of Array.isArray(x.coefficientsLots) ? (x.coefficientsLots as Record<string, Json>[]) : []) if (!coef(l.coefficient)) issues.push(`hypothèses ${String(x.planRef)} : coefficient du lot ${String(l.lot)} invalide`);
+    }
+  }
   if (!isObject(p.totaux) || !money((p.totaux as Record<string, Json>).total)) issues.push("total non décimal");
   return issues;
 }
@@ -853,6 +1079,11 @@ export type EstimationCorrection = {
   readonly id: string; readonly ouvrageId: string; readonly pieceId: string | null; readonly etatProjet: EtatProjet; readonly nature: EstimationNature;
   readonly valeurCalculee: number | null; readonly valeurRetenue: number; readonly raison: string; readonly auteurId: string | null; readonly date: string;
   readonly retireLe: string | null; readonly retirePar: string | null; readonly raisonRetrait: string | null;
+  /** Valeur source figée à la correction (1402) : quantité, unité, PU, montant automatique, coefficient et sa provenance. */
+  readonly valeurSource: {
+    readonly quantite: number | null; readonly unite: OuvrageUnite; readonly prixUnitaire: number | null; readonly montantCalcule: number | null;
+    readonly coefficient: number | null; readonly coefficientSource: CoefficientSource | null;
+  } | null;
 };
 export type EstimationCible = { readonly ouvrageId: string; readonly pieceId: string | null; readonly etatProjet: EtatProjet; readonly nature: EstimationNature };
 
@@ -870,4 +1101,8 @@ export interface ReleveEstimationRepository {
   bibliothequePrix(releveId: string): Promise<BibliothequePrix[]>;
   saveBibliothequePrix(releveId: string, bibliothequeId: string, donnees: PrixDonnees): Promise<void>;
   deleteBibliothequePrix(releveId: string, bibliothequeId: string): Promise<void>;
+  /** Coefficients et hypothèses du relevé (lecture ; `revision` 0 : jamais enregistrés). */
+  parametres(releveId: string): Promise<EstimationParametres>;
+  /** Enregistre les paramètres ; `revision` : celle lue (refus PT409 si modifiés ailleurs). */
+  saveParametres(releveId: string, donnees: EstimationParametresDonnees, revision: number): Promise<EstimationParametres>;
 }

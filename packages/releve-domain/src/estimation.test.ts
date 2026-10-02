@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { MetreStructure } from "./metre";
 import {
   agregerEstimation, buildEstimationGpPayload, centimesText, comparerEstimations, ESTIMATION_ANOMALIE_CODES, ESTIMATION_CSV_COLUMNS, ESTIMATION_GP_CONTRACT,
-  estimationAnomalieMessage, estimationDetails, estimationToCsv, evaluerEstimation, forfaitCentimes, formatHeures, formatMontant, formatPrixUnitaire,
+  estimationAnomalieMessage, estimationDetails, estimationToCsv, evaluerEstimation, evaluerEstimationAvecParametres, forfaitCentimes, PARAMETRES_VIDES, formatHeures, formatMontant, formatPrixUnitaire,
   planEstimationFromJson, PRIX_ISSUE_MESSAGES, PRIX_TYPES, prixAnomalie, prixGlobal, prixTexte, prixUnitaireComposite, syntheseCouts, totalEstimation,
   validateEstimationGpPayload,
-  type EstimationEntree, type EstimationSource, type PlanEstimation, type PrixDonnees,
+  type EstimationEntree, type EstimationParametresDonnees, type EstimationSource, type PlanEstimation, type PrixDonnees,
 } from "./estimation";
 import { evaluerQuantitatif, OUVRAGE_CATALOGUE_STANDARD, validateQuantitatifGpPayload, type OuvrageRecord, type PlanQuantitatif } from "./quantitatif";
 
@@ -147,13 +147,16 @@ const ouv = (id: string, extra: Partial<OuvrageRecord> = {}): OuvrageRecord => (
   id, nom: id, code: id, categorie: "peinture", unite: "m2", regle: { source: "saisie", valeur: 1 }, pertePourcent: 0, arrondi: { mode: "aucun" }, etatTravaux: "nouveau", etats: ["nouveau"], ...extra,
 });
 function sourceDe(planId: string, ouvrages: OuvrageRecord[], lignes: { ouvrageId: string; pieceId: string | null; etatProjet: "existant" | "a_deposer" | "nouveau" | "deplace"; quantiteRetenue: number | null }[],
-  prix: EstimationEntree["prix"], ajustements: EstimationEntree["ajustements"] = []): EstimationSource {
+  prix: EstimationEntree["prix"], ajustements: EstimationEntree["ajustements"] = [], parametres: EstimationParametresDonnees = {}): EstimationSource {
   const qLignes = lignes.map((l) => ({ ...l, source: "saisie" as const, uniteSource: "m2" as const, unite: ouvrages.find((o) => o.id === l.ouvrageId)!.unite, elements: 1, nonCalculables: 0, base: l.quantiteRetenue,
     quantiteBrute: l.quantiteRetenue, quantiteAvecPerte: l.quantiteRetenue, quantiteCalculee: l.quantiteRetenue, ajustement: null, annotations: [] }));
   const quantitatif: PlanQuantitatif = { version: 1, planId, etageId: "e1", etat: "projete", numero: 2, ouvrages, moteur: "quantitatif-v1", lignes: qLignes, anomalies: [] };
-  const e = evaluerEstimation({ ouvrages, lignes: qLignes, prix, ajustements });
+  // Comme le serveur (1402) : coefficients résolus, puis moteur ; prix enrichis du coefficient appliqué et de sa provenance.
+  const { prixEffectifs: eff, ...e } = evaluerEstimationAvecParametres({ ouvrages, lignes: qLignes, prix, ajustements }, parametres);
   const estimation: PlanEstimation = { version: 1, planId, etageId: "e1", etat: "projete", numero: 2, base: "HT", devise: "EUR", ...e,
-    prix: (prix ?? []).map((p) => ({ ...p, origine: "saisie", bibliothequeId: null, revision: 1, updatedAt: null, updatedBy: null })) };
+    parametres: { ...PARAMETRES_VIDES, donnees: parametres, revision: Object.keys(parametres).length ? 1 : 0 },
+    prix: (prix ?? []).map((p, i) => ({ ...p, origine: "saisie", bibliothequeId: null, revision: 1, updatedAt: null, updatedBy: null,
+      coefficientApplique: eff[i].coefficientApplique, coefficientSource: eff[i].coefficientSource })) };
   return { etageId: "e1", planId, numero: 2, etat: "projete", figeLe: null, libelle: `Solution ${planId}`, quantitatif, estimation };
 }
 
@@ -204,11 +207,11 @@ describe("sous-totaux, total chantier, dépose / neuf / déplacement, exports, c
     expect(csv.startsWith("﻿")).toBe(true);
     const rows = csv.slice(1).trim().split("\r\n");
     expect(rows[0]).toBe(ESTIMATION_CSV_COLUMNS.join(";"));
-    expect(rows[1]).toBe("Chantier A;Bât. 1;RDC;Logement;Séjour;Peinture;Peinture;PEI;PEI;Quantité;Nouveau;m²;31,238;14,75;109,33;351,43;0,00;0,00;7,810;460,76;460,76;non;;");
+    expect(rows[1]).toBe("Chantier A;Bât. 1;RDC;Logement;Séjour;Peinture;Peinture;PEI;PEI;Quantité;Nouveau;m²;31,238;14,75;109,33;351,43;0,00;0,00;7,810;460,76;460,76;non;;;1;aucun;;");
     expect(rows.at(-1)).toContain("Total chantier HT (estimation)");
     expect(rows.at(-1)).toContain(";1075,76;");
   });
-  it("contrat GP estimation 1.0.0 : quantitatif 1.0.0 imbriqué SANS prix, prix structurés, HT, aucun devis, idempotent", () => {
+  it("contrat GP estimation 1.1.0 : quantitatif 1.0.0 imbriqué SANS prix, prix structurés, HT, aucun devis, idempotent", () => {
     const payload = buildEstimationGpPayload({ releveId: "r1", etat: "projete", structure, sources: [src], details,
       photos: [{ ref: "m1", storagePath: "t/r1/photos/m1.jpg", mimeType: "image/jpeg", legende: "Mur humide", pieceRef: "p1", etatDocumente: "initial", priseLe: null }],
       annotations: [{ ref: "a1", texte: "Fissure", forme: "texte", pieceRef: "p1", cible: null }] });
