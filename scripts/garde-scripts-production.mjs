@@ -25,6 +25,9 @@ export const REGISTRE_SCRIPTS = Object.freeze({
   "seed_entreprise_pilote_btp.sql": { destructif: false },
   "assertions_entreprise_pilote_btp.sql": { destructif: false },
   "cleanup_entreprise_pilote_btp.sql": { destructif: true, cleConfirmation: "CONFIRM_DELETE_TEST_DATA", valeurAttendue: "YES" },
+  // Satellites Preview (A-01/A-02) : droits applicatifs du pilote et état GP déterministe, après le seed.
+  "fixture_preview_satellites_pilote.sql": { destructif: false },
+  "assertions_fixture_preview_satellites_pilote.sql": { destructif: false },
 });
 
 /**
