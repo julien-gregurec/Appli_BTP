@@ -1,4 +1,4 @@
--- ELSATIA TOOLS → GESTION PRO — RELEVÉ & MÉTRÉ — LOT 11 — COSTING HANDOFF V1 (migration 20260930001501)
+-- ELSATIA TOOLS → GESTION PRO — RELEVÉ & MÉTRÉ — LOT 11 — COSTING HANDOFF V1 (migration 20261002001116)
 --
 -- Qualifie sous RLS réelle, sur une vraie estimation du Lot 10 :
 --   S1–S8   schéma et droits : tables en lecture seule, RPC SECURITY DEFINER, internes non exposées, anonyme, gardes incident ;

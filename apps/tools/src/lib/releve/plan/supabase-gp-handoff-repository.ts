@@ -1,7 +1,7 @@
 /**
  * Adaptateur Supabase du port `GpHandoffRepository` (Lot 11) : envoi RÉEL de l'estimation vers Gestion Pro.
  *
- * Une seule écriture : la RPC `gp_tools_importer_estimation` (migration 20260930001501), qui vérifie les droits Tools
+ * Une seule écriture : la RPC `gp_tools_importer_estimation` (migration 20261002001116), qui vérifie les droits Tools
  * ET Gestion Pro, recompare le contrat à l'estimation calculée par le serveur et garantit l'idempotence. Aucune table
  * Gestion Pro n'est écrite directement, aucun devis n'est demandé : Gestion Pro en décide.
  */

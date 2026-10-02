@@ -234,6 +234,29 @@ describe("contrat Gestion Pro 1.1.0 : ouvrages, quantités, prix simplifiés, hy
     expect(payload.perimetre.gestionProLibreDeRechiffrer).toBe(true);
     expect(payload.source).toMatchObject({ application: "elsatia-tools", module: "releve-metre", exporteLe: "2026-10-02T09:00:00.000Z", releveId: "r1" });
   });
+  // Train canonique V9 : le Lot 11 (import GP, migration 20261002001116) a été qualifié sur un Lot 10
+  // en contrat 1.0.0 ; il est porté au-dessus du Lot 10 1.1.0. Miroir du contrôle serveur
+  // `gp_tools_contrat_anomalie` : le contrat 1.1.0 doit y être recevable tel quel.
+  it("recevable par le contrôle serveur Gestion Pro du Lot 11 (miroir de gp_tools_contrat_anomalie)", () => {
+    const json = JSON.parse(JSON.stringify(payload));
+    expect(json.contract.version).toMatch(/^1\.[0-9]+\.[0-9]+$/);
+    expect(json.kind).toBe("releve-metre/estimation");
+    expect(json.montants).toMatchObject({ base: "HT", devise: "EUR" });
+    expect(JSON.stringify(json)).not.toMatch(/"[^"]*(numeroDevis|devisNumero|numeroFacture|facture|commande|signature|marge|remise|prixVente|prix_vente|tauxTva|tva|ttc|statutDevis|accepte|refuse)[^"]*"\s*:/i);
+    expect(Array.isArray(json.lignes) && Array.isArray(json.quantitatif.ouvrages) && typeof json.totaux === "object").toBe(true);
+    expect(json.quantitatif.contract.name).toBe("elsatia.tools.quantitatif");
+    expect(json.quantitatif.contract.version).toMatch(/^1\.[0-9]+\.[0-9]+$/);
+    expect(json.totaux.total).toMatch(/^-?[0-9]+\.[0-9]{2}$/);
+    const refs = new Set(json.quantitatif.ouvrages.map((o: { ref: string }) => o.ref));
+    for (const l of json.lignes) {
+      expect(refs.has(l.ouvrageRef)).toBe(true);
+      if (l.montantRetenu !== null && l.montantRetenu !== undefined) expect(l.montantRetenu).toMatch(/^-?[0-9]+\.[0-9]{2}$/);
+      if (l.quantite !== null && l.quantite !== undefined) expect(l.quantite).toMatch(/^-?[0-9]+(\.[0-9]+)?$/);
+      expect(["existant", "a_deposer", "nouveau", "deplace"]).toContain(l.etatProjet);
+      expect(["quantite", "forfait"]).toContain(l.nature);
+    }
+    expect(new Set(json.lignes.map((l: { ref: string }) => l.ref)).size).toBe(json.lignes.length);
+  });
   it("hypothèses et coefficients par plan, règle de priorité explicite", () => {
     expect(payload.hypotheses.priorite).toEqual(["ouvrage", "lot", "general"]);
     expect(payload.hypotheses.plans).toEqual([{ planRef: "pA", coefficientGeneral: "1.05", coefficientsLots: [{ lot: "Peinture", coefficient: "1.2" }],

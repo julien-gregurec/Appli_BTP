@@ -5,10 +5,10 @@ import { ESTIMATION_GP_CONTRACT, type EstimationGpPayload } from "./estimation";
 import { classerErreurEnvoiGp, gpEnvoisFromJson, gpImportMessage, gpImportResultatFromJson, resumeEnvoiGp } from "./gp-handoff";
 
 const lire = (chemin: string) => readFileSync(fileURLToPath(new URL(chemin, import.meta.url)), "utf8");
-const sql = lire("../../../supabase/migrations/20260930001501_gp_tools_import_estimation_v1.sql");
+const sql = lire("../../../supabase/migrations/20261002001116_gp_tools_import_estimation_v1.sql");
 const estimationTs = lire("./estimation.ts");
 
-describe("parité contrat Tools (Lot 10) ↔ import Gestion Pro (migration 20260930001501)", () => {
+describe("parité contrat Tools (Lot 10) ↔ import Gestion Pro (migration 20261002001116)", () => {
   it("même nom de contrat, majeure 1 acceptée côté GP", () => {
     expect(sql).toContain(`'${ESTIMATION_GP_CONTRACT.name}'`);
     expect(ESTIMATION_GP_CONTRACT.version).toMatch(/^1\.\d+\.\d+$/);

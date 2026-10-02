@@ -1,7 +1,7 @@
 /**
  * Lot 11 — Transmission réelle de l'estimation Tools vers Gestion Pro (contrat `elsatia.tools.estimation` 1.x).
  *
- * Tools ENVOIE ; Gestion Pro IMPORTE (RPC `gp_tools_importer_estimation`, migration 20260930001501) et reste seul
+ * Tools ENVOIE ; Gestion Pro IMPORTE (RPC `gp_tools_importer_estimation`, migration 20261002001116) et reste seul
  * propriétaire du prix de vente, de la marge, de la remise, de la TVA, du devis et de sa version commerciale.
  *
  * Règles (vérifiées par le serveur, rappelées ici pour l'interface et les tests) :

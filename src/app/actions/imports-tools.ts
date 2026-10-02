@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Imports Tools / Relevé (Lot 11) : actions Gestion Pro. Toutes passent par les RPC de la migration 20260930001501,
+ * Imports Tools / Relevé (Lot 11) : actions Gestion Pro. Toutes passent par les RPC de la migration 20261002001116,
  * qui vérifient l'entreprise, la permission GP (`gerer_devis`) et l'immutabilité du snapshot. Aucune n'écrit dans Tools.
  */
 import { redirect } from "next/navigation";

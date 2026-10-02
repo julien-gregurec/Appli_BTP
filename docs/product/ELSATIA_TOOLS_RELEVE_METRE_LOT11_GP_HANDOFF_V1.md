@@ -40,7 +40,7 @@ Le travail produit dans Tools (relevé → métré → quantitatif → estimatio
 | Vitest `apps/tools` | **2 160 / 2 160** (+6 `plan-lot11`) |
 | `tsc --noEmit` racine et `apps/tools` | 0 erreur |
 | ESLint `apps/tools`, `src`, `packages`, recette | 0 erreur (4 avertissements `<img>` antérieurs, hors lot) |
-| `verify:migrations`, `verify:train-expectations` | OK (attendus synchronisés : 373 / `20260930001501`) |
+| `verify:migrations`, `verify:train-expectations` | OK (attendus synchronisés : 373 / `20261002001116`) |
 | **Playwright Tools → GP** `tools-releve-lot11-gp.spec.ts` | **11 / 11** (voir §13), passe finale complète |
 | Playwright non-régression Relevé Lots 2 → 10 + Atelier | **117 / 117** (15,9 min, une passe, pile réelle) |
 | Build Tools web / natif (Capacitor) / Gestion Pro | OK ; `/devis/imports-tools` et `/devis/imports-tools/[id]` dynamiques, `/releves/estimation` statique |
@@ -50,12 +50,12 @@ Le travail produit dans Tools (relevé → métré → quantitatif → estimatio
 - `git merge-base` Lot 10 / V8 = `a622540` (Lot 9) : V8 contient déjà les Lots 2 → 9. Le Lot 10 = **5 commits** au-dessus.
 - Branche de session repositionnée sur `53b4bc7`, puis `cherry-pick` des 5 commits du Lot 10 : **sans conflit**. Migration `20260930001401` postérieure à la dernière V8 (`20260928000812`) : ordre monotone conservé.
 - **Défaut de port détecté et réparé** : le Lot 10 (qualifié hors train) crée 3 tables sans rappeler `incident_installer_gardes()`. Sur V8 + Lot 10, pgTAP `incident_safe_mode_v1` test 23 et `v8_convergence_incident_gardes_v1` test 1 échouent (**have 3, want 0** : tables écrivables en mode lecture seule). La migration du Lot 11 rappelle `incident_installer_gardes()` : **131 / 131** et **32 / 32**, plus un test dédié (S6).
-- Attendus du train synchronisés (`npm run sync:train-expectations`) : 373 migrations, dernière `20260930001501`.
+- Attendus du train synchronisés (`npm run sync:train-expectations`) : 373 migrations, dernière `20261002001116`.
 
 | Commit | Objet |
 |---|---|
 | `443151a`…`2dea8f0` | Lot 10 porté (5 commits, contenu identique) |
-| `aed3b66` | migration `20260930001501` (additive) + pgTAP Lot 11 |
+| `aed3b66` | migration `20261002001116` (additive) + pgTAP Lot 11 |
 | `2707606` | Tools : « Envoyer vers Gestion Pro », domaine `gp-handoff`, Vitest |
 | `6daeb64` | GP : « Imports Tools / Relevé », unité m³, Vitest GP |
 | `3f8f905` | recette Playwright Tools → GP ; performances (import linéaire, RLS une fois par requête, détail GP sans snapshot) |
@@ -81,7 +81,7 @@ Estimation (Lot 10)                             RPC gp_tools_importer_estimation
 - **Le serveur fait foi** : le contrat est construit dans le navigateur (photos, annotations, revêtements, pièces), mais ses lignes, quantités, montants retenus, plans et total sont **recomparés** à l'estimation recalculée par le moteur SQL du Lot 10. Tout écart → `PT409 SOURCE_OBSOLETE`. Un montant forgé, une ligne omise ou un ouvrage supprimé entre-temps ne passent pas (pgTAP O1–O4, Playwright).
 - **Dossier lu par le serveur** : client et chantier viennent de `tools_releves.chantier_gp_id` / `client_gp_id` (liens GP déjà gardés par le Lot 2 : même entreprise, permissions GP). Le client est déduit du chantier GP s'il n'est pas lié. Jamais depuis le contrat.
 
-### Modèle (migration `20260930001501`, additive)
+### Modèle (migration `20261002001116`, additive)
 
 | Table | Rôle |
 |---|---|

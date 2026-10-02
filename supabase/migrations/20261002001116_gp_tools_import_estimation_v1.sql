@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930001501 (Relevé & Métré Lot 11 (claude/beautiful-tesla-grj0pu, commits Lot 11 portés sur le Lot 10 de fervent-bell)), renuméroté 20261002001116
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA TOOLS → GESTION PRO — RELEVÉ & MÉTRÉ — LOT 11 — COSTING HANDOFF V1
 --
 -- Branche réellement le contrat `elsatia.tools.estimation` 1.0.0 (Lot 10, packages/releve-domain/src/estimation.ts)
