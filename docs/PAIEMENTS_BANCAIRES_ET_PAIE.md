@@ -25,12 +25,12 @@ La réception d’un bulletin ne déclenche donc jamais seule un salaire. Elle c
 - clé uniquement dans les variables secrètes Vercel ;
 - IBAN complet jamais renvoyé à l’interface ;
 - seuls les quatre derniers caractères sont affichés ;
-- empreinte SHA-256 pour détecter les doublons ;
+- empreinte de l’IBAN pour détecter les doublons : index aveugle HMAC sous la clé active (format v2), SHA-256 historique pour les valeurs v1 ;
 - remplacement d’un RIB par création d’une nouvelle version active ;
 - validation obligatoire avant utilisation dans un lot ;
 - journal append-only des changements et validations.
 
-La variable `BANK_DATA_ENCRYPTION_KEY` doit être sauvegardée dans un coffre-fort de secrets. Sa perte rend les IBAN illisibles. Son changement exige une procédure de rotation et de rechiffrement.
+Les clés de chiffrement forment un trousseau versionné (`BANK_DATA_ENCRYPTION_KEY` = clé historique k1, `BANK_DATA_ENCRYPTION_KEYS` = `k2:<clé>,…`, `BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID`). Chaque valeur chiffrée porte l’identifiant de sa clé (`v2:k2:A256GCM:…`). Chaque clé doit être sauvegardée dans le coffre-fort de secrets : sa perte rend illisibles les IBAN encore chiffrés avec elle. Une clé ne se remplace jamais : on en ajoute une nouvelle puis on rechiffre (`npm run bank-keys`). Procédures de rotation, de compromission et de restauration : `docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md`.
 
 ## Intégration Powens Pay
 
@@ -95,7 +95,7 @@ Un accès support plateforme est explicitement exclu du module, même lorsqu’u
 ## Mise en service
 
 1. Appliquer `20260716000089_paiements_bancaires_paie.sql`.
-2. Générer `BANK_DATA_ENCRYPTION_KEY` avec `openssl rand -base64 32` et la sauvegarder dans le gestionnaire de secrets.
+2. Générer `BANK_DATA_ENCRYPTION_KEY` avec `openssl rand -base64 32` et la sauvegarder dans le gestionnaire de secrets, puis l’attester en base : `npm run bank-keys -- register --key-id k1`.
 3. Souscrire un contrat Powens Pay et renseigner les quatre variables Powens dans Vercel.
 4. Générer un secret d’import d’au moins 32 caractères si l’intégration expert-comptable est utilisée.
 5. Redéployer l’application.

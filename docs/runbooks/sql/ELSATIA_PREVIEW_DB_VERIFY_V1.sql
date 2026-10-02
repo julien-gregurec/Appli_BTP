@@ -27,14 +27,15 @@
 -- par application (…0928 804). Contrôle 33 (train canonique V8) : données personnelles des salariés
 -- (…0928 806, ELSATIA_EMPLOYEE_PERSONAL_DATA_ACCESS_HARDENING_V1). Contrôles 34-37 (train canonique V8) :
 -- mode sûr et convergence (…0928 807-808, 811), Relevé Lots 8-9 (…0928 809-810), red team V2
--- (…0928 805), recalcul des devis par instruction (…0928 812).
+-- (…0928 805), recalcul des devis par instruction (…0928 812). Contrôle 38 : chiffrement bancaire
+-- versionné et rotation des clés (…0930 813, ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1).
 -- Complète, sans la remplacer, docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql.
 
 begin transaction read only;
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (382, '20260930000404')),
+attendu_train(nb, derniere) as (values (383, '20260930000813')),
 -- [/train-expectations]
 -- Lecture dynamique : sur une base encore au train V2 (db-verify --allow-pending avant push),
 -- la table n'existe pas et le contrôle 14 doit échouer proprement, pas le script entier.
@@ -580,6 +581,26 @@ controles(ordre, controle, attendu, observe, ok, bloquant) as (
            and not exists (select 1 from pg_trigger where tgrelid = 'public.lignes_devis'::regclass and tgname = 'recalc_devis_apres_ligne')
            and to_regprocedure('public.trg_recalc_devis_instruction()') is not null
            and not has_function_privilege('authenticated', 'public.trg_recalc_devis_instruction()', 'execute'), true
+  union all
+  -- 38 : chiffrement bancaire versionné (ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1, …0930 813).
+  -- Registre des clés (sans clé), une seule active, garde d'écriture, RPC opérateur fermées à l'API
+  -- cliente, aucune donnée sous une clé retirée, compromise ou non enregistrée. Lecture dynamique :
+  -- sur une base antérieure, le registre est absent et le contrôle échoue proprement.
+  select 38, 'Chiffrement bancaire : registre des clés et garde d''écriture (20260930000813)',
+         '1 clé active, 2 gardes, RPC fermées à authenticated, 0 donnée sous clé retirée/compromise/inconnue',
+         case when to_regclass('public.cles_chiffrement_bancaire') is null then 'registre absent'
+              else concat_ws(', ',
+                (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.cles_chiffrement_bancaire where statut = ''active''', false, true, '')))[1]::text || ' active(s)',
+                (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D' and tgname = 'garde_chiffres_bancaires')::text || '/2 gardes',
+                (xpath('/row/n/text()', query_to_xml('select coalesce(sum(nombre), 0) as n from public.cles_bancaires_inventaire() where statut_cle in (''retiree'', ''compromise'', ''non_enregistree'')', false, true, '')))[1]::text || ' donnée(s) sous clé interdite',
+                (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.cles_chiffrement_bancaire where empreinte_controle is null and statut <> ''retiree''', false, true, '')))[1]::text || ' clé(s) à attester (bank-keys register)') end,
+         to_regclass('public.cles_chiffrement_bancaire') is not null
+           and (xpath('/row/n/text()', query_to_xml('select count(*) as n from public.cles_chiffrement_bancaire where statut = ''active''', false, true, '')))[1]::text = '1'
+           and (select count(*) from pg_trigger where not tgisinternal and tgenabled <> 'D' and tgname = 'garde_chiffres_bancaires') = 2
+           and (xpath('/row/n/text()', query_to_xml('select coalesce(sum(nombre), 0) as n from public.cles_bancaires_inventaire() where statut_cle in (''retiree'', ''compromise'', ''non_enregistree'')', false, true, '')))[1]::text = '0'
+           and not has_function_privilege('authenticated', 'public.chiffres_bancaires_rechiffrer_lot(text,text,jsonb)', 'execute')
+           and not has_function_privilege('authenticated', 'public.cles_bancaires_etat()', 'execute')
+           and not has_table_privilege('authenticated', 'public.cles_chiffrement_bancaire', 'select'), true
 )
 select controle, attendu, observe, ok, bloquant
 from controles

@@ -6,7 +6,7 @@
 
 | App | Total | Required | Conditional | Optional | Preview-only | Public | Secret | Build-time |
 |---|---|---|---|---|---|---|---|---|
-| gestion_pro | 124 | 19 | 84 | 21 | 1 | 11 | 18 | 12 |
+| gestion_pro | 128 | 19 | 88 | 21 | 1 | 11 | 20 | 12 |
 | colors | 6 | 6 | 0 | 0 | 0 | 4 | 1 | 5 |
 | tools | 7 | 2 | 1 | 4 | 0 | 6 | 0 | 7 |
 | reserves | 10 | 5 | 3 | 2 | 1 | 3 | 2 | 4 |
@@ -37,6 +37,10 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | REQUIRED |  | oui |  |  |  |  |  |  |
 | `TOOLS_STORE_ENVIRONMENT` | REQUIRED |  |  |  |  |  |  |  |  |
 | `APPLE_ROOT_CA_BASE64` | CONDITIONAL |  |  |  |  |  |  |  | dès que les achats iOS Tools sont ouverts |
+| `BANK_DATA_ENCRYPTION_ACTIVE_KEY_ID` | CONDITIONAL |  |  |  |  |  |  |  | obligatoire dès que le trousseau contient plusieurs clés |
+| `BANK_DATA_ENCRYPTION_KEYS` | CONDITIONAL |  | oui |  |  |  |  |  | dès la première rotation de clé bancaire (k2 et suivantes) |
+| `BANK_DATA_ENCRYPTION_WRITE_FORMAT` | CONDITIONAL |  |  |  |  |  | v1, v2 |  | uniquement pour un retour arrière du code vers une version antérieure à la V1 |
+| `BANK_OAUTH_STATE_HMAC_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que les paiements bancaires sont activés (recommandé ; sinon repli historique) |
 | `BREVO_API_KEY` | CONDITIONAL |  | oui |  |  |  |  |  | dès que l'envoi d'e-mails est activé |
 | `ELSATIA_IDENTITY_ISSUER` | CONDITIONAL |  |  |  |  |  |  |  | dès que Studio est déployé (GP émetteur et Studio vérificateur) |
 | `ELSATIA_IDENTITY_SIGNING_KEYS` | CONDITIONAL |  | oui |  |  |  |  |  | dès que Studio est déployé |
