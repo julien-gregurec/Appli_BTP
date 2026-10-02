@@ -80,7 +80,9 @@ if [ "$HARNESS" = 1 ]; then
   SUPABASE_BIN="$V9/harness/supabase-sim.sh"
   psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' psql -X -At -v ON_ERROR_STOP=1 -d "$DB_HARNESS" "$@"; }
   DB_VERIFY_URL="postgresql://localhost/$DB_HARNESS?host=/var/run/postgresql"
-  DB_VERIFY_ARGS=(--local-harness)
+  # Banc neuf : ni propriétaire plateforme ni clé d'attestation (STEP 7 du runbook V3) → les 2
+  # anomalies documentées de db-verify --before-owner sont tolérées. JAMAIS sur la Preview réelle.
+  DB_VERIFY_ARGS=(--local-harness --before-owner)
 else
   SUPABASE_BIN="${SUPABASE_BIN:-npx supabase}"
   psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' PGCONNECT_TIMEOUT=15 psql "$ELSATIA_PREVIEW_DB_URL" -X -At -v ON_ERROR_STOP=1 "$@"; }
