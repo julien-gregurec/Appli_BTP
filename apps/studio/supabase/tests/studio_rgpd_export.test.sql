@@ -113,7 +113,9 @@ select ok(not exists (select 1 from studio_identity.export_events where detail::
   'journal : compteurs uniquement, aucun contenu');
 select throws_ok($$delete from studio_identity.export_events$$, '42501', null, 'journal : immuable');
 select set_config('request.jwt.claims', '', true);
-update studio_guard.control set mode = 'read_only';
+-- Train V9 : le mode sûr Studio (V8, 20260929180000) exige un motif pour toute bascule hors
+-- read_write (même règle que la suite post-H) ; la règle est conservée, la fixture fournit le motif.
+update studio_guard.control set mode = 'read_only', reason = 'export RGPD : droit d''accès en lecture seule';
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 select is(public.studio_export_subject(repeat('X', 43), gen_random_uuid()) ->> 'statut', 'ok', 'Studio en lecture seule : l''export reste possible (droit d''accès)');
