@@ -29,6 +29,11 @@ export async function creerChantierAction(formData: FormData) {
   if (!clientId) {
     redirect(`/chantiers/nouveau?error=${encodeURIComponent("Client obligatoire")}`);
   }
+  const debutPrevu = champ(formData, "date_debut_prevue");
+  const finPrevue = champ(formData, "date_fin_prevue");
+  if (debutPrevu && finPrevue && finPrevue < debutPrevu) {
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent("La date de fin prévue précède la date de début.")}`);
+  }
 
   const latitudeBrute = champ(formData, "latitude");
   const longitudeBrute = champ(formData, "longitude");

@@ -85,6 +85,9 @@ export function DocumentImprimable({
   signatures?: SignatureImprimable[];
   photos?: Array<{ id: string; nom: string; legende?: string | null }>;
 }) {
+  // Les dates arrivent au format ISO (AAAA-MM-JJ) depuis la base : on les
+  // présente au format français sans passer par Date pour éviter tout décalage de fuseau.
+  const dateFr=(valeur:string)=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(valeur);return m?`${m[3]}/${m[2]}/${m[1]}`:valeur;};
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
   const couleur=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_documents??"")?entreprise.couleur_documents!:"#0d1b2a";
@@ -135,12 +138,12 @@ export function DocumentImprimable({
         <div style={{ textAlign: positionLogo==="droite"?"left":"right", display:positionLogo==="centre"?"none":"block" }}>
           <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: moderne?"#fff":couleur }}>{typeDoc}</div>
           <div style={{ fontFamily: "monospace", fontSize: "15px" }}>{numero}</div>
-          <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateEmission}</div>
-          {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateSecondaire.valeur}</div>}
+          <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateFr(dateEmission)}</div>
+          {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateFr(dateSecondaire.valeur)}</div>}
         </div>
       </div>
 
-      {positionLogo==="centre"&&<div style={{textAlign:"center",marginBottom:"8px"}}><strong style={{fontSize:"22px",textTransform:"uppercase"}}>{typeDoc}</strong><div style={{fontFamily:"monospace"}}>{numero} · Émis le {dateEmission}</div></div>}
+      {positionLogo==="centre"&&<div style={{textAlign:"center",marginBottom:"8px"}}><strong style={{fontSize:"22px",textTransform:"uppercase"}}>{typeDoc}</strong><div style={{fontFamily:"monospace"}}>{numero} · Émis le {dateFr(dateEmission)}</div></div>}
       <hr style={{ border: "none", borderTop: epuree ? `1px solid ${couleur}` : elegante?`1px solid ${accent}`:`3px solid ${accent}`, margin: compacte ? "8px 0 12px" : "12px 0 20px" }} />
 
       {/* Client */}

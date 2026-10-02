@@ -25,13 +25,15 @@ export async function remplirDevis(page, { clientLabel, chantierNom, lignes, rem
     const v = await sel.locator("option", { hasText: nom }).first().getAttribute("value");
     await sel.selectOption(v);
   }
-  const base = await page.getByPlaceholder("Désignation").count();
-  const deja = catalogue.length ? base : 0; // les prestations insérées occupent les premières lignes
+  let prochain = catalogue.length ? await page.getByPlaceholder("Désignation").count() : 0;
   for (let i = 0; i < lignes.length; i++) {
     const l = lignes[i];
-    let idx = deja + i;
+    let idx;
     if (l.catalogue !== undefined) idx = l.catalogue; // retouche d'une ligne issue du catalogue
-    else if (idx >= (await page.getByPlaceholder("Désignation").count())) await page.getByRole("button", { name: /Ajouter une ligne|\+ Ligne|Ajouter/ }).first().click();
+    else {
+      idx = prochain++;
+      if (idx >= (await page.getByPlaceholder("Désignation").count())) await page.getByRole("button", { name: "+ Ajouter une ligne" }).click();
+    }
     if (l.designation) await page.getByPlaceholder("Désignation").nth(idx).fill(l.designation);
     if (l.type) await page.locator('select:has(option[value="main_oeuvre"])').nth(idx).selectOption(l.type).catch(() => {});
     if (l.quantite !== undefined) await page.locator('input[title="Quantité"]').nth(idx).fill(String(l.quantite));

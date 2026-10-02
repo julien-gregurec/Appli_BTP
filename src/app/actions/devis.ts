@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import type { LigneDevis } from "@/lib/devis";
-import { TRANSITIONS_DEVIS } from "@/lib/devis";
+import { TAUX_TVA, TRANSITIONS_DEVIS, calcTotaux } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
@@ -38,10 +38,28 @@ function nettoieLignes(lignes: LigneDevis[]) {
     }));
 }
 
+// Garde-fous de saisie : une remise hors 0–100 %, une quantité négative ou un
+// total négatif produisaient des devis à montant négatif. Une ligne à prix
+// unitaire négatif (remise commerciale) reste possible tant que le total est positif.
+function erreurDevis(payload: DevisPayload, lignes: ReturnType<typeof nettoieLignes>): string | null {
+  const remise = Number(payload.remise_globale) || 0;
+  if (remise < 0 || remise > 100) return "La remise globale doit être comprise entre 0 et 100 %.";
+  for (const l of lignes) {
+    if (l.quantite < 0) return `Quantité négative sur la ligne « ${l.designation} ».`;
+    if (l.remise_ligne < 0 || l.remise_ligne > 100) return `La remise de la ligne « ${l.designation} » doit être comprise entre 0 et 100 %.`;
+    if (!TAUX_TVA.includes(l.taux_tva as (typeof TAUX_TVA)[number])) return `Taux de TVA non autorisé sur la ligne « ${l.designation} ».`;
+  }
+  const { ht } = calcTotaux(lignes, remise);
+  if (ht < 0) return "Le total du devis ne peut pas être négatif.";
+  return null;
+}
+
 export async function creerDevisAction(payload: DevisPayload) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const lignes = nettoieLignes(payload.lignes);
+  const invalide = erreurDevis(payload, lignes);
+  if (invalide) return { error: invalide };
 
   const { data: devisId, error } = await supabase.rpc("creer_devis_brouillon", {
     p_entreprise_id: ctx.entrepriseId,
@@ -83,6 +101,8 @@ export async function modifierDevisAction(devisId: string, payload: DevisPayload
   }
 
   const lignes = nettoieLignes(payload.lignes);
+  const invalide = erreurDevis(payload, lignes);
+  if (invalide) return { error: invalide };
   const { error } = await supabase.rpc("modifier_devis_brouillon", {
     p_devis_id: devisId,
     p_devis: {
