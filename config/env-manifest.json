@@ -234,6 +234,10 @@
         "justification": "Harnais de test de @elsatia/identity (TEST_HARNESS) : les variables PLATFORM_*/STUDIO_*_URL, *_JWT_SECRET, *_DB_URL, STUDIO_APP_URL, E2E_* désignent la pile locale jetable (packages/elsatia-identity/scripts/local-stack.sh), jamais un environnement déployé."
       },
       {
+        "path": "scripts/commercialization/",
+        "justification": "Commercialization Readiness Gate V1 : registre documentaire de preuves (noms de variables et de catégories cités en texte), sans lecture de variable d'application. Jamais déployé ; aucun appel réseau."
+      },
+      {
         "path": "packages/elsatia-identity/scripts/",
         "justification": "Outils locaux de @elsatia/identity (pile GoTrue/PostgREST jetable, keygen, passerelle de test). Jamais déployés."
       },

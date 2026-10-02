@@ -61,6 +61,8 @@
     "test:db": "supabase test db",
     "incident:drill": "bash scripts/incident/drill.sh",
     "test:incident-drill": "node --test scripts/incident/lib.test.mjs",
+    "commercialization:check": "node scripts/commercialization/check.mjs",
+    "test:commercialization": "node --test scripts/commercialization/gate.test.mjs",
     "studio:e2e:gate": "node apps/studio/scripts/e2e-gate.mjs",
     "pilot:auth:bootstrap": "bash scripts/local-postgres-bootstrap/gotrue_pilot_bootstrap.sh pilot_gp",
     "pilot:auth:scenarios": "bash scripts/local-postgres-bootstrap/run_pilot_auth_scenarios.sh pilot_gp",

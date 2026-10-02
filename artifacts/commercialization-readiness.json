@@ -1,0 +1,4671 @@
+{
+  "schema": "elsatia.commercialization-readiness/v1",
+  "generated_at": "2026-09-28T20:51:08.940Z",
+  "head": "35d4fb13",
+  "branch": "claude/gifted-cori-vv7scp",
+  "base": {
+    "ref": "integration/elsatia-canonical-train-v6",
+    "commit": "9102ec80",
+    "verdict": "CANONICAL TRAIN V6 LOCALLY QUALIFIED",
+    "migrations": 358,
+    "last_migration": "20260928000601"
+  },
+  "reference_dates": {
+    "activity_start_declared": "2026-10-01",
+    "note": "date d'activité déclarée, utilisée uniquement comme repère de configuration existant ; elle n'implique aucune obligation de vendre à cette date"
+  },
+  "run_code": true,
+  "run_db": true,
+  "executions": [
+    {
+      "name": "typecheck",
+      "command": "npm run -s typecheck",
+      "code": 0,
+      "duree_s": 59.2,
+      "tail": []
+    },
+    {
+      "name": "lint",
+      "command": "npm run -s lint",
+      "code": 0,
+      "duree_s": 67.6,
+      "tail": [
+        "/home/user/Appli_BTP/workers/studio-video/eslint.config.mjs",
+        "  3:1  warning  Assign array to a variable before exporting as module default  import/no-anonymous-default-export",
+        "✖ 15 problems (0 errors, 15 warnings)"
+      ]
+    },
+    {
+      "name": "test",
+      "command": "npm run -s test",
+      "code": 0,
+      "duree_s": 41.4,
+      "tail": [
+        "      Tests  431 passed (431)",
+        "   Start at  20:49:29",
+        "   Duration  3.01s (transform 1.25s, setup 0ms, import 2.25s, tests 738ms, environment 4ms)"
+      ]
+    },
+    {
+      "name": "studio-test",
+      "command": "npm --prefix apps/studio run -s test",
+      "code": 0,
+      "duree_s": 4.1,
+      "tail": [
+        "      Tests  291 passed (291)",
+        "   Start at  20:49:32",
+        "   Duration  3.54s (transform 649ms, setup 0ms, import 1.44s, tests 4.56s, environment 2ms)"
+      ]
+    },
+    {
+      "name": "verify:migrations",
+      "command": "npm run -s verify:migrations",
+      "code": 0,
+      "duree_s": 0.2,
+      "tail": [
+        "358 migrations valides, noms et horodatages uniques.",
+        "Cibles de migration OK : partagé 358 · Studio dédié 14 (9 copies gelées + 5 dédiées)."
+      ]
+    },
+    {
+      "name": "test:migration-targets",
+      "command": "npm run -s test:migration-targets",
+      "code": 0,
+      "duree_s": 0.5,
+      "tail": [
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 330.197799"
+      ]
+    },
+    {
+      "name": "verify:train-expectations",
+      "command": "npm run -s verify:train-expectations",
+      "code": 0,
+      "duree_s": 0.2,
+      "tail": [
+        "train : 358 migrations, dernière 20260928000601 ; DB verify : 29 contrôles",
+        "OK : attendus à jour"
+      ]
+    },
+    {
+      "name": "verify:secrets",
+      "command": "npm run -s verify:secrets",
+      "code": 0,
+      "duree_s": 0.3,
+      "tail": [
+        "3030 fichiers suivis contrôlés, aucun secret reconnu (2 exceptions nommées)."
+      ]
+    },
+    {
+      "name": "verify:env-manifest",
+      "command": "npm run -s verify:env-manifest",
+      "code": 0,
+      "duree_s": 0.8,
+      "tail": [
+        "  … 5 de plus (--verbose)",
+        "Constats ouverts au manifeste : 13 (P0:2 P1:10 P2:1) — voir docs/qualification/ELSATIA_ENV_MANIFEST_AND_CI_V1.md",
+        "OK : aucune erreur — 14 décision(s) DECISION_REQUIRED en attente (non bloquantes)."
+      ]
+    },
+    {
+      "name": "test:env-manifest",
+      "command": "npm run -s test:env-manifest",
+      "code": 0,
+      "duree_s": 1.6,
+      "tail": [
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 1363.857673"
+      ]
+    },
+    {
+      "name": "test:seeds",
+      "command": "npm run -s test:seeds",
+      "code": 0,
+      "duree_s": 0.7,
+      "tail": [
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 518.521839"
+      ]
+    },
+    {
+      "name": "test:preview-pack",
+      "command": "npm run -s test:preview-pack",
+      "code": 0,
+      "duree_s": 0.5,
+      "tail": [
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 306.542608"
+      ]
+    },
+    {
+      "name": "test:stripe-scripts",
+      "command": "sh -c npm run -s test:stripe-ordering-script && npm run -s test:stripe-trial-script && npm run -s test:stripe-resubscription-script",
+      "code": 0,
+      "duree_s": 1,
+      "tail": [
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 131.793708"
+      ]
+    },
+    {
+      "name": "build",
+      "command": "sh -c npm run -s build && npm run -s build:reserves && npm run -s build:colors && npm --prefix apps/studio run -s build",
+      "code": 0,
+      "duree_s": 67.3,
+      "tail": [
+        "ƒ Proxy (Middleware)",
+        "○  (Static)   prerendered as static content",
+        "ƒ  (Dynamic)  server-rendered on demand"
+      ]
+    },
+    {
+      "name": "db:fresh",
+      "command": "bash scripts/local-postgres-bootstrap/rebuild_db.sh elsatia_gate_fresh",
+      "code": 0,
+      "duree_s": 18.9,
+      "tail": [
+        "== bootstrap ==",
+        "== migrations ==",
+        "== OK: 358 migrations applied cleanly to elsatia_gate_fresh =="
+      ]
+    },
+    {
+      "name": "db:verify-local",
+      "command": "node scripts/preview/db-verify.mjs --local-harness --before-owner",
+      "code": 0,
+      "duree_s": 0.4,
+      "tail": [
+        "  ✓ [DB-RLS] buckets_total — 19",
+        "  ✓ [DB-SERVICE-ONLY] RPC techniques — 37/37 : EXECUTE service_role seul (anon/authenticated refusés)",
+        "GO : base Preview conforme."
+      ]
+    }
+  ],
+  "remote_calls": false,
+  "verdict": "ELSATIA COMMERCIALIZATION GATE NOT YET PASSED",
+  "pass": false,
+  "global_score": null,
+  "global_score_reason": "Aucun score global : une moyenne masquerait un NO-GO critique. Lire les catégories et la liste des P0.",
+  "categories": {
+    "CODE": {
+      "total": 8,
+      "applicable": 8,
+      "counts": {
+        "GO": 7,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 0,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 87.5,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "DATABASE": {
+      "total": 9,
+      "applicable": 9,
+      "counts": {
+        "GO": 7,
+        "NO-GO": 0,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 2,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 77.8,
+      "open_p0": [
+        "DB-HOSTED-LEDGER"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "SECURITY": {
+      "total": 14,
+      "applicable": 14,
+      "counts": {
+        "GO": 6,
+        "NO-GO": 4,
+        "DECISION_REQUIRED": 1,
+        "REMOTE_PROOF_REQUIRED": 2,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 42.9,
+      "open_p0": [
+        "SEC-STORAGE-HOSTED",
+        "SEC-BANK-KEY-VERSIONING"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "BILLING": {
+      "total": 15,
+      "applicable": 15,
+      "counts": {
+        "GO": 5,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 4,
+        "REMOTE_PROOF_REQUIRED": 4,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 33.3,
+      "open_p0": [
+        "BILL-STRIPE-TEST-PRICES",
+        "BILL-STRIPE-TEST-WEBHOOKS",
+        "BILL-STRIPE-TEST-FLOWS",
+        "BILL-STRIPE-TAX",
+        "BILL-COMMERCIAL-LOCK",
+        "BILL-STRIPE-LIVE"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "EMAIL": {
+      "total": 10,
+      "applicable": 10,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 3,
+        "DECISION_REQUIRED": 3,
+        "REMOTE_PROOF_REQUIRED": 2,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 10,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "LEGAL": {
+      "total": 13,
+      "applicable": 12,
+      "counts": {
+        "GO": 0,
+        "NO-GO": 2,
+        "DECISION_REQUIRED": 5,
+        "REMOTE_PROOF_REQUIRED": 0,
+        "MANUAL_REQUIRED": 5,
+        "NOT_APPLICABLE": 1
+      },
+      "go_percent": 0,
+      "open_p0": [
+        "LEGAL-IDENTITY-IN-TRAIN",
+        "LEGAL-ADDRESS",
+        "LEGAL-VAT",
+        "LEGAL-STRIPE-SELLER"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "RGPD": {
+      "total": 10,
+      "applicable": 10,
+      "counts": {
+        "GO": 0,
+        "NO-GO": 3,
+        "DECISION_REQUIRED": 5,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 0,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "BACKUP_DR": {
+      "total": 8,
+      "applicable": 8,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 4,
+        "MANUAL_REQUIRED": 2,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 12.5,
+      "open_p0": [
+        "DR-REMOTE-BACKUP",
+        "DR-HOSTED-STORAGE",
+        "DR-POST-RESTORE-PROCEDURE",
+        "DR-VOLUME-PASSPHRASE"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "PREVIEW": {
+      "total": 5,
+      "applicable": 5,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 1,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 20,
+      "open_p0": [
+        "PREVIEW-PACK-TARGETS-V6",
+        "PREVIEW-EXECUTED",
+        "PREVIEW-PROJECT-INVENTORY"
+      ],
+      "state": "BLOCKED_P0"
+    },
+    "OBSERVABILITY": {
+      "total": 4,
+      "applicable": 4,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 1,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 25,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "PERFORMANCE": {
+      "total": 3,
+      "applicable": 3,
+      "counts": {
+        "GO": 2,
+        "NO-GO": 0,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 66.7,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "MOBILE": {
+      "total": 6,
+      "applicable": 6,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 0,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 0,
+        "MANUAL_REQUIRED": 5,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 16.7,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "STUDIO": {
+      "total": 5,
+      "applicable": 5,
+      "counts": {
+        "GO": 2,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 1,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 40,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "TOOLS_RELEVE": {
+      "total": 5,
+      "applicable": 5,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 2,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 20,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "RESERVES": {
+      "total": 4,
+      "applicable": 3,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 0,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 1
+      },
+      "go_percent": 33.3,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "COLORS": {
+      "total": 4,
+      "applicable": 4,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 1,
+        "REMOTE_PROOF_REQUIRED": 1,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 25,
+      "open_p0": [],
+      "state": "OPEN"
+    },
+    "OPERATIONS": {
+      "total": 5,
+      "applicable": 5,
+      "counts": {
+        "GO": 1,
+        "NO-GO": 1,
+        "DECISION_REQUIRED": 1,
+        "REMOTE_PROOF_REQUIRED": 2,
+        "MANUAL_REQUIRED": 0,
+        "NOT_APPLICABLE": 0
+      },
+      "go_percent": 20,
+      "open_p0": [
+        "OPS-V6-PRODUCTION"
+      ],
+      "state": "BLOCKED_P0"
+    }
+  },
+  "blockers": {
+    "BLOCKER_TECHNIQUE": [
+      "CODE-POST-V6-CONVERGENCE",
+      "SEC-REDTEAM-RESIDUALS",
+      "SEC-BANK-KEY-VERSIONING",
+      "SEC-ENV-P1-FINDINGS",
+      "SEC-CI-COVERAGE",
+      "BILL-WEBHOOK-RETRY-RESIDUAL",
+      "EMAIL-CODE-READY",
+      "EMAIL-SECURITY-FIXES",
+      "EMAIL-FLOW-DEFECTS",
+      "LEGAL-VISUALS",
+      "RGPD-CGV-DELETION-PROMISE",
+      "RGPD-EMPLOYES-OVEREXPOSURE",
+      "RGPD-RESERVES-PURGE",
+      "DR-TOOLING-IN-TRAIN",
+      "PREVIEW-PACK-TARGETS-V6",
+      "OBS-HEALTH-LOGS",
+      "STUDIO-POST-V6-LOTS",
+      "TOOLS-RELEVE-LOT7",
+      "RES-MINOR-DEFECTS",
+      "COLORS-OPEN-ITEMS",
+      "OPS-PREFLIGHT-ENFORCEMENT"
+    ],
+    "BLOCKER_REMOTE": [
+      "DB-PGTAP-COMPLETE",
+      "DB-HOSTED-LEDGER",
+      "SEC-AUTH-HOSTED",
+      "SEC-STORAGE-HOSTED",
+      "BILL-STRIPE-TEST-PRICES",
+      "BILL-STRIPE-TEST-WEBHOOKS",
+      "BILL-STRIPE-TEST-FLOWS",
+      "BILL-CUSTOMER-PORTAL",
+      "EMAIL-BREVO-API-REAL",
+      "EMAIL-PRODUCTION-ENV",
+      "RGPD-PURGE-HOSTED",
+      "DR-REMOTE-BACKUP",
+      "DR-HOSTED-STORAGE",
+      "DR-HOSTED-AUTH-CONFIG",
+      "DR-RTO-RPO",
+      "PREVIEW-EXECUTED",
+      "OBS-SENTRY-PRODUCTION",
+      "PERF-V6-CAPACITY",
+      "STUDIO-HOSTED",
+      "TOOLS-ENTITLEMENT",
+      "RES-HOSTED",
+      "COLORS-PREVIEW",
+      "OPS-ROLLBACK",
+      "OPS-V6-PRODUCTION"
+    ],
+    "BLOCKER_LEGAL": [
+      "LEGAL-IDENTITY-IN-TRAIN",
+      "LEGAL-ADDRESS",
+      "LEGAL-VAT",
+      "LEGAL-CONTACT",
+      "LEGAL-STRIPE-SELLER",
+      "LEGAL-SHOP",
+      "LEGAL-PROVIDERS-PUBLIC",
+      "LEGAL-LAWYER-REVIEW"
+    ],
+    "DECISION_REQUIRED": [
+      "SEC-SUSPENSION-CROSS-APP",
+      "BILL-PRICING-DECISIONS",
+      "BILL-STRIPE-TAX",
+      "BILL-GRACE-PERIOD",
+      "BILL-COMMERCIAL-LOCK",
+      "EMAIL-CONTACT-ADDRESS",
+      "EMAIL-AUTH-ROUTING",
+      "EMAIL-PROVIDERS",
+      "LEGAL-TRADEMARK",
+      "RGPD-CONTRACT-RETENTION",
+      "RGPD-LIFECYCLE-DECISIONS",
+      "RGPD-LOG-RETENTION",
+      "RGPD-STUDIO-INVITATIONS",
+      "RGPD-STUDIO-SHARED-WORKSPACES",
+      "PREVIEW-PROJECT-INVENTORY",
+      "STUDIO-DECISIONS",
+      "TOOLS-DOWNGRADE-READ",
+      "TOOLS-VOLUME-PIECE",
+      "COLORS-LICENSED-CHART",
+      "OPS-CRONS-FAIL-OPEN"
+    ],
+    "MANUAL_VALIDATION": [
+      "SEC-LEGACY-DEMO-CREDENTIALS",
+      "BILL-STRIPE-LIVE",
+      "EMAIL-HOSTED-TEMPLATES",
+      "LEGAL-SIRET",
+      "LEGAL-OTHER-APPS",
+      "RGPD-PROVIDERS",
+      "DR-POST-RESTORE-PROCEDURE",
+      "DR-VOLUME-PASSPHRASE",
+      "PREVIEW-MANUAL-CONFIRMATIONS",
+      "OBS-ALERTING-UPTIME",
+      "MOB-IPHONE-PHYSICAL",
+      "MOB-IPAD-PHYSICAL",
+      "MOB-SAFARI-IOS",
+      "MOB-FIELD",
+      "MOB-NATIVE-STORES"
+    ]
+  },
+  "priorities": {
+    "P0": [
+      "DB-HOSTED-LEDGER",
+      "SEC-STORAGE-HOSTED",
+      "SEC-BANK-KEY-VERSIONING",
+      "BILL-STRIPE-TEST-PRICES",
+      "BILL-STRIPE-TEST-WEBHOOKS",
+      "BILL-STRIPE-TEST-FLOWS",
+      "BILL-STRIPE-TAX",
+      "BILL-COMMERCIAL-LOCK",
+      "BILL-STRIPE-LIVE",
+      "LEGAL-IDENTITY-IN-TRAIN",
+      "LEGAL-ADDRESS",
+      "LEGAL-VAT",
+      "LEGAL-STRIPE-SELLER",
+      "DR-REMOTE-BACKUP",
+      "DR-HOSTED-STORAGE",
+      "DR-POST-RESTORE-PROCEDURE",
+      "DR-VOLUME-PASSPHRASE",
+      "PREVIEW-PACK-TARGETS-V6",
+      "PREVIEW-EXECUTED",
+      "PREVIEW-PROJECT-INVENTORY",
+      "OPS-V6-PRODUCTION"
+    ],
+    "P1": [
+      "CODE-POST-V6-CONVERGENCE",
+      "DB-PGTAP-COMPLETE",
+      "SEC-SUSPENSION-CROSS-APP",
+      "SEC-AUTH-HOSTED",
+      "SEC-LEGACY-DEMO-CREDENTIALS",
+      "SEC-ENV-P1-FINDINGS",
+      "BILL-CUSTOMER-PORTAL",
+      "BILL-PRICING-DECISIONS",
+      "BILL-WEBHOOK-RETRY-RESIDUAL",
+      "BILL-GRACE-PERIOD",
+      "EMAIL-CODE-READY",
+      "EMAIL-SECURITY-FIXES",
+      "EMAIL-BREVO-API-REAL",
+      "EMAIL-HOSTED-TEMPLATES",
+      "EMAIL-PRODUCTION-ENV",
+      "EMAIL-CONTACT-ADDRESS",
+      "EMAIL-AUTH-ROUTING",
+      "LEGAL-SIRET",
+      "LEGAL-CONTACT",
+      "LEGAL-SHOP",
+      "LEGAL-PROVIDERS-PUBLIC",
+      "LEGAL-LAWYER-REVIEW",
+      "LEGAL-OTHER-APPS",
+      "RGPD-CONTRACT-RETENTION",
+      "RGPD-LIFECYCLE-DECISIONS",
+      "RGPD-CGV-DELETION-PROMISE",
+      "RGPD-EMPLOYES-OVEREXPOSURE",
+      "RGPD-PURGE-HOSTED",
+      "RGPD-RESERVES-PURGE",
+      "RGPD-PROVIDERS",
+      "RGPD-LOG-RETENTION",
+      "DR-TOOLING-IN-TRAIN",
+      "DR-HOSTED-AUTH-CONFIG",
+      "DR-RTO-RPO",
+      "PREVIEW-MANUAL-CONFIRMATIONS",
+      "OBS-SENTRY-PRODUCTION",
+      "OBS-HEALTH-LOGS",
+      "OBS-ALERTING-UPTIME",
+      "PERF-V6-CAPACITY",
+      "MOB-IPHONE-PHYSICAL",
+      "MOB-IPAD-PHYSICAL",
+      "MOB-SAFARI-IOS",
+      "MOB-FIELD",
+      "TOOLS-ENTITLEMENT",
+      "TOOLS-DOWNGRADE-READ",
+      "RES-HOSTED",
+      "COLORS-PREVIEW",
+      "OPS-ROLLBACK",
+      "OPS-PREFLIGHT-ENFORCEMENT",
+      "OPS-CRONS-FAIL-OPEN"
+    ],
+    "P2": [
+      "SEC-REDTEAM-RESIDUALS",
+      "SEC-CI-COVERAGE",
+      "EMAIL-PROVIDERS",
+      "EMAIL-FLOW-DEFECTS",
+      "LEGAL-VISUALS",
+      "LEGAL-TRADEMARK",
+      "RGPD-STUDIO-INVITATIONS",
+      "RGPD-STUDIO-SHARED-WORKSPACES",
+      "MOB-NATIVE-STORES",
+      "STUDIO-POST-V6-LOTS",
+      "STUDIO-HOSTED",
+      "STUDIO-DECISIONS",
+      "TOOLS-RELEVE-LOT7",
+      "TOOLS-VOLUME-PIECE",
+      "RES-MINOR-DEFECTS",
+      "COLORS-OPEN-ITEMS",
+      "COLORS-LICENSED-CHART"
+    ]
+  },
+  "reasons_p0": [
+    "DB-HOSTED-LEDGER [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Migrations V6 appliquées sur Preview puis Production (ledger hébergé) — dépend de : Exécution de la qualification Preview (sauvegarde validée puis `db push`), puis bascule Production ; V6 n'est déployé nulle part",
+    "SEC-STORAGE-HOSTED [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Policies Storage (19 buckets) jamais vérifiées sur un vrai service Storage — dépend de : `preview:storage-smoke` (cross-tenant) pendant la qualification Preview",
+    "SEC-BANK-KEY-VERSIONING [NO-GO · BLOCKER_TECHNIQUE · P0] Clé BANK_DATA_ENCRYPTION_KEY sans identifiant de version : pas de rotation, perte = IBAN/BIC illisibles (F-DR-BANK-KEY-VERSIONING) — dépend de : Lot cryptographie : versionnement de clé (format chiffré avec identifiant) et procédure de rotation",
+    "BILL-STRIPE-TEST-PRICES [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Existence et montants des Price IDs Stripe (verify:stripe-prices strict jamais vert) — dépend de : Clé Stripe Test en lecture (`STRIPE_TEST_SECRET_KEY` CI ou poste opérateur) puis `npm run verify:stripe-prices` en mode strict ; dépend de BILL-PRICING-DECISIONS",
+    "BILL-STRIPE-TEST-WEBHOOKS [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Webhooks signés par Stripe Test réel, endpoints et événements abonnés, STRIPE_WEBHOOK_EXPECTED_MODE par déploiement — dépend de : `preview:stripe-verify` + événements Stripe Test réels pendant la qualification Preview",
+    "BILL-STRIPE-TEST-FLOWS [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Checkout, essai, ordre et réabonnement contre Stripe Test réel (scripts préparés, jamais exécutés) — dépend de : `scripts/qualification/stripe-{ordering,trial,resubscription}-test-mode.mjs` avec clé Stripe Test, sur Preview",
+    "BILL-STRIPE-TAX [DECISION_REQUIRED · DECISION_REQUIRED · P0] Stripe Tax / STRIPE_AUTOMATIC_TAX_ENABLED : bloqué tant que le régime de TVA n'est pas confirmé — dépend de : LEGAL-VAT (régime de TVA), puis paramétrage Stripe Tax et affichage HT/TTC aligné",
+    "BILL-COMMERCIAL-LOCK [DECISION_REQUIRED · DECISION_REQUIRED · P0] Ouverture des souscriptions publiques (verrou ABONNEMENTS_PUBLICS_OUVERTS ; aucune garde de date dans V6) — dépend de : Décision d'ouverture après levée des P0 ; variable posée en Production. La garde de date du 01/10/2026 n'existe que sur la branche identité légale (non portée)",
+    "BILL-STRIPE-LIVE [MANUAL_REQUIRED · MANUAL_VALIDATION · P0] Compte Stripe Live : activation, Price IDs Live, endpoints webhook Live — dépend de : LEGAL-STRIPE-SELLER, BILL-PRICING-DECISIONS, BILL-STRIPE-TAX ; `docs/organisation/P15_STRIPE_LIVE_PREPARATION.md`",
+    "LEGAL-IDENTITY-IN-TRAIN [NO-GO · BLOCKER_LEGAL · P0] Identité officielle (EI, 850 559 873 R.C.S. Strasbourg, elsatia.fr) absente des pages légales de V6 — dépend de : Porter l'alignement d'identité de `claude/awesome-franklin-se2s33` — branche partie de main 4d92ddbe, pas de V6 : portage manuel des seules corrections d'identité, puis requalification",
+    "LEGAL-ADDRESS [DECISION_REQUIRED · BLOCKER_LEGAL · P0] Adresse de publication (mentions légales et factures Stripe) : adresse retenue à l'immatriculation ou domiciliation — dépend de : Décision écrite de l'exploitant (aucune adresse n'est choisie par le gate), puis mentions légales et Stripe alignés",
+    "LEGAL-VAT [DECISION_REQUIRED · BLOCKER_LEGAL · P0] Régime de TVA (franchise « 293 B » ou assujettissement) : prix affichés HT, mention TVA « à confirmer » — dépend de : Régime confirmé, puis NEXT_PUBLIC_LEGAL_TVA, CGV, /tarifs, Stripe Tax et pied de facture alignés",
+    "LEGAL-STRIPE-SELLER [MANUAL_REQUIRED · BLOCKER_LEGAL · P0] Identité vendeur Stripe (entreprise, public details, libellé bancaire, pied de facture, CGV/confidentialité) — dépend de : Checklist opérateur §6 de l'audit d'identité ; dépend de LEGAL-ADDRESS et LEGAL-VAT",
+    "DR-REMOTE-BACKUP [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Sauvegarde hébergée (PITR / sauvegardes Supabase) jamais restaurée ni vérifiée — dépend de : Drill Preview autorisé : restauration de projet / PITR, puis `dr:verify --backup` sur la sauvegarde",
+    "DR-HOSTED-STORAGE [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Fichiers Storage hors des sauvegardes de base : copie S3 → S3 appariée au backup_id à mettre en place — dépend de : Copie S3 → S3 vérifiée par SHA-256 (manifeste), mesurée sur Preview (R3 du rapport DR V2)",
+    "DR-POST-RESTORE-PROCEDURE [MANUAL_REQUIRED · MANUAL_VALIDATION · P0] Procédure post-restauration obligatoire : rejeu Stripe (droits rouverts), révocation des sessions et rotation JWT (mots de passe/bans ressuscités) — dépend de : Intégrer R1/R2/R6 du rapport DR V2 au runbook DR et les valider sur Preview",
+    "DR-VOLUME-PASSPHRASE [MANUAL_REQUIRED · MANUAL_VALIDATION · P0] Passphrase du volume DR (seul dépôt de secrets) sans garde documentée (F-DR-VOLUME-PASSPHRASE) — dépend de : Deux dépositaires documentés et un test de restauration du volume",
+    "PREVIEW-PACK-TARGETS-V6 [NO-GO · BLOCKER_TECHNIQUE · P0] Le pack cible V5 (f6399f15) : son préflight refuse un train plus récent qualifié (V6) — dépend de : Porter le pack sur le train retenu et mettre à jour `scripts/preview/qualification/train.json` par revue",
+    "PREVIEW-EXECUTED [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Qualification Preview distante réellement exécutée (V4 : BLOCKED ; pack V1 : NOT EXECUTED) — dépend de : `npm run preview:qualification -- --mode full --apply-migrations` depuis un poste avec réseau et identifiants ; rendre artifacts/preview-qualification.json",
+    "PREVIEW-PROJECT-INVENTORY [DECISION_REQUIRED · DECISION_REQUIRED · P0] Projets Preview : réutiliser elsatia-preview (limite de 2 projets) ; aucun projet Vercel pour Colors, Tools, Réserves, Studio — dépend de : Décision propriétaire (P0-1 des décisions finales) avant toute exécution Preview",
+    "OPS-V6-PRODUCTION [REMOTE_PROOF_REQUIRED · BLOCKER_REMOTE · P0] Production (app.elsatia.fr) sur une lignée antérieure : V6 jamais déployé — dépend de : PREVIEW-EXECUTED vert, puis bascule Production selon le runbook de cutover"
+  ],
+  "integrity_downgrades": [],
+  "items": [
+    {
+      "id": "CODE-BUILD",
+      "category": "CODE",
+      "title": "Build des 5 applications (GP, Tools, Colors, Réserves, Studio)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "CANONICAL TRAIN V6 LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « CANONICAL TRAIN V6 LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "✅ `next build`",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « ✅ `next build` »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "build",
+          "ok": true,
+          "detail": "build : code 0 (67.3 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-TYPECHECK",
+      "category": "CODE",
+      "title": "Typecheck (racine + apps)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "Les 5 applications passent typecheck",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « Les 5 applications passent typecheck »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "typecheck",
+          "ok": true,
+          "detail": "typecheck : code 0 (59.2 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-LINT",
+      "category": "CODE",
+      "title": "Lint (0 erreur ; 15 avertissements préexistants)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "✅ 0 erreur (15 avertissements",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « ✅ 0 erreur (15 avertissements »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "lint",
+          "ok": true,
+          "detail": "lint : code 0 (67.6 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-TESTS",
+      "category": "CODE",
+      "title": "Tests unitaires Vitest (GP 2 300, Tools 2 118, Colors 431, Réserves 186, Studio 291)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**2 300** passés",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **2 300** passés »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "test",
+          "ok": true,
+          "detail": "test : code 0 (41.4 s)"
+        },
+        {
+          "kind": "exec",
+          "name": "studio-test",
+          "ok": true,
+          "detail": "studio-test : code 0 (4.1 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-MIGRATIONS",
+      "category": "CODE",
+      "title": "Migrations : 358 valides, cibles partagé / Studio dédié, attendus du train synchronisés",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "`npm run verify:migrations` : **358 valides**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « `npm run verify:migrations` : **358 valides** »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "verify:migrations",
+          "ok": true,
+          "detail": "verify:migrations : code 0 (0.2 s)"
+        },
+        {
+          "kind": "exec",
+          "name": "test:migration-targets",
+          "ok": true,
+          "detail": "test:migration-targets : code 0 (0.5 s)"
+        },
+        {
+          "kind": "exec",
+          "name": "verify:train-expectations",
+          "ok": true,
+          "detail": "verify:train-expectations : code 0 (0.2 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-SEEDS",
+      "category": "CODE",
+      "title": "Seeds : registre complet et 16/16 seeds actifs qualifiés sur 358 migrations",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "ALL ACTIVE SEEDS QUALIFIED — 16/16",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « ALL ACTIVE SEEDS QUALIFIED — 16/16 »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "test:seeds",
+          "ok": true,
+          "detail": "test:seeds : code 0 (0.7 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-TOOLING-TESTS",
+      "category": "CODE",
+      "title": "Outillage hors réseau (pack Preview, manifeste, scripts Stripe test-mode)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "`test:preview-pack` ✅ **29/29**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « `test:preview-pack` ✅ **29/29** »"
+        },
+        {
+          "kind": "exec",
+          "name": "test:preview-pack",
+          "ok": true,
+          "detail": "test:preview-pack : code 0 (0.5 s)"
+        },
+        {
+          "kind": "exec",
+          "name": "test:env-manifest",
+          "ok": true,
+          "detail": "test:env-manifest : code 0 (1.6 s)"
+        },
+        {
+          "kind": "exec",
+          "name": "test:stripe-scripts",
+          "ok": true,
+          "detail": "test:stripe-scripts : code 0 (1 s)"
+        }
+      ]
+    },
+    {
+      "id": "CODE-POST-V6-CONVERGENCE",
+      "category": "CODE",
+      "title": "Lots qualifiés post-V6 hors train (e-mail, identité légale, DR V2, pack Preview, Studio post-H/E2E, Relevé Lot 7, observabilité)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Train V7 : intégrer et requalifier les branches post-V6 (bases hétérogènes : V5 f6399f15, Lot 6 d734f255, Studio fb7082c6, et main 4d92ddbe pour identité légale et observabilité)",
+      "owner": "Dév (train canonique)",
+      "rationale": "Le code qui ferme plusieurs points EMAIL, LEGAL, BACKUP_DR, PREVIEW et OBSERVABILITY n'existe que sur ces branches.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "ELSATIA EMAIL ACTIONS REQUIRED",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « ELSATIA EMAIL ACTIONS REQUIRED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "ELSATIA LEGAL IDENTITY ACTIONS REQUIRED",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « ELSATIA LEGAL IDENTITY ACTIONS REQUIRED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "ELSATIA DR LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « ELSATIA DR LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md",
+          "ref": "origin/claude/wizardly-keller-3gz8nv",
+          "contains": "REMOTE PREVIEW OPERATOR HANDOFF PACK V1 READY",
+          "ok": true,
+          "detail": "origin/claude/wizardly-keller-3gz8nv:docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md ⊃ « REMOTE PREVIEW OPERATOR HANDOFF PACK V1 READY »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_STUDIO_DEDICATED_PLAYWRIGHT_CI_V1.md",
+          "ref": "origin/claude/jolly-volta-doejq2",
+          "contains": "STUDIO DEDICATED E2E LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/jolly-volta-doejq2:docs/qualification/ELSATIA_STUDIO_DEDICATED_PLAYWRIGHT_CI_V1.md ⊃ « STUDIO DEDICATED E2E LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT7_EQUIPEMENTS_CALQUES_V1.md",
+          "ref": "origin/claude/nifty-edison-mevolm",
+          "contains": "RELEVE METRE LOT 7 LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/nifty-edison-mevolm:docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT7_EQUIPEMENTS_CALQUES_V1.md ⊃ « RELEVE METRE LOT 7 LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "packages/email/src/identite.ts",
+          "ok": false,
+          "detail": "absent : packages/email/src/identite.ts"
+        },
+        {
+          "kind": "file",
+          "path": "src/lib/identite-legale.ts",
+          "ok": false,
+          "detail": "absent : src/lib/identite-legale.ts"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/dr/v2/dr-verify.mjs",
+          "ok": false,
+          "detail": "absent : scripts/dr/v2/dr-verify.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/preview/qualification/train.json",
+          "ok": false,
+          "detail": "absent : scripts/preview/qualification/train.json"
+        },
+        {
+          "kind": "file",
+          "path": "src/app/api/healthz/route.ts",
+          "ok": false,
+          "detail": "absent : src/app/api/healthz/route.ts"
+        }
+      ]
+    },
+    {
+      "id": "DB-FRESH",
+      "category": "DATABASE",
+      "title": "Base neuve : 358/358 migrations, 0 erreur (PostgreSQL 16)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**358/358 migrations, 0 erreur**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **358/358 migrations, 0 erreur** »"
+        },
+        {
+          "kind": "unchanged-since",
+          "commit": "9102ec80",
+          "paths": [
+            "src",
+            "apps",
+            "packages",
+            "supabase",
+            "workers",
+            "package-lock.json"
+          ],
+          "ok": true,
+          "detail": "src, apps, packages, supabase, workers, package-lock.json identiques à 9102ec80"
+        },
+        {
+          "kind": "exec",
+          "name": "db:fresh",
+          "ok": true,
+          "detail": "db:fresh : code 0 (18.9 s)"
+        }
+      ]
+    },
+    {
+      "id": "DB-UPGRADE",
+      "category": "DATABASE",
+      "title": "Upgrade V5 → V6 avec données réalistes : 0 écart de lignes, 91/91 empreintes, 28/28 contrôles métier",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**91/91 empreintes métier identiques**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **91/91 empreintes métier identiques** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**28/28 contrôles métier**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **28/28 contrôles métier** »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/qualification/upgrade-v5-v6.sh",
+          "ok": true,
+          "detail": "scripts/qualification/upgrade-v5-v6.sh"
+        }
+      ]
+    },
+    {
+      "id": "DB-RLS",
+      "category": "DATABASE",
+      "title": "RLS : sonde réelle 51 utilisateurs × 29 tables, 0 écart ; aucune table publique sans RLS",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**0 écart / 1 479 cellules**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **0 écart / 1 479 cellules** »"
+        },
+        {
+          "kind": "exec",
+          "name": "db:verify-local",
+          "ok": true,
+          "detail": "db:verify-local : code 0 (0.4 s)"
+        }
+      ]
+    },
+    {
+      "id": "DB-POLICIES",
+      "category": "DATABASE",
+      "title": "Policies : 639 → 639, aucune supprimée, modifiée ou ajoutée par V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "639 → 639 : **0 supprimée, 0 modifiée, 0 ajoutée**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « 639 → 639 : **0 supprimée, 0 modifiée, 0 ajoutée** »"
+        }
+      ]
+    },
+    {
+      "id": "DB-GRANTS",
+      "category": "DATABASE",
+      "title": "Grants et EXECUTE : inchangés ; 37 RPC techniques réservées au service_role",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "Grants | ✅ 0 retiré/modifié, 0 ajouté",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « Grants | ✅ 0 retiré/modifié, 0 ajouté »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**37** (+ `purger_contrats_conserves_echus`",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **37** (+ `purger_contrats_conserves_echus` »"
+        },
+        {
+          "kind": "exec",
+          "name": "db:verify-local",
+          "ok": true,
+          "detail": "db:verify-local : code 0 (0.4 s)"
+        }
+      ]
+    },
+    {
+      "id": "DB-VERIFY-LOCAL",
+      "category": "DATABASE",
+      "title": "DB verify Preview rejoué sur base V6 neuve : GO (29 contrôles, préflight 21 / 0 bloquant, 19 buckets, 37/37)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**`GO : base Preview conforme.`**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **`GO : base Preview conforme.`** »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/preview/db-verify.mjs",
+          "ok": true,
+          "detail": "scripts/preview/db-verify.mjs"
+        },
+        {
+          "kind": "exec",
+          "name": "db:verify-local",
+          "ok": true,
+          "detail": "db:verify-local : code 0 (0.4 s)"
+        }
+      ]
+    },
+    {
+      "id": "DB-PGTAP-COMPLETE",
+      "category": "DATABASE",
+      "title": "pgTAP complet : 143/152 fichiers propres, 0 régression ; 9 fichiers limités par le banc local",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "pgsodium réel (platform_stripe_state_attestation_r72) et amorce Supabase complète (cloud sync entitlement) : `supabase test db` sur un vrai projet Supabase ; les 7 suites Studio du projet partagé relèvent du projet dédié (543/543)",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "pgTAP **143/152 propres, 0 régression**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « pgTAP **143/152 propres, 0 régression** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "pgsodium réel absent de l'amorce",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « pgsodium réel absent de l'amorce »"
+        }
+      ]
+    },
+    {
+      "id": "DB-HOSTED-LEDGER",
+      "category": "DATABASE",
+      "title": "Migrations V6 appliquées sur Preview puis Production (ledger hébergé)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Exécution de la qualification Preview (sauvegarde validée puis `db push`), puis bascule Production ; V6 n'est déployé nulle part",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "V6 **non déployé**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « V6 **non déployé** »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_V4_REMOTE_PREVIEW_EXECUTION_V1.md",
+          "ref": "origin/claude/zen-davinci-xn6m3m",
+          "contains": "V4 PREVIEW BLOCKED",
+          "ok": true,
+          "detail": "origin/claude/zen-davinci-xn6m3m:docs/qualification/ELSATIA_V4_REMOTE_PREVIEW_EXECUTION_V1.md ⊃ « V4 PREVIEW BLOCKED »"
+        }
+      ]
+    },
+    {
+      "id": "DB-DR-LOCAL",
+      "category": "DATABASE",
+      "title": "Restauration base : backup strict restauré à l'identique (0 écart), 4 sinistres, compatibilité schéma V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Détail et limites hébergées : catégorie BACKUP_DR.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "ELSATIA DR LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « ELSATIA DR LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "Contrôle de compatibilité V6",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « Contrôle de compatibilité V6 »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-MULTI-TENANT",
+      "category": "SECURITY",
+      "title": "Isolation multi-tenant : red team V3 (3 failles corrigées), remédiation des bloqueurs, sonde RLS V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md",
+          "contains": "REDTEAM-V3-01",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md ⊃ « REDTEAM-V3-01 »"
+        },
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260922000323_redteam_v3_authenticated_rpc_bypass_revocation.sql",
+          "ok": true,
+          "detail": "supabase/migrations/20260922000323_redteam_v3_authenticated_rpc_bypass_revocation.sql"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md",
+          "contains": "SECURITY BLOCKERS REMEDIATED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md ⊃ « SECURITY BLOCKERS REMEDIATED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**0 écart / 1 479 cellules**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **0 écart / 1 479 cellules** »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-REDTEAM-RESIDUALS",
+      "category": "SECURITY",
+      "title": "Résidus red team V3 non corrigés : oracle inter-tenant (RT-V3-P2-01), jeton de document anon (P3-02), pas de limitation de débit sur les partages publics (P3-03)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Lot sécurité : resserrer `acces_module_pour_permission`, revoir le grant anon de `document_commercial_par_token`, limiter le débit des routes de partage public",
+      "owner": "Dév",
+      "rationale": "Gravités P2/P3 reprises du rapport red team V3 ; couverture de la matrice des 15 acteurs déclarée partielle par ce rapport.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md",
+          "contains": "RT-V3-P2-01",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md ⊃ « RT-V3-P2-01 »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md",
+          "contains": "RT-V3-P3-03",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md ⊃ « RT-V3-P3-03 »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-READ-ONLY-RESERVES-D01",
+      "category": "SECURITY",
+      "title": "Lecture seule Réserves D-01 (hôte suspendu) : pgTAP 97, Playwright 7/7 sur V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md",
+          "contains": "RESERVES SUSPENSION POLICY LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_HOST_SUSPENSION_POLICY_V1.md ⊃ « RESERVES SUSPENSION POLICY LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260928000301_reserves_hote_suspendu_lecture_seule_v1.sql",
+          "ok": true,
+          "detail": "supabase/migrations/20260928000301_reserves_hote_suspendu_lecture_seule_v1.sql"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "| **Réserves D-01** | idem, base neuve distincte | 7 | ✅ **7/7** |",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « | **Réserves D-01** | idem, base neuve distincte | 7 | ✅ **7/7** | »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-READ-ONLY-STUDIO",
+      "category": "SECURITY",
+      "title": "Lecture seule Studio appliquée en base (garde d'écriture centrale, 22 RPC refusées, 42501)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md",
+          "contains": "STUDIO DB GUARDS LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md ⊃ « STUDIO DB GUARDS LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**22 RPC\nauthentifiées** protégées",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **22 RPC\nauthentifiées** protégées »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-SUSPENSION-CROSS-APP",
+      "category": "SECURITY",
+      "title": "Abonnement GP suspendu : accès coupé (pas de lecture seule) et accès Colors/Tools/Réserves couplé au statut GP (RT-V3-P2-02)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décision produit explicite demandée par le red team V3 ; puis `a_acces_application()` et `est_membre_actif` alignés et testés",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md",
+          "contains": "RT-V3-P2-02",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_TENANT_RED_TEAM_V3.md ⊃ « RT-V3-P2-02 »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1.md",
+          "contains": "deviennent invisibles à ses membres",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1.md ⊃ « deviennent invisibles à ses membres »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-AUTH-LOCAL",
+      "category": "SECURITY",
+      "title": "Auth sur GoTrue réel local : jetons valides/expirés/bannis/révoqués, identité Studio B + I1 73/73 ×3",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PILOT_AUTH_POSTGREST_ACCEPTANCE_AUTOMATION_V1.md",
+          "contains": "Auth qualifiée",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PILOT_AUTH_POSTGREST_ACCEPTANCE_AUTOMATION_V1.md ⊃ « Auth qualifiée »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**73/73, trois exécutions consécutives**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **73/73, trois exécutions consécutives** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STUDIO_AUTH_CLOSED_SIGNUP_HARDENING_V1.md",
+          "contains": "STUDIO CLOSED SIGNUP LOCALLY ENFORCED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STUDIO_AUTH_CLOSED_SIGNUP_HARDENING_V1.md ⊃ « STUDIO CLOSED SIGNUP LOCALLY ENFORCED »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-AUTH-HOSTED",
+      "category": "SECURITY",
+      "title": "Auth hébergée : AAL2/MFA réel, URLs de redirection par application, signup fermé sur GoTrue hébergé",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Qualification Preview (étapes Auth du pack) ; réglages Supabase Dashboard par projet",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "AAL2/MFA réel",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « AAL2/MFA réel »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "Redirect URLs Auth par app",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « Redirect URLs Auth par app »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-STORAGE-HOSTED",
+      "category": "SECURITY",
+      "title": "Policies Storage (19 buckets) jamais vérifiées sur un vrai service Storage",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`preview:storage-smoke` (cross-tenant) pendant la qualification Preview",
+      "owner": "Opérateur",
+      "rationale": "Photos, plans et documents clients : une policy fausse expose des données d'un tenant à un autre.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "Auth / Storage / multi-tenant | **REMOTE PROOF REQUIRED**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « Auth / Storage / multi-tenant | **REMOTE PROOF REQUIRED** »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/preview/storage-smoke.mjs",
+          "ok": true,
+          "detail": "scripts/preview/storage-smoke.mjs"
+        }
+      ]
+    },
+    {
+      "id": "SEC-SECRETS",
+      "category": "SECURITY",
+      "title": "Aucun secret reconnu dans les fichiers suivis (verify:secrets, CI)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "executed",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "`verify:secrets` ✅",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « `verify:secrets` ✅ »"
+        },
+        {
+          "kind": "file",
+          "path": ".github/workflows/ci.yml",
+          "contains": "verify:secrets",
+          "ok": true,
+          "detail": ".github/workflows/ci.yml ⊃ « verify:secrets »"
+        },
+        {
+          "kind": "exec",
+          "name": "verify:secrets",
+          "ok": true,
+          "detail": "verify:secrets : code 0 (0.3 s)"
+        }
+      ]
+    },
+    {
+      "id": "SEC-DEPENDENCIES",
+      "category": "SECURITY",
+      "title": "Audit des dépendances (npm audit --audit-level=high) en CI hebdomadaire",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Non rejoué par le gate (appel au registre npm) ; preuve = remédiation documentée et job CI.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md",
+          "contains": "js-yaml",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md ⊃ « js-yaml »"
+        },
+        {
+          "kind": "file",
+          "path": ".github/workflows/ci.yml",
+          "contains": "audit:security",
+          "ok": true,
+          "detail": ".github/workflows/ci.yml ⊃ « audit:security »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-LEGACY-DEMO-CREDENTIALS",
+      "category": "SECURITY",
+      "title": "Rotation des identifiants de démo historiques signalée « rotation requise » par l'audit de sécurité",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Confirmer par écrit la suppression du compte de démo et la rotation ; mettre à jour docs/AUDIT_SECURITE.md (daté du 18/07/2026, antérieur à la fermeture de l'accès anonyme)",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/AUDIT_SECURITE.md",
+          "contains": "rotation requise",
+          "ok": true,
+          "detail": "docs/AUDIT_SECURITE.md ⊃ « rotation requise »"
+        }
+      ]
+    },
+    {
+      "id": "SEC-BANK-KEY-VERSIONING",
+      "category": "SECURITY",
+      "title": "Clé BANK_DATA_ENCRYPTION_KEY sans identifiant de version : pas de rotation, perte = IBAN/BIC illisibles (F-DR-BANK-KEY-VERSIONING)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P0",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Lot cryptographie : versionnement de clé (format chiffré avec identifiant) et procédure de rotation",
+      "owner": "Dév",
+      "rationale": "Gravité P0 reprise du manifeste d'environnement. Bascule seule en GO quand le constat est fermé au manifeste.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-finding",
+          "id": "F-DR-BANK-KEY-VERSIONING",
+          "ok": true,
+          "detail": "manifeste F-DR-BANK-KEY-VERSIONING : P0 open"
+        }
+      ]
+    },
+    {
+      "id": "SEC-ENV-P1-FINDINGS",
+      "category": "SECURITY",
+      "title": "Constats P1 ouverts du manifeste : double usage de secrets HMAC, repli silencieux d'environnement, replis localhost, nom de clé service Studio",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Lots code du manifeste : STRIPE_CONNECT_STATE_HMAC_KEY, clé d'état bancaire dédiée, refus d'environnement absent au déploiement, indicateur d'environnement dans Réserves/Studio",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-finding",
+          "id": "F-HMAC-STRIPE-OAUTH-STATE",
+          "ok": true,
+          "detail": "manifeste F-HMAC-STRIPE-OAUTH-STATE : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-HMAC-BANK-STATE-FALLBACK",
+          "ok": true,
+          "detail": "manifeste F-HMAC-BANK-STATE-FALLBACK : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-ENV-FALLBACK-LOCAL",
+          "ok": true,
+          "detail": "manifeste F-ENV-FALLBACK-LOCAL : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-ENV-INDICATOR-ADOPTION",
+          "ok": true,
+          "detail": "manifeste F-ENV-INDICATOR-ADOPTION : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-URL-LOCALHOST-FALLBACK",
+          "ok": true,
+          "detail": "manifeste F-URL-LOCALHOST-FALLBACK : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-STUDIO-SERVICE-KEY-NAME",
+          "ok": true,
+          "detail": "manifeste F-STUDIO-SERVICE-KEY-NAME : P1 detected"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-SUPABASE-PUBLIC-KEY-NAME",
+          "ok": true,
+          "detail": "manifeste F-SUPABASE-PUBLIC-KEY-NAME : P1 detected"
+        }
+      ]
+    },
+    {
+      "id": "SEC-CI-COVERAGE",
+      "category": "SECURITY",
+      "title": "pgTAP du projet partagé (red team, D-01, Stripe) et recettes Playwright GP/Réserves/Relevé/Colors absents de la CI",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Job CI PostgreSQL 16 + pgTAP sur supabase/tests (comme `studio-dedicated`) et job Playwright sur piles locales",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": ".github/workflows/ci.yml",
+          "contains": "studio-dedicated",
+          "ok": true,
+          "detail": ".github/workflows/ci.yml ⊃ « studio-dedicated »"
+        },
+        {
+          "kind": "note",
+          "text": "Aucun job CI n'exécute supabase/tests du projet partagé ni les recettes Playwright GP/Réserves/Relevé/Colors (lecture de .github/workflows/*.yml).",
+          "ok": true,
+          "detail": "Aucun job CI n'exécute supabase/tests du projet partagé ni les recettes Playwright GP/Réserves/Relevé/Colors (lecture de .github/workflows/*.yml)."
+        }
+      ]
+    },
+    {
+      "id": "BILL-LOCAL-SECURITY",
+      "category": "BILLING",
+      "title": "Sécurité facturation self-service : contournement RLS fermé, 3DS ne suspend jamais, colonnes commerciales verrouillées",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SELF_SERVICE_BILLING_SECURITY_CLOSURE_V3.md",
+          "contains": "BILLING SECURITY CLOSED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SELF_SERVICE_BILLING_SECURITY_CLOSURE_V3.md ⊃ « BILLING SECURITY CLOSED »"
+        },
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260923000332_verrouillage_colonnes_commerciales_entreprises.sql",
+          "ok": true,
+          "detail": "supabase/migrations/20260923000332_verrouillage_colonnes_commerciales_entreprises.sql"
+        }
+      ]
+    },
+    {
+      "id": "BILL-LOCAL-ORDERING",
+      "category": "BILLING",
+      "title": "Ordre des événements Stripe : désordre, rejeu, doublons et 100 courses convergent",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_EVENT_ORDERING_HARDENING_V1.md",
+          "contains": "STRIPE ORDERING LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_EVENT_ORDERING_HARDENING_V1.md ⊃ « STRIPE ORDERING LOCALLY QUALIFIED »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-LOCAL-TRIAL",
+      "category": "BILLING",
+      "title": "Essai : trial_end borné à l'essai local, double Checkout concurrent bloqué",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1.md",
+          "contains": "STRIPE TRIAL LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_TRIAL_SYNCHRONIZATION_V1.md ⊃ « STRIPE TRIAL LOCALLY QUALIFIED »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-LOCAL-RESUBSCRIPTION",
+      "category": "BILLING",
+      "title": "Réabonnement après annulation : 120/120 ordres convergent, Playwright 6/6 ×2 sur V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1.md",
+          "contains": "STRIPE RESUBSCRIPTION LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_RESUBSCRIPTION_FLOW_V1.md ⊃ « STRIPE RESUBSCRIPTION LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "Stripe réabonnement **6/6 ×2**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « Stripe réabonnement **6/6 ×2** »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-LOCAL-CONNECT-BOUTIQUE",
+      "category": "BILLING",
+      "title": "Webhooks Connect/Boutique et idempotence de la Boutique (Boutique et Connect OFF au lancement)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md",
+          "contains": "STRIPE WEBHOOK BLOCKER CLOSED LOCALLY",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md ⊃ « STRIPE WEBHOOK BLOCKER CLOSED LOCALLY »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_BOUTIQUE_PAYMENT_IDEMPOTENCY_CLOSURE_V1.md",
+          "contains": "BOUTIQUE IDEMPOTENCY BLOCKER CLOSED LOCALLY",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_BOUTIQUE_PAYMENT_IDEMPOTENCY_CLOSURE_V1.md ⊃ « BOUTIQUE IDEMPOTENCY BLOCKER CLOSED LOCALLY »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-STRIPE-TEST-PRICES",
+      "category": "BILLING",
+      "title": "Existence et montants des Price IDs Stripe (verify:stripe-prices strict jamais vert)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Clé Stripe Test en lecture (`STRIPE_TEST_SECRET_KEY` CI ou poste opérateur) puis `npm run verify:stripe-prices` en mode strict ; dépend de BILL-PRICING-DECISIONS",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "scripts/verify-stripe-prices.mjs",
+          "ok": true,
+          "detail": "scripts/verify-stripe-prices.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "config/stripe-prices.test.json",
+          "ok": true,
+          "detail": "config/stripe-prices.test.json"
+        }
+      ]
+    },
+    {
+      "id": "BILL-STRIPE-TEST-WEBHOOKS",
+      "category": "BILLING",
+      "title": "Webhooks signés par Stripe Test réel, endpoints et événements abonnés, STRIPE_WEBHOOK_EXPECTED_MODE par déploiement",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`preview:stripe-verify` + événements Stripe Test réels pendant la qualification Preview",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "scripts/preview/stripe-test-verify.mjs",
+          "ok": true,
+          "detail": "scripts/preview/stripe-test-verify.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md",
+          "contains": "REMOTE_ACTION_REQUIRED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md ⊃ « REMOTE_ACTION_REQUIRED »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-STRIPE-TEST-FLOWS",
+      "category": "BILLING",
+      "title": "Checkout, essai, ordre et réabonnement contre Stripe Test réel (scripts préparés, jamais exécutés)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`scripts/qualification/stripe-{ordering,trial,resubscription}-test-mode.mjs` avec clé Stripe Test, sur Preview",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "scripts/qualification/stripe-ordering-test-mode.mjs",
+          "ok": true,
+          "detail": "scripts/qualification/stripe-ordering-test-mode.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/qualification/stripe-trial-test-mode.mjs",
+          "ok": true,
+          "detail": "scripts/qualification/stripe-trial-test-mode.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/qualification/stripe-resubscription-test-mode.mjs",
+          "ok": true,
+          "detail": "scripts/qualification/stripe-resubscription-test-mode.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "Stripe Test réel, Storage/GoTrue/e-mail réels, Portail Stripe réel",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « Stripe Test réel, Storage/GoTrue/e-mail réels, Portail Stripe réel »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-CUSTOMER-PORTAL",
+      "category": "BILLING",
+      "title": "Portail client Stripe (configuration et bouton de reprise) non observé",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`scripts/configurer-portail-stripe.mjs` sur Stripe Test puis observation du Portail pendant la Preview",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "scripts/configurer-portail-stripe.mjs",
+          "ok": true,
+          "detail": "scripts/configurer-portail-stripe.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_SELF_SERVICE_BILLING_SECURITY_CLOSURE_V3.md",
+          "contains": "REMOTE STRIPE REQUIRED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_SELF_SERVICE_BILLING_SECURITY_CLOSURE_V3.md ⊃ « REMOTE STRIPE REQUIRED »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-PRICING-DECISIONS",
+      "category": "BILLING",
+      "title": "Grille tarifaire Stripe : contrats de Price divergents (modules, comptes supplémentaires, options IA, générations historiques, bloc stockage)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "5 décisions STRIPE-* du manifeste, puis création des Price IDs et `verify:stripe-prices`",
+      "owner": "Julien",
+      "rationale": "Constat F-STRIPE-CONTRACTS-DIVERGENT classé P1 au manifeste ; les décisions propriétaire finales le rangent en P2-9. Retenu P1 : aucune vente sans grille de prix arrêtée.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md",
+          "contains": "P2-9",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md ⊃ « P2-9 »"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-STRIPE-CONTRACTS-DIVERGENT",
+          "ok": true,
+          "detail": "manifeste F-STRIPE-CONTRACTS-DIVERGENT : P1 open"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL : ouverte"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS : ouverte"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STRIPE-IA-OPTIONS : ouverte"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS : ouverte"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STRIPE-STORAGE-BLOCK",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STRIPE-STORAGE-BLOCK : ouverte"
+        }
+      ]
+    },
+    {
+      "id": "BILL-STRIPE-TAX",
+      "category": "BILLING",
+      "title": "Stripe Tax / STRIPE_AUTOMATIC_TAX_ENABLED : bloqué tant que le régime de TVA n'est pas confirmé",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P0",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "LEGAL-VAT (régime de TVA), puis paramétrage Stripe Tax et affichage HT/TTC aligné",
+      "owner": "Julien + comptable",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/organisation/P15_STRIPE_LIVE_PREPARATION.md",
+          "contains": "BLOQUÉ — régime TVA officiel à confirmer",
+          "ok": true,
+          "detail": "docs/organisation/P15_STRIPE_LIVE_PREPARATION.md ⊃ « BLOQUÉ — régime TVA officiel à confirmer »"
+        },
+        {
+          "kind": "file",
+          "path": "src/lib/stripe-abonnement.ts",
+          "contains": "STRIPE_AUTOMATIC_TAX_ENABLED",
+          "ok": true,
+          "detail": "src/lib/stripe-abonnement.ts ⊃ « STRIPE_AUTOMATIC_TAX_ENABLED »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-WEBHOOK-RETRY-RESIDUAL",
+      "category": "BILLING",
+      "title": "Événement webhook réservé puis en échec : perdu au réessai suivant de Stripe (résidu D3)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Réessai après échec idempotent sur `stripe_webhook_events` (réarmement de la réservation en échec)",
+      "owner": "Dév",
+      "rationale": "Résidu fonctionnel classé P1 et non corrigé par décision dans le rapport de clôture des webhooks.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md",
+          "contains": "D3",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STRIPE_CONNECT_BOUTIQUE_WEBHOOK_CLOSURE_V1.md ⊃ « D3 »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-GRACE-PERIOD",
+      "category": "BILLING",
+      "title": "Délai de grâce après impayé (STRIPE_DELAI_GRACE_PAIEMENT_JOURS, défaut 0 = suspension immédiate)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Valeur écrite puis variable posée par environnement",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260923000333_horodatage_events_abonnement_et_delai_grace.sql",
+          "ok": true,
+          "detail": "supabase/migrations/20260923000333_horodatage_events_abonnement_et_delai_grace.sql"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "STRIPE_DELAI_GRACE_PAIEMENT_JOURS",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « STRIPE_DELAI_GRACE_PAIEMENT_JOURS »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-COMMERCIAL-LOCK",
+      "category": "BILLING",
+      "title": "Ouverture des souscriptions publiques (verrou ABONNEMENTS_PUBLICS_OUVERTS ; aucune garde de date dans V6)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P0",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décision d'ouverture après levée des P0 ; variable posée en Production. La garde de date du 01/10/2026 n'existe que sur la branche identité légale (non portée)",
+      "owner": "Julien",
+      "rationale": "Le verrou est un drapeau d'environnement : sans décision explicite, aucune souscription publique n'est possible.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "src/lib/commercialisation-abonnements.ts",
+          "contains": "ABONNEMENTS_PUBLICS_OUVERTS",
+          "ok": true,
+          "detail": "src/lib/commercialisation-abonnements.ts ⊃ « ABONNEMENTS_PUBLICS_OUVERTS »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "DEBUT_COMMERCIALISATION",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « DEBUT_COMMERCIALISATION »"
+        }
+      ]
+    },
+    {
+      "id": "BILL-STRIPE-LIVE",
+      "category": "BILLING",
+      "title": "Compte Stripe Live : activation, Price IDs Live, endpoints webhook Live",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P0",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "LEGAL-STRIPE-SELLER, BILL-PRICING-DECISIONS, BILL-STRIPE-TAX ; `docs/organisation/P15_STRIPE_LIVE_PREPARATION.md`",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/operations/DIAGNOSTIC_STRIPE_WEBHOOKS_V1.md",
+          "contains": "Stripe Live n'est pas activé",
+          "ok": true,
+          "detail": "docs/operations/DIAGNOSTIC_STRIPE_WEBHOOKS_V1.md ⊃ « Stripe Live n'est pas activé »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-CODE-READY",
+      "category": "EMAIL",
+      "title": "Architecture e-mail commune (garde Preview, origines par application, gabarit, journal sans fuite, lettre morte) : code prêt",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter `claude/practical-ritchie-yvsg3f` (base V5 f6399f15) dans le train V7 et requalifier",
+      "owner": "Dév (train canonique)",
+      "rationale": "Code prêt et qualifié localement, mais hors train : V6 n'a ni `packages/email/src/identite.ts` ni la garde Preview du transport.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "ELSATIA EMAIL ACTIONS REQUIRED",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « ELSATIA EMAIL ACTIONS REQUIRED »"
+        },
+        {
+          "kind": "file",
+          "path": "packages/email/src/identite.ts",
+          "ok": false,
+          "detail": "absent : packages/email/src/identite.ts"
+        },
+        {
+          "kind": "file",
+          "path": "packages/email/src/livraison.ts",
+          "ok": false,
+          "detail": "absent : packages/email/src/livraison.ts"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-SECURITY-FIXES",
+      "category": "EMAIL",
+      "title": "Correctifs de sécurité du lot e-mail absents de V6 : open redirect du callback Réserves, jetons de partage envoyés à Sentry, échappement HTML",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Même portage que EMAIL-CODE-READY (fichiers `apps/reserves/src/app/auth/callback/route.ts`, `src/lib/sentry-nettoyage.ts`)",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "Défaut réel corrigé dans Réserves",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « Défaut réel corrigé dans Réserves »"
+        },
+        {
+          "kind": "file",
+          "path": "src/lib/sentry-nettoyage.ts",
+          "ok": false,
+          "detail": "absent : src/lib/sentry-nettoyage.ts"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-AUTH-SMTP-PROD",
+      "category": "EMAIL",
+      "title": "SMTP Brevo du projet Supabase Production, domaine elsatia.fr authentifié (DKIM), reset testé de bout en bout (lignée pré-V6)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Preuve du registre central (P5, 09-08-2026). Ne couvre pas les gabarits neutres du lot e-mail (EMAIL-HOSTED-TEMPLATES).",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/organisation/REGISTRE_CENTRAL.md",
+          "contains": "SMTP Brevo configuré directement par l'utilisateur",
+          "ok": true,
+          "detail": "docs/organisation/REGISTRE_CENTRAL.md ⊃ « SMTP Brevo configuré directement par l'utilisateur »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/organisation/REGISTRE_CENTRAL.md",
+          "contains": "Test de bout en bout réussi après correctifs",
+          "ok": true,
+          "detail": "docs/organisation/REGISTRE_CENTRAL.md ⊃ « Test de bout en bout réussi après correctifs »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-BREVO-API-REAL",
+      "category": "EMAIL",
+      "title": "Flux applicatifs Brevo (devis/factures, relances, abonnement, support, invitations Réserves) : aucun envoi réel",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`smoke:email:preview --brevo-send` vers une adresse de l'allowlist Preview, après EMAIL-CODE-READY",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "**Aucun e-mail réel n'a été envoyé.**",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « **Aucun e-mail réel n'a été envoyé.** »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/smoke-email-preview.mjs",
+          "ok": true,
+          "detail": "scripts/smoke-email-preview.mjs"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-HOSTED-TEMPLATES",
+      "category": "EMAIL",
+      "title": "Gabarits Supabase neutres à reporter dans le Dashboard (Preview et Production) — action A-2",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "EMAIL-CODE-READY (gabarits versionnés), puis report manuel dans les deux projets Supabase",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-2 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-2 | »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-PRODUCTION-ENV",
+      "category": "EMAIL",
+      "title": "ELSATIA_APPLICATION_ENV=production sur GP et Réserves, EMAIL_PREVIEW_ALLOWLIST en Preview — action A-4",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Après portage du lot e-mail : sans la variable, la garde fail-closed bloque tous les e-mails Brevo",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-4 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-4 | »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-CONTACT-ADDRESS",
+      "category": "EMAIL",
+      "title": "Adresse de contact affichée : support@elsatia.fr (registre P14B) ou contact@elsatia.fr (runbook SMTP, audit identité) — action A-3",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Choix écrit, puis SUPPORT_EMAIL, EMAIL_FROM_ADDRESS et pack juridique alignés",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-3 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-3 | »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/juridique/README.md",
+          "contains": "support@elsatia.fr",
+          "ok": true,
+          "detail": "docs/juridique/README.md ⊃ « support@elsatia.fr »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "contact@elsatia.fr",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « contact@elsatia.fr »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-AUTH-ROUTING",
+      "category": "EMAIL",
+      "title": "Routage Auth par application (reset Tools atterrit sur GP) — action A-1",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Option 1/2/3 du rapport e-mail, puis implémentation",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-1 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-1 | »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-PROVIDERS",
+      "category": "EMAIL",
+      "title": "Fournisseurs e-mail : SMTP du projet Studio, Brevo API + SMTP (DPA), secours éventuel — action A-8",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décision fournisseurs ; Studio OFF au lancement",
+      "owner": "Julien / conseil",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-8 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-8 | »"
+        }
+      ]
+    },
+    {
+      "id": "EMAIL-FLOW-DEFECTS",
+      "category": "EMAIL",
+      "title": "Défauts de flux ouverts : Studio consomme le jeton au GET (A-5), idempotence B1/B5 (A-6), relais Colors (A-7), repli localhost Réserves (A-9)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Correctifs P2 du rapport e-mail (A-5, A-6) et décisions A-7, A-9",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-5 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-5 | »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md",
+          "ref": "origin/claude/practical-ritchie-yvsg3f",
+          "contains": "| A-6 |",
+          "ok": true,
+          "detail": "origin/claude/practical-ritchie-yvsg3f:docs/qualification/ELSATIA_TRANSACTIONAL_EMAIL_ARCHITECTURE_V1.md ⊃ « | A-6 | »"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:RESERVES-URL-FAIL-CLOSED",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:RESERVES-URL-FAIL-CLOSED : ouverte"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-IDENTITY-IN-TRAIN",
+      "category": "LEGAL",
+      "title": "Identité officielle (EI, 850 559 873 R.C.S. Strasbourg, elsatia.fr) absente des pages légales de V6",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P0",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Porter l'alignement d'identité de `claude/awesome-franklin-se2s33` — branche partie de main 4d92ddbe, pas de V6 : portage manuel des seules corrections d'identité, puis requalification",
+      "owner": "Dév (train canonique)",
+      "rationale": "Mentions légales V6 : SIRET « en cours de finalisation », TVA « à confirmer », aucun RCS. Mentions obligatoires d'un éditeur (LCEN).",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/mentions-legales.md",
+          "contains": "[EDITEUR_SIRET]",
+          "ok": true,
+          "detail": "docs/juridique/mentions-legales.md ⊃ « [EDITEUR_SIRET] »"
+        },
+        {
+          "kind": "file",
+          "path": "src/components/DocumentLegal.tsx",
+          "contains": "en cours de finalisation",
+          "ok": true,
+          "detail": "src/components/DocumentLegal.tsx ⊃ « en cours de finalisation »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "850 559 873 R.C.S. Strasbourg",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « 850 559 873 R.C.S. Strasbourg »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/juridique/mentions-legales.md",
+          "contains": "850 559 873",
+          "ok": false,
+          "detail": "marqueur absent dans docs/juridique/mentions-legales.md : 850 559 873"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-ADDRESS",
+      "category": "LEGAL",
+      "title": "Adresse de publication (mentions légales et factures Stripe) : adresse retenue à l'immatriculation ou domiciliation",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Décision écrite de l'exploitant (aucune adresse n'est choisie par le gate), puis mentions légales et Stripe alignés",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/mentions-legales.md",
+          "contains": "à revérifier contre l'avis SIRENE",
+          "ok": true,
+          "detail": "docs/juridique/mentions-legales.md ⊃ « à revérifier contre l'avis SIRENE »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Adresse de l'établissement",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Adresse de l'établissement »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-VAT",
+      "category": "LEGAL",
+      "title": "Régime de TVA (franchise « 293 B » ou assujettissement) : prix affichés HT, mention TVA « à confirmer »",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Régime confirmé, puis NEXT_PUBLIC_LEGAL_TVA, CGV, /tarifs, Stripe Tax et pied de facture alignés",
+      "owner": "Exploitant + comptable",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/cgv.md",
+          "contains": "[EDITEUR_MENTION_TVA]",
+          "ok": true,
+          "detail": "docs/juridique/cgv.md ⊃ « [EDITEUR_MENTION_TVA] »"
+        },
+        {
+          "kind": "file",
+          "path": "src/components/DocumentLegal.tsx",
+          "contains": "à confirmer",
+          "ok": true,
+          "detail": "src/components/DocumentLegal.tsx ⊃ « à confirmer »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Régime de TVA",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Régime de TVA »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-SIRET",
+      "category": "LEGAL",
+      "title": "SIRET (SIREN + NIC) non connu du dépôt : NEXT_PUBLIC_LEGAL_SIRET vide",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Avis de situation SIRENE, puis NEXT_PUBLIC_LEGAL_SIRET par environnement (aucune valeur inventée)",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": ".env.example",
+          "contains": "NEXT_PUBLIC_LEGAL_SIRET=",
+          "ok": true,
+          "detail": ".env.example ⊃ « NEXT_PUBLIC_LEGAL_SIRET= »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Le **SIRET** (SIREN + NIC) n'est pas connu",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Le **SIRET** (SIREN + NIC) n'est pas connu »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-CONTACT",
+      "category": "LEGAL",
+      "title": "Boîte de contact publiée dans le pack juridique (support@ ou contact@elsatia.fr)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Même décision que EMAIL-CONTACT-ADDRESS",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Boîte `contact@elsatia.fr`",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Boîte `contact@elsatia.fr` »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/juridique/README.md",
+          "contains": "support@elsatia.fr",
+          "ok": true,
+          "detail": "docs/juridique/README.md ⊃ « support@elsatia.fr »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-STRIPE-SELLER",
+      "category": "LEGAL",
+      "title": "Identité vendeur Stripe (entreprise, public details, libellé bancaire, pied de facture, CGV/confidentialité)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Checklist opérateur §6 de l'audit d'identité ; dépend de LEGAL-ADDRESS et LEGAL-VAT",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Stripe — champs d'identité vendeur attendus",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Stripe — champs d'identité vendeur attendus »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-SHOP",
+      "category": "LEGAL",
+      "title": "Boutique matériel : vente de biens hors activité déclarée, Checkout sans `invoice_creation` (aucune facture émise)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Décision juridique avant toute activation (Boutique OFF au lancement)",
+      "owner": "Juriste + exploitant",
+      "rationale": "La fiche fournisseur « Liria (boutique) » citée par l'audit est déjà renommée dans V6 (migration 20260801000194).",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Boutique matériel",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Boutique matériel »"
+        },
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260801000194_renommer_identite_elsatia_boutique.sql",
+          "ok": true,
+          "detail": "supabase/migrations/20260801000194_renommer_identite_elsatia_boutique.sql"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-VISUALS",
+      "category": "LEGAL",
+      "title": "Guides PDF et vidéos (output/) encore à la marque « Liria » ; icônes PWA de V6 déjà ELSATIA",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Régénération des guides et vidéos ELSATIA avant toute diffusion (fichiers non servis par l'application)",
+      "owner": "Exploitant / design",
+      "rationale": "L'audit d'identité (base main 4d92ddbe) visait aussi le logo et les icônes : dans V6, public/icons affiche ELSATIA et src/ ne référence aucun fichier output/.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf",
+          "ok": true,
+          "detail": "output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Logos, icônes, guide PDF, vidéos",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Logos, icônes, guide PDF, vidéos »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-PROVIDERS-PUBLIC",
+      "category": "LEGAL",
+      "title": "Sous-traitants (OpenAI, Sentry, Powens) : garanties et localisation à vérifier avant publication",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Vérification juridique ; voir RGPD-PROVIDERS",
+      "owner": "Juriste",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "**Sous-traitants** OpenAI, Sentry, Powens",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « **Sous-traitants** OpenAI, Sentry, Powens »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-LAWYER-REVIEW",
+      "category": "LEGAL",
+      "title": "Relecture avocat du pack juridique (brouillons, pas un conseil juridique)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_LEGAL",
+      "dependency": "Pack aligné (LEGAL-IDENTITY-IN-TRAIN, LEGAL-ADDRESS, LEGAL-VAT) puis relecture",
+      "owner": "Juriste",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/README.md",
+          "contains": "à faire relire par un avocat",
+          "ok": true,
+          "detail": "docs/juridique/README.md ⊃ « à faire relire par un avocat »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/commercial/GO_LIVE_COMMERCIAL_CHECKLIST.md",
+          "contains": "[ ] Relecture avocat effectuée",
+          "ok": true,
+          "detail": "docs/commercial/GO_LIVE_COMMERCIAL_CHECKLIST.md ⊃ « [ ] Relecture avocat effectuée »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-OTHER-APPS",
+      "category": "LEGAL",
+      "title": "Identité légale de Tools, Colors, Réserves, Studio et du site vitrine non auditée ; pack juridique limité à « ELSATIA Gestion Pro »",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Audit d'identité par application (référence : audit V1) et extension des CGU/confidentialité aux applications vendues",
+      "owner": "Dév + juriste",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Apps Tools, Colors, Réserves, Studio, et site vitrine",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Apps Tools, Colors, Réserves, Studio, et site vitrine »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/juridique/mentions-legales.md",
+          "contains": "ELSATIA Gestion Pro",
+          "ok": true,
+          "detail": "docs/juridique/mentions-legales.md ⊃ « ELSATIA Gestion Pro »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-TRADEMARK",
+      "category": "LEGAL",
+      "title": "Dépôt de la marque ELSATIA non vérifié",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Vérification ; ne pas parler de marque déposée d'ici là",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "Dépôt de la marque ELSATIA",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « Dépôt de la marque ELSATIA »"
+        }
+      ]
+    },
+    {
+      "id": "LEGAL-ACTIVITY-DATE",
+      "category": "LEGAL",
+      "title": "Date d'activité déclarée 01/10/2026",
+      "declared_status": "NOT_APPLICABLE",
+      "status": "NOT_APPLICABLE",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Repère de configuration existant (garde DEBUT_COMMERCIALISATION de la branche identité légale). Le gate n'en déduit aucune obligation de vendre ; l'ouverture reste la décision BILL-COMMERCIAL-LOCK.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md",
+          "ref": "origin/claude/awesome-franklin-se2s33",
+          "contains": "DEBUT_COMMERCIALISATION",
+          "ok": true,
+          "detail": "origin/claude/awesome-franklin-se2s33:docs/qualification/ELSATIA_LEGAL_IDENTITY_COMMERCIALIZATION_AUDIT_V1.md ⊃ « DEBUT_COMMERCIALISATION »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-CONTRACT-RETENTION",
+      "category": "RGPD",
+      "title": "Conservation des contrats acceptés : A durée, B point de départ (B1/B2), C photos — rien d'activé (fail-closed)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décision écrite dans docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md (aucune durée choisie par le gate), puis activation propriétaire et mise à jour confidentialité/registre/DPA",
+      "owner": "Julien + conseil",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md",
+          "contains": "fail-closed",
+          "ok": true,
+          "detail": "docs/legal/ELSATIA_RGPD_CONTRACT_RETENTION_OWNER_DECISION_V2.md ⊃ « fail-closed »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**aucune durée, aucun point de départ, aucun sort des\nphotos activés — fail-closed**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **aucune durée, aucun point de départ, aucun sort des\nphotos activés — fail-closed** »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-LIFECYCLE-DECISIONS",
+      "category": "RGPD",
+      "title": "Décisions de cycle de vie ouvertes : tables RETAIN et durée comptable, photos GPS/pointage, pseudonymisation du journal, purge self-service, anonymisation clients",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "LEGAL_DECISION_REQUIRED 1-5 (P1-6, P1-7 des décisions propriétaire)",
+      "owner": "Julien + conseil",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RGPD_DATA_LIFECYCLE_CLOSURE_V3.md",
+          "contains": "LEGAL_DECISION_REQUIRED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RGPD_DATA_LIFECYCLE_CLOSURE_V3.md ⊃ « LEGAL_DECISION_REQUIRED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md",
+          "contains": "P1-6",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md ⊃ « P1-6 »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-CGV-DELETION-PROMISE",
+      "category": "RGPD",
+      "title": "CGV : suppression des données 30 jours après la fin du contrat, sans tâche de production qui l'exécute",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Planification de la purge (architecture V2 existante) ou modification de la clause CGV",
+      "owner": "Dév + Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/cgv.md",
+          "contains": "délai de **30 jours** pour récupérer ses données",
+          "ok": true,
+          "detail": "docs/juridique/cgv.md ⊃ « délai de **30 jours** pour récupérer ses données »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RGPD_DATA_LIFECYCLE_CLOSURE_V3.md",
+          "contains": "30 jours",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RGPD_DATA_LIFECYCLE_CLOSURE_V3.md ⊃ « 30 jours »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-EMPLOYES-OVEREXPOSURE",
+      "category": "RGPD",
+      "title": "Table employes : e-mail, téléphone, notes (et colonnes de carte BTP / code de borne) lisibles par tout membre actif du tenant",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Resserrer la policy SELECT de `employes` (vue `employes_annuaire` = fondation), migrer les 82 lectures `from(\"employes\")` de src/",
+      "owner": "Dév",
+      "rationale": "« ACTUAL BLOCKER (réduit) » de la checklist Preview V2 ; vérifié sur la base V6 neuve : policy PERMISSIVE ALL `est_membre_actif(entreprise_id)`. Intra-tenant uniquement (l'isolation inter-tenant est prouvée).",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "Sur-exposition RGPD table `employes`",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « Sur-exposition RGPD table `employes` »"
+        },
+        {
+          "kind": "file",
+          "path": "supabase/migrations/20260922000312_gp_pilot_employes_annuaire_vue_restreinte.sql",
+          "contains": "OUVERT",
+          "ok": true,
+          "detail": "supabase/migrations/20260922000312_gp_pilot_employes_annuaire_vue_restreinte.sql ⊃ « OUVERT »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-PURGE-HOSTED",
+      "category": "RGPD",
+      "title": "Purge d'entreprise (architecture V2) qualifiée localement ; jamais exécutée sur un projet hébergé",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Rejeu de `purger-entreprise.mjs` sur Preview (tenant de recette), runbook RGPD V2",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RGPD_PURGE_ARCHITECTURE_CLOSURE_V2.md",
+          "contains": "RGPD PURGE ARCHITECTURE LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RGPD_PURGE_ARCHITECTURE_CLOSURE_V2.md ⊃ « RGPD PURGE ARCHITECTURE LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/runbooks/ELSATIA_RGPD_PURGE_OPERATION_V2.md",
+          "ok": true,
+          "detail": "docs/runbooks/ELSATIA_RGPD_PURGE_OPERATION_V2.md"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-RESERVES-PURGE",
+      "category": "RGPD",
+      "title": "Aucune couverture RGPD des tables reserves_* (purge, fichiers de plans, mutations appliquées)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Étendre l'architecture de purge V2 à Réserves (G-05 fichiers `reserves-plans`, R-09 `reserves_mutations_appliquees`)",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RGPD_PURGE_ARCHITECTURE_CLOSURE_V2.md",
+          "contains": "ne correspond à des « réserves » de chantier",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RGPD_PURGE_ARCHITECTURE_CLOSURE_V2.md ⊃ « ne correspond à des « réserves » de chantier »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md",
+          "contains": "R-09",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md ⊃ « R-09 »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-PROVIDERS",
+      "category": "RGPD",
+      "title": "Registre des sous-traitants : région Sentry à confirmer ; hébergeur worker Studio et Redis absents ; réévaluation avant Boutique/Powens",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Confirmer la région Sentry ; compléter le registre au choix de DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/juridique/rgpd-sous-traitants.md",
+          "contains": "Confirmer la région du projet Sentry",
+          "ok": true,
+          "detail": "docs/juridique/rgpd-sous-traitants.md ⊃ « Confirmer la région du projet Sentry »"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER : ouverte"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-LOG-RETENTION",
+      "category": "RGPD",
+      "title": "Rétention des journaux techniques (Vercel, Supabase, Sentry) et des journaux opérateur non définie ni vérifiée",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Durées décidées puis vérifiées chez chaque fournisseur",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md",
+          "contains": "jamais vérifiée dans ce dépôt",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md ⊃ « jamais vérifiée dans ce dépôt »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/operations/AUDIT_LOG_OPERATEUR_V1.md",
+          "contains": "Aucune politique de rétention définie",
+          "ok": true,
+          "detail": "docs/operations/AUDIT_LOG_OPERATEUR_V1.md ⊃ « Aucune politique de rétention définie »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-STUDIO-INVITATIONS",
+      "category": "RGPD",
+      "title": "Invitations Studio : aucune analyse RGPD dans le train (lot post-H hors V6)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Lot Studio post-H porté (STUDIO-POST-V6-LOTS) puis classement des données d'invitation ; Studio OFF au lancement",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md",
+          "contains": "invitations",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STUDIO_V3_PORT_HOSTED_READINESS_V1.md ⊃ « invitations »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md",
+          "ref": "origin/claude/modest-pasteur-izfaqm",
+          "contains": "invitations",
+          "ok": true,
+          "detail": "origin/claude/modest-pasteur-izfaqm:docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md ⊃ « invitations »"
+        }
+      ]
+    },
+    {
+      "id": "RGPD-STUDIO-SHARED-WORKSPACES",
+      "category": "RGPD",
+      "title": "Effacement Studio : espaces partagés d'un compte supprimé (D3), contenus dans l'espace d'autrui (D4), délai (D1), conservation du journal (D2)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décisions D1-D5, D7 du lot Studio B ; exécution d'effacement `off` d'ici là ; Studio OFF au lancement",
+      "owner": "Julien + conseil",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md",
+          "contains": "**Espaces partagés**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md ⊃ « **Espaces partagés** »"
+        }
+      ]
+    },
+    {
+      "id": "DR-LOCAL",
+      "category": "BACKUP_DR",
+      "title": "DR local : backup vérifié par restauration stricte, 4 sinistres, Storage et Auth réels (GoTrue, storage-api) — ELSATIA DR LOCALLY QUALIFIED",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "ELSATIA DR LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « ELSATIA DR LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "**0 écart**",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « **0 écart** »"
+        }
+      ]
+    },
+    {
+      "id": "DR-TOOLING-IN-TRAIN",
+      "category": "BACKUP_DR",
+      "title": "Outillage DR V2 (`npm run dr:verify`, garde-fous) absent du train V6",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter `claude/determined-rubin-zdzpmy` (base V5) ; réconcilier ci.yml et le registre des seeds (§16 du rapport DR V2)",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "npm run dr:verify",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « npm run dr:verify »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/dr/v2/dr-verify.mjs",
+          "ok": false,
+          "detail": "absent : scripts/dr/v2/dr-verify.mjs"
+        }
+      ]
+    },
+    {
+      "id": "DR-REMOTE-BACKUP",
+      "category": "BACKUP_DR",
+      "title": "Sauvegarde hébergée (PITR / sauvegardes Supabase) jamais restaurée ni vérifiée",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Drill Preview autorisé : restauration de projet / PITR, puis `dr:verify --backup` sur la sauvegarde",
+      "owner": "Opérateur",
+      "rationale": "Données clients sans restauration prouvée : risque data majeur.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "Les RTO/RPO hébergés restent **NOT PROVEN**",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « Les RTO/RPO hébergés restent **NOT PROVEN** »"
+        },
+        {
+          "kind": "file",
+          "path": "PRODUCTION_CHECKLIST.md",
+          "contains": "Sauvegardes Supabase testées et restaurables",
+          "ok": true,
+          "detail": "PRODUCTION_CHECKLIST.md ⊃ « Sauvegardes Supabase testées et restaurables »"
+        }
+      ]
+    },
+    {
+      "id": "DR-HOSTED-STORAGE",
+      "category": "BACKUP_DR",
+      "title": "Fichiers Storage hors des sauvegardes de base : copie S3 → S3 appariée au backup_id à mettre en place",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Copie S3 → S3 vérifiée par SHA-256 (manifeste), mesurée sur Preview (R3 du rapport DR V2)",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "La sauvegarde des objets d'un projet Supabase hébergé",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « La sauvegarde des objets d'un projet Supabase hébergé »"
+        }
+      ]
+    },
+    {
+      "id": "DR-HOSTED-AUTH-CONFIG",
+      "category": "BACKUP_DR",
+      "title": "Configuration Auth hébergée hors base (clés JWT, SMTP, gabarits, hooks, MFA, URLs de redirection) non sauvegardée",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Export documenté de la configuration par projet et procédure de révocation globale validée sur Preview",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "Nécessite Supabase hébergé (non prouvé)",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « Nécessite Supabase hébergé (non prouvé) »"
+        }
+      ]
+    },
+    {
+      "id": "DR-RTO-RPO",
+      "category": "BACKUP_DR",
+      "title": "RTO/RPO hébergés non mesurés ; aucun objectif fixé (mesures locales ≠ SLA)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Objectifs RTO/RPO décidés puis drill Preview mesuré (R8 du rapport DR V2)",
+      "owner": "Julien + opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "Ces valeurs ne sont pas un SLA",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « Ces valeurs ne sont pas un SLA »"
+        }
+      ]
+    },
+    {
+      "id": "DR-POST-RESTORE-PROCEDURE",
+      "category": "BACKUP_DR",
+      "title": "Procédure post-restauration obligatoire : rejeu Stripe (droits rouverts), révocation des sessions et rotation JWT (mots de passe/bans ressuscités)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P0",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Intégrer R1/R2/R6 du rapport DR V2 au runbook DR et les valider sur Preview",
+      "owner": "Opérateur",
+      "rationale": "Priorité « P0 procédure » reprise du rapport DR V2.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "| R1 |",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « | R1 | »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md",
+          "ref": "origin/claude/determined-rubin-zdzpmy",
+          "contains": "| R2 |",
+          "ok": true,
+          "detail": "origin/claude/determined-rubin-zdzpmy:docs/qualification/ELSATIA_DISASTER_RECOVERY_RESTORE_V2.md ⊃ « | R2 | »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/runbooks/ELSATIA_DISASTER_RECOVERY_RUNBOOK_V2.md",
+          "ok": true,
+          "detail": "docs/runbooks/ELSATIA_DISASTER_RECOVERY_RUNBOOK_V2.md"
+        }
+      ]
+    },
+    {
+      "id": "DR-VOLUME-PASSPHRASE",
+      "category": "BACKUP_DR",
+      "title": "Passphrase du volume DR (seul dépôt de secrets) sans garde documentée (F-DR-VOLUME-PASSPHRASE)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P0",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Deux dépositaires documentés et un test de restauration du volume",
+      "owner": "Exploitant",
+      "rationale": "Gravité P0 reprise du manifeste d'environnement.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-finding",
+          "id": "F-DR-VOLUME-PASSPHRASE",
+          "ok": true,
+          "detail": "manifeste F-DR-VOLUME-PASSPHRASE : P0 open"
+        }
+      ]
+    },
+    {
+      "id": "PREVIEW-PACK-READY",
+      "category": "PREVIEW",
+      "title": "Pack opérateur Preview distante : commande unique, 35 étapes, protection Production, 27 tests hors réseau",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Pack prêt ≠ Preview exécutée (voir PREVIEW-EXECUTED).",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md",
+          "ref": "origin/claude/wizardly-keller-3gz8nv",
+          "contains": "REMOTE PREVIEW OPERATOR HANDOFF PACK V1 READY",
+          "ok": true,
+          "detail": "origin/claude/wizardly-keller-3gz8nv:docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md ⊃ « REMOTE PREVIEW OPERATOR HANDOFF PACK V1 READY »"
+        }
+      ]
+    },
+    {
+      "id": "PREVIEW-PACK-TARGETS-V6",
+      "category": "PREVIEW",
+      "title": "Le pack cible V5 (f6399f15) : son préflight refuse un train plus récent qualifié (V6)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P0",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter le pack sur le train retenu et mettre à jour `scripts/preview/qualification/train.json` par revue",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md",
+          "ref": "origin/claude/wizardly-keller-3gz8nv",
+          "contains": "rend `NO-GO` et demande de mettre à jour `train.json` par revue",
+          "ok": true,
+          "detail": "origin/claude/wizardly-keller-3gz8nv:docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md ⊃ « rend `NO-GO` et demande de mettre à jour `train.json` par revue »"
+        },
+        {
+          "kind": "file",
+          "path": "scripts/preview/qualification/train.json",
+          "contains": "9102ec80",
+          "ok": false,
+          "detail": "absent : scripts/preview/qualification/train.json"
+        }
+      ]
+    },
+    {
+      "id": "PREVIEW-EXECUTED",
+      "category": "PREVIEW",
+      "title": "Qualification Preview distante réellement exécutée (V4 : BLOCKED ; pack V1 : NOT EXECUTED)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "`npm run preview:qualification -- --mode full --apply-migrations` depuis un poste avec réseau et identifiants ; rendre artifacts/preview-qualification.json",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_V4_REMOTE_PREVIEW_EXECUTION_V1.md",
+          "ref": "origin/claude/zen-davinci-xn6m3m",
+          "contains": "V4 PREVIEW BLOCKED",
+          "ok": true,
+          "detail": "origin/claude/zen-davinci-xn6m3m:docs/qualification/ELSATIA_V4_REMOTE_PREVIEW_EXECUTION_V1.md ⊃ « V4 PREVIEW BLOCKED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md",
+          "ref": "origin/claude/wizardly-keller-3gz8nv",
+          "contains": "`NOT EXECUTED`",
+          "ok": true,
+          "detail": "origin/claude/wizardly-keller-3gz8nv:docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md ⊃ « `NOT EXECUTED` »"
+        },
+        {
+          "kind": "file",
+          "path": "artifacts/preview-qualification.json",
+          "contains": "PREVIEW QUALIFIED\"",
+          "ok": false,
+          "detail": "absent : artifacts/preview-qualification.json"
+        }
+      ]
+    },
+    {
+      "id": "PREVIEW-PROJECT-INVENTORY",
+      "category": "PREVIEW",
+      "title": "Projets Preview : réutiliser elsatia-preview (limite de 2 projets) ; aucun projet Vercel pour Colors, Tools, Réserves, Studio",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P0",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Décision propriétaire (P0-1 des décisions finales) avant toute exécution Preview",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:PREVIEW-PROJECT-INVENTORY",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:PREVIEW-PROJECT-INVENTORY : ouverte"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md",
+          "contains": "P0-1",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md ⊃ « P0-1 »"
+        }
+      ]
+    },
+    {
+      "id": "PREVIEW-MANUAL-CONFIRMATIONS",
+      "category": "PREVIEW",
+      "title": "Confirmations manuelles de la Preview (réception des e-mails, parcours humains)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Après PREVIEW-EXECUTED : cocher les confirmations de summary.md",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md",
+          "ref": "origin/claude/wizardly-keller-3gz8nv",
+          "contains": "confirmations manuelles",
+          "ok": true,
+          "detail": "origin/claude/wizardly-keller-3gz8nv:docs/qualification/ELSATIA_REMOTE_PREVIEW_OPERATOR_HANDOFF_V1.md ⊃ « confirmations manuelles »"
+        }
+      ]
+    },
+    {
+      "id": "OBS-SENTRY-CODE",
+      "category": "OBSERVABILITY",
+      "title": "Sentry câblé (serveur, edge, navigateur), sendDefaultPii=false, désactivé sans DSN",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "sentry.server.config.ts",
+          "contains": "sendDefaultPii: false",
+          "ok": true,
+          "detail": "sentry.server.config.ts ⊃ « sendDefaultPii: false »"
+        },
+        {
+          "kind": "file",
+          "path": "sentry.edge.config.ts",
+          "ok": true,
+          "detail": "sentry.edge.config.ts"
+        },
+        {
+          "kind": "file",
+          "path": "docs/SENTRY.md",
+          "ok": true,
+          "detail": "docs/SENTRY.md"
+        }
+      ]
+    },
+    {
+      "id": "OBS-SENTRY-PRODUCTION",
+      "category": "OBSERVABILITY",
+      "title": "Sentry branché et reçu sur l'environnement Production",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "DSN posé et événement de test observé en Production",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "PRODUCTION_CHECKLIST.md",
+          "contains": "Sentry branché sur l'environnement Production",
+          "ok": true,
+          "detail": "PRODUCTION_CHECKLIST.md ⊃ « Sentry branché sur l'environnement Production »"
+        }
+      ]
+    },
+    {
+      "id": "OBS-HEALTH-LOGS",
+      "category": "OBSERVABILITY",
+      "title": "Journaux structurés, /api/healthz, suivi des tâches planifiées : branche observabilité (PILOT INCIDENT READY) hors train",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter `ops/observability-incident-readiness-v1` (base main 4d92ddbe, migration job_runs à renuméroter) puis requalifier",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_OBSERVABILITY_INCIDENT_READINESS_V1.md",
+          "ref": "origin/ops/observability-incident-readiness-v1",
+          "contains": "PILOT INCIDENT READY",
+          "ok": true,
+          "detail": "origin/ops/observability-incident-readiness-v1:docs/qualification/ELSATIA_OBSERVABILITY_INCIDENT_READINESS_V1.md ⊃ « PILOT INCIDENT READY »"
+        },
+        {
+          "kind": "file",
+          "path": "src/app/api/healthz/route.ts",
+          "ok": false,
+          "detail": "absent : src/app/api/healthz/route.ts"
+        }
+      ]
+    },
+    {
+      "id": "OBS-ALERTING-UPTIME",
+      "category": "OBSERVABILITY",
+      "title": "Alerting et surveillance de disponibilité : aucun fournisseur connecté, aucune astreinte définie",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Moniteur externe + canal d'alerte + personne d'astreinte, après OBS-HEALTH-LOGS",
+      "owner": "Exploitant",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "PRODUCTION_CHECKLIST.md",
+          "contains": "Monitoring/alerting Production",
+          "ok": true,
+          "detail": "PRODUCTION_CHECKLIST.md ⊃ « Monitoring/alerting Production »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_OBSERVABILITY_INCIDENT_READINESS_V1.md",
+          "ref": "origin/ops/observability-incident-readiness-v1",
+          "contains": "Aucun fournisseur d'alertes connecté",
+          "ok": true,
+          "detail": "origin/ops/observability-incident-readiness-v1:docs/qualification/ELSATIA_OBSERVABILITY_INCIDENT_READINESS_V1.md ⊃ « Aucun fournisseur d'alertes connecté »"
+        }
+      ]
+    },
+    {
+      "id": "PERF-V6-CAPACITY",
+      "category": "PERFORMANCE",
+      "title": "Capacité GP sur V6 : REMOTE/LOCAL PROOF PENDING (dernier rapport mesuré sur release/gp-v1-rc@8caef21, verdict PILOT CAPACITY READY, pas « 40 utilisateurs »)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Aucun rapport Performance en cours disponible sur origin : rejouer `scripts/perf` sur V6 localement, puis mesurer sur Preview (pooler, latence réelle)",
+      "owner": "Dév + opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_GP_PERFORMANCE_CAPACITY_V1.md",
+          "contains": "PILOT CAPACITY READY",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_GP_PERFORMANCE_CAPACITY_V1.md ⊃ « PILOT CAPACITY READY »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "Dashboard 1,7–1,8 s non corrigé",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « Dashboard 1,7–1,8 s non corrigé »"
+        }
+      ]
+    },
+    {
+      "id": "PERF-RESERVES-LOCAL",
+      "category": "PERFORMANCE",
+      "title": "Réserves : recette performance V6 5/5 (2 000 réserves) sur pile locale",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "V6 performance",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « V6 performance »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md",
+          "contains": "2 000 réserves",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md ⊃ « 2 000 réserves »"
+        }
+      ]
+    },
+    {
+      "id": "PERF-RELEVE-LOCAL",
+      "category": "PERFORMANCE",
+      "title": "Relevé : 500 murs + 300 ouvertures (next dev), recette V6 16/16",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "perf 100-500 murs + 50-300 ouvertures",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « perf 100-500 murs + 50-300 ouvertures »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT6_GEOMETRIE_BATIMENT_V1.md",
+          "contains": "500 murs + 300 ouvertures",
+          "ok": true,
+          "detail": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT6_GEOMETRIE_BATIMENT_V1.md ⊃ « 500 murs + 300 ouvertures »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-EMULATED",
+      "category": "MOBILE",
+      "title": "Profils émulés : WebKit iPhone 13 / iPad (gen 7), Pixel 7, colors-mobile 73/73, Réserves V4 mobile 6/6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Émulation seulement ; aucune preuve sur appareil physique.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "playwright.config.ts",
+          "contains": "iPhone 13",
+          "ok": true,
+          "detail": "playwright.config.ts ⊃ « iPhone 13 »"
+        },
+        {
+          "kind": "file",
+          "path": "playwright.config.ts",
+          "contains": "iPad (gen 7)",
+          "ok": true,
+          "detail": "playwright.config.ts ⊃ « iPad (gen 7) »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "Colors (`colors` + `colors-mobile`)",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « Colors (`colors` + `colors-mobile`) »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-IPHONE-PHYSICAL",
+      "category": "MOBILE",
+      "title": "iPhone physique : aucun test",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Recette sur un vrai iPhone contre la Preview HTTPS (après PREVIEW-EXECUTED)",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md",
+          "contains": "MOBILE EMULATED ONLY",
+          "ok": true,
+          "detail": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md ⊃ « MOBILE EMULATED ONLY »"
+        },
+        {
+          "kind": "file",
+          "path": "apps/tools/docs/native-validation-r7.md",
+          "contains": "pas sur iPhone physique",
+          "ok": true,
+          "detail": "apps/tools/docs/native-validation-r7.md ⊃ « pas sur iPhone physique »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-IPAD-PHYSICAL",
+      "category": "MOBILE",
+      "title": "iPad physique : aucun test (Relevé tablette : MOBILE EMULATED ONLY)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Recette Relevé et Réserves sur un vrai iPad contre la Preview",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT6_GEOMETRIE_BATIMENT_V1.md",
+          "contains": "MOBILE EMULATED ONLY",
+          "ok": true,
+          "detail": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT6_GEOMETRIE_BATIMENT_V1.md ⊃ « MOBILE EMULATED ONLY »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-SAFARI-IOS",
+      "category": "MOBILE",
+      "title": "Safari / WebKit iOS réel : non testé (seul WebKit desktop piloté par Playwright)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Parcours clés (connexion, capture photo, hors ligne, PWA) dans Safari iOS réel",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md",
+          "contains": "Safari / WebKit iOS",
+          "ok": true,
+          "detail": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT4_CAPTURE_MEDIA_V1.md ⊃ « Safari / WebKit iOS »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-FIELD",
+      "category": "MOBILE",
+      "title": "Terrain réel : rechargement hors ligne Réserves non exécutable localement, installation PWA réelle non testée",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P1",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Recette terrain (réseau dégradé, hors ligne, PWA installée) sur appareils réels",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "--grep-invert \"rechargement hors ligne\"",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « --grep-invert \"rechargement hors ligne\" »"
+        },
+        {
+          "kind": "file",
+          "path": "PRODUCTION_CHECKLIST.md",
+          "contains": "installation réelle sur appareil non testée",
+          "ok": true,
+          "detail": "PRODUCTION_CHECKLIST.md ⊃ « installation réelle sur appareil non testée »"
+        }
+      ]
+    },
+    {
+      "id": "MOB-NATIVE-STORES",
+      "category": "MOBILE",
+      "title": "Tools natif : installation sur appareil réel non cochée (TestFlight / Google Play)",
+      "declared_status": "MANUAL_REQUIRED",
+      "status": "MANUAL_REQUIRED",
+      "priority": "P2",
+      "blocker": "MANUAL_VALIDATION",
+      "dependency": "Distribution magasins d'applications (hors vente web)",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/mobile-stores/tools/TOOLS_TESTFLIGHT_CHECKLIST_V1.md",
+          "contains": "Installation vérifiée sur un appareil réel",
+          "ok": true,
+          "detail": "docs/mobile-stores/tools/TOOLS_TESTFLIGHT_CHECKLIST_V1.md ⊃ « Installation vérifiée sur un appareil réel »"
+        }
+      ]
+    },
+    {
+      "id": "STUDIO-OFF-AT-LAUNCH",
+      "category": "STUDIO",
+      "title": "Studio OFF pour la première Preview (aucune migration Studio dans le projet partagé, STUDIO_ACCESS_MODE=closed)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**Studio reste OFF pour la première Preview**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **Studio reste OFF pour la première Preview** »"
+        }
+      ]
+    },
+    {
+      "id": "STUDIO-LOCAL",
+      "category": "STUDIO",
+      "title": "Chaîne Studio dédiée : 14 migrations, 543 pgTAP, 0 table GP, identité B + I1 73/73 ×3",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "pgTAP **543 ok, 0 échec**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « pgTAP **543 ok, 0 échec** »"
+        },
+        {
+          "kind": "file",
+          "path": "apps/studio/scripts/dedicated-db-check.sh",
+          "ok": true,
+          "detail": "apps/studio/scripts/dedicated-db-check.sh"
+        }
+      ]
+    },
+    {
+      "id": "STUDIO-POST-V6-LOTS",
+      "category": "STUDIO",
+      "title": "Studio post-H et banc E2E dédié (21/21 ×4, correctif F1) qualifiés hors train",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter `claude/jolly-volta-doejq2` (inclut `claude/modest-pasteur-izfaqm`, base fb7082c6) ; Studio OFF au lancement",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_STUDIO_DEDICATED_PLAYWRIGHT_CI_V1.md",
+          "ref": "origin/claude/jolly-volta-doejq2",
+          "contains": "STUDIO DEDICATED E2E LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/jolly-volta-doejq2:docs/qualification/ELSATIA_STUDIO_DEDICATED_PLAYWRIGHT_CI_V1.md ⊃ « STUDIO DEDICATED E2E LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "ref",
+          "path": "docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md",
+          "ref": "origin/claude/modest-pasteur-izfaqm",
+          "contains": "STUDIO POST-H LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/modest-pasteur-izfaqm:docs/qualification/ELSATIA_STUDIO_POST_H_PORT_V1.md ⊃ « STUDIO POST-H LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "apps/studio/e2e-dedicated",
+          "ok": false,
+          "detail": "absent : apps/studio/e2e-dedicated"
+        }
+      ]
+    },
+    {
+      "id": "STUDIO-HOSTED",
+      "category": "STUDIO",
+      "title": "Projet Supabase Studio dédié hébergé et contrôles H1-H6 non exécutés",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P2",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Projet dédié provisionné (décision B + I1 tranchée), checklist H1-H6 ; Studio OFF au lancement",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md",
+          "contains": "H1",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_STUDIO_DB_GUARDS_RGPD_FOUNDATION_V1.md ⊃ « H1 »"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION : tranchée"
+        }
+      ]
+    },
+    {
+      "id": "STUDIO-DECISIONS",
+      "category": "STUDIO",
+      "title": "Décisions Studio ouvertes : mode d'inscription en Production, hébergeur du worker vidéo",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Avant toute ouverture de Studio (OFF au lancement)",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT : ouverte"
+        },
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER : ouverte"
+        }
+      ]
+    },
+    {
+      "id": "TOOLS-RELEVE-LOCAL",
+      "category": "TOOLS_RELEVE",
+      "title": "Relevé & Métré Lots 2-6 + Atelier : Playwright 68/68, pgTAP Relevé propres, surface pièce serveur 32/32",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**Relevé + Atelier total**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **Relevé + Atelier total** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "`elsatia_tools_releve_surface_piece_sync_v1` **32/32**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « `elsatia_tools_releve_surface_piece_sync_v1` **32/32** »"
+        }
+      ]
+    },
+    {
+      "id": "TOOLS-ENTITLEMENT",
+      "category": "TOOLS_RELEVE",
+      "title": "Contournement d'entitlement cloud-sync fermé localement (16/16), jamais rejoué sur Supabase réel",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "pgTAP `elsatia_tools_cloud_sync_entitlement_closure_v1` sur un vrai projet Supabase (erreurs d'amorce localement)",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_TOOLS_ENTITLEMENT_CLOUD_SYNC_CLOSURE_V1.md",
+          "contains": "TOOLS ENTITLEMENT BLOCKER CLOSED LOCALLY",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_TOOLS_ENTITLEMENT_CLOUD_SYNC_CLOSURE_V1.md ⊃ « TOOLS ENTITLEMENT BLOCKER CLOSED LOCALLY »"
+        }
+      ]
+    },
+    {
+      "id": "TOOLS-DOWNGRADE-READ",
+      "category": "TOOLS_RELEVE",
+      "title": "Utilisateur rétrogradé : perte de lecture des projets synchronisés (choix conservateur à confirmer, DECISION_REQUIRED-04)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "Confirmation explicite du comportement avant vente de l'offre Tools Pro",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_TOOLS_ENTITLEMENT_CLOUD_SYNC_CLOSURE_V1.md",
+          "contains": "DECISION_REQUIRED-04",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_TOOLS_ENTITLEMENT_CLOUD_SYNC_CLOSURE_V1.md ⊃ « DECISION_REQUIRED-04 »"
+        }
+      ]
+    },
+    {
+      "id": "TOOLS-RELEVE-LOT7",
+      "category": "TOOLS_RELEVE",
+      "title": "Relevé Lot 7 (mobilier, équipements, calques) qualifié hors train",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Porter `claude/nifty-edison-mevolm` (base Lot 6 d734f255) dans le train suivant",
+      "owner": "Dév (train canonique)",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "ref",
+          "path": "docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT7_EQUIPEMENTS_CALQUES_V1.md",
+          "ref": "origin/claude/nifty-edison-mevolm",
+          "contains": "RELEVE METRE LOT 7 LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "origin/claude/nifty-edison-mevolm:docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT7_EQUIPEMENTS_CALQUES_V1.md ⊃ « RELEVE METRE LOT 7 LOCALLY QUALIFIED »"
+        }
+      ]
+    },
+    {
+      "id": "TOOLS-VOLUME-PIECE",
+      "category": "TOOLS_RELEVE",
+      "title": "Volume de la pièce non calculé (colonne réservée)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "DECISION_REQUIRED:V6-VOLUME-PIECE",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "`DECISION_REQUIRED:V6-VOLUME-PIECE`",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « `DECISION_REQUIRED:V6-VOLUME-PIECE` »"
+        }
+      ]
+    },
+    {
+      "id": "RES-LOCAL",
+      "category": "RESERVES",
+      "title": "Réserves : 59/59 Playwright, D-01 7/7, GP ↔ Réserves 5/5 ×3 sur V6",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md",
+          "contains": "RESERVES LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md ⊃ « RESERVES LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**59/59**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **59/59** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**5/5 ×3**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **5/5 ×3** »"
+        }
+      ]
+    },
+    {
+      "id": "RES-HOSTED",
+      "category": "RESERVES",
+      "title": "Storage réel (S3), GoTrue réel et e-mails d'invitation non couverts par la pile locale (H-01)",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Qualification Preview Réserves (projet Vercel à créer, voir PREVIEW-PROJECT-INVENTORY)",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md",
+          "contains": "H-01",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md ⊃ « H-01 »"
+        }
+      ]
+    },
+    {
+      "id": "RES-MINOR-DEFECTS",
+      "category": "RESERVES",
+      "title": "Défauts mineurs ouverts : R-06 auteur nul, R-07 nb_pages réécrivable, R-08 échappement de recherche",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Correctifs P3 du rapport Réserves",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md",
+          "contains": "R-07",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_RESERVES_FULL_LOCAL_QUALIFICATION_V1.md ⊃ « R-07 »"
+        }
+      ]
+    },
+    {
+      "id": "RES-SENTRY",
+      "category": "RESERVES",
+      "title": "Télémétrie Sentry absente de Réserves",
+      "declared_status": "NOT_APPLICABLE",
+      "status": "NOT_APPLICABLE",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": "Choix produit assumé documenté (NON-BLOCKER) ; l'alerting global relève d'OBS-ALERTING-UPTIME.",
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md",
+          "contains": "Absente par choix produit assumé",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_PREVIEW_GO_LIVE_CHECKLIST_V2.md ⊃ « Absente par choix produit assumé »"
+        }
+      ]
+    },
+    {
+      "id": "COLORS-LOCAL",
+      "category": "COLORS",
+      "title": "Colors : 442 pgTAP, 431 Vitest, Playwright 73/73 (V6) — COLORS LOCALLY QUALIFIED",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md",
+          "contains": "COLORS LOCALLY QUALIFIED",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md ⊃ « COLORS LOCALLY QUALIFIED »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "**73/73**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « **73/73** »"
+        }
+      ]
+    },
+    {
+      "id": "COLORS-PREVIEW",
+      "category": "COLORS",
+      "title": "Colors Preview : domaine 13 « Preview config » non prouvé, 73 e2e à rejouer sur Preview, supabase test db réel",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Projet Vercel Colors (PREVIEW-PROJECT-INVENTORY), option « fichiers hors racine », rejeu e2e",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md",
+          "contains": "Preview config",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md ⊃ « Preview config »"
+        }
+      ]
+    },
+    {
+      "id": "COLORS-OPEN-ITEMS",
+      "category": "COLORS",
+      "title": "Colors : redirection des actions suspendues (R1, UX), écran /utilisateurs « ComingSoon »",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P2",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "§7 du rapport Colors V2",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md",
+          "contains": "ComingSoon",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_COLORS_FULL_QUALIFICATION_V2.md ⊃ « ComingSoon »"
+        }
+      ]
+    },
+    {
+      "id": "COLORS-LICENSED-CHART",
+      "category": "COLORS",
+      "title": "Nuancier sous licence / OCR (DPA requis)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P2",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "P2-10 des décisions propriétaire",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md",
+          "contains": "P2-10",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_OWNER_DECISIONS_FINAL_V1.md ⊃ « P2-10 »"
+        }
+      ]
+    },
+    {
+      "id": "OPS-SUPPORT",
+      "category": "OPERATIONS",
+      "title": "Processus support premiers clients (support@elsatia.fr, priorités P0-P3, fil in-app, aucun SLA promis)",
+      "declared_status": "GO",
+      "status": "GO",
+      "priority": null,
+      "blocker": null,
+      "dependency": null,
+      "owner": null,
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/commercial/SUPPORT_PREMIERS_CLIENTS.md",
+          "contains": "support@elsatia.fr",
+          "ok": true,
+          "detail": "docs/commercial/SUPPORT_PREMIERS_CLIENTS.md ⊃ « support@elsatia.fr »"
+        }
+      ]
+    },
+    {
+      "id": "OPS-ROLLBACK",
+      "category": "OPERATIONS",
+      "title": "Go-live et rollback Production documentés, jamais répétés sur la lignée V6",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P1",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "Répétition du rollback applicatif (Vercel) et du correctif base forward-only sur Preview",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md",
+          "ok": true,
+          "detail": "docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md"
+        },
+        {
+          "kind": "file",
+          "path": "docs/DEPLOIEMENT_ET_RETOUR_ARRIERE.md",
+          "contains": "restaure pas la base Supabase",
+          "ok": true,
+          "detail": "docs/DEPLOIEMENT_ET_RETOUR_ARRIERE.md ⊃ « restaure pas la base Supabase »"
+        }
+      ]
+    },
+    {
+      "id": "OPS-V6-PRODUCTION",
+      "category": "OPERATIONS",
+      "title": "Production (app.elsatia.fr) sur une lignée antérieure : V6 jamais déployé",
+      "declared_status": "REMOTE_PROOF_REQUIRED",
+      "status": "REMOTE_PROOF_REQUIRED",
+      "priority": "P0",
+      "blocker": "BLOCKER_REMOTE",
+      "dependency": "PREVIEW-EXECUTED vert, puis bascule Production selon le runbook de cutover",
+      "owner": "Opérateur",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "file",
+          "path": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md",
+          "contains": "V6 **non déployé**",
+          "ok": true,
+          "detail": "docs/qualification/ELSATIA_CANONICAL_TRAIN_V6_CONVERGENCE_V1.md ⊃ « V6 **non déployé** »"
+        },
+        {
+          "kind": "file",
+          "path": "docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md",
+          "ok": true,
+          "detail": "docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md"
+        }
+      ]
+    },
+    {
+      "id": "OPS-PREFLIGHT-ENFORCEMENT",
+      "category": "OPERATIONS",
+      "title": "Préflight d'environnement : « enforce » en Preview, pas encore en Production (F-PREFLIGHT-ENFORCEMENT)",
+      "declared_status": "NO-GO",
+      "status": "NO-GO",
+      "priority": "P1",
+      "blocker": "BLOCKER_TECHNIQUE",
+      "dependency": "Passer `preflight_enforcement_by_target.production` à enforce après vérification des variables Production",
+      "owner": "Dév",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-finding",
+          "id": "F-PREFLIGHT-ENFORCEMENT",
+          "ok": true,
+          "detail": "manifeste F-PREFLIGHT-ENFORCEMENT : P1 open"
+        }
+      ]
+    },
+    {
+      "id": "OPS-CRONS-FAIL-OPEN",
+      "category": "OPERATIONS",
+      "title": "FEATURE_CRONS_ENABLED fail-open (absent = tâches planifiées actives)",
+      "declared_status": "DECISION_REQUIRED",
+      "status": "DECISION_REQUIRED",
+      "priority": "P1",
+      "blocker": "DECISION_REQUIRED",
+      "dependency": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN (poser la variable avant tout déploiement si fail-closed)",
+      "owner": "Julien",
+      "rationale": null,
+      "integrity_error": null,
+      "proof_mode": "evidence",
+      "evidence": [
+        {
+          "kind": "manifest-decision",
+          "id": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN",
+          "ok": true,
+          "detail": "manifeste DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN : ouverte"
+        },
+        {
+          "kind": "manifest-finding",
+          "id": "F-FLAG-CRONS-FAIL-OPEN",
+          "ok": true,
+          "detail": "manifeste F-FLAG-CRONS-FAIL-OPEN : P1 detected"
+        }
+      ]
+    }
+  ]
+}
