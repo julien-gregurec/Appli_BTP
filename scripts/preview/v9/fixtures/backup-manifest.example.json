@@ -16,6 +16,10 @@
       "path": "../elsatia-v9-backup/preview-auth-data.sql"
     },
     {
+      "kind": "migrations_data",
+      "path": "../elsatia-v9-backup/preview-migrations-data.sql"
+    },
+    {
       "kind": "ledger",
       "path": "../elsatia-v9-backup/ledger-avant.json"
     },

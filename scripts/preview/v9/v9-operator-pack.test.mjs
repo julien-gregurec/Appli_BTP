@@ -314,6 +314,7 @@ test("sauvegarde : conforme ; Auth absente, fichier dans le dépôt, trop ancien
     { kind: "schema", path: f("s.sql", "-- PostgreSQL database dump\nCREATE TABLE public.x (id int);\n") },
     { kind: "data", path: f("d.sql", 'COPY "public"."x" (id) FROM stdin;\n1\n\\.\n') },
     { kind: "auth", path: f("a.sql", 'COPY "auth"."users" (id) FROM stdin;\n\\.\n') },
+    { kind: "migrations_data", path: f("m.sql", "COPY supabase_migrations.schema_migrations (version, name) FROM stdin;\n\\.\n") },
     { kind: "ledger", path: f("l.json", fixture("ledger-372-ok.json")) },
   ];
   const maintenant = new Date("2026-10-03T08:00:00Z");
@@ -323,7 +324,8 @@ test("sauvegarde : conforme ; Auth absente, fichier dans le dépôt, trop ancien
   assert.equal(verifierSauvegarde({ ...m, artefacts: art.filter((a) => a.kind !== "auth") }, opts).verdict, "BACKUP_MISSING");
   assert.equal(verifierSauvegarde({ ...m, created_at: "2026-10-01T07:00:00Z" }, opts).verdict, "BACKUP_MISSING");
   assert.equal(verifierSauvegarde({ ...m, project_ref: PROD }, opts).verdict, "BACKUP_MISSING");
-  assert.equal(verifierSauvegarde({ ...m, artefacts: [...art.slice(0, 3), { kind: "ledger", path: f("l2.json", fixture("ledger-373-etrangere.json")) }] }, opts).verdict, "BACKUP_MISSING");
+  assert.equal(verifierSauvegarde({ ...m, artefacts: [...art.slice(0, 4), { kind: "ledger", path: f("l2.json", fixture("ledger-373-etrangere.json")) }] }, opts).verdict, "BACKUP_MISSING");
+  assert.equal(verifierSauvegarde({ ...m, artefacts: art.filter((a) => a.kind !== "migrations_data") }, opts).verdict, "BACKUP_MISSING");
   assert.equal(verifierSauvegarde({ ...m, artefacts: [...art.slice(1), { kind: "schema", path: resolve(ROOT, "package.json") }] }, opts).verdict, "BACKUP_MISSING");
   assert.equal(verifierSauvegarde({ ...m, artefacts: [{ ...art[0], sha256: "0".repeat(64) }, ...art.slice(1)] }, opts).verdict, "BACKUP_MISSING");
   assert.equal(verifierSauvegarde({ ...m, artefacts: [{ kind: "auth", path: f("vide.sql", "") }, ...art.filter((a) => a.kind !== "auth")] }, opts).verdict, "BACKUP_MISSING");
@@ -404,4 +406,19 @@ test("fixtures : aucune valeur qui ressemble à un vrai secret", () => {
     const t = readFileSync(resolve(FIX, f), "utf8");
     for (const m of motifs) assert.ok(!m.test(t), `${f} : ${m}`);
   }
+});
+
+test("reprise (cas A) : préfixe V9 partiel accepté seulement avec --expect reprise, plan = migrations restantes", () => {
+  const partiel = ledger("ledger-380-partiel.json");
+  assert.equal(analyserLedger(partiel, local, { attente: "reprise" }).conforme, true);
+  assert.equal(analyserLedger(ledger("ledger-372-ok.json"), local, { attente: "reprise" }).conforme, false);
+  assert.equal(analyserLedger(ledger("ledger-389-v9.json"), local, { attente: "reprise" }).conforme, false);
+  const plan = planMigration(partiel, local, { reprise: true, exigerPreuve813: true });
+  assert.equal(plan.aAppliquer.length, 9);
+  assert.equal(plan.aAppliquer[0].version, "20261002001105");
+  assert.equal(plan.aAppliquer.at(-1).version, "20261002001113");
+  assert.throws(() => planMigration(partiel, local), ErreurLedger);
+  const dry = ["Would push these migrations:", ...local.slice(380).map((m) => ` • ${m.fichier}`)].join("\n");
+  assert.ok(analyserDryRun(dry, plan).ok);
+  assert.equal(analyserDryRun(fixture("dry-run-17.txt"), plan).ok, false);
 });

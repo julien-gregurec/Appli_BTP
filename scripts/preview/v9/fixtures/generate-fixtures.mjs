@@ -93,6 +93,7 @@ export function fixtures(local = trainLocal()) {
       { kind: "schema", path: "../elsatia-v9-backup/preview-schema.sql" },
       { kind: "data", path: "../elsatia-v9-backup/preview-data.sql" },
       { kind: "auth", path: "../elsatia-v9-backup/preview-auth-data.sql" },
+      { kind: "migrations_data", path: "../elsatia-v9-backup/preview-migrations-data.sql" },
       { kind: "ledger", path: "../elsatia-v9-backup/ledger-avant.json" },
       { kind: "roles", path: "../elsatia-v9-backup/preview-roles.sql" },
       { kind: "storage_metadata", path: "../elsatia-v9-backup/preview-storage-data.sql" },
