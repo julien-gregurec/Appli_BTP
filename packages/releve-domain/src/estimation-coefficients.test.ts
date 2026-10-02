@@ -1,5 +1,5 @@
 /**
- * Lot 10 (complément, migration 20260930001402) : coefficients facultatifs (ouvrage > lot > général, sans cumul),
+ * Lot 10 (complément, migration 20261002001115) : coefficients facultatifs (ouvrage > lot > général, sans cumul),
  * hypothèses, valeur source et obsolescence d'une correction sur changement de QUANTITÉ, estimation séparée par état,
  * contrat Gestion Pro `elsatia.tools.estimation` 1.1.0, calculs décimaux exacts et grands volumes.
  */
@@ -16,12 +16,12 @@ import {
 import { OUVRAGE_LOT_PAR_CATEGORIE, ouvrageLot, type OuvrageRecord, type PlanQuantitatif } from "./quantitatif";
 
 const B = (value: number | string) => BigInt(value);
-const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260930001402_tools_releve_metre_estimation_coefficients_v1.sql", import.meta.url)), "utf8");
+const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20261002001115_tools_releve_metre_estimation_coefficients_v1.sql", import.meta.url)), "utf8");
 type Cas = { entree: EstimationEntree & { parametres: EstimationParametresDonnees | null; ouvrages: (Pick<OuvrageRecord, "id" | "etatTravaux" | "categorie"> & { lot?: string })[] }; attendu: { prixEffectifs: unknown; resultat: unknown } };
 const parite = JSON.parse(readFileSync(fileURLToPath(new URL("./estimation-parite-coefficients.fixture.json", import.meta.url)), "utf8")) as { cas: Cas[] };
 const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 
-describe("parité domaine ↔ migration 20260930001402", () => {
+describe("parité domaine ↔ migration 20261002001115", () => {
   it(`P2. coefficients + obsolescence sur quantité : le miroir reproduit EXACTEMENT le serveur (${parite.cas.length} cas, jeu vérifié aussi par pgTAP)`, () => {
     expect(parite.cas.length).toBeGreaterThanOrEqual(40);
     for (const cas of parite.cas) {

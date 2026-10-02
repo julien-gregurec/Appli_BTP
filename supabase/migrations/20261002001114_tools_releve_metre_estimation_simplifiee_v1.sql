@@ -1,3 +1,5 @@
+-- Train canonique V9 : numéro d'origine 20260930001401 (Relevé & Métré Lot 10 (claude/fervent-bell-1tbhc5)), renuméroté 20261002001114
+-- (bloc V9 strictement après 20261002000901 / 20261002001003, ordre relatif d'origine conservé) ; corps inchangé.
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 10 — ESTIMATION SIMPLIFIÉE V1
 -- Rapport : docs/product/ELSATIA_TOOLS_RELEVE_METRE_LOT10_ESTIMATION_SIMPLIFIEE_V1.md
 --

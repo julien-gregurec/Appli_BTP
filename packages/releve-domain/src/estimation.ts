@@ -1,5 +1,5 @@
 /**
- * Lot 10 — Estimation simplifiée (miroir des migrations 20260930001401 et 20260930001402).
+ * Lot 10 — Estimation simplifiée (miroir des migrations 20261002001114 et 20261002001115).
  *
  * TOOLS = estimation simplifiée, HT, estimative ; GESTION PRO = chiffrage complet (prix de vente, marge, remise,
  * TVA, devis). Aucun numéro de devis, aucune facture, aucune commande, aucune signature, aucun workflow devis.
@@ -374,7 +374,7 @@ function exactCents(value: number): boolean {
   return !s.includes(".") || s.length - s.indexOf(".") - 1 <= 2;
 }
 
-// ── Coefficients et hypothèses (miroir de la migration 20260930001402) ───────
+// ── Coefficients et hypothèses (miroir de la migration 20261002001115) ───────
 //
 // Paramètres FACULTATIFS d'un relevé : coefficient général, coefficients par lot, texte d'hypothèses. PRIORITÉ (le plus
 // précis l'emporte, AUCUN CUMUL) : coefficient saisi sur le prix de l'ouvrage > coefficient du lot de l'ouvrage >

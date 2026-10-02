@@ -1,5 +1,5 @@
 -- ELSATIA TOOLS — RELEVÉ & MÉTRÉ — LOT 10 (complément) — COEFFICIENTS, HYPOTHÈSES, OBSOLESCENCE SUR QUANTITÉ
--- (migration 20260930001402)
+-- (migration 20261002001115)
 --
 -- Qualifie sous RLS réelle, avec des VALEURS EXACTES :
 --   S1–S8   schéma et droits : table en lecture seule, RPC SECURITY DEFINER, lecture interne non exposée, fonctions

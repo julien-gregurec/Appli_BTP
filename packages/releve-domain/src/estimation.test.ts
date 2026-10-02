@@ -12,12 +12,12 @@ import {
 import { evaluerQuantitatif, OUVRAGE_CATALOGUE_STANDARD, validateQuantitatifGpPayload, type OuvrageRecord, type PlanQuantitatif } from "./quantitatif";
 
 const B = (value: number | string) => BigInt(value);
-const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20260930001401_tools_releve_metre_estimation_simplifiee_v1.sql", import.meta.url)), "utf8").replace(/\s+/g, " ");
+const sql = readFileSync(fileURLToPath(new URL("../../../supabase/migrations/20261002001114_tools_releve_metre_estimation_simplifiee_v1.sql", import.meta.url)), "utf8").replace(/\s+/g, " ");
 type Cas = { entree: EstimationEntree; attendu: unknown };
 const parite = JSON.parse(readFileSync(fileURLToPath(new URL("./estimation-parite.fixture.json", import.meta.url)), "utf8")) as { cas: Cas[] };
 const quoted = (values: readonly string[]) => values.map((value) => `'${value}'`).join(",");
 
-describe("parité domaine ↔ migration 20260930001401", () => {
+describe("parité domaine ↔ migration 20261002001114", () => {
   it("énumérations identiques (types de prix, codes d'anomalie)", () => {
     const flat = sql.replace(/, /g, ",");
     expect(flat).toContain(`not in (${quoted(PRIX_TYPES)})`);

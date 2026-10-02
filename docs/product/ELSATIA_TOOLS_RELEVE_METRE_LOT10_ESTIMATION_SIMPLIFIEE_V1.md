@@ -49,7 +49,7 @@ Qualification locale : PostgreSQL 16 avec les **373** vraies migrations et la vr
 | Playwright Lot 10 `tools-releve-lot10.spec.ts` | **11 / 11**, deux passages complets verts |
 | Playwright non-régression Lots 2 → 9 + Atelier | **107 / 107** (fichier par fichier ; Lots 2 et 3 sur pile neuve) |
 | Builds Tools web / natif (Capacitor) / Gestion Pro | OK ; `/releves/estimation` statique (web et export natif) |
-| `verify:migrations` / `verify:train-expectations` | OK (373, dernière `20260930001402`, attendus synchronisés) |
+| `verify:migrations` / `verify:train-expectations` | OK (373, dernière `20261002001115`, attendus synchronisés) |
 
 ## 1. Base, branche et décision de départ
 
@@ -70,7 +70,7 @@ L'historique contenait déjà **deux implémentations du Lot 10**, jamais intég
 | `3725a724` | **migration 1402** : coefficients, hypothèses, valeur source, obsolescence sur quantité, garde mode sûr + pgTAP |
 | `b9d425ac` | domaine : miroir 1402, parité P2, filtre par état, CSV, **contrat GP 1.1.0** |
 | `1b786846` | vue : coefficients et hypothèses, filtre de travaux, provenance, motif d'obsolescence |
-| `0dc3a656` | attendus du train (373 / `20260930001402`) |
+| `0dc3a656` | attendus du train (373 / `20261002001115`) |
 | `8194355b` | recette Playwright du complément |
 
 ## 2. Défaut trouvé et corrigé : mode sûr V8
@@ -295,7 +295,7 @@ Sur la base de travail, **avant** la migration 1402, `incident_safe_mode_v1` et 
 | D9 | Hypothèses | texte libre ≤ 2 000 caractères, transmis à GP ; inclus dans la clé d'idempotence |
 | D10 | Filtre de travaux | état local de la vue (non persisté dans l'URL) ; l'export JSON GP reste **complet** (GP reçoit tout), seul le CSV suit le filtre |
 | D11 | Mode sûr | garde posée par 1402 sur les tables 1401 (correctif additif, aucune migration existante modifiée) |
-| D12 | Attendus du train | synchronisés (373 / `20260930001402`) : documents générés seulement |
+| D12 | Attendus du train | synchronisés (373 / `20261002001115`) : documents générés seulement |
 
 ## 15. Limites réelles
 

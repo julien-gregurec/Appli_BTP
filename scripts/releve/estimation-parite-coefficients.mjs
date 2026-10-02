@@ -115,7 +115,7 @@ const sql = `select coalesce(jsonb_agg(jsonb_build_object('prixEffectifs', x.eff
 const out = execFileSync("su", ["postgres", "-c", `psql -X -q -At -d ${db}`], { input: sql, maxBuffer: 1 << 30 }).toString();
 const attendus = JSON.parse(out);
 const file = sortie ?? resolve(import.meta.dirname, "../../packages/releve-domain/src/estimation-parite-coefficients.fixture.json");
-writeFileSync(file, `${JSON.stringify({ graine: Number(graineArg), moteur: "estimation-v1", migration: "20260930001402", cas: entrees.map((entree, i) => ({ entree, attendu: attendus[i] })) })}\n`);
+writeFileSync(file, `${JSON.stringify({ graine: Number(graineArg), moteur: "estimation-v1", migration: "20261002001115", cas: entrees.map((entree, i) => ({ entree, attendu: attendus[i] })) })}\n`);
 const sources = attendus.flatMap((a) => a.prixEffectifs.map((p) => p.coefficientSource));
 const obs = attendus.flatMap((a) => a.resultat.anomalies.filter((x) => x.code === "estimation_obsolete").map((x) => x.detail));
 console.log(`${total} cas, ${attendus.reduce((s, a) => s + a.resultat.lignes.length, 0)} lignes · coefficients ${["ouvrage", "lot", "general", "aucun", null].map((k) => `${k}=${sources.filter((x) => x === k).length}`).join(" ")} · obsolètes ${obs.filter((d) => d === "quantite_modifiee").length} quantité / ${obs.filter((d) => d === "ajustement_perime").length} montant → ${file}`);
