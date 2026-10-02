@@ -32,6 +32,15 @@ RLS cross-tenant est **toujours SEV1**, quelle que soit l'ampleur apparente :
 voir §9 de la mission et `docs/qualification/ELSATIA_DR_EXACT_TIP_V2.md`
 §Secrets.
 
+**Restauration × clés bancaires** (`docs/qualification/ELSATIA_BANKING_ENCRYPTION_KEY_ROTATION_V1.md` §9) : une sauvegarde de la
+base ne contient AUCUNE clé, seulement le registre `public.cles_chiffrement_bancaire`
+(identifiants, statuts, empreintes HMAC). Après toute restauration, avant de
+rouvrir les paiements : `npm run bank-keys -- verify --strict` contre la base
+restaurée, avec le trousseau du coffre DR. Verdict `RESTAURATION_NON_DECHIFFRABLE`
+(`CLE_MANQUANTE`, `EMPREINTE_DIFFERENTE`, `AUTHENTIFICATION_ECHOUEE`) ⇒ SEV1 : ne
+pas rouvrir, retrouver au coffre la clé citée (les clés retirées y restent
+scellées pendant toute la rétention des sauvegardes).
+
 ## 2. Arbre de décision (SEV1 — suspicion de perte de données DB)
 
 ```

@@ -43,6 +43,8 @@
     "test:seeds": "node --test scripts/seeds/registry.test.mjs scripts/seed-elsatia-preview-year.test.mjs scripts/garde-scripts-production.test.mjs",
     "verify:seeds": "node scripts/seeds/verify-seeds.mjs",
     "dr:verify": "node scripts/dr/v2/dr-verify.mjs",
+    "bank-keys": "node --experimental-strip-types --no-warnings scripts/bank-keys/bank-keys.mjs",
+    "test:bank-keys": "node --experimental-strip-types --no-warnings --test scripts/bank-keys/bank-keys.test.mjs",
     "test:dr-guard": "node --test scripts/dr/v2/garde-cible.test.mjs",
     "prebuild": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:gestion-pro": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
