@@ -1,11 +1,11 @@
 # ELSATIA Tools — Relevé & Métré — Lot 10 — Estimation simplifiée V1
 
-**Date** : 2026-09-30
-**Branche** : `claude/blissful-thompson-ipjcxl` (branche de session imposée, voir D1)
-**Base** : Lot 9 qualifié `claude/compassionate-volta-cnbzjs` @ `a622540` (*RELEVE METRE LOT 9 LOCALLY QUALIFIED*).
-**Nature** : rapport autonome. Tout ce qui est affirmé ici a été exécuté dans cette session.
-**Règle produit appliquée** : TOOLS = estimation simplifiée ; GESTION PRO = chiffrage complet, devis, marge, vente.
-**Hors périmètre, volontairement** : devis, facture, commande, signature, workflow accepté / refusé, TVA, marge, remise, prix de vente (tous refusés, §15), appareils physiques, Preview, production, PR, merge.
+**Date** : 2026-10-02
+**Branche** : `claude/fervent-bell-1tbhc5` (worktree dédié)
+**Base** : `integration/elsatia-canonical-train-v8` @ `53b4bc76` (*CANONICAL TRAIN V8 LOCALLY QUALIFIED*), dernière branche qualifiée Relevé/Métré qui comprend le Lot 9 (`d1f14db7 merge(v8): Relevé & Métré Lot 9`).
+**Nature** : rapport autonome. Tout ce qui est affirmé ici a été exécuté dans cette session, sauf mention contraire.
+**Frontière produit** : TOOLS = relevé + plan + métrés + quantitatifs + **estimation simplifiée**. GESTION PRO = chiffrage complet, devis, marges, commandes, commercial.
+**Hors périmètre** : devis, numérotation de devis, conditions commerciales, acompte, TVA, marge, remise, signature client, facture, commande. Aucune PR, aucun merge, **aucun déploiement**.
 
 ---
 
@@ -13,321 +13,309 @@
 
 > **RELEVE METRE LOT 10 LOCALLY QUALIFIED**
 
-Le quantitatif du Lot 9 reçoit une **estimation simplifiée HT**. Chaque ouvrage peut porter un **prix estimatif structuré**, qui reste facultatif : composantes **MATÉRIAU** (€/unité), **MAIN D'ŒUVRE** (heures par unité × taux horaire), **FORFAIT** (montant fixe par ouvrage), **AUTRE** (€/unité), plus un **coefficient simple**. Une saisie rapide « prix unitaire global » crée une seule composante typée, ce qui garde les données structurées.
+Chaque ouvrage du quantitatif (Lot 9) peut recevoir un **prix HT facultatif**, éventuellement un **coefficient**. Le **serveur** calcule les montants (moteur SQL pur, arithmétique entière, au centime). La quantité utilisée est la quantité **retenue** du Lot 9, pertes comprises. **La perte n'est jamais recomptée.**
 
-- **Calcul par le serveur** : moteur SQL pur, arithmétique entière, arrondi au centime « moitié loin de zéro » par composante. Le domaine TypeScript en est le **miroir exact**, avec une parité prouvée sur **3 000 cas aléatoires** et sur un jeu figé de 40 cas vérifié par Vitest ET pgTAP.
-- **Quantité utilisée** : la quantité **retenue** du Lot 9, pertes et arrondis compris. **La perte n'est jamais réappliquée.**
-- **Affichage et exports** :
-  - ligne : quantité × PU = total ;
-  - sous-total par lot (ou par chantier / bâtiment / étage / zone / pièce / ouvrage) et total chantier ;
-  - coût **dépose / neuf / déplacement / travaux sur existant / total projet** ;
-  - répartition par type et heures estimées ;
-  - exports **CSV**, **JSON** (contrat **`elsatia.tools.estimation` 1.0.0**) et **impression / PDF navigateur**.
-- **Corrections auditées** : montant automatique conservé, montant retenu, raison, auteur, date, retrait tracé, obsolescence signalée.
-- **Versioning** : estimation **figée avec le plan**. Un plan dérivé reçoit ses prix copiés et est recalculé indépendamment ; les corrections ne sont pas copiées.
-- **Bibliothèque** : prix facultatif par ouvrage de bibliothèque.
-- **Multi-scénario (préparation)** : comparaison **solution A / solution B** = deux plans d'un même étage.
+L'estimation donne des sous-totaux par ouvrage, lot, pièce, zone, étage, bâtiment et chantier, ainsi que le total général HT. Elle se sépare par état : existant, dépose, neuf, déplacé. Les coefficients sont facultatifs, à trois niveaux :
 
-« Locally qualified » : PostgreSQL 16 avec les 352 vraies migrations et la vraie RLS, vrai GoTrue, vrai PostgREST, vrai Chromium. **Tablette : MOBILE EMULATED ONLY.** Performances mesurées en `next dev`, pile locale.
+- ouvrage ;
+- lot ;
+- général.
+
+La règle de priorité est explicite : **le plus précis l'emporte, sans cumul**. Toute correction de montant est motivée, auditée et devient **obsolète** si la quantité change. Le contrat Tools → Gestion Pro **`elsatia.tools.estimation` 1.1.0** transporte :
+
+- les ouvrages ;
+- les quantités ;
+- les prix ;
+- les hypothèses et les coefficients ;
+- les métadonnées de source.
+
+**Gestion Pro reste libre de rechiffrer.**
+
+Qualification locale : PostgreSQL 16 avec les **373** vraies migrations et la vraie RLS, vrai GoTrue, vrai PostgREST, vrai Chromium (`next dev`). **Tablette : MOBILE EMULATED ONLY.**
 
 ### Chiffres clés (exécutés sur HEAD)
 
 | Contrôle | Résultat |
 |---|---|
-| Install fraîche | **352 / 352** migrations |
-| pgTAP Relevé (13 fichiers) | **734 / 734** (Lots 2–9 : 667 inchangés, **Lot 10 : 67**) |
-| pgTAP suite complète | 146 fichiers, 3 929 tests. **Mêmes 9 fichiers en échec, mêmes compteurs** que sur une base Lot 9 reconstruite dans la même session (3 862 tests), soit uniquement +67 Lot 10, tous verts. Ce sont les limites du banc : Studio ×7, `platform_stripe_state_attestation_r72` (pgsodium), `elsatia_tools_cloud_sync_entitlement_closure_v1` |
-| Parité moteur SQL ↔ TS | **3 000 cas aléatoires** (40 578 lignes, 13 831 anomalies) identiques. Jeu figé de 40 cas (473 lignes) vert en Vitest et en pgTAP (P1) |
-| Vitest `packages/releve-domain` | **371 / 371** avec le jeu étendu (Lot 9 : 333 ; +38) |
-| Vitest racine | **2 224 / 2 224** (178 fichiers ; +1 test ignoré hors variable `ESTIMATION_PARITE_EXTRA` : la parité étendue opt-in) |
-| Vitest `apps/tools` | **2 154 / 2 154** (188 fichiers ; +4) |
-| `tsc --noEmit` racine et `apps/tools` | 0 erreur |
-| ESLint `apps/tools` (`npm run lint`), domaine, recette, script de parité | 0 erreur, 0 avertissement |
-| Build Tools web / natif (Capacitor) / Gestion Pro | OK. `/releves/estimation` est statique (web et export natif) |
-| Playwright Lot 10 `tools-releve-lot10.spec.ts` | **10 / 10**, deux passages complets verts (desktop, tablette, sécurité, versions, bibliothèque, exports, performance 100 / 1 000 / 5 000 lignes) |
-| Playwright non-régression Lots 8 + 9 | **24 / 24** |
-| Playwright non-régression Lots 6 + 7 | **31 / 31** |
-| Playwright non-régression Lots 2 + 3 + 4 + 5 + Atelier | **52 / 52** |
-| Performance 5 000 lignes (pile réelle) | calcul serveur **0,98 s** · édition d'un prix (RPC) **0,02 s** · recalcul **0,89 s** · changement de sous-total **0,49 s** · export CSV **0,23 s** · JSON **1,08 s** |
+| Install fraîche | **373 / 373** migrations (`rebuild_db.sh lot10_fresh`) |
+| pgTAP Lot 10 | **67 / 67** (1401) + **53 / 53** (1402) |
+| pgTAP Relevé Lots 2 → 9 + mode sûr + V8 (base de travail) | **929 / 929** + 53. Avant 1402 : **2 échecs V8** (§2) |
+| pgTAP suite complète (base neuve) | **165 fichiers, 8 193 tests**. **Mêmes 9 fichiers en échec, mêmes compteurs** que la base V8 de référence reconstruite dans la session (163 fichiers, 8 073 tests) : +120 tests Lot 10 (67 + 53), tous verts (§13) |
+| Parité moteur SQL ↔ TS | P1 : 40 cas (1401), **inchangée**. P2 : **40 cas / 392 lignes** (coefficients, obsolescence sur quantité), vérifiée par Vitest ET pgTAP |
+| Vitest `packages/releve-domain` | **427 / 427** (+2 ignorés opt-in : parités étendues) |
+| Vitest racine | **2 682 / 2 682** (206 fichiers ; 38 ignorés préexistants) |
+| Vitest `apps/tools` | **2 156 / 2 156** (188 fichiers) |
+| `tsc --noEmit` racine et `apps/tools`, ESLint `apps/tools` | 0 erreur, 0 avertissement |
+| Playwright Lot 10 `tools-releve-lot10.spec.ts` | **11 / 11**, deux passages complets verts |
+| Playwright non-régression Lots 2 → 9 + Atelier | **107 / 107** (fichier par fichier ; Lots 2 et 3 sur pile neuve) |
+| Builds Tools web / natif (Capacitor) / Gestion Pro | OK ; `/releves/estimation` statique (web et export natif) |
+| `verify:migrations` / `verify:train-expectations` | OK (373, dernière `20260930001402`, attendus synchronisés) |
 
-## 1. Base et branche
+## 1. Base, branche et décision de départ
 
-- `git fetch` de `claude/compassionate-volta-cnbzjs` (Lot 9 qualifié, `a622540`).
-- **D1** : la branche de session `claude/blissful-thompson-ipjcxl` pointait localement sur `main` (`4d92ddb`, ancêtre du Lot 9, sans commit propre, absente du dépôt distant). Elle a été repositionnée sur `a622540`, puis poussée (nouvelle branche distante). Aucune PR, aucun merge.
+L'historique contenait déjà **deux implémentations du Lot 10**, jamais intégrées à un train :
+
+- `claude/blissful-thompson-ipjcxl`, posée sur le Lot 9 isolé ;
+- `claude/beautiful-tesla-grj0pu`, portée sur V8, suivie d'un Lot 11 (import GP).
+
+**DECISION_REQUIRED D1 (choix conservateur retenu)** : partir de la dernière branche qualifiée comprenant le Lot 9, soit le **train V8**. J'ai ensuite **repris les 5 commits Lot 10 déjà portés sur V8** (`443151a2..2dea8f0b`, cherry-pick sans conflit) au lieu de tout réécrire. Le Lot 11 n'est pas repris : il est hors périmètre et touche Gestion Pro au-delà du contrat d'échange. Ces commits ont été audités contre le cahier des charges de cette mission ; les écarts sont comblés par la migration **1402** (§3 à §8).
 
 | Commit | Objet |
 |---|---|
-| `8e50ed5` | migration 1401 (additive) + pgTAP Lot 10 |
-| `677ae3a` | domaine : moteur miroir, sous-totaux, comparaison, CSV, contrat GP, jeu de parité |
-| `7ab8e72` | Tools : vue Estimation, dépôt Supabase, navigation, liens |
-| `ddbbeab` | recette Playwright Lot 10 + rendu mémoïsé |
-| *(ce rapport)* | rapport Lot 10 |
+| `0354305a` | migration 1401 (prix, moteur, corrections, gel) + pgTAP (repris) |
+| `514cd45f` | domaine miroir, CSV, contrat GP 1.0.0 (repris) |
+| `ccf684df` | vue `/releves/estimation` (reprise) |
+| `1b4976bc` | recette Playwright (reprise) |
+| `bd085126` | rapport d'origine, remplacé par celui-ci |
+| `3725a724` | **migration 1402** : coefficients, hypothèses, valeur source, obsolescence sur quantité, garde mode sûr + pgTAP |
+| `b9d425ac` | domaine : miroir 1402, parité P2, filtre par état, CSV, **contrat GP 1.1.0** |
+| `1b786846` | vue : coefficients et hypothèses, filtre de travaux, provenance, motif d'obsolescence |
+| `0dc3a656` | attendus du train (373 / `20260930001402`) |
+| `8194355b` | recette Playwright du complément |
 
-## 2. Architecture — une couche séparée, le serveur calcule
+## 2. Défaut trouvé et corrigé : mode sûr V8
 
-Le quantitatif du Lot 9 **reste sans prix** : son contrat d'ouvrage, sa bibliothèque et son contrat GP 1.0.0 sont inchangés, et le contrat d'ouvrage refuse toujours toute clé de prix (pgTAP S7–S8). L'estimation est une **couche séparée** posée sur les quantités retenues.
+Sur V8, toute table créée après la migration Incident doit porter la garde d'écriture `incident_garde_ecriture`. La migration 1401 n'appelait pas `incident_installer_gardes()`. Ses 3 tables restaient donc **écrivables en mode lecture seule** :
 
-| Couche | Fichier | Rôle |
+- `tools_releves_estimation_prix` ;
+- `tools_releves_bibliotheque_prix` ;
+- `tools_releves_estimation_ajustements`.
+
+**Preuve** (base de travail, avant 1402) : `incident_safe_mode_v1` n° 23 et `v8_convergence_incident_gardes_v1` n° 1 échouent (*have 3, want 0*). La migration 1402 rappelle la fonction. Les deux tests repassent, et le pgTAP 1402 (G1–G4) prouve PT503 sur les 4 tables du Lot 10.
+
+## 3. Prix simples (§1 de la mission)
+
+- **Prix unitaire HT facultatif** par ouvrage. La saisie rapide « PU global » donne une composante typée. Le prix structuré est facultatif aussi : matériau, main d'œuvre (heures × taux), forfait, autre.
+- **Unité** : celle de l'ouvrage du Lot 9, inchangée.
+- **Coefficient facultatif** sur le prix de l'ouvrage (0,01 – 10, 4 décimales). Champ vide = hérité (§5).
+- **Perte** : jamais recomptée. Le moteur utilise la quantité retenue du Lot 9 ; la clé `pertePourcent` est refusée dans un prix.
+- **Montant calculé par le serveur**. Le client n'envoie que des prix ; aucun montant ne circule du client vers le serveur (test du dépôt Tools).
+
+## 4. Estimation (§2)
+
+- Sous-totaux exacts par **ouvrage, lot, pièce, zone, étage, bâtiment, chantier** (sélecteur « Sous-totaux par »), plus le **total général HT**.
+- Arrondi au centime « moitié loin de zéro » par composante et par ligne ; sous-totaux = sommes de lignes. **Aucun écart d'arrondi.** Vitest le vérifie : la somme des groupes égale le total, pour les 7 niveaux.
+- **Calculs décimaux exacts** (Vitest), là où un calcul en flottants se tromperait :
+
+| Calcul | Résultat exact | En flottants |
 |---|---|---|
-| Serveur | migration `20260930001401` | contrat de prix (`tools_releve_prix_anomalie`), moteur pur (`tools_releve_estimation_evaluer`), 3 tables, gardes, reprise des prix (copie, bibliothèque), RPC, gel |
-| Domaine | `packages/releve-domain/src/estimation.ts` | énumérations, contrat, **miroir exact** du moteur (BigInt), détail, sous-totaux, dépose / neuf / déplacement, comparaison, formats, CSV, contrat GP et sa validation, port de persistance |
-| Parité | `scripts/releve/estimation-parite.mjs`, `estimation-parite.fixture.json` | entrées aléatoires déterministes, résultat attendu calculé par le serveur |
-| Accès | `apps/tools/src/lib/releve/plan/supabase-estimation-repository.ts` | RPC uniquement ; aucun montant envoyé |
-| Pièces jointes | `apps/tools/src/lib/releve/plan/estimation-export.ts` | photos (chemins de stockage, légende, pièce), annotations |
-| Vue | `components/releve/estimation/ReleveEstimationWorkspace.tsx`, route `/releves/estimation?id=&etat=&niveau=` | tuiles, sous-totaux, prix par plan, corrections, bibliothèque, comparaison, exports |
+| 1 × 1,005 € | 1,01 € | 1,00 € |
+| 2,675 × 1 € | 2,68 € | — |
+| 0,333 × 0,3333 € × 1,0001 | 0,11 € | — |
+| 10 lignes à 0,10 € | 1,00 € | — |
+| 90 000 × 1 000 000 € × 10 | 900 000 000 000,00 € | — |
 
-**Modèle** (3 tables, `entreprise_id`, RLS lecture seule pour `authenticated`, écriture par RPC seulement) :
+## 5. Coefficients (§3)
 
-- `tools_releves_estimation_prix` : prix d'un ouvrage de plan ;
-- `tools_releves_bibliotheque_prix` : prix facultatif d'un ouvrage de bibliothèque ;
-- `tools_releves_estimation_ajustements` : corrections de montant ;
-
-plus une colonne `tools_releves_plans.estimation` (estimation figée).
-
-## 3. Modèle (§1, §2, §6)
-
-Contrat d'un prix, identique en SQL et en TS. Les clés inconnues sont refusées, TVA, marge, remise et prix de vente compris.
-
-| Élément | Contrat | Précision / bornes |
+| Niveau | Où | Stockage |
 |---|---|---|
-| `composantes` | 1 à 12 | — |
-| `materiau` / `autre` | `prixUnitaire` (€ HT par unité de l'ouvrage) | 4 décimales, 0 – 1 000 000 |
-| `main_d_oeuvre` | `heuresParUnite` × `tauxHoraire` (interne ou estimatif) | 4 décimales (0 – 10 000 h) ; 2 décimales (0 – 10 000 €/h) |
-| `forfait` | `montant` fixe par ouvrage | 2 décimales, 0 – 10⁸ |
-| `coefficient` | simple (difficulté, accès…), 1 par défaut | 0,01 – 10, 4 décimales |
-| `libelle`, `commentaire` | facultatifs | 120 / 500 caractères |
+| Ouvrage | formulaire de prix (champ vide = hérité) | dans le prix de l'ouvrage |
+| Lot | panneau « Coefficients et hypothèses » | `tools_releves_estimation_parametres.donnees.coefficientsLots` (≤ 50 lots) |
+| Général | idem | `…coefficientGeneral` |
 
-Par ligne (ouvrage × pièce × état), le moteur produit :
+**Priorité** (pure, `tools_releve_estimation_prix_effectifs` ↔ `prixEffectifs`) : **coefficient de l'ouvrage > coefficient de son lot > coefficient général > 1, JAMAIS cumulés.** Un coefficient 1 saisi sur l'ouvrage prime et neutralise le lot et le général.
 
-- la quantité (retenue, Lot 9) ;
-- le PU composite ;
-- les montants par type (au centime) ;
-- les heures ;
-- le coût estimatif (montant automatique) ;
-- l'éventuelle correction ;
-- le total retenu.
+Exemple réel (pgTAP F4, Playwright) avec un général de 1,1, une Peinture à 1,2 et une Plâtrerie à 1,5 :
 
-**Main d'œuvre** : heures estimées et taux seulement. Ni salaires, ni charges, ni marge, ni coût de revient GP.
-
-## 4. Arrondis et pertes (§7, §8)
-
-- Quantité = **quantité retenue** du quantitatif (Lot 9 : opérations → perte → arrondi → 3 décimales). **Aucune perte dans un prix** : la clé `pertePourcent` est refusée (pgTAP C8, Playwright).
-- Exemple réel (Playwright, pgTAP E3/E5) : peinture Séjour 29,683 m² nets + 5 % = **31,167 m²** (Lot 9) × (3,50 + 0,25 h × 45 €) = 109,08 + 350,63 = **459,71 €**. Plinthes 12,915 ml (perte comprise) × 8,90 € = **114,94 €**.
-- Même règle que le Lot 9 : arithmétique entière, arrondi « moitié loin de zéro ».
-  - Échelles : quantité 10⁻³, prix 10⁻⁴ €, heures 10⁻⁴ h, taux et forfait 10⁻² €, coefficient 10⁻⁴.
-  - **Chaque composante est arrondie au centime sur chaque ligne** ; le montant de ligne est leur somme ; les sous-totaux sont des sommes de lignes.
-  - Il n'y a donc **aucun écart d'arrondi** entre les lignes, les lots et le total (Vitest : la somme des lots égale le total, pour 7 niveaux).
-
-## 5. TVA (§5)
-
-L'estimation est **HT, estimative, en euros**. Il n'existe ni champ TVA, ni TTC, ni régime de TVA : les clés `tva`, `marge`, `remise` et `prixVente` sont refusées par le contrat (C2) et par la validation du contrat GP.
-
-L'écran l'annonce : « Ce n'est ni un devis ni une facture : prix de vente, marge, remise, TVA et devis sont décidés dans Gestion Pro. »
-
-La mission autorise explicitement l'HT : **aucun DECISION_REQUIRED** sur ce point.
-
-## 6. Bibliothèque (§3)
-
-- Prix **facultatif** par ouvrage de bibliothèque (panneau « Bibliothèque : prix facultatifs »). Une entrée sans prix reste exploitable (B3).
-- Reprise automatique à la création d'un ouvrage **depuis la bibliothèque**. Le prix est un instantané : une modification ultérieure de la bibliothèque est sans effet (V4).
-- « Appliquer les prix de la bibliothèque » : complète **seulement les ouvrages sans prix**, par lien de bibliothèque puis par **code** (catalogue du Lot 9). Aucun prix existant n'est écrasé (B6, Playwright).
-- Un ouvrage **sans prix** reste exploitable en quantitatif : ligne « sans prix », hors total, anomalie de gravité *information*.
-
-## 7. Estimation, sous-totaux, existant / dépose / neuf (§4, §9)
-
-- Tuiles : **Total projet HT**, **Dépose**, **Neuf**, **Déplacement**, **Travaux sur existant**, **heures de main d'œuvre**, compteurs (lignes, sans prix, corrigées). Répartition par type (matériau / main d'œuvre / forfait / autre) et écart des corrections.
-- **Sous-totaux** par lot (par défaut) ou par chantier, bâtiment, étage, zone, pièce ou ouvrage. Chaque ouvrage affiche quantité × PU (+ forfait) = montant. Le **total chantier** est la somme exacte des lignes.
-- Plan projeté réel (Playwright) :
-
-| Poste | Calcul | Montant |
+| Ouvrage | Coefficient appliqué | Montant |
 |---|---|---|
-| Démolition de cloison | 10,00 m² × 0,5 h × 40 € | **200,00 €** (dépose) |
-| Cloison neuve | 9,50 m² × (18 + 0,6 h × 45 €) | **427,50 €** (neuf) |
-| Déplacement de radiateur | 2 h × 50 € | **100,00 €** (déplacement) |
+| Peinture 20 m² × 10 € | lot 1,2 | **240,00 €** |
+| Cloison 10 m² × 20 € (coefficient 1 saisi) | ouvrage 1 | **200,00 €** |
+| Divers 2 u × 50 € | général 1,1 | **110,00 €** |
 
-- FORFAIT : une ligne par ouvrage, dans l'état de travaux de l'ouvrage, sans pièce. Exemple : portes existantes 2 × 250 € = 500 € (existant) + évacuation 80 € (neuf).
+Sans cumul : lot 1,2 et général 1,05 sur 2 m² × 10 € donnent **24,00 €**, pas 25,20 € (Vitest, pgTAP R4).
 
-## 8. Corrections manuelles (§10)
+Le moteur d'estimation reçoit des **prix effectifs** : son arithmétique est inchangée. Le lot d'un ouvrage est calculé comme au Lot 9 (lot saisi, sinon lot de la catégorie). Le miroir SQL `tools_releve_ouvrage_lot` est vérifié sur les 19 catégories et sur les blancs Unicode retirés par `trim()`.
 
-`tools_releve_estimation_ajuster(plan, ouvrage, pièce, état, nature, montant, raison)` :
+- Ce n'est **ni une marge ni une remise** : l'écran l'écrit.
+- Le contrat refuse `marge`, `remise`, `tva`, `acompte`, `conditionsCommerciales` et `numeroDevis` (pgTAP C2, Vitest).
+- Aucun moteur de marge ni de devis.
 
-- **montant automatique lu par le serveur** ;
-- montant retenu (≥ 0, 2 décimales) ;
-- **raison obligatoire** ;
-- auteur (`auth.uid()`), date serveur, journal.
+## 6. Traçabilité (§4)
 
-Une nouvelle correction **retire** la précédente (tracé). Le retrait ramène au montant automatique. Une correction est immuable et aucune écriture directe n'est possible.
-
-Affichage : « Retenu 100,00 € au lieu de 114,94 € — « raison » · date ». Si le montant automatique change (prix modifié, quantité changée), la correction devient **obsolète** : anomalie `estimation_obsolete`, jamais remplacée en silence. Une correction sans ligne est `ajustement_orphelin`. Un ouvrage supprimé voit ses corrections retirées (tracées).
-
-Audit complet : `tools_releve_estimation_corrections(plan)` (actives et retirées). Chaque saisie de prix est journalisée **avant / après** avec son auteur (E12).
-
-## 9. Versioning (§11)
-
-- **Gel** : `tools_releve_plan_figer` est redéfini (même signature, mêmes droits). Il écrit `plans.estimation` sur le **quantitatif figé**, que la garde du Lot 5 rend immuable, même pour le propriétaire des tables (V5). Les prix et corrections d'un plan figé sont immuables (V2, V3, V6). L'estimation figée reste inchangée si la hauteur ou la bibliothèque changent ensuite (V4).
-- **Plan dérivé** : prix **copiés** (origine `copie`), corrections **non** copiées, recalcul **indépendant** sur ses propres quantités. Exemple V8 : à 3,00 m, 36,35 m² + 5 % = 38,168 m² × 15,25 € = 582,06 €.
-- Plans figés avant le Lot 10 : estimation recalculée à la lecture depuis leur quantitatif figé, signalée `recalcul_plan_fige_avant_lot10`.
-
-## 10. Multi-scénario (§12) — préparé, sans moteur complexe
-
-Une **solution** est un **plan** d'un étage. La contrainte existante « un seul plan modifiable par étage et par état » donne la séquence suivante : solution A figée, puis solution B dérivée.
-
-- `tools_releve_estimation_plans(étage)` liste les plans.
-- `comparerEstimations(A, B)` calcule l'écart B − A par lot, par état et au total, ainsi que les heures.
-- Panneau « Comparer deux solutions » dans la vue.
-
-Playwright : A figé « Solution A », B dérivé avec une peinture plus chère ; l'écart exact est affiché au total et sur le lot Peinture.
-
-## 11. Exports (§13)
-
-| Export | Contenu |
+| Exigence | Réalisation |
 |---|---|
-| **CSV** (Excel FR : `;`, virgule, BOM) | chantier → pièce, lot, catégorie, code, ouvrage, nature, état, unité, quantité, PU, matériau, MO, forfait, autre, heures, montant automatique, montant retenu, corrigé, raison, anomalies ; **dernière ligne : total chantier HT** |
-| **JSON** | contrat Gestion Pro (§12) |
-| **Impression / PDF navigateur** | « Imprimer / PDF » déplie les cartes et masque les commandes (`@media print`). Playwright : `window.print` appelé, cartes ouvertes, commandes masquées en média *print*, PDF Chromium produit (≈ 125 Ko) |
+| Valeur source | `valeur_source` figée **par le serveur** à la correction : quantité, unité, PU, montant automatique, coefficient appliqué et sa provenance |
+| Valeur calculée | montant automatique courant de la ligne, toujours affiché à côté du retenu |
+| Override | montant retenu (≥ 0, 2 décimales) ; une nouvelle correction retire la précédente (tracé) |
+| Motif obligatoire | raison ≥ 3 caractères (serveur et écran) |
+| Auteur / date | `auth.uid()`, horodatage serveur ; journal avant / après (prix, paramètres, corrections) |
+| **Stale si la quantité change** | correction **obsolète** dès que la quantité de sa ligne diffère de la quantité source, **même si le montant automatique ne change pas** (ouvrage sans prix, ligne devenue non calculable). Motif `quantite` (prioritaire) ou `montant` |
 
-## 12. Contrat Gestion Pro (§14)
+Le montant retenu n'est **jamais remplacé en silence**. Exemple réel (pgTAP A6, Playwright) :
 
-**Nouveau contrat versionné `elsatia.tools.estimation` 1.0.0** (`buildEstimationGpPayload`, voir D3) :
+1. Une évacuation **sans prix** est corrigée à 40 €.
+2. Sa quantité passe de 5 u à 6 u.
+3. Résultat : anomalie `estimation_obsolete` / `quantite_modifiee`, écran « à revoir : quantité 5 u → 6 u depuis la correction », le retenu reste à 40 €.
+
+Si l'on change ensuite le coefficient général, la correction de « divers » devient obsolète avec le motif montant (110,00 → 120,00, pgTAP A7).
+
+Le moteur est **rétro-compatible** : une correction sans `quantiteSource` (antérieure à 1402) produit une sortie octet pour octet identique au 1401 (pgTAP S7). La parité P1 est inchangée.
+
+## 7. États (§5)
+
+Les états du Lot 9 sont conservés : **existant, à déposer, neuf, déplacé**.
+
+- **Tuiles** : Dépose, Neuf, Déplacement, Travaux sur existant, Total projet.
+- **Filtre « Travaux »** :
+  - Tout ;
+  - Travaux (créer + déposer + déplacer) ;
+  - À créer ;
+  - À déposer ;
+  - À déplacer ;
+  - Existant.
+- **Effet du filtre** : il agit sur les sous-totaux, le total de la sélection et l'export CSV (`filtrerParEtats`, Vitest, Playwright).
+
+## 8. Pas de devis (§6)
+
+| Interdit | Garantie |
+|---|---|
+| numérotation de devis, facture, commande, signature | aucune table, colonne ni fonction `tools_releve*` correspondante (pgTAP S6) ; refus dans les contrats de prix, de paramètres et de transfert GP |
+| conditions commerciales, acompte, escompte, échéancier | clés refusées (paramètres : `cle` ; contrat GP : `validateEstimationGpPayload`) |
+| TVA (complexe ou non), TTC | estimation **HT** uniquement ; clés refusées |
+| marge, remise commerciale | clés refusées ; le coefficient est documenté comme n'étant ni l'une ni l'autre |
+| écran | aucun « devis n° », « facture n° », « bon de commande », « TTC », « signature » (Playwright, test Sécurité) |
+
+## 9. Transfert Gestion Pro (§7) — contrat `elsatia.tools.estimation` **1.1.0**
+
+Évolution **mineure et additive** : tout contrat 1.0.x reste recevable (Vitest). Contenu :
 
 | Section | Contenu |
 |---|---|
-| `readiness` | `contract-only`, `devis: not-generated`, `documentsCommerciaux: none` |
-| `montants` | EUR, **HT**, estimative |
-| `perimetre.decideParGestionPro` | prix de vente, marge, remise, TVA, devis final |
-| `quantitatif` | **contrat `elsatia.tools.quantitatif` 1.0.0 imbriqué, inchangé et toujours sans prix** : plans, ouvrages, quantités, états projetés, annotations de ligne |
-| `pieces` | chemin, usage, hauteur, surface de sol, périmètre utile |
-| `prix` | composantes structurées, coefficient, PU, forfait, origine |
-| `lignes` | quantité, PU, montants par type, heures, automatique / retenu, correction avec raison, auteur et date, emplacement, référence de la ligne de quantité |
-| `totaux` | total, par état, par type, par lot, heures, écart des corrections |
-| `etatsProjetes` | dépose / neuf / déplacement / existant / total |
-| `revetements` | métré du Lot 8 |
-| `photos` | références de stockage, légende, pièce ; aucun octet copié |
-| `annotations` | texte, forme, pièce, cible |
-| `anomalies` | hors *information* |
+| `quantitatif` | ouvrages et quantités : contrat `elsatia.tools.quantitatif` 1.0.0 imbriqué, inchangé, sans prix |
+| `prix` | prix simplifiés saisis : composantes, `coefficient` **appliqué**, `coefficientSaisi`, `coefficientSource`, PU avec coefficient, forfait, origine |
+| `hypotheses` (**1.1**) | `priorite` (ouvrage, lot, général), règle en clair, par plan : coefficient général, coefficients par lot, texte d'hypothèses, révision, date, auteur |
+| `lignes[].correction` (**1.1**) | raison, auteur, date, montant automatique d'alors, `quantiteSource`, `obsolete`, `motifObsolescence` |
+| `source` (**1.1**) | `application: elsatia-tools`, `module: releve-metre`, `exporteLe`, relevé, état, plans (numéro, gel), moteurs |
+| `perimetre` | `decideParGestionPro` (prix de vente, marge, remise, TVA, devis final) et **`gestionProLibreDeRechiffrer: true`** |
+| `totaux`, `etatsProjetes` | total, par état, par type, par lot, heures, écart des corrections, `correctionsObsoletes` |
+| `idempotencyKey` | couvre les quantités, les montants retenus **et les hypothèses** : une hypothèse modifiée donne une nouvelle version côté GP |
 
-Tous les montants sont en **chaîne décimale exacte**. La clé d'idempotence couvre le relevé, l'état, les plans (numéro, gel) et l'empreinte des quantités et montants retenus.
+**Côté Gestion Pro** : aucun code GP modifié. Le validateur du contrat (domaine partagé) accepte toute version 1.x. **DECISION_REQUIRED D7** : l'import GP du Lot 11 (branche `beautiful-tesla`, non intégré) accepte déjà `1.x`. Aucune nouvelle clé 1.1 ne contient un mot de sa liste noire SQL, donc un payload 1.1.0 lui reste recevable ; ce point est vérifié par lecture, pas exécuté (Lot 11 hors base).
 
-`validateEstimationGpPayload` (côté GP) vérifie : version majeure 1, montants HT décimaux, références résolues, contrat quantitatif imbriqué recevable, et **aucune donnée commerciale** (numéro de devis, facture, commande, signature, marge, remise, TVA, TTC, prix de vente). **Aucun devis n'est créé.**
+## 10. UX terrain / tablette (§8) — `/releves/estimation`
 
-## 13. Pas de devis dans Tools (§15)
+- **Cartes repliables**, aucune `<table>`, aucun débordement horizontal à 820 × 1180 (Playwright, deux tests). Cibles ≥ 40 px.
+- **Panneau « Coefficients et hypothèses »** :
+  - règle de priorité affichée ;
+  - lots proposés : ceux des ouvrages présents ;
+  - erreurs de saisie avec le même message que le serveur ;
+  - lecture seule pour la consultation ;
+  - révision optimiste (PT409, rien n'est écrasé).
+- **Carte d'ouvrage** :
+  - PU affiché avec le coefficient réellement appliqué ;
+  - badge « × 1,2 (lot) » ou « × 1,1 (général) ».
+- **Ligne corrigée** : montant automatique à côté, motif d'obsolescence en clair.
+- **Impression / PDF navigateur** : le panneau des hypothèses est imprimé.
 
-- Aucune table, colonne ni fonction de devis, facture, commande, signature, TVA, marge ou remise dans `tools_releves%` (pgTAP S9).
-- Contrat de prix et validation GP : ces clés sont refusées.
-- Écran (Playwright) : aucun « devis n° », « facture n° », « bon de commande », « TTC », « signature », « accepté » ou « refusé ».
+## 11. Exports
 
-## 14. Performances (§16)
+- **CSV** (Excel FR), qui suit le filtre de travaux. Les colonnes ajoutées sont en **fin de ligne**, les colonnes existantes restent inchangées :
+  - coefficient appliqué ;
+  - origine du coefficient ;
+  - quantité source de la correction ;
+  - correction obsolète (motif).
+- **JSON** : contrat GP 1.1.0.
+- **Impression** : inchangée.
 
-**Domaine seul (Vitest)**
+## 12. Tests (§9)
 
-| Lignes | Calcul | Édition prix + recalcul | Détail + sous-totaux | Export CSV + GP |
-|---|---|---|---|---|
-| 100 | 2 ms | 1 ms | 2 ms | 5 ms |
-| 1 000 | 14 ms | 13 ms | 11 ms | 26 ms |
-| 5 000 | 74 ms | 45 ms | 50 ms | 91 ms |
-
-Correction appliquée : l'export GP était quadratique (252 ms à 5 000 lignes) ; il est désormais indexé (91 ms).
-
-**Moteur SQL (psql, 5 000 lignes)** : quantitatif 0,51 s + estimation **0,33 s**.
-
-**Pile réelle (Playwright, `next dev`, second passage)** :
-
-| Lignes | Calcul (RPC) | Édition prix (RPC) | Recalcul | Vue complète | Édition prix à l'écran | Changement de sous-total | CSV | JSON |
-|---|---|---|---|---|---|---|---|---|
-| 100 | 48 ms | 12 ms | 42 ms | 1,8 s | 155 ms | 76 ms | 37 ms | 242 ms |
-| 1 000 | 195 ms | 25 ms | 210 ms | 2,4 s | 420 ms | 98 ms | 69 ms | 399 ms |
-| 5 000 | 984 ms | 22 ms | 891 ms | 3,6 s | 1,67 s | 486 ms | 226 ms | 1,08 s |
-
-- Corrections faites pendant la recette :
-  - les corps des sous-totaux ne sont rendus qu'à l'ouverture ;
-  - plans et cartes d'ouvrage sont mémoïsés (signature de contenu) ;
-  - effet mesuré : changement de sous-total 2,77 s → 0,49 s, édition à l'écran 2,86 s → 1,67 s, dont ≈ 1 s de recalcul serveur.
-- « Vue complète » comprend la lecture de structure du relevé (limite connue depuis le Lot 8). Le JSON comprend le chargement du métré et des photos.
-
-## 15. Tablette (§17)
-
-Tablette 820 × 1180 tactile (Playwright, émulation) :
-
-- cartes uniquement, **aucune `<table>`**, **aucun débordement horizontal** ;
-- cibles ≥ 40 px ;
-- un prix est saisi, puis une correction, au doigt ;
-- le niveau de sous-total se change à l'écran.
-
-## 16. Tests (§18)
-
-| Suite | Fichier | Tests |
-|---|---|---|
-| pgTAP | `elsatia_tools_releve_metre_lot10_estimation_simplifiee.test.sql` | **67** : S1–S9 schéma / droits / Lot 9 sans prix / aucun devis, C1–C8 contrat, **P1 parité**, E1–E12 estimation réelle, B1–B7 bibliothèque, A1–A10 corrections, V1–V9 versioning, T1–T7 isolation |
-| Vitest domaine | `estimation.test.ts` | 38 : énumérations / messages SQL, **P1** (40 cas + jeu étendu opt-in), contrat (17 cas), cas BTP (perte non réappliquée, arrondi par composante, forfait, sans prix, corrections, prix invalide), sous-totaux 7 niveaux, dépose / neuf / déplacement, A / B, CSV, contrat GP, performance 100 / 1 000 / 5 000 |
-| Vitest Tools | `plan-lot10.test.ts` | 4 : navigation, dépôt (RPC seulement, aucun montant envoyé), refus serveur, pièces jointes |
-| Playwright | `tools-releve-lot10.spec.ts` | 10 : prix → montants, sous-totaux + exports + impression, corrections, bibliothèque, dépose / neuf / déplacement + versions + A / B, sécurité, **tablette**, performance 100 / 1 000 / 5 000 |
-
-Commandes rejouables :
-
-```text
-scripts/local-postgres-bootstrap/rebuild_db.sh lot10_fresh                          → 352 migrations OK
-cd supabase/tests && pg_prove -d lot10_fresh elsatia_tools_releve_metre_*.test.sql → 734/734
-cd supabase/tests && pg_prove -d lot10_fresh *.test.sql                             → 146 fichiers, 9 KO connus (identiques au Lot 9)
-node scripts/releve/estimation-parite.mjs <base> 3000 777 /tmp/p.json               → jeu étendu (le jeu figé : 40 cas, graine 20260930)
-ESTIMATION_PARITE_EXTRA=/tmp/p.json npx vitest run packages/releve-domain           → 371/371
-npx vitest run ; (apps/tools) npx vitest run ; npx tsc --noEmit ; (apps/tools) npx tsc --noEmit ; (apps/tools) npm run lint
-(apps/tools, NEXT_PUBLIC_TOOLS_ENV=local …) npm run build ; npm run build:native ; (racine) npm run build:gestion-pro
-scripts/local-postgres-bootstrap/releve_e2e_stack.sh + (apps/tools) next dev --webpack -p 3020
-  + npx playwright test tests/e2e/tools-releve-lot10.spec.ts --project=desktop-chromium                      → 10/10 (×2)
-  + npx playwright test tests/e2e/tools-releve-lot{8,9}.spec.ts --project=desktop-chromium                  → 24/24
-  + npx playwright test tests/e2e/tools-releve-lot{6,7}.spec.ts --project=desktop-chromium                  → 31/31
-  + npx playwright test tests/e2e/tools-releve-lot{2,3,4,5}.spec.ts tests/e2e/tools-atelier-lot5-nonregression.spec.ts --project=desktop-chromium → 52/52
-```
-
-## 17. Sécurité
-
-| Profil | Résultat (pgTAP + Playwright) |
+| Exigence | Preuve |
 |---|---|
-| métreur | prix, import, corrections, bibliothèque de prix (plan non figé) |
-| consultation | lit estimation, synthèse et plans ; aucune écriture (42501) |
-| **autre tenant** | estimation, synthèse, plans, prix, corrections, bibliothèque : 42501 ; rien de visible |
-| anonyme | aucune RPC |
-| plan figé | estimation figée ; aucune écriture, même par le propriétaire des tables |
-| écriture directe | tables en lecture seule ; contrat vérifié par CHECK même pour `service_role` |
+| Calculs décimaux exacts | Vitest « calculs décimaux EXACTS » ; parités P1 et P2 (SQL = TS au centime) |
+| Grands volumes | Vitest 1 000 / 5 000 / **20 000 lignes** avec coefficients et corrections : sous-totaux = total, contrat GP valide. Playwright 100 / 1 000 / 5 000 lignes sur pile réelle (ci-dessous) |
+| Overrides | pgTAP A1–A7 (+ Lot 10 A1–A10), Vitest traçabilité, Playwright corrections |
+| Stale | pgTAP A6–A7, Vitest (quantité, sans prix, non calculable, montant), Playwright (quantité 5 → 6 u) |
+| Plans figés / dérivés | pgTAP V1–V4 : paramètres figés au gel ; changement ultérieur sans effet sur le figé ; dérivé recalculé avec les paramètres courants, corrections non copiées. Lot 10 V1–V9 |
+| Exports | Vitest CSV / GP ; Playwright CSV filtré, JSON 1.1.0, impression |
+| Contrat GP | Vitest 1.1.0 (hypothèses, prix, valeur source, idempotence, interdits, rétro-compatibilité 1.0) ; Playwright JSON réel |
+| Sécurité | pgTAP T1–T5 (consultation, autre tenant, anonyme), G1–G4 (mode sûr) ; Playwright (autre tenant 42501, acompte 22023, PT409) |
 
-- Fonctions internes non exécutables par `authenticated` : `tools_releve_plan_estimation_calcul`, `tools_releve_estimation_prix_json`, `tools_releve_plan_estimation_lire`, `tools_releve_estimation_prix_ecrire`, déclencheurs.
-- Le moteur pur `tools_releve_estimation_evaluer` est exécutable : il ne lit aucune table.
-- Seule redéfinition : `tools_releve_plan_figer`, à l'identique plus l'estimation figée.
-- Additions au Lot 9 : deux déclencheurs sur `tools_releves_ouvrages` (reprise du prix à la création ; retrait tracé des corrections à la suppression) et une fonction exportée `niveauCle` dans le domaine.
-- Aucune garde affaiblie, aucune ligne existante réécrite.
+**Playwright, pile réelle** :
 
-## 18. Non-régression
+- `tools-releve-lot10.spec.ts` : **11 / 11**, deux passages.
+- Non-régression, exécution fichier par fichier :
 
-- pgTAP Relevé Lots 2–9 : 667 / 667 sur la base Lot 10, **aucun test adapté**. Le contrat d'ouvrage du Lot 9 refuse toujours les prix.
-- Playwright Lots 2 → 9 et Atelier : **107 / 107**.
-- Vitest : ajouts seulement.
-- Liens ajoutés (fiche relevé « Estimation », Quantitatifs « Estimation (HT) ») sans modifier les parcours existants.
+| Fichier | Résultat |
+|---|---|
+| Lot 2 | **4 / 4** |
+| Lot 3 | **6 / 6** (pile neuve) |
+| Lot 4 | **19 / 19** |
+| Lot 5 | **17 / 17** |
+| Lot 6 | **16 / 16** |
+| Lot 7 | **15 / 15** |
+| Lot 8 | **12 / 12** |
+| Lot 9 | **12 / 12** |
+| Atelier | **6 / 6** |
 
-## 19. DECISION_REQUIRED (choix conservateurs retenus)
+Écarts observés sur une pile **réutilisée** (comptes de recette ayant accumulé plusieurs dizaines de relevés, dont des relevés de 5 000 lignes) :
+
+- un enchaînement de tous les fichiers dans une seule commande a échoué une fois à la **connexion** (Lot 4) ;
+- le Lot 3 « recherche et filtres de la liste » a échoué une fois.
+
+Sur une **pile neuve**, Lot 3 : 6 / 6 et Lot 2 : 4 / 4. Lot 4 relancé seul sur la pile réutilisée : 19 / 19. Ces deux échecs viennent de l'environnement de recette, pas du Lot 10, qui ne touche ni la liste des relevés ni la connexion.
+
+**Performances (pile réelle, `next dev`, second passage, ms)** :
+
+| Lignes | Calcul RPC | Édition prix RPC | Recalcul | Vue complète | Édition à l'écran | Sous-totaux | CSV | JSON |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 49 | 13 | 49 | 2 005 | 207 | 97 | 52 | 261 |
+| 1 000 | 295 | 13 | 294 | 2 385 | 937 | 124 | 84 | 497 |
+| 5 000 | 1 399 | 14 | 1 307 | 5 161 | 1 923 | 270 | 270 | 1 101 |
+
+Enregistrer les coefficients recalcule **tous les plans non figés du relevé**. Dans la recette, le relevé contient aussi les plans de 100, 1 000 et 5 000 lignes : **4,1 s**. Le domaine seul traite 20 000 lignes avec coefficients et contrat GP en environ 1,5 s (Vitest).
+
+## 13. Suite pgTAP complète
+
+| Base | Fichiers | Tests | Fichiers en échec |
+|---|---|---|---|
+| V8 de référence `53b4bc76` (371 migrations) | 163 | 8 073 | 9 |
+| **Lot 10** (373 migrations) | **165** | **8 193** | **les mêmes 9, mêmes compteurs** (diff vide, hors largeur de colonne) |
+
+Les 9 échecs sont les limites connues du banc local, identiques sur la référence :
+
+- Studio ×7 : schéma du projet dédié absent du projet partagé ;
+- `platform_stripe_state_attestation_r72` : pgsodium simulé ;
+- `elsatia_tools_cloud_sync_entitlement_closure_v1`.
+
+Sur la base de travail, **avant** la migration 1402, `incident_safe_mode_v1` et `v8_convergence_incident_gardes_v1` échouaient aussi à cause du Lot 10 (§2). Ils sont verts après.
+
+## 14. DECISION_REQUIRED (choix conservateurs retenus, la mission ne devant pas s'arrêter)
 
 | # | Sujet | Choix |
 |---|---|---|
-| D1 | Branche | branche de session repositionnée sur le Lot 9 (elle pointait sur un ancêtre, sans commit propre) |
-| D2 | Où vivent les prix | **couche séparée** (tables dédiées). Le contrat d'ouvrage et la bibliothèque du Lot 9 restent sans prix, ses tests sont inchangés |
-| D3 | Contrat GP | **nouveau contrat `elsatia.tools.estimation` 1.0.0** qui imbrique le quantitatif 1.0.0 inchangé, plutôt qu'un quantitatif 1.1.0 : le validateur 1.x refuse les prix, et une mineure qui en ajoute casserait ses consommateurs |
-| D4 | Base des composantes | toutes les composantes (MO comprise) s'appliquent à la **même quantité retenue, perte comprise** : une seule perte, jamais deux. Calculer la MO sur la quantité sans perte serait une règle métier à valider |
-| D5 | FORFAIT | montant fixe **par ouvrage**, une ligne « forfait » dans l'état de travaux de l'ouvrage, sans pièce. Un ouvrage dont le prix n'a qu'un forfait a des lignes de quantité à 0 € (il n'est pas « sans prix ») |
-| D6 | Coefficient | multiplie toutes les composantes et les heures ; borné 0,01 – 10 ; ce n'est pas une marge |
-| D7 | Arrondi | centime par composante et par ligne, puis sommes. Le PU composite affiché (4 décimales) est indicatif : total de ligne = somme des composantes arrondies |
-| D8 | Correction | porte sur le **montant d'une ligne** (pas sur le PU) ; possible sans prix (montant automatique nul) ; obsolète si l'automatique change |
-| D9 | Multi-scénario | solution = plan d'un étage ; comparaison côté client (lot, état, total). Aucun moteur de scénarios ; la contrainte existante (un plan modifiable par étage et par état) est conservée |
-| D10 | Bibliothèque | prix repris comme instantané ; application par lien puis par code, **seulement aux ouvrages sans prix** (remplacement possible par la RPC, non exposé à l'écran) |
-| D11 | « Sans prix » | anomalie de gravité *information* : exclue de « À vérifier » et du contrat GP |
-| D12 | Pièces jointes GP | photos, annotations et revêtements transmis par référence (chemin de stockage, identifiants), chargés au moment de l'export ; aucun octet copié |
-| D13 | Plans figés avant le Lot 10 | recalculés à la lecture sur leur quantitatif figé (aucun prix possible), signalés `recalcul_plan_fige_avant_lot10` |
+| D1 | Point de départ | train V8 qualifié + reprise des commits Lot 10 déjà portés sur V8, audités ; Lot 11 non repris |
+| D2 | Où vivent les prix | couche séparée (tables dédiées, 1401) ; le Lot 9 reste sans prix, ses tests sont inchangés |
+| D3 | Portée des coefficients général / lot | **par relevé** (chantier) : un seul réglage terrain pour tous les étages. **Figés avec chaque plan au gel**, si bien qu'un plan figé ne change jamais |
+| D4 | Priorité | **substitution** (le plus précis l'emporte), **jamais de cumul** : lisible sur le terrain, aucun effet d'empilement assimilable à une marge |
+| D5 | Coefficient 1 sur l'ouvrage | prime (neutralise lot et général) ; champ vide = hérité ; les prix existants sans coefficient deviennent « hérités », donc identiques tant qu'aucun coefficient de relevé n'est posé |
+| D6 | Perte | toujours celle du Lot 9, incluse dans la quantité retenue ; jamais dans un prix ni dans un coefficient |
+| D7 | Contrat GP | mineure **1.1.0** additive ; aucun code GP modifié ; compatibilité avec l'import Lot 11 vérifiée par lecture seulement |
+| D8 | Obsolescence | sur quantité **ou** montant ; motif « quantité » prioritaire ; corrections antérieures à 1402 : règle du 1401 (montant seul) |
+| D9 | Hypothèses | texte libre ≤ 2 000 caractères, transmis à GP ; inclus dans la clé d'idempotence |
+| D10 | Filtre de travaux | état local de la vue (non persisté dans l'URL) ; l'export JSON GP reste **complet** (GP reçoit tout), seul le CSV suit le filtre |
+| D11 | Mode sûr | garde posée par 1402 sur les tables 1401 (correctif additif, aucune migration existante modifiée) |
+| D12 | Attendus du train | synchronisés (373 / `20260930001402`) : documents générés seulement |
 
-## 20. Limites réelles
+## 15. Limites réelles
 
 | Sujet | État |
 |---|---|
 | Appareils physiques, Safari / WebKit iOS | **non testés** (MOBILE EMULATED ONLY) |
-| Import côté Gestion Pro | non construit : contrat `elsatia.tools.estimation` 1.0.0 préparé, validé, non transmis |
-| TVA | volontairement absente (HT seulement), décidée par Gestion Pro |
-| Vue sur très gros relevés | la lecture de structure (Lots 2/3, RLS ligne à ligne) domine l'affichage ; à 5 000 lignes, l'édition d'un prix à l'écran prend 1,7 s, dont ≈ 1 s de recalcul serveur (quantitatif + estimation) |
-| Attendus Preview du train (`verify:train-expectations`) | dérive antérieure à ce lot (déjà signalée au Lot 9), non modifiés ici ; `npm run sync:train-expectations` à lancer au prochain train |
-| Performances | `next dev`, pile locale : à remesurer en build de production / Preview |
+| Import côté Gestion Pro | non construit ici (Lot 11 distinct) ; contrat 1.1.0 préparé, validé, non transmis |
+| Recalcul après changement de coefficient | relit tous les plans du relevé : 4,1 s avec un plan de 5 000 lignes dans le relevé (`next dev`) |
+| Faux positif théorique du contrôle GP | une hypothèse saisie contenant une chaîne entre guillemets suivie de « : » et d'un mot interdit pourrait être prise pour une clé par l'expression régulière (préexistant, déjà vrai pour les raisons de correction) |
+| Performances | mesurées en `next dev`, pile locale ; à remesurer en build de production / Preview |
+
+## 16. Commandes rejouables
+
+```text
+scripts/local-postgres-bootstrap/rebuild_db.sh lot10_fresh                                  → 373 migrations
+cd supabase/tests && pg_prove -d lot10_fresh elsatia_tools_releve_metre_lot10*.test.sql      → 67 + 53
+node scripts/releve/estimation-parite-coefficients.mjs <base> 40 20261002                  → jeu P2 (fixture)
+npx vitest run ; (apps/tools) npx vitest run ; npx tsc --noEmit ; (apps/tools) npx tsc --noEmit && npm run lint
+npm run verify:migrations ; npm run verify:train-expectations
+scripts/local-postgres-bootstrap/releve_e2e_stack.sh + (apps/tools) next dev --webpack -p 3020
+  + npx playwright test tests/e2e/tools-releve-lot10.spec.ts --project=desktop-chromium           → 11/11 (×2)
+  + npx playwright test tests/e2e/tools-releve-lot<N>.spec.ts --project=desktop-chromium (N = 2…9) + atelier
+```
