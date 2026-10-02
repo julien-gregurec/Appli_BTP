@@ -180,8 +180,11 @@ select ok((select cree_par is null from public.acces_externes_documents
 -- 1d. Notifications push
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+-- Fenêtre bornée à la transaction (created_at = now()) : la fonction, comme la proposition,
+-- ne trie pas ; sur une base peuplée (> 200 en attente), l'appartenance aux 200 premières
+-- d'une fenêtre de 25 h n'est pas garantie.
 select ok('ae000000-0000-0000-0000-000000000001'::uuid in
-          (select id from public.push_notifications_en_attente_service(now() - interval '25 hours', 200)), 'Push : notification en attente listée');
+          (select id from public.push_notifications_en_attente_service(now(), 200)), 'Push : notification en attente listée');
 select is((select count(*)::int from public.push_notifications_en_attente_service(now() - interval '25 hours', 0)), 0, 'Push : plafond respecté (0)');
 select is(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') ->> 'titre', 'Titre PV9', 'Push : contenu');
 select is(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') ->> 'preference_active', 'false', 'Push : préférence respectée');
@@ -199,7 +202,7 @@ select is(jsonb_array_length(public.push_preparer_notification_service('ae000000
 select lives_ok($$select public.push_marquer_notification_envoyee_service('ae000000-0000-0000-0000-000000000001')$$, 'Push : notification marquée');
 select ok(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') is null, 'Push : notification traitée → null');
 select ok('ae000000-0000-0000-0000-000000000001'::uuid not in
-          (select id from public.push_notifications_en_attente_service(now() - interval '25 hours', 200)), 'Push : plus listée');
+          (select id from public.push_notifications_en_attente_service(now(), 500)), 'Push : plus listée');
 select throws_ok($$select endpoint from public.push_abonnements$$, '42501', null, 'Push : toujours aucune lecture directe des abonnements');
 reset role;
 select is((select count(*)::int from public.push_abonnements where id = 'bf000000-0000-0000-0000-000000000001'), 1,
