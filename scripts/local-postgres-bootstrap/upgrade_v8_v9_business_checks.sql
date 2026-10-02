@@ -6,7 +6,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(30);
+select plan(33);
 
 create or replace function pg_temp.en(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -46,6 +46,16 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
           0, 'S01 anon : aucune RPC V9 exécutable');
 select ok(not has_function_privilege('authenticated', 'public.recalc_totaux_facture(uuid)', 'execute'),
           'S02 B4 corrigé SANS rouvrir recalc_totaux_facture à authenticated');
+
+-- ── Socle V9 final : Security Residual V2 (…1002 001001), Legal Consent (…1002 000901) ──
+select is((select count(*)::int from pg_policies where schemaname = 'public'
+            and tablename in ('postes', 'permissions_poste', 'utilisateurs_entreprises')
+            and coalesce(qual, '') || coalesce(with_check, '') ilike '%entreprise_sans_membres%'),
+          0, 'S03 1001 : plus aucune policy fail-open « entreprise sans membres »');
+select is((select count(*)::int from platform.documents_legaux_versions), 3, 'LG01 901 : 3 versions de documents légaux (CGU, CGV, DPA)');
+create temp table vide as select count(*)::int as n from public.permissions_poste x
+  where not exists (select 1 from public.utilisateurs_entreprises ue where ue.entreprise_id = x.entreprise_id);
+grant select on vide to authenticated;
 
 -- ── Facture brouillon de l'ère V8 (B4) ────────────────────────────────────
 set local role authenticated;
@@ -95,6 +105,10 @@ select is(coalesce((select sum(heures_total) from public.pointages_gestion_totau
           'P03 ouvrier : total = ce que la RLS lui montre (parité, aucun droit élargi)');
 select is((select count(*)::int from public.factures where entreprise_id = 'f1462e00-0000-0000-0000-000000000001'), 0,
           'P04 ouvrier : toujours aucune facture lisible (RLS inchangée)');
+select is((select count(*)::int from public.permissions_poste x
+            where not exists (select 1 from public.utilisateurs_entreprises ue where ue.entreprise_id = x.entreprise_id)),
+          0, 'S04 1001 : un utilisateur ne lit plus la matrice de permissions d''une entreprise sans membre ('
+             || (select n from vide) || ' lignes en base)');
 
 -- ── Chiffrement bancaire : données v1 de l'ère V8 ─────────────────────────
 select throws_ok($$ select * from public.cles_chiffrement_bancaire $$, '42501', null, 'B01 authenticated : registre des clés illisible');

@@ -12,6 +12,15 @@ tout écart est une PERTE ou un CHANGEMENT DE DROIT SILENCIEUX (code de sortie 1
                        attester) et journal_cles_chiffrement_bancaire, RLS active, aucun droit d'API ;
   R-V9-B4              modifier_facture_brouillon : EXECUTE réaffirmé authenticated seul (anon, public,
                        service_role retirés explicitement par …0930000102) ;
+  R-V9-LEGAL-901       tables nouvelles platform.documents_legaux_versions (3 versions : CGU, CGV, DPA) et
+                       platform.acceptations_documents_legaux (0) — Legal Consent (…1002 000901) ;
+  R-V9-SEC-1001        Security Residual V2 (…1002 001001) : 5 policies de postes / permissions_poste /
+                       utilisateurs_entreprises réécrites SANS la clause fail-open entreprise_sans_membres
+                       (« bootstrap ou invitation par un membre actif » devient « invitation par un membre
+                       actif ») ; vérifié : aucune des 5 ne référence plus entreprise_sans_membres et chacune
+                       garde est_membre_actif / est_membre_actif_reel. Sonde : une cellule peut BAISSER sur
+                       postes / permissions_poste d'exactement le nombre de lignes appartenant aux entreprises
+                       SANS membre (lecture fail-open fermée), jamais autrement ;
   R-V9-RPC             fonction NOUVELLE : définie par une migration V9, search_path figé, jamais exécutable
                        par anon ; classée authenticated (RPC applicative : SECURITY DEFINER à parité RLS
                        prouvée par pgTAP, ou SECURITY INVOKER — la RLS de l'appelant s'applique telle
@@ -40,7 +49,14 @@ def psql(sql):
 
 
 silencieux = []
-NOUVELLES_TABLES = {"public.cles_chiffrement_bancaire": 1, "public.journal_cles_chiffrement_bancaire": 0}
+NOUVELLES_TABLES = {"public.cles_chiffrement_bancaire": 1, "public.journal_cles_chiffrement_bancaire": 0,
+                    "platform.documents_legaux_versions": 3, "platform.acceptations_documents_legaux": 0}
+POLICIES_1001 = {
+    ("postes", "membres voient les postes"), ("postes", "membres gèrent les postes"),
+    ("permissions_poste", "membres voient les permissions"), ("permissions_poste", "membres gèrent les permissions"),
+    ("utilisateurs_entreprises", "bootstrap ou invitation par un membre actif"),
+    ("utilisateurs_entreprises", "invitation par un membre actif"),
+}
 
 # 1. Lignes et empreintes : aucune donnée existante modifiée.
 rc_a, rc_p = avant["row_counts"], apres["row_counts"]
@@ -70,23 +86,57 @@ for t, l in rls_p.items():
     if t not in rls_a and l.split("|")[1] != "true":
         silencieux.append(f"table nouvelle sans RLS {t}")
 pa, pp = set(avant["policies"]), set(apres["policies"])
+cle_pol = lambda l: tuple(l.split("|")[:2])
+regle_1001 = 0
 for l in sorted(pa - pp):
-    silencieux.append(f"policy supprimée ou modifiée {l}")
+    if cle_pol(l) in POLICIES_1001:
+        regle_1001 += 1
+    else:
+        silencieux.append(f"policy supprimée ou modifiée {l}")
 for l in sorted(pp - pa):
-    silencieux.append(f"policy ajoutée {l}")
+    if cle_pol(l) in POLICIES_1001:
+        regle_1001 += 1
+    else:
+        silencieux.append(f"policy ajoutée {l}")
+if regle_1001:
+    # Les 5 policies de 1001 : plus aucune référence à entreprise_sans_membres, garde d'appartenance conservée.
+    lignes_1001 = psql("""select tablename || '|' || policyname || '|' ||
+        (coalesce(qual, '') || coalesce(with_check, '') ilike '%entreprise_sans_membres%') || '|' ||
+        (coalesce(qual, '') || coalesce(with_check, '') ~ 'est_membre_actif(_reel)?\\(')
+      from pg_policies where schemaname = 'public'
+       and (tablename, policyname) in (('postes', 'membres voient les postes'), ('postes', 'membres gèrent les postes'),
+            ('permissions_poste', 'membres voient les permissions'), ('permissions_poste', 'membres gèrent les permissions'),
+            ('utilisateurs_entreprises', 'invitation par un membre actif'),
+            ('utilisateurs_entreprises', 'bootstrap ou invitation par un membre actif'))
+      order by 1;""")
+    if len(lignes_1001) != 5 or any(not l.endswith("|false|true") for l in lignes_1001):
+        silencieux.append(f"R-V9-SEC-1001 non vérifiée : {lignes_1001}")
+# Lignes appartenant aux entreprises SANS membre (seule visibilité retirée par 1001).
+vide = {}
+for t in ("postes", "permissions_poste"):
+    vide[t] = int(psql(f"""select count(*) from public.{t} x where not exists
+        (select 1 from public.utilisateurs_entreprises ue where ue.entreprise_id = x.entreprise_id);""")[0])
 sonde = 0
+sonde_1001 = 0
 for u, res in avant["rls_probe"].items():
     for t, n in res.items():
         m = apres["rls_probe"].get(u, {}).get(t)
         sonde += 1
         if m != n:
-            silencieux.append(f"sonde RLS {u}/{t}: {n} -> {m}")
+            if t in vide and m is not None and n - m == vide[t] and vide[t] > 0:
+                sonde_1001 += 1
+            else:
+                silencieux.append(f"sonde RLS {u}/{t}: {n} -> {m}")
 
 # 3. Droits de table : aucun retrait, aucun ajout.
 ga, gp = set(avant["grants"]), set(apres["grants"])
 for g in sorted(ga - gp):
     silencieux.append(f"droit de table retiré ou modifié {g}")
 for g in sorted(gp - ga):
+    t, role, privs = g.split("|")
+    # R-V9-LEGAL-901 : registre des documents légaux lisible par le serveur (service_role) SEULEMENT.
+    if t in ("platform.documents_legaux_versions", "platform.acceptations_documents_legaux") and role == "service_role" and privs == "SELECT":
+        continue
     silencieux.append(f"droit de table ajouté {g}")
 
 # 4. Fonctions : aucune supprimée ; EXECUTE inchangé sauf R-V9-B4 ; nouvelles classées R-V9-RPC.
@@ -107,14 +157,14 @@ for f in sorted(glob.glob(os.path.join(REPO, "supabase/migrations/*.sql"))):
     v = os.path.basename(f).split("_")[0]
     if v <= DERNIERE_V8:
         continue
-    for nom in re.findall(r"create or replace function public\.([a-z_0-9]+)", open(f).read(), re.I):
+    for schema, nom in re.findall(r"create or replace function (public|platform)\.([a-z_0-9]+)", open(f).read(), re.I):
         origine.setdefault(nom.lower(), os.path.basename(f)[:14])
 attributs = {}
-for l in psql("""select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||p.prosecdef||'|'||
+for l in psql("""select n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||p.prosecdef||'|'||
                    coalesce(array_to_string(p.proconfig, ','), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                 where n.nspname = 'public';"""):
+                 where n.nspname in ('public', 'platform');"""):
     k, secdef, conf = l.split("|")
-    attributs["public." + k] = (secdef in ("t", "true"), "search_path" in conf)
+    attributs[k] = (secdef in ("t", "true"), "search_path" in conf)
 classes = {"authenticated": [], "service_role": [], "interne": []}
 for k, l in sorted(fp.items()):
     if k in fa:
@@ -138,6 +188,8 @@ for k, l in sorted(fp.items()):
 
 print(f"Données : {len(rc_a)} tables, 0 écart attendu ; {len(avant['checksums'])} empreintes ; tables nouvelles {sorted(t for t in rc_p if t not in rc_a)}")
 print(f"RLS : {len(pa)} policies avant / {len(pp)} après ; sonde {sonde} cellules ({len(avant['rls_probe'])} utilisateurs)")
+print(f"R-V9-SEC-1001 : {regle_1001} entrée(s) de policy (5 policies réécrites) ; {sonde_1001} cellule(s) de sonde en baisse "
+      f"d'exactement les lignes des entreprises sans membre (postes {vide['postes']}, permissions_poste {vide['permissions_poste']})")
 print(f"Droits de table : {len(ga)} avant / {len(gp)} après")
 for c, lst in classes.items():
     print(f"R-V9-RPC {c} : {len(lst)}" + (" — " + ", ".join(lst) if lst else ""))
