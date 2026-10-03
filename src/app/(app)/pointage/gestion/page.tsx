@@ -44,7 +44,7 @@ export default async function GestionPointagesPage({searchParams}:{searchParams:
   const lies=new Set(sessions.map(s=>s.pointage_id).filter(Boolean));
   const anciens=pointages.filter(p=>!lies.has(p.id));
   const parEmploye=new Map<string,{nom:string;heures:number}>();
-  for(const p of pointages){const e=un(p.employe);if(e){const ligne=parEmploye.get(e.id)??{nom:`${e.prenom??""} ${e.nom}`.trim(),heures:0};ligne.heures+=Number(p.heures_normales)+Number(p.heures_supplementaires);parEmploye.set(e.id,ligne);}}
+  for(const p of pointages){if(p.verification_statut==="rejete")continue;const e=un(p.employe);if(e){const ligne=parEmploye.get(e.id)??{nom:`${e.prenom??""} ${e.nom}`.trim(),heures:0};ligne.heures+=Number(p.heures_normales)+Number(p.heures_supplementaires);parEmploye.set(e.id,ligne);}}
   const verificationsParSession=new Map<string,VerificationZone[]>();
   for(const controle of verifications){const liste=verificationsParSession.get(controle.session_id)??[];liste.push(controle);verificationsParSession.set(controle.session_id,liste);}
 

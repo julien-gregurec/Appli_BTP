@@ -45,3 +45,4 @@
 - B36 P3 facture brouillon non supprimable (pas d'action UI; cascade bloquée par trigger lignes) → brouillons s'accumulent
 - Données héritées pré-correctifs à auditer en production: factures depuis devis remisés (B16), acomptes encaissés au-delà du net d'avoir (B20), devis refacturés (B34), journées > 24 h (B35)
 - Endurance: 6 cycles = 60 chantiers, 60 devis, 90 factures émises, ~130 paiements, 300 pointages ; invariants sans dérive après correctifs
+- B37 P2 totaux d'heures (Mon pointage, Total par employé, planning réalisé, copilote) incluaient les pointages REJETÉS (28 h affichées / 16 h retenues en octobre) ; lib rentabilité copilote comptait tous statuts vs page rentabilité « validés ». CORRIGÉ. Définition « à vérifier compte ou non » à arbitrer (chantier/rentabilité: validés seulement ; pointage/gestion: hors rejetés)

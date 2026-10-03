@@ -584,3 +584,7 @@
 {"ts":"2026-10-03T00:23:37.177Z","parcours":"Endurance","nom":"Invariant : heures pointées par salarié = somme normale + sup, pas de doublon jour/chantier","statut":"PASS","detail":"doublons=0 ; salarie 152 pointages 1216.00 h ; chef 150 pointages 1200.00 h"}
 {"ts":"2026-10-03T00:23:37.180Z","parcours":"Endurance","nom":"Invariant (données du lancement) : rentabilité recalculée (CA émis, MO, achats) cohérente par chantier","statut":"PASS","detail":"20 chantiers d'endurance, CA total 663931.7 €, MO 23400 €"}
 {"ts":"2026-10-03T00:24:01.779Z","parcours":"Endurance","nom":"Correctif : plafond 24 h/jour tous chantiers (3 × 8 h acceptés, 4e refusé)","statut":"PASS","detail":"ok,ok,ok,refus total=24.00 h"}
+{"ts":"2026-10-03T00:28:22.919Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-09 : « Mes heures » du salarié == base","statut":"PASS","detail":"UI normales=816 sup=408 ; DB hors rejetés=816/408 ; DB rejetés inclus=824/416"}
+{"ts":"2026-10-03T00:28:24.543Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-09 : « Total par employé » (responsable) == base","statut":"PASS","detail":"UI=1224  DB hors rejetés=1224 DB tous=1240"}
+{"ts":"2026-10-03T00:28:25.275Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-10 : « Mes heures » du salarié == base","statut":"PASS","detail":"UI normales=15 sup=1 ; DB hors rejetés=15/1 ; DB rejetés inclus=27/1"}
+{"ts":"2026-10-03T00:28:26.039Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-10 : « Total par employé » (responsable) == base","statut":"PASS","detail":"UI=16  DB hors rejetés=16 DB tous=28"}

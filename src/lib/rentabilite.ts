@@ -28,7 +28,7 @@ export async function calculerRentabiliteChantiers(supabase: SupabaseClient, ent
     supabase.from("chantiers").select("id, nom").eq("entreprise_id", entrepriseId).order("nom"),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", entrepriseId),
     supabase.from("devis").select("chantier_id, montant_ht").eq("entreprise_id", entrepriseId).eq("statut", "accepte"),
-    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", entrepriseId),
+    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", entrepriseId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", entrepriseId),
   ]);
 

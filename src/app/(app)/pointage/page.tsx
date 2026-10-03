@@ -52,8 +52,10 @@ export default async function PointagePage({searchParams}:{searchParams:Promise<
   const ouvertes=sessions.filter(s=>!s.depart_at);
   const lies=new Set(sessions.map(s=>s.pointage_id).filter(Boolean));
   const anciens=pointages.filter(p=>!lies.has(p.id));
-  const totalNormal=pointages.reduce((s,p)=>s+Number(p.heures_normales),0);
-  const totalSup=pointages.reduce((s,p)=>s+Number(p.heures_supplementaires),0);
+  // Les pointages rejetés par le responsable ne comptent pas dans les totaux.
+  const pointagesRetenus=pointages.filter(p=>p.verification_statut!=="rejete");
+  const totalNormal=pointagesRetenus.reduce((s,p)=>s+Number(p.heures_normales),0);
+  const totalSup=pointagesRetenus.reduce((s,p)=>s+Number(p.heures_supplementaires),0);
   const maSessionOuverte=ouvertes[0];
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">

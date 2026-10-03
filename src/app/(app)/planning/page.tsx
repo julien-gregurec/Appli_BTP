@@ -100,7 +100,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
 
   const affectations = (affectationsData ?? []) as A[];
   const pointages=(pointagesData??[]) as P[];
-  const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>pointages.filter(p=>p.employe_id===employeId&&p.date===date&&(!chantierId||p.chantier_id===chantierId)).reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);
+  const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>pointages.filter(p=>p.verification_statut!=="rejete"&&p.employe_id===employeId&&p.date===date&&(!chantierId||p.chantier_id===chantierId)).reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
   const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
