@@ -1,0 +1,1196 @@
+Row counts : 153 tables d'avant, 4 écart(s)
+   ÉCART public.historique_tarification : 1 -> 6
+   ÉCART public.plans_abonnement : 8 -> 16
+   ÉCART public.plateforme_admins : 2 -> 3
+   ÉCART storage.buckets : 12 -> 19
+Tables nouvelles : 130 platform.acceptations_documents_legaux(0), platform.commandes_fournisseurs_purgees(0), platform.contrats_acceptes_purges(0), platform.documents_legaux_versions(3), platform.purge_audit(0), platform.purge_autorisations_echeance(0), platform.purge_autorisations_facture(0), platform.purge_politique_contrats(1), platform.purge_politique_contrats_journal(2), platform.tools_releve_surface_autorisations(0), public.acces_applications_entreprises(0), public.affectations_historique(0), public.applications_elsatia(5), public.assistance_actions_interdites(7), public.assistance_domaines_sensibles(13), public.assistance_evenements(0), public.assistance_motifs(7), public.assistance_notifications(0), public.assistance_perimetres(5), public.assistance_roles_correspondance(28), public.assistance_sessions(0), public.assistance_sessions_applications(0), public.avenants(0), public.cles_chiffrement_bancaire(1), public.colors_analyses_ocr(0), public.colors_emplacements(0), public.colors_mouvements(0), public.colors_nettoyages_photos(0), public.colors_parametres(0), public.colors_seaux(0), public.communications(0), public.communications_audiences(0), public.communications_journal(0), public.communications_lectures(0), public.communications_pieces_jointes(0), public.communications_preferences(0), public.contrats_abonnement(0), public.elsatia_identity_outbox(0), public.elsatia_identity_subjects(0), public.employes_cout_horaire(68), public.employes_taux_facture(68), public.entitlements_utilisateurs_elsatia(0), public.entreprises_dashboard_cache(9), public.evenements_commerciaux_applications(0), public.generations_tarifaires(4), public.habilitations_applications_utilisateurs(0), public.historique_acces_applications(0), public.historique_capacite_personnes(0), public.historique_contrats_abonnement(0), public.historique_entitlements_elsatia(0), public.historique_modules_entreprises(0), public.historique_mutations_plateforme(0), public.historique_remises_commerciales(0), public.incident_controles(0), public.incident_journal(0), public.incident_statuts_services(12), public.journal_cles_chiffrement_bancaire(0), public.lignes_avenants(0), public.modules_entreprises(0), public.modules_gestion_pro(19), public.modules_gestion_pro_tarifs(24), public.operations_capacite_stripe(0), public.plateforme_journal_actions(0), public.plateforme_operations_remise(0), public.plateforme_operations_remise_historique(0), public.plateforme_verrous_remise_stripe(0), public.promotions_commerciales(0), public.rapport_migration_suspension_par_app_v1(0), public.receptions_idempotence(0), public.remises_commerciales(0), public.reserves(0), public.reserves_annuaire_publication(0), public.reserves_chantiers(0), public.reserves_contacts(0), public.reserves_conversations(0), public.reserves_conversations_lectures(0), public.reserves_evenements_notifications(0), public.reserves_historique(0), public.reserves_intervenants(0), public.reserves_invitations(0), public.reserves_messages(0), public.reserves_mutations_appliquees(0), public.reserves_notifications_envois(0), public.reserves_notifications_lectures(0), public.reserves_notifications_types(14), public.reserves_photos(0), public.reserves_plans(0), public.reserves_preferences_notifications(0), public.reserves_transitions(17), public.roles_applications_elsatia(15), public.sessions_revoquees(0), public.stripe_essai_ecarts(0), public.stripe_evenements_ordre(0), public.stripe_objets_ordre(0), public.stripe_subscriptions_remplacees(0), public.studio_media_analysis(0), public.studio_media_assets(0), public.studio_media_limits(1), public.studio_project_assets(0), public.studio_projects(0), public.studio_render_jobs(0), public.studio_render_outbox(0), public.studio_render_outputs(0), public.studio_signup_policy(1), public.studio_timeline_clips(0), public.studio_timelines(0), public.studio_workspace_members(0), public.studio_workspaces(0), public.tools_demandes_suppression_compte(0), public.tools_monetization_customers(0), public.tools_monetization_events(0), public.tools_monetization_subscriptions(0), public.tools_offres_catalogue(2), public.tools_projects(0), public.tools_releves(0), public.tools_releves_batiments(0), public.tools_releves_chantiers(0), public.tools_releves_elements(0), public.tools_releves_etages(0), public.tools_releves_exports_gp(0), public.tools_releves_journal(0), public.tools_releves_medias(0), public.tools_releves_metre_ajustements(0), public.tools_releves_ouvrages(0), public.tools_releves_ouvrages_bibliotheque(0), public.tools_releves_pieces(0), public.tools_releves_plans(0), public.tools_releves_quantitatif_ajustements(0), public.tools_releves_versions(0), public.tools_releves_zones(0)
+Checksums métier : 23/38 identiques ; différents : abonnement_evenements, clients, commandes_fournisseurs, depenses_fournisseurs, devis, employes, entreprises, factures, lignes_commande, lignes_devis, lignes_factures, mouvements_stock, notes_frais, pointages, stripe_webhook_events
+RLS flags : 0 table(s) existante(s) modifiée(s) ; 120 table(s) nouvelle(s), toutes RLS : True
+Policies : 473 avant, 658 après ; supprimées 2, modifiées 85, ajoutées 187
+   SUPPRIMÉE support_messages.support_msg_insert
+   SUPPRIMÉE utilisateurs_entreprises.bootstrap ou invitation par un membre actif
+   MODIFIÉE abonnement_evenements.abonnement_evenements_admin_select
+   MODIFIÉE abonnement_stockage_releves.abonnement_stockage_releves_lecture
+   MODIFIÉE abonnements_entreprises.abonnement entreprise lecture gestion
+   MODIFIÉE affectations.membres affectations
+   MODIFIÉE affectations.role_gestion_delete
+   MODIFIÉE affectations.role_gestion_insert
+   MODIFIÉE affectations.role_gestion_update
+   MODIFIÉE boutique_commandes.boutique_commandes_lecture
+   MODIFIÉE boutique_lignes_commande.boutique_lignes_lecture
+   MODIFIÉE boutique_produits.boutique_produits_gestion
+   MODIFIÉE boutique_produits.boutique_produits_lecture
+   MODIFIÉE catalogue_options_abonnement.options lecture publique
+   MODIFIÉE catalogue_services_mise_en_service.services lecture publique
+   MODIFIÉE chantiers.chantiers_lecture_selon_droits
+   MODIFIÉE chantiers.lecture_chantiers_selon_permission
+   MODIFIÉE chantiers.membres modifient les chantiers
+   MODIFIÉE chantiers.membres suppriment les chantiers
+   MODIFIÉE chantiers.membres écrivent les chantiers
+   MODIFIÉE chantiers.role_gestion_delete
+   MODIFIÉE chantiers.role_gestion_insert
+   MODIFIÉE chantiers.role_gestion_update
+   MODIFIÉE clients.lecture_clients_selon_permission
+   MODIFIÉE clients.membres accèdent aux clients
+   MODIFIÉE clients.role_gestion_delete
+   MODIFIÉE clients.role_gestion_insert
+   MODIFIÉE clients.role_gestion_update
+   MODIFIÉE devis.lecture_devis_selon_permission
+   MODIFIÉE devis.membres devis
+   MODIFIÉE devis.role_gestion_delete
+   MODIFIÉE devis.role_gestion_insert
+   MODIFIÉE devis.role_gestion_update
+   MODIFIÉE documents_chantier.documents_chantier_ajout
+   MODIFIÉE documents_chantier.documents_chantier_ajout_terrain
+   MODIFIÉE documents_chantier.documents_chantier_lecture
+   MODIFIÉE documents_chantier.documents_chantier_modification
+   MODIFIÉE documents_chantier.documents_chantier_suppression
+   MODIFIÉE documents_chantier.role_gestion_delete
+   MODIFIÉE documents_chantier.role_gestion_insert
+   MODIFIÉE documents_chantier.role_gestion_update
+   MODIFIÉE entreprise_feature_flags.feature_flags_manage
+   MODIFIÉE entreprise_feature_flags.feature_flags_select
+   MODIFIÉE factures.lecture_factures_selon_permission
+   MODIFIÉE factures.membres factures
+   MODIFIÉE factures.role_gestion_delete
+   MODIFIÉE factures.role_gestion_insert
+   MODIFIÉE factures.role_gestion_update
+   MODIFIÉE factures_abonnement.factures abonnement lecture gestion
+   MODIFIÉE historique_tarification.historique tarif lecture plateforme
+   MODIFIÉE lignes_devis.lecture_lignes_devis_selon_permission
+   MODIFIÉE lignes_devis.membres lignes_devis
+   MODIFIÉE lignes_devis.role_gestion_delete
+   MODIFIÉE lignes_devis.role_gestion_insert
+   MODIFIÉE lignes_devis.role_gestion_update
+   MODIFIÉE lignes_factures.lecture_lignes_factures_selon_permission
+   MODIFIÉE lignes_factures.membres lignes_factures
+   MODIFIÉE lignes_factures.role_gestion_delete
+   MODIFIÉE lignes_factures.role_gestion_insert
+   MODIFIÉE lignes_factures.role_gestion_update
+   MODIFIÉE notifications_utilisateurs.notifications_marquer_lue
+   MODIFIÉE notifications_utilisateurs.notifications_personnelles
+   MODIFIÉE options_abonnement_entreprises.options entreprise lecture gestion
+   MODIFIÉE paiements.lecture_paiements_selon_permission
+   MODIFIÉE paiements.membres paiements
+   MODIFIÉE paiements.role_gestion_delete
+   MODIFIÉE paiements.role_gestion_insert
+   MODIFIÉE paiements.role_gestion_update
+   MODIFIÉE permissions_poste.membres gèrent les permissions
+   MODIFIÉE permissions_poste.membres voient les permissions
+   MODIFIÉE plans_abonnement.plans lecture publique
+   MODIFIÉE plateforme_reinitialisations_mot_de_passe.plateforme_reinit_mdp_lecture
+   MODIFIÉE pointages.membres pointages
+   MODIFIÉE pointages.role_gestion_delete
+   MODIFIÉE pointages.role_gestion_update
+   MODIFIÉE pointages.role_pointage_select
+   MODIFIÉE postes.membres gèrent les postes
+   MODIFIÉE postes.membres voient les postes
+   MODIFIÉE sessions_pointage.role_gestion_delete
+   MODIFIÉE sessions_pointage.role_pointage_select
+   MODIFIÉE sessions_pointage.sessions_pointage_membres
+   MODIFIÉE taches.lecture_taches_selon_permission
+   MODIFIÉE taches.membres accèdent aux tâches
+   MODIFIÉE taches.role_gestion_delete
+   MODIFIÉE taches.role_gestion_insert
+   MODIFIÉE taches.role_gestion_update
+   MODIFIÉE utilisateurs_entreprises.admins modifient les appartenances
+   ajoutées sur : acces_applications_entreprises, affectations, affectations_historique, applications_elsatia, assistance_actions_interdites, assistance_domaines_sensibles, assistance_evenements, assistance_motifs, assistance_notifications, assistance_perimetres, assistance_roles_correspondance, assistance_sessions, assistance_sessions_applications, avenants, colors_analyses_ocr, colors_emplacements, colors_mouvements, colors_parametres, colors_seaux, communications, communications_audiences, communications_journal, communications_lectures, communications_pieces_jointes, communications_preferences, contrats_abonnement, employes_cout_horaire, employes_taux_facture, entitlements_utilisateurs_elsatia, entreprises, evenements_commerciaux_applications, generations_tarifaires, habilitations_applications_utilisateurs, habilitations_employe, historique_acces_applications, historique_capacite_personnes, historique_contrats_abonnement, historique_entitlements_elsatia, historique_modules_entreprises, historique_mutations_plateforme, historique_remises_commerciales, historique_tarification, incident_controles, incident_statuts_services, lignes_avenants, modules_entreprises, modules_gestion_pro, modules_gestion_pro_tarifs, objects, operations_capacite_stripe, plateforme_journal_actions, plateforme_operations_remise, plateforme_operations_remise_historique, promotions_commerciales, rapport_migration_suspension_par_app_v1, receptions_idempotence, remises_commerciales, reserves, reserves_annuaire_publication, reserves_chantiers, reserves_contacts, reserves_conversations, reserves_conversations_lectures, reserves_evenements_notifications, reserves_historique, reserves_intervenants, reserves_invitations, reserves_messages, reserves_mutations_appliquees, reserves_notifications_lectures, reserves_notifications_types, reserves_photos, reserves_plans, reserves_preferences_notifications, reserves_transitions, roles_applications_elsatia, stripe_essai_ecarts, stripe_evenements_ordre, stripe_objets_ordre, stripe_subscriptions_remplacees, studio_media_analysis, studio_media_assets, studio_media_limits, studio_project_assets, studio_projects, studio_render_jobs, studio_render_outputs, studio_timeline_clips, studio_timelines, studio_workspace_members, studio_workspaces, tools_demandes_suppression_compte, tools_monetization_customers, tools_monetization_subscriptions, tools_offres_catalogue, tools_projects, tools_releves, tools_releves_batiments, tools_releves_chantiers, tools_releves_elements, tools_releves_etages, tools_releves_exports_gp, tools_releves_journal, tools_releves_medias, tools_releves_metre_ajustements, tools_releves_ouvrages, tools_releves_ouvrages_bibliotheque, tools_releves_pieces, tools_releves_plans, tools_releves_quantitatif_ajustements, tools_releves_versions, tools_releves_zones, utilisateurs_entreprises
+Sonde RLS réelle : 17 utilisateurs, 255 cellules, 38 écart(s)
+   ÉCART 10000000-0000-0000-0000-000000000001/chantiers: 62 -> 60
+   ÉCART 10000000-0000-0000-0000-000000000001/clients: 63 -> 60
+   ÉCART 10000000-0000-0000-0000-000000000001/commandes_fournisseurs: 241 -> 240
+   ÉCART 10000000-0000-0000-0000-000000000001/devis: 301 -> 300
+   ÉCART 10000000-0000-0000-0000-000000000001/employes: 12 -> 8
+   ÉCART 10000000-0000-0000-0000-000000000001/entreprises: 2 -> 1
+   ÉCART 10000000-0000-0000-0000-000000000001/factures: 181 -> 180
+   ÉCART 10000000-0000-0000-0000-000000000001/notes_frais: 301 -> 300
+   ÉCART 10000000-0000-0000-0000-000000000001/pointages: 2 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000002/chantiers: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000002/employes: 4 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000002/entreprises: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000002/notes_frais: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000002/pointages: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000003/chantiers: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000003/employes: 4 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000003/entreprises: 1 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000003/pointages: 2 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000004/chantiers: 2 -> 0
+   ÉCART 10000000-0000-0000-0000-000000000004/clients: 3 -> 0
+Droits de table : 219 retiré(s)/modifié(s), 211 ajouté(s) sur table existante, 194 sur table nouvelle
+   public.abonnement_evenements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.abonnement_stockage_releves|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.abonnements_entreprises|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.abonnements_entreprises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.absences_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.acces_externes_documents|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.acces_externes_documents|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.acces_support_log|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.acces_support_log|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.affectations_vehicules|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.affectations_vehicules|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.affectations|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.alertes_operationnelles_delegations|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.alertes_operationnelles_delegations|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.alertes_operationnelles_ignorees|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.anomalies_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.appareils_comptes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.appareils_comptes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.appels_contacts|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.appels_offres|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.article_teintes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.articles_stock|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.bons_livraison|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.boutique_commandes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.boutique_commandes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.boutique_lignes_commande|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.boutique_lignes_commande|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.boutique_produits|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.bulletins_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.catalogue_options_abonnement|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.catalogue_options_abonnement|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.catalogue_services_mise_en_service|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.catalogue_services_mise_en_service|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.categories_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.categories_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.champs_personnalises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.chantier_transferts|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.chantier_transferts|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.chantiers|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.charges_recurrentes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.charges_recurrentes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.cles_api|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.cles_api|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.clients|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.codes_acces|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.codes_acces|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.codes_identification|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.codes_identification|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.commandes_fournisseurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.comptes_rendus_chantier|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.compteurs_reference|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.compteurs_reference|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.connecteurs_externes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.connexions_bancaires|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.connexions_bancaires|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.connexions_email|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.contacts_clients|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.contacts_clients|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.contrats_entretien|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.conversations_internes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.conversations_internes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.coordonnees_bancaires|authenticated|INSERT,SELECT
+   public.coordonnees_bancaires|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.deductions_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.demandes_conges|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.demandes_conges|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.depenses_fournisseurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.devis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.documents_chantier|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.documents_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.documents_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.doe_generations|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.doe_generations|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.dossiers_paie_salaries|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.ecritures_comptables_importees|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.ecritures_comptables_importees|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.elements_export_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.elements_export_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.emails_chantier|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.employes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.employes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.entreprise_besoins|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.entreprise_besoins|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.entreprise_feature_flags|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.entreprises|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.entreprises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.equipes_chantiers|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.exports_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.exports_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.facturation_comptes_mensuelle|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.facturation_comptes_mensuelle|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.factures_abonnement|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.factures_abonnement|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.factures|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.fiches_techniques_articles|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.fournisseurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.grands_deplacements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.habilitations_employe|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.historique_tarification|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.historique_tarification|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.indemnites_deplacement_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.interventions|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.inventaires|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.inventaires|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_abus_securite|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_activite|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_audit_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.journal_audit_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_audit_paie|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.journal_audit_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_ia|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.journal_ia|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.journal_paiements_bancaires|authenticated|INSERT,SELECT
+   public.journal_paiements_bancaires|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.legal_holds_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.legal_holds_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_commande|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.lignes_commande|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_devis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_factures|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_inventaire|authenticated|DELETE,INSERT,UPDATE
+   public.lignes_inventaire|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_metres|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_modeles_devis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lignes_situations|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.lots_virements|authenticated|INSERT,SELECT
+   public.lots_virements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.messages_internes|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.messages_internes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.metres|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.modeles_devis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.modeles_roles_predefinis|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.modeles_roles_predefinis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.mouvements_outillage|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.mouvements_outillage|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.mouvements_stock|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.notifications_utilisateurs|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.notifications_utilisateurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.options_abonnement_entreprises|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.options_abonnement_entreprises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.ordres_virements|authenticated|INSERT,SELECT
+   public.ordres_virements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.outils|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.paiements|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.paiements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.parametres_paie_entreprise|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.parametres_relances|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.periodes_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.permissions_disponibles|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.permissions_disponibles|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.permissions_poste|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.pieces_jointes_devis|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.pieces_jointes_devis|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.pieces_jointes_messages|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.pieces_jointes_messages|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.pieces_jointes_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.planning_evenements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.plans_abonnement|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.plans_abonnement|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.plateforme_acces_entreprises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.plateforme_admins|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.plateforme_admins|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.plateforme_reinitialisations_mot_de_passe|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.plateforme_reinitialisations_mot_de_passe|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.pointages|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.pointages|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.politiques_conservation_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.politiques_conservation_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.postes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.preferences_notifications_push|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.prestations_catalogue|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.primes_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.profils_paie_employes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.push_abonnements|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.push_abonnements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.rate_limits_applicatifs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.reglements_fournisseurs|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.reglements_fournisseurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.regularisations_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.relances_documents|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.relances_documents|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.relances_impayes|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.releves_kilometrage|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.remises_banque_paiements|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.remises_banque|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.sessions_pointage|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.situations_travaux|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.sous_traitants_chantiers|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.stripe_webhook_events|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.suggestions_ocr_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.suggestions_ocr_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.support_messages|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.support_messages|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.taches|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.tarifs_fournisseurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.temps_travail_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.tentatives_acces_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.tentatives_acces_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.tentatives_borne_stock|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.tentatives_borne_stock|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.types_chantier|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.utilisateurs_entreprises|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.utilisateurs_entreprises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.utilisateurs|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.utilisateurs|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.valeurs_champs_personnalises|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.validations_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.validations_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.validations_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.vehicules|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.verifications_zone_pointage|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.verifications_zone_pointage|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.versions_documents_notes_frais|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.versions_documents_notes_frais|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.zones_deplacement_paie|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   public.zones_depot|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.zones_depot|service_role|DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+   storage.objects|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.abonnement_evenements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.abonnement_stockage_releves|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.abonnements_entreprises|authenticated|SELECT
+   public.abonnements_entreprises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.absences_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.acces_externes_documents|authenticated|INSERT,SELECT,UPDATE
+   public.acces_externes_documents|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.acces_support_log|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.affectations_vehicules|authenticated|SELECT
+   public.affectations_vehicules|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.affectations|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.alertes_operationnelles_delegations|authenticated|SELECT
+   public.alertes_operationnelles_delegations|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.alertes_operationnelles_ignorees|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.anomalies_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.appareils_comptes|authenticated|SELECT
+   public.appareils_comptes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.appels_contacts|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.appels_offres|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.article_teintes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.articles_stock|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.bons_livraison|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.boutique_commandes|authenticated|INSERT,SELECT,UPDATE
+   public.boutique_commandes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.boutique_lignes_commande|authenticated|INSERT,SELECT
+   public.boutique_lignes_commande|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.boutique_produits|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.bulletins_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.catalogue_options_abonnement|authenticated|SELECT
+   public.catalogue_options_abonnement|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.catalogue_services_mise_en_service|authenticated|SELECT
+   public.catalogue_services_mise_en_service|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.categories_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.categories_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.champs_personnalises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.chantier_transferts|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.chantiers|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.charges_recurrentes|authenticated|INSERT,SELECT,UPDATE
+   public.charges_recurrentes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.cles_api|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.clients|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.codes_acces|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.codes_identification|authenticated|SELECT
+   public.codes_identification|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.commandes_fournisseurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.comptes_rendus_chantier|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.compteurs_reference|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.connecteurs_externes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.connexions_bancaires|authenticated|INSERT,SELECT,UPDATE
+   public.connexions_bancaires|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.connexions_email|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.contacts_clients|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.contrats_entretien|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.conversations_internes|authenticated|INSERT,SELECT
+   public.conversations_internes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.coordonnees_bancaires|authenticated|SELECT
+   public.coordonnees_bancaires|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.deductions_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.demandes_conges|authenticated|INSERT,SELECT,UPDATE
+   public.demandes_conges|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.depenses_fournisseurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.devis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.documents_chantier|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.documents_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.documents_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.doe_generations|authenticated|INSERT,SELECT,UPDATE
+   public.doe_generations|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.dossiers_paie_salaries|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.ecritures_comptables_importees|authenticated|INSERT,SELECT
+   public.ecritures_comptables_importees|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.elements_export_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.elements_export_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.emails_chantier|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.employes|authenticated|DELETE,INSERT,UPDATE
+   public.employes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.entreprise_besoins|authenticated|INSERT,SELECT,UPDATE
+   public.entreprise_besoins|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.entreprise_feature_flags|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.entreprises|authenticated|SELECT
+   public.entreprises|service_role|REFERENCES,SELECT,TRIGGER,TRUNCATE
+   public.equipes_chantiers|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.exports_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.exports_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.facturation_comptes_mensuelle|authenticated|SELECT
+   public.facturation_comptes_mensuelle|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.factures_abonnement|authenticated|SELECT
+   public.factures_abonnement|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.factures|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.fiches_techniques_articles|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.fournisseurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.grands_deplacements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.habilitations_employe|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.historique_tarification|authenticated|SELECT
+   public.historique_tarification|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.indemnites_deplacement_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.interventions|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.inventaires|authenticated|SELECT
+   public.inventaires|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_abus_securite|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_activite|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_audit_notes_frais|authenticated|SELECT
+   public.journal_audit_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_audit_paie|authenticated|INSERT,SELECT
+   public.journal_audit_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_ia|authenticated|INSERT,SELECT
+   public.journal_ia|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.journal_paiements_bancaires|authenticated|SELECT
+   public.journal_paiements_bancaires|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.legal_holds_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.legal_holds_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_commande|authenticated|INSERT,SELECT
+   public.lignes_commande|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_devis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_factures|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_inventaire|authenticated|DELETE,INSERT,SELECT,UPDATE
+   public.lignes_inventaire|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_metres|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_modeles_devis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lignes_situations|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.lots_virements|authenticated|SELECT
+   public.lots_virements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.messages_internes|authenticated|INSERT,SELECT
+   public.messages_internes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.metres|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.modeles_devis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.modeles_roles_predefinis|authenticated|SELECT
+   public.modeles_roles_predefinis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.mouvements_outillage|authenticated|SELECT
+   public.mouvements_outillage|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.mouvements_stock|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.notifications_utilisateurs|authenticated|SELECT,UPDATE
+   public.notifications_utilisateurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.options_abonnement_entreprises|authenticated|SELECT
+   public.options_abonnement_entreprises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.ordres_virements|authenticated|SELECT
+   public.ordres_virements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.outils|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.paiements|authenticated|DELETE,SELECT,UPDATE
+   public.paiements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.parametres_paie_entreprise|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.parametres_relances|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.periodes_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.permissions_disponibles|authenticated|SELECT
+   public.permissions_disponibles|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.permissions_poste|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.pieces_jointes_devis|authenticated|SELECT
+   public.pieces_jointes_devis|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.pieces_jointes_messages|authenticated|SELECT
+   public.pieces_jointes_messages|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.pieces_jointes_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.planning_evenements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.plans_abonnement|authenticated|SELECT
+   public.plans_abonnement|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.plateforme_acces_entreprises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.plateforme_admins|authenticated|SELECT
+   public.plateforme_admins|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.plateforme_reinitialisations_mot_de_passe|authenticated|SELECT
+   public.plateforme_reinitialisations_mot_de_passe|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.pointages|authenticated|DELETE
+   public.pointages|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.politiques_conservation_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.politiques_conservation_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.postes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.preferences_notifications_push|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.prestations_catalogue|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.primes_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.profils_paie_employes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.push_abonnements|authenticated|DELETE,INSERT,SELECT
+   public.push_abonnements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.rate_limits_applicatifs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.reglements_fournisseurs|authenticated|DELETE,INSERT,SELECT
+   public.reglements_fournisseurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.regularisations_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.relances_documents|authenticated|SELECT
+   public.relances_documents|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.relances_impayes|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.releves_kilometrage|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.remises_banque_paiements|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.remises_banque|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.sessions_pointage|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.situations_travaux|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.sous_traitants_chantiers|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.stripe_webhook_events|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.suggestions_ocr_notes_frais|authenticated|SELECT
+   public.suggestions_ocr_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.support_messages|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.taches|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.tarifs_fournisseurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.temps_travail_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.tentatives_acces_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.tentatives_borne_stock|authenticated|SELECT
+   public.tentatives_borne_stock|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.types_chantier|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.utilisateurs_entreprises|authenticated|INSERT,SELECT,UPDATE
+   public.utilisateurs_entreprises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.utilisateurs|authenticated|INSERT,SELECT,UPDATE
+   public.utilisateurs|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.valeurs_champs_personnalises|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.validations_notes_frais|authenticated|SELECT
+   public.validations_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.validations_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.vehicules|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.verifications_zone_pointage|authenticated|SELECT
+   public.verifications_zone_pointage|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.versions_documents_notes_frais|authenticated|INSERT,SELECT,UPDATE
+   public.versions_documents_notes_frais|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.zones_deplacement_paie|service_role|REFERENCES,TRIGGER,TRUNCATE
+   public.zones_depot|authenticated|INSERT,SELECT,UPDATE
+   public.zones_depot|service_role|REFERENCES,TRIGGER,TRUNCATE
+   storage.objects|authenticated|DELETE,INSERT,SELECT
+Fonctions : 241 EXECUTE modifié(s) sur existantes, 4 supprimée(s), 713 nouvelle(s) dont 401 exécutable(s) par anon/authenticated
+   public.a_permission(p_entreprise_id uuid, p_permission text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.activer_compte_employe(p_numero text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.actualiser_conversation_message() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.actualiser_facturation_depassement_appareils() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.affecter_vehicule(p_entreprise_id uuid, p_vehicule_id uuid, p_employe_id uuid, p_note text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.affecter_vehicule_interne(p_entreprise_id uuid, p_vehicule_id uuid, p_employe_id uuid, p_note text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.ajouter_audit_note_frais(p_entreprise_id uuid, p_action text, p_ressource_type text, p_ressource_id uuid, p_ancien_statut text, p_nouveau_statut text, p_metadata jsonb, p_empreinte_document text, p_adresse_ip text, p_user_agent text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.annuler_lot_virements(p_entreprise_id uuid, p_lot_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.annuler_suppression_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.anonymiser_employe(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.appliquer_modele_devis(p_entreprise_id uuid, p_modele_id uuid, p_devis_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.appliquer_modele_role_predefini_interne(p_entreprise_id uuid, p_modele_cle text, p_reinitialiser boolean) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.articles_stock_avec_prix(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.audit_paie_automatique() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.avancer_statut_chantier(p_entreprise_id uuid, p_chantier_id uuid, p_cible text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.boutique_finaliser_commande_payee(p_commande_id uuid, p_checkout_id text) : ['false', 'true', 'true'] -> ['false', 'false', 'true']
+   public.changer_statut_commande(p_entreprise_id uuid, p_commande_id uuid, p_statut text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.changer_statut_commande_interne(p_entreprise_id uuid, p_commande_id uuid, p_statut text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.changer_statut_compte_application(p_entreprise_id uuid, p_employe_id uuid, p_statut text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.chantiers_liste_paginee(p_entreprise_id uuid, p_recherche text, p_statut text, p_page integer, p_taille integer) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.chantiers_pointage_disponibles(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.classer_facture_fournisseur(p_entreprise_id uuid, p_depense_id uuid, p_chantier_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.clients_liste_paginee(p_entreprise_id uuid, p_recherche text, p_type text, p_statut text, p_page integer, p_taille integer) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.cloturer_session_pointage(p_entreprise_id uuid, p_session_id uuid, p_depart_at timestamp with time zone, p_pause_minutes integer, p_latitude numeric, p_longitude numeric, p_precision numeric, p_photo_path text, p_motif_sans_gps text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.cloturer_session_pointage_interne(p_entreprise_id uuid, p_session_id uuid, p_depart_at timestamp with time zone, p_pause_minutes integer, p_latitude numeric, p_longitude numeric, p_precision numeric, p_photo_path text, p_motif_sans_gps text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.code_identification_existe(p_entreprise_id uuid, p_type text, p_ressource_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.configurer_identifiants_employes(p_entreprise_id uuid, p_mode text, p_prefixe text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.contacts_messagerie(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.contexte_abonnement_courant() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.contexte_acces_proxy(p_droits_acces text[], p_droits_gestion text[]) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.controler_periode_paie(p_periode_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.controler_periode_paie_interne(p_periode_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.couts_indemnites_paie_par_chantier(p_entreprise_id uuid, p_chantier_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_chantier_depuis_devis(p_devis_id uuid, p_nom text, p_adresse text, p_code_postal text, p_ville text, p_description text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_code_identification(p_entreprise_id uuid, p_type text, p_ressource_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_commande_fournisseur(p_entreprise_id uuid, p_commande jsonb, p_lignes jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_commande_fournisseur_interne(p_entreprise_id uuid, p_commande jsonb, p_lignes jsonb) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.creer_devis_brouillon(p_entreprise_id uuid, p_devis jsonb, p_lignes jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_entreprise_bootstrap(p_nom text, p_siret text, p_adresse text, p_code_postal text, p_ville text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_facture_avancee(p_entreprise_id uuid, p_devis_id uuid, p_type text, p_pourcentage numeric, p_est_dgd boolean, p_facture_origine_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_facture_depuis_devis(p_devis_id uuid, p_type text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_inventaire_stock(p_entreprise_id uuid, p_zone_id uuid, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_inventaire_stock_interne(p_entreprise_id uuid, p_zone_id uuid, p_commentaire text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.creer_inventaire_stock_selection(p_entreprise_id uuid, p_article_ids uuid[], p_zone_id uuid, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_lot_virements(p_entreprise_id uuid, p_type_lot text, p_date_execution date, p_ordres jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_poste_avec_permissions(p_entreprise_id uuid, p_nom text, p_permissions text[]) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.creer_situation_travaux(p_entreprise_id uuid, p_devis_id uuid, p_avancement_pct numeric, p_retenue_garantie_pct numeric, p_notes text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.declarer_pointage_oublie(p_entreprise_id uuid, p_chantier_id uuid, p_date date, p_arrivee time without time zone, p_depart time without time zone, p_pause_minutes integer, p_latitude numeric, p_longitude numeric, p_precision numeric, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.definir_code_stock_employe(p_entreprise_id uuid, p_employe_id uuid, p_code text, p_actif boolean) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.definir_mot_de_passe_stock_personnel(p_entreprise_id uuid, p_mot_de_passe text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.deleguer_alerte_operationnelle(p_entreprise_id uuid, p_alerte_cle text, p_alerte_domaine text, p_alerte_titre text, p_alerte_href text, p_alerte_niveau text, p_employe_id uuid, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.demander_suppression_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.demarrer_transmission_lot(p_entreprise_id uuid, p_lot_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.depenses_fournisseurs_liste_paginee(p_entreprise_id uuid, p_recherche text, p_statut text, p_page integer, p_taille integer) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.devis_liste_paginee(p_entreprise_id uuid, p_recherche text, p_statut text, p_page integer, p_taille integer) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.document_commercial_par_token(p_token_hash text) : ['true', 'true', 'true'] -> ['true', 'true', 'false']
+   public.dupliquer_devis(p_devis_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.employe_borne_autorise(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_permission text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.employe_courant(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.employes_delegables_alertes(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_appareil_courant(p_entreprise_id uuid, p_identifiant_appareil uuid, p_nom_appareil text, p_type_appareil text, p_application_installee boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_comptage_inventaire(p_entreprise_id uuid, p_inventaire_id uuid, p_comptages jsonb, p_valider boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_comptage_inventaire_interne(p_entreprise_id uuid, p_inventaire_id uuid, p_comptages jsonb, p_valider boolean) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.enregistrer_coordonnees_bancaires(p_entreprise_id uuid, p_type text, p_beneficiaire_id uuid, p_titulaire text, p_iban_chiffre text, p_iban_hash text, p_iban_quatre_derniers text, p_bic_chiffre text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_mouvement_outillage(p_entreprise_id uuid, p_outil_id uuid, p_type text, p_employe_id uuid, p_chantier_id uuid, p_etat text, p_note text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_mouvement_outillage_interne(p_entreprise_id uuid, p_outil_id uuid, p_type text, p_employe_id uuid, p_chantier_id uuid, p_etat text, p_note text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.enregistrer_mouvement_stock_borne(p_entreprise_id uuid, p_code_personnel text, p_code_article text, p_type text, p_quantite numeric, p_chantier_id uuid, p_code_chantier text, p_teinte_id uuid, p_motif text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.enregistrer_mouvement_stock_borne_v2(p_entreprise_id uuid, p_numero_employe text, p_mot_de_passe text, p_code_article text, p_type text, p_quantite numeric, p_chantier_id uuid, p_code_chantier text, p_teinte_id uuid, p_motif text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.enregistrer_mouvement_stock_borne_v3(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_code_article text, p_type text, p_quantite numeric, p_chantier_id uuid, p_code_chantier text, p_teinte_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_mouvement_stock_borne_v4(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_code_article text, p_type text, p_quantite numeric, p_chantier_id uuid, p_code_chantier text, p_vehicule_id uuid, p_code_vehicule text, p_outil_id uuid, p_code_outil text, p_teinte_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_permissions_poste(p_entreprise_id uuid, p_poste_id uuid, p_permissions text[]) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_pieces_jointes_devis(p_devis_id uuid, p_pieces jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_presence_application(p_installee boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_sortie_lot(p_entreprise_id uuid, p_lignes jsonb, p_chantier_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_sortie_lot_borne_v2(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_lignes jsonb, p_type_destination text, p_destination_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.enregistrer_sortie_lot_v2(p_entreprise_id uuid, p_lignes jsonb, p_type_destination text, p_destination_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.entreprise_sans_membres(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_acces_support_actif(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_compte_depot_courant() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_employe_du_compte(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_employe_paie_courant(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_membre_actif(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.est_plateforme_admin() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.existe_doublon_note_frais(p_entreprise_id uuid, p_empreinte text, p_note_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.exporter_donnees_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.facturer_situation_travaux(p_entreprise_id uuid, p_situation_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.factures_liste_paginee(p_entreprise_id uuid, p_recherche text, p_statut text, p_page integer, p_taille integer) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.finaliser_export_notes_frais(p_export_id uuid, p_storage_path text, p_nom_fichier text, p_empreinte text, p_taille bigint, p_items jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.garantir_fiche_pointage_courante(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.generer_numero_inscription_employe() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.handle_new_user() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.identifiant_employe_depuis_qr_borne(p_entreprise_id uuid, p_code text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.importer_articles_stock(p_entreprise_id uuid, p_type text, p_lignes jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.importer_articles_stock_interne(p_entreprise_id uuid, p_type text, p_lignes jsonb) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.initialiser_essai_entreprise() : ['true', 'true', 'true'] -> ['false', 'false', 'false']
+   public.installer_roles_predefinis(p_entreprise_id uuid, p_reinitialiser_existants boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.journaliser_acces_refuse_note_frais(p_entreprise_id uuid, p_ressource_type text, p_ressource_id uuid, p_action text, p_motif text, p_adresse_ip text, p_user_agent text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.lier_justificatif_depense(p_entreprise_id uuid, p_depense_id uuid, p_path text, p_nom text, p_mime text, p_taille bigint) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.lier_justificatif_depense_interne(p_entreprise_id uuid, p_depense_id uuid, p_path text, p_nom text, p_mime text, p_taille bigint) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.lignes_inventaire_avec_prix(p_entreprise_id uuid, p_inventaire_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.marquer_invitation_employe(p_entreprise_id uuid, p_employe_id uuid, p_canal text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.marquer_lot_transmis(p_entreprise_id uuid, p_lot_id uuid, p_provider text, p_provider_payment_id text, p_consent_url text, p_provider_statut text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.materialiser_charge_recurrente(p_entreprise_id uuid, p_charge_id uuid, p_numero_piece text, p_date_piece date) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.materialiser_charge_recurrente_interne(p_entreprise_id uuid, p_charge_id uuid, p_numero_piece text, p_date_piece date) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.mes_devis_chantiers_sans_prix(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.mettre_outil_rebut(p_entreprise_id uuid, p_outil_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.modifier_compte_poste_pointage(p_entreprise_id uuid, p_utilisateur_id uuid, p_poste_id uuid, p_pointage_personnel_actif boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.modifier_devis_brouillon(p_devis_id uuid, p_devis jsonb, p_lignes jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.modifier_facture_brouillon(p_facture_id uuid, p_facture jsonb, p_lignes jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.modifier_poste_membre(p_entreprise_id uuid, p_utilisateur_id uuid, p_poste_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.modifier_reference_comptable_note_frais(p_note_id uuid, p_reference text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.notifier_permission(p_entreprise_id uuid, p_permission text, p_type text, p_titre text, p_message text, p_lien text, p_niveau text, p_ressource_type text, p_ressource_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.notifier_utilisateur(p_entreprise_id uuid, p_utilisateur_id uuid, p_type text, p_titre text, p_message text, p_lien text, p_niveau text, p_ressource_type text, p_ressource_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.obtenir_ou_creer_fournisseur_boutique(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.partage_entreprise_avec(p_utilisateur_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_acceder_conversation(p_conversation_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_consulter_chantier(p_entreprise_id uuid, p_chantier_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_consulter_note_frais(p_note_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_consulter_pointage_employe(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_gerer_acces(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_gerer_paie(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_lire_devis(p_devis_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_lire_document_employe_sensible(p_path text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_modifier_note_frais_personnelle(p_note_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_pointer_pour_employe(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_voir_document_chantier(p_document_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.peut_voir_notes_frais_equipe(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_ajouter_admin(p_email text, p_nom text, p_role text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_appliquer_remise(p_entreprise_id uuid, p_coupon_id text, p_description text, p_motif_interne text, p_duree_mois integer, p_type text, p_valeur numeric) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.plateforme_besoins() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_creer_entreprise(p_nom text, p_siret text, p_ville text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_creer_version_tarif(p_code text, p_nom text, p_prix_mensuel_ht numeric, p_prix_annuel_ht numeric, p_utilisateurs_inclus integer, p_administrateurs_inclus integer, p_operations_ia_incluses integer, p_stockage_go_inclus numeric, p_valide_du date, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_enregistrer_reglement(p_entreprise_id uuid, p_note text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_entreprises() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_entrer_entreprise(p_entreprise_id uuid, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_exiger_role(VARIADIC p_roles text[]) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.plateforme_lister_admins() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_modifier_abonnement(p_entreprise_id uuid, p_statut text, p_echeance date, p_note text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_modifier_tarif_poste(p_poste_id uuid, p_code_offre text, p_tarif numeric) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_postes_tarifs() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_quitter_entreprise() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_releve_facturation(p_mois date) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_retirer_admin(p_email text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_retirer_remise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.plateforme_role_courant() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_roles_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_signaler_impaye(p_entreprise_id uuid, p_message text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_snapshot_facturation(p_mois date) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_support_fils() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_support_messages(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_support_repondre(p_entreprise_id uuid, p_contenu text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_usage_appareils() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_usage_entreprises() : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.plateforme_verifier_et_journaliser_reinitialisation(p_entreprise_id uuid, p_email text, p_motif text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.prefixe_identifiant_entreprise(p_nom text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.proteger_signature_document() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.publier_message_avec_pieces(p_conversation_id uuid, p_contenu text, p_pieces jsonb) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.recalc_paiements_facture(p_facture_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.recalc_reglements_fournisseur(p_depense_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.recalc_totaux_commande(p_commande_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.recalc_totaux_devis(p_devis_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.recalc_totaux_facture(p_facture_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.recalculer_dossier_paie(p_dossier_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.recalculer_dossier_paie_automatique() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.receptions_lignes_ouvertes(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.recomputer_statut_commande(p_commande_id uuid) : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.reinitialiser_mot_de_passe_stock_employe(p_entreprise_id uuid, p_employe_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.reinitialiser_role_predefini(p_entreprise_id uuid, p_poste_id uuid, p_modele_cle text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.rejoindre_entreprise_par_code(p_code text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.resoudre_employe_borne(p_entreprise_id uuid, p_identifiant text, p_mot_de_passe text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.retablir_lot_apres_echec_transmission(p_entreprise_id uuid, p_lot_id uuid, p_message text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.retirer_piece_jointe_devis(p_piece_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.revoquer_appareil_compte(p_entreprise_id uuid, p_appareil_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.role_courant_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.seed_categories_notes_frais(p_entreprise_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.snapshot_compte_facturable(p_employe_id uuid, p_motif text) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.support_marquer_lus_entreprise(p_entreprise_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.supprimer_poste_vide(p_entreprise_id uuid, p_poste_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.synchroniser_periode_paie(p_periode_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.synchroniser_periode_paie_interne(p_periode_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.synchroniser_taches_devis_accepte(p_devis_id uuid) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.transition_demande_conge(p_demande_id uuid, p_action text, p_message text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.transition_grand_deplacement(p_id uuid, p_statut text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.transition_note_frais(p_note_id uuid, p_nouveau_statut text, p_message text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.transition_periode_paie(p_periode_id uuid, p_nouveau_statut text, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.trg_alerte_outil_hors_service() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_appliquer_delai_paiement_fournisseur() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_calculer_tva_charge_recurrente() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_calculer_tva_depense_fournisseur() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_commande_numero() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_creer_code_identification() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_creer_poste_compte_depot() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_devis_numero() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_devis_sync_chantier() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_facture_numero() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_facture_statut_paiement_coherent() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_facture_sync_chantier() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_figer_prix_achat_inventaire() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_fournisseur_reference() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_identifiant_interne_employe() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_inventaire_numero() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_lignes_factures_brouillon_only() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_notes_frais_immutables() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_notifications_affectations() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_notifications_conges() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_notifications_notes_frais() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_numero_inscription_employe() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_outil_reference() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_prefixe_identifiant_entreprise() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_commande() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_devis() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_devis_remise() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_facture() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_paiements() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_recalc_reglements_fournisseur() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_ref_chantier() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_ref_client() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_ref_employe() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_reference_note_frais() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_reference_suite_metier() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_refuser_mutation_archive() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_releve_kilometrage() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_seed_categories_notes_frais() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_seed_politique_notes_frais() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_seed_types_chantier() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_synchroniser_compte_employe() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_synchroniser_depense_actif() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_synchroniser_taches_devis() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_synchroniser_taches_ligne_devis() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.trg_verifier_depense_fournisseur() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_verifier_heures_affectation() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.trg_verifier_reglement_fournisseur() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.valider_bulletin_paie(p_entreprise_id uuid, p_bulletin_id uuid, p_accepte boolean) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.valider_coordonnees_bancaires(p_entreprise_id uuid, p_id uuid, p_accepte boolean, p_message text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.valider_lot_virements(p_entreprise_id uuid, p_lot_id uuid) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.valider_preuve_pointage(p_entreprise_id uuid, p_pointage_id uuid, p_statut text, p_commentaire text) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.verifier_code_identification() : ['false', 'true', 'true'] -> ['false', 'false', 'false']
+   public.verifier_droit_prix_stock() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.verifier_teinte_mouvement() : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.verifier_zone_pointage(p_entreprise_id uuid, p_session_id uuid, p_latitude numeric, p_longitude numeric, p_precision numeric) : ['false', 'true', 'true'] -> ['false', 'true', 'false']
+   public.zone_petit_deplacement_pour_distance(p_entreprise_id uuid, p_distance_km numeric, p_date date) : ['false', 'false', 'true'] -> ['false', 'false', 'false']
+   public.enregistrer_reception_commande(p_entreprise_id uuid, p_commande_id uuid, p_lignes jsonb) : ['false', 'true', 'true'] -> ABSENTE
+   public.enregistrer_reception_commande_interne(p_entreprise_id uuid, p_commande_id uuid, p_receptions jsonb) : ['false', 'false', 'true'] -> ABSENTE
+   public.enregistrer_reception_lot(p_entreprise_id uuid, p_lignes jsonb, p_attributions jsonb, p_motif text) : ['false', 'true', 'true'] -> ABSENTE
+   public.enregistrer_reception_lot_borne(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_lignes jsonb, p_attributions jsonb, p_motif text) : ['false', 'true', 'true'] -> ABSENTE
+   exécutable app : public.a_acces_application(p_entreprise_id uuid, p_application_code text)|false|true|false
+   exécutable app : public.a_acces_module_gestion_pro(p_entreprise_id uuid, p_module_code text, p_permission text)|false|true|false
+   exécutable app : public.acceptations_documents_legaux_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.accepter_documents_legaux(p_entreprise_id uuid, p_contexte text, p_documents jsonb)|false|true|false
+   exécutable app : public.acces_module_pour_permission(p_entreprise_id uuid, p_permissions text[])|false|true|false
+   exécutable app : public.annuler_baisse_capacite_planifiee(p_entreprise_id uuid)|false|true|true
+   exécutable app : public.applications_autorisees(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.assistance_autorise(p_entreprise_id uuid, p_application_code text, p_famille text, p_domaine text, p_action text, p_confirmation_renforcee boolean)|false|true|false
+   exécutable app : public.assistance_bandeau(p_application_code text)|false|true|false
+   exécutable app : public.assistance_evenements_append_only()|true|true|true
+   exécutable app : public.assistance_historique_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.assistance_journaliser(p_application_code text, p_action text, p_objet_type text, p_objet_id uuid, p_famille text, p_domaine text, p_ancien jsonb, p_nouveau jsonb, p_resultat text, p_refus_raison text)|false|true|false
+   exécutable app : public.assistance_notifications_immuable()|true|true|true
+   exécutable app : public.assistance_ouvrir(p_entreprise_id uuid, p_applications text[], p_motif_cle text, p_motif_detail text, p_perimetre text, p_duree_minutes integer, p_ticket text, p_incident_global boolean, p_confirmation_renforcee boolean, p_utilisateur_assiste_id uuid)|false|true|false
+   exécutable app : public.assistance_permissions_gestion_pro(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.assistance_quitter(p_motif text)|false|true|false
+   exécutable app : public.assistance_revoquer(p_session_id uuid, p_motif text)|false|true|false
+   exécutable app : public.assistance_session_courante()|false|true|false
+   exécutable app : public.assistance_sessions_immuable()|true|true|true
+   exécutable app : public.assistance_sessions_pas_de_suppression()|true|true|true
+   exécutable app : public.assistance_toucher()|false|true|false
+   exécutable app : public.boutique_commandes_paiement_serveur_seul()|true|true|true
+   exécutable app : public.capacite_personnes_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.capacite_stripe_etat_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.capturer_client_snapshot()|true|true|true
+   exécutable app : public.capturer_entreprise_snapshot_devis()|true|true|true
+   exécutable app : public.chantier_donnees_chiffrees(p_entreprise_id uuid, p_chantier_id uuid, p_heures boolean, p_achats boolean, p_notes boolean)|false|true|false
+   exécutable app : public.chantier_heures_synthese(p_entreprise_id uuid, p_chantier_id uuid)|false|true|false
+   exécutable app : public.chantier_pointages_valides_page(p_entreprise_id uuid, p_chantier_id uuid, p_limite integer, p_decalage integer)|false|true|false
+   exécutable app : public.chantier_synthese_chiffree(p_entreprise_id uuid, p_chantier_id uuid, p_achats boolean, p_notes boolean, p_limite integer)|false|true|false
+   exécutable app : public.chantiers_assignes_consultables()|false|true|false
+   exécutable app : public.chantiers_equipes_du_compte()|false|true|false
+   exécutable app : public.colonnes_personnelles_purge()|true|true|true
+   exécutable app : public.colors_acteurs_activite(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.colors_action_autorisee(p_entreprise_id uuid, p_action text)|false|true|false
+   exécutable app : public.colors_activite_recente(p_entreprise_id uuid, p_seau_id uuid, p_depuis timestamp with time zone, p_types text[], p_auteur_id uuid, p_emplacement_id uuid, p_limite integer, p_avant_created_at timestamp with time zone, p_avant_id uuid)|false|true|false
+   exécutable app : public.colors_ajuster_quantite(p_seau_id uuid, p_valeur numeric, p_type text, p_motif text)|false|true|false
+   exécutable app : public.colors_archiver_seau(p_seau_id uuid, p_archiver boolean, p_motif text)|false|true|false
+   exécutable app : public.colors_changer_etat(p_seau_id uuid, p_etat text, p_motif text)|false|true|false
+   exécutable app : public.colors_confirmer_analyse_ocr(p_analyse_id uuid, p_resultat jsonb)|false|true|false
+   exécutable app : public.colors_creer_analyse_ocr(p_entreprise_id uuid, p_seau_id uuid, p_photo_path text, p_resultat jsonb, p_confiance numeric)|false|true|false
+   exécutable app : public.colors_definir_finition(p_seau_id uuid, p_finition text)|false|true|false
+   exécutable app : public.colors_definir_photo(p_seau_id uuid, p_photo_path text)|false|true|false
+   exécutable app : public.colors_definir_reference_nuancier(p_seau_id uuid, p_reference text, p_distance numeric, p_confirme boolean)|false|true|false
+   exécutable app : public.colors_deplacer_seau(p_seau_id uuid, p_emplacement_id uuid, p_motif text)|false|true|false
+   exécutable app : public.colors_enregistrer_parametres(p_entreprise_id uuid, p_seuil numeric)|false|true|false
+   exécutable app : public.colors_modifier_seau(p_seau_id uuid, p_marque text, p_produit text, p_reference_produit text, p_teinte_nom text, p_teinte_reference text, p_couleur_hex text, p_notes text)|false|true|false
+   exécutable app : public.colors_nettoyages_photos_seau(p_seau_id uuid)|false|true|false
+   exécutable app : public.colors_rejeter_analyse_ocr(p_analyse_id uuid, p_motif text)|false|true|false
+   exécutable app : public.colors_resoudre_nettoyage_photo(p_seau_id uuid, p_photo_path text)|false|true|false
+   exécutable app : public.colors_role_courant(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.colors_signaler_nettoyage_photo(p_seau_id uuid, p_photo_path text, p_erreur text)|false|true|false
+   exécutable app : public.colors_statistiques(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.communications_accuser(p_communication_id uuid, p_evenement text, p_produit_at timestamp with time zone, p_appareil text)|false|true|false
+   exécutable app : public.communications_audience_figee()|true|true|true
+   exécutable app : public.communications_changer_statut(p_id uuid, p_transition text)|false|true|false
+   exécutable app : public.communications_creer(p_titre text, p_texte_court text, p_type text, p_mode_affichage text, p_debut_at timestamp with time zone, p_fin_at timestamp with time zone, p_contenu text, p_priorite text, p_frequence text, p_canaux text[], p_lien text, p_libelle_bouton text, p_applications text[], p_entreprises uuid[], p_segments text[], p_roles text[], p_permissions text[], p_roles_applicatifs text[])|false|true|false
+   exécutable app : public.communications_definir_preferences(p_accepte_commerciales boolean, p_accepte_produit boolean)|false|true|false
+   exécutable app : public.communications_figer_apres_publication()|true|true|true
+   exécutable app : public.communications_journal_append_only()|true|true|true
+   exécutable app : public.communications_pour_utilisateur(p_application_code text, p_entreprise_id uuid)|false|true|false
+   exécutable app : public.communications_statistiques(p_communication_id uuid)|false|true|false
+   exécutable app : public.contexte_application_courant()|false|true|false
+   exécutable app : public.contrat_generation_vendable()|true|true|true
+   exécutable app : public.contrat_journaliser()|true|true|true
+   exécutable app : public.contrat_montants_figes()|true|true|true
+   exécutable app : public.contrat_pas_de_suppression()|true|true|true
+   exécutable app : public.creer_avenant(p_entreprise_id uuid, p_devis_origine_id uuid, p_notes_client text, p_notes_internes text, p_lignes jsonb)|false|true|false
+   exécutable app : public.creer_entreprise_avec_acceptation(p_nom text, p_siret text, p_adresse text, p_code_postal text, p_ville text, p_documents jsonb)|false|true|false
+   exécutable app : public.creer_pointage_regularisation(p_entreprise_id uuid, p_employe_id uuid, p_chantier_id uuid, p_date date, p_arrivee time without time zone, p_depart time without time zone, p_pause_minutes integer, p_motif text)|false|true|true
+   exécutable app : public.dashboard_indicateurs(p_entreprise_id uuid, p_aujourdhui date)|false|true|false
+   exécutable app : public.depenses_fournisseurs_totaux(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.documents_legaux_a_accepter(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.elsatia_chiffres_seuls(p_valeur text)|true|true|true
+   exécutable app : public.elsatia_normaliser_recherche(p_valeur text)|true|true|true
+   exécutable app : public.employes_du_compte_affectation_consultables()|false|true|false
+   exécutable app : public.employes_du_compte_pointage_consultables()|false|true|false
+   exécutable app : public.enregistrer_operation_capacite_stripe(p_entreprise_id uuid, p_type_operation text, p_ancienne_capacite integer, p_nouvelle_capacite integer, p_plan_code text, p_periodicite text, p_price_id text, p_stripe_subscription_id text, p_idempotency_key text, p_date_effet_souhaitee timestamp with time zone, p_source text, p_motif text)|false|true|false
+   exécutable app : public.enregistrer_paiement_facture(p_entreprise_id uuid, p_facture_id uuid, p_montant numeric, p_date date, p_mode text, p_reference text)|false|true|false
+   exécutable app : public.enregistrer_reception_commande(p_entreprise_id uuid, p_commande_id uuid, p_lignes jsonb, p_idempotency_key uuid)|false|true|false
+   exécutable app : public.enregistrer_reception_lot(p_entreprise_id uuid, p_lignes jsonb, p_attributions jsonb, p_motif text, p_idempotency_key uuid)|false|true|false
+   exécutable app : public.enregistrer_reception_lot_borne(p_entreprise_id uuid, p_identifiant_employe text, p_mot_de_passe text, p_lignes jsonb, p_attributions jsonb, p_motif text, p_idempotency_key uuid)|false|true|false
+   exécutable app : public.entreprise_active_autorisee(p_entreprise_id uuid)|false|true|true
+   exécutable app : public.entreprises_avec_permission(p_permission text)|false|true|false
+   exécutable app : public.entreprises_avec_une_permission(p_permissions text[])|false|true|false
+   exécutable app : public.entreprises_membre_actif()|false|true|false
+   exécutable app : public.est_acces_support_actif(p_entreprise_id uuid, p_application_code text)|false|true|false
+   exécutable app : public.est_membre_actif_reel(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.est_membre_plateforme_actif(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.est_plateforme_proprietaire()|false|true|false
+   exécutable app : public.etat_commercial_applications(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.etat_reabonnement_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.export_comptable_achats(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.export_comptable_reglements(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.export_comptable_tva_collectee(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.export_comptable_ventes(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.finaliser_operation_capacite_stripe(p_operation_id uuid, p_statut text, p_stripe_item_id text, p_erreur_courte text, p_stripe_etat_observe jsonb)|false|true|false
+   exécutable app : public.fixer_entreprise_ligne_devis()|true|true|true
+   exécutable app : public.fixer_entreprise_ligne_facture()|true|true|true
+   exécutable app : public.formater_numero_document(p_prefixe text, p_avec_annee boolean, p_avec_mois boolean, p_separateur text, p_largeur integer, p_numero integer, p_date date)|true|true|true
+   exécutable app : public.gp_alertes_parc(p_entreprise_id uuid, p_aujourdhui date, p_horizon_jours integer, p_limite integer)|false|true|false
+   exécutable app : public.gp_alertes_stock(p_entreprise_id uuid, p_limite integer)|false|true|false
+   exécutable app : public.gp_chantier_documents_audiences(p_entreprise_id uuid, p_chantier_id uuid)|false|true|false
+   exécutable app : public.gp_chantier_documents_page(p_entreprise_id uuid, p_chantier_id uuid, p_limite integer, p_avant_created_at timestamp with time zone, p_avant_id uuid)|false|true|false
+   exécutable app : public.gp_client_chantiers_page(p_entreprise_id uuid, p_client_id uuid, p_limite integer, p_avant_created_at timestamp with time zone, p_avant_id uuid)|false|true|false
+   exécutable app : public.gp_client_synthese(p_entreprise_id uuid, p_client_id uuid)|false|true|false
+   exécutable app : public.gp_crm_synthese(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.gp_dashboard_chantiers(p_entreprise_id uuid, p_aujourdhui date, p_limite integer)|false|true|false
+   exécutable app : public.gp_depenses_synthese(p_entreprise_id uuid, p_fournisseur_id uuid, p_vehicule_id uuid, p_outil_id uuid)|false|true|false
+   exécutable app : public.gp_doe_contenu(p_entreprise_id uuid, p_chantier_id uuid)|false|true|false
+   exécutable app : public.gp_effectif_actif(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.gp_exiger_membre(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.gp_options_chantiers(p_entreprise_id uuid, p_statuts_exclus text[], p_client_id uuid, p_tri text)|false|true|false
+   exécutable app : public.gp_options_clients(p_entreprise_id uuid, p_statut text, p_statut_exclu text, p_tri text)|false|true|false
+   exécutable app : public.gp_options_employes(p_entreprise_id uuid, p_inclure_inactifs boolean)|false|true|false
+   exécutable app : public.gp_parc_synthese(p_entreprise_id uuid, p_aujourdhui date)|false|true|false
+   exécutable app : public.gp_sous_traitant_missions_synthese(p_entreprise_id uuid, p_fournisseur_id uuid)|false|true|false
+   exécutable app : public.historique_contrats_append_only()|true|true|true
+   exécutable app : public.historique_remises_immuable()|true|true|true
+   exécutable app : public.incident_controle_actif(p_app text, p_controle text)|false|true|true
+   exécutable app : public.incident_etat_public()|true|true|true
+   exécutable app : public.incident_upload_ouvert(p_bucket text)|false|true|true
+   exécutable app : public.journal_ia_consommation(p_entreprise_id uuid, p_debut timestamp with time zone, p_fin timestamp with time zone)|false|true|false
+   exécutable app : public.modifier_avenant_brouillon(p_avenant_id uuid, p_notes_client text, p_notes_internes text, p_lignes jsonb)|false|true|false
+   exécutable app : public.module_gestion_pro_actif_entreprise(p_entreprise_id uuid, p_module_code text)|false|true|false
+   exécutable app : public.modules_entreprise_etat(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.notes_frais_page(p_entreprise_id uuid, p_statut text, p_categorie text, p_chantier_id uuid, p_employe_id uuid, p_limite integer, p_avant_date date, p_avant_id uuid)|false|true|false
+   exécutable app : public.notes_frais_synthese_employes(p_entreprise_id uuid, p_statut text, p_categorie text, p_chantier_id uuid, p_employe_id uuid)|false|true|false
+   exécutable app : public.notifier_devis_accepte(p_devis_id uuid)|false|true|false
+   exécutable app : public.paie_anomalies_page(p_entreprise_id uuid, p_periode_id uuid, p_dossier_id uuid, p_limite integer)|false|true|false
+   exécutable app : public.paie_export_contenu(p_entreprise_id uuid, p_periode_id uuid, p_avec_pieces boolean)|false|true|false
+   exécutable app : public.paie_periode_dossiers_page(p_entreprise_id uuid, p_periode_id uuid, p_statut text, p_recherche text, p_dossier_id uuid, p_limite integer, p_decalage integer)|false|true|false
+   exécutable app : public.paie_periode_synthese(p_entreprise_id uuid, p_periode_id uuid, p_statut text, p_recherche text, p_dossier_id uuid)|false|true|false
+   exécutable app : public.peut_consulter_affectation_employe(p_entreprise_id uuid, p_employe_id uuid)|false|true|true
+   exécutable app : public.planning_semaine(p_entreprise_id uuid, p_debut date, p_fin date, p_employe_id uuid)|false|true|false
+   exécutable app : public.plateforme_a_permission(p_permission text)|false|true|false
+   exécutable app : public.plateforme_activer_admin(p_email text)|false|true|false
+   exécutable app : public.plateforme_activer_application_entreprise(p_entreprise_id uuid, p_application_code text, p_valide_du timestamp with time zone, p_valide_jusqu_au timestamp with time zone, p_source text, p_reference_externe text)|false|true|false
+   exécutable app : public.plateforme_annuaire_compteurs(p_recherche text, p_filtres jsonb)|false|true|false
+   exécutable app : public.plateforme_annuaire_entreprises(p_recherche text, p_onglet text, p_tri text, p_sens text, p_page integer, p_taille integer, p_filtres jsonb)|false|true|false
+   exécutable app : public.plateforme_annuaire_journaliser_export(p_onglet text, p_recherche_non_vide boolean, p_colonnes integer)|false|true|false
+   exécutable app : public.plateforme_applications_compteurs()|false|true|false
+   exécutable app : public.plateforme_attribuer_entitlement_utilisateur(p_utilisateur_id uuid, p_application_code text, p_niveau text, p_capabilities text[], p_source text, p_priorite integer, p_valide_du timestamp with time zone, p_expire_le timestamp with time zone, p_reference_externe text)|false|true|false
+   exécutable app : public.plateforme_autoriser_effet_externe(p_action text)|false|true|false
+   exécutable app : public.plateforme_commencer_operation_remise(p_entreprise_id uuid, p_intention_id uuid, p_stripe_subscription_id text, p_type_operation text, p_etat_souhaite jsonb)|false|true|false
+   exécutable app : public.plateforme_creer_remise(p_entreprise_id uuid, p_type text, p_valeur numeric, p_perimetre_cible text, p_perimetre_cles text[], p_duree_mode text, p_date_debut date, p_date_fin date, p_nb_echeances integer, p_motif text, p_cumul_autorise boolean, p_seconde_confirmation boolean, p_ambiguite_annuelle_confirmee boolean, p_tarif_public_centimes integer, p_prix_resultant_centimes integer)|false|true|false
+   exécutable app : public.plateforme_definir_capacite_personnes_supplementaire(p_entreprise_id uuid, p_capacite integer, p_motif text, p_source text, p_reference_externe text)|false|true|false
+   exécutable app : public.plateforme_definir_module_entreprise(p_entreprise_id uuid, p_module_code text, p_actif boolean, p_origine text, p_valide_du date, p_valide_jusqu date, p_reference_externe text, p_motif text, p_source text)|false|true|false
+   exécutable app : public.plateforme_definir_statut_commercial_application(p_entreprise_id uuid, p_application_code text, p_statut text, p_motif text, p_essai_fin timestamp with time zone)|false|true|false
+   exécutable app : public.plateforme_definir_url_preview_application(p_code text, p_url text)|false|true|false
+   exécutable app : public.plateforme_demander_reprise_operation_remise(p_operation_id uuid)|false|true|false
+   exécutable app : public.plateforme_desactiver_application_entreprise(p_entreprise_id uuid, p_application_code text)|false|true|false
+   exécutable app : public.plateforme_detacher_admin_revoque(p_email text)|false|true|false
+   exécutable app : public.plateforme_ecriture_autorisee(VARIADIC p_roles text[])|false|true|false
+   exécutable app : public.plateforme_est_superuser()|false|true|false
+   exécutable app : public.plateforme_habiliter_utilisateur_application(p_utilisateur_id uuid, p_entreprise_id uuid, p_application_code text, p_role_code text, p_valide_du timestamp with time zone, p_valide_jusqu_au timestamp with time zone)|false|true|false
+   exécutable app : public.plateforme_incident_basculer(p_portee text, p_controle text, p_actif boolean, p_motif text, p_incident_ref text, p_expire_dans_minutes integer)|false|true|false
+   exécutable app : public.plateforme_incident_controles_lister()|false|true|false
+   exécutable app : public.plateforme_incident_journal_lister(p_limite integer)|false|true|false
+   exécutable app : public.plateforme_incident_statut_definir(p_service text, p_statut text, p_message_public text, p_motif text)|false|true|false
+   exécutable app : public.plateforme_lever_suspension_globale(p_entreprise_id uuid, p_motif text)|false|true|false
+   exécutable app : public.plateforme_lire_entreprise_membres(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.plateforme_lire_operation_remise(p_operation_id uuid)|false|true|false
+   exécutable app : public.plateforme_modifier_role_admin(p_email text, p_role text)|false|true|false
+   exécutable app : public.plateforme_operation_remise_json(p_operation plateforme_operations_remise)|false|true|true
+   exécutable app : public.plateforme_postes_tarifs_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.plateforme_promotion_confirmer_activation(p_id uuid, p_stripe_coupon_id text, p_stripe_promotion_code_id text)|false|true|false
+   exécutable app : public.plateforme_promotion_confirmer_desactivation(p_id uuid)|false|true|false
+   exécutable app : public.plateforme_promotion_creer(p_nom_interne text, p_type_remise text, p_valeur numeric, p_duree text, p_duree_mois integer, p_date_debut date, p_date_fin date, p_offres text[], p_entreprise_id uuid, p_justification text, p_est_pilote boolean, p_code_promotionnel text, p_limite_utilisations integer)|false|true|false
+   exécutable app : public.plateforme_promotion_modifier(p_id uuid, p_nom_interne text, p_type_remise text, p_valeur numeric, p_duree text, p_duree_mois integer, p_date_debut date, p_date_fin date, p_offres text[], p_entreprise_id uuid, p_justification text, p_est_pilote boolean, p_code_promotionnel text, p_limite_utilisations integer)|false|true|false
+   exécutable app : public.plateforme_promotion_preparer_activation(p_id uuid)|false|true|false
+   exécutable app : public.plateforme_promotion_preparer_desactivation(p_id uuid)|false|true|false
+   exécutable app : public.plateforme_promotions_lister()|false|true|false
+   exécutable app : public.plateforme_proprietaire_revendiquer()|false|true|false
+   exécutable app : public.plateforme_rattacher_admin(p_email text, p_utilisateur_id uuid)|false|true|false
+   exécutable app : public.plateforme_retirer_habilitation_application(p_utilisateur_id uuid, p_entreprise_id uuid, p_application_code text)|false|true|false
+   exécutable app : public.plateforme_revoquer_entitlement_utilisateur(p_entitlement_id uuid, p_reason text)|false|true|false
+   exécutable app : public.plateforme_revoquer_remise(p_remise_id uuid, p_motif text)|false|true|false
+   exécutable app : public.plateforme_statut_identite_courant()|false|true|false
+   exécutable app : public.plateforme_support_destinataire_reponse(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.plateforme_support_marquer_messages_lus(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.plateforme_suspendre_compte_global(p_entreprise_id uuid, p_motif text)|false|true|false
+   exécutable app : public.pointages_couts_appliques(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.pointages_equipe_periode(p_entreprise_id uuid, p_debut date, p_fin date, p_debut_at timestamp with time zone, p_fin_at timestamp with time zone)|false|true|false
+   exécutable app : public.pointages_gestion_anciennes_saisies_ids(p_entreprise_id uuid, p_debut date, p_fin date, p_limite integer, p_decalage integer)|false|true|false
+   exécutable app : public.pointages_gestion_compteurs_mois(p_entreprise_id uuid, p_debut date, p_fin date, p_debut_at timestamp with time zone, p_fin_at timestamp with time zone)|false|true|false
+   exécutable app : public.pointages_gestion_totaux_mois(p_entreprise_id uuid, p_debut date, p_fin date)|false|true|false
+   exécutable app : public.prix_contractuel_courant(p_entreprise_id uuid, p_produit text)|false|true|false
+   exécutable app : public.relances_auto_candidats_selection(p_entreprise_id uuid, p_type_document text, p_limite integer)|false|true|true
+   exécutable app : public.remise_perimetre_recouvre(p_cible_a text, p_cles_a text[], p_cible_b text, p_cles_b text[])|true|true|true
+   exécutable app : public.rentabilite_chantier(p_entreprise_id uuid, p_chantier_id uuid)|false|true|false
+   exécutable app : public.rentabilite_chantiers_page(p_entreprise_id uuid, p_tri text, p_limite integer, p_decalage integer, p_avec_activite boolean)|false|true|false
+   exécutable app : public.rentabilite_chantiers_totaux(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_acteur_courant(p_reserve_id uuid)|false|true|false
+   exécutable app : public.reserves_action_autorisee(p_entreprise_id uuid, p_action text)|false|true|false
+   exécutable app : public.reserves_ajouter_photo(p_reserve_id uuid, p_usage text, p_legende text, p_mime_type text, p_taille_octets integer, p_nom_fichier text, p_origine_client_id uuid)|false|true|false
+   exécutable app : public.reserves_ajouter_plan(p_chantier_id uuid, p_nom text, p_niveau text, p_zone text, p_mime_type text, p_taille_octets integer, p_nom_fichier text, p_ordre integer)|false|true|false
+   exécutable app : public.reserves_annuaire_publier(p_entreprise_id uuid, p_publiee boolean, p_corps_etat text, p_zone_intervention text, p_email_contact text, p_telephone_contact text)|false|true|false
+   exécutable app : public.reserves_annuaire_rechercher(p_entreprise_id uuid, p_terme text)|false|true|false
+   exécutable app : public.reserves_annuler(p_reserve_id uuid, p_commentaire text)|false|true|false
+   exécutable app : public.reserves_assigner(p_reserve_id uuid, p_intervenant_id uuid, p_commentaire text)|false|true|false
+   exécutable app : public.reserves_attribuer_role(p_utilisateur_id uuid, p_entreprise_id uuid, p_role_code text)|false|true|false
+   exécutable app : public.reserves_chantier_lecture_seule_hote(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_chantier_visible_intervenant(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_commenter(p_reserve_id uuid, p_contenu text, p_photo_id uuid, p_origine_client_id uuid)|false|true|false
+   exécutable app : public.reserves_confirmer_photo(p_photo_id uuid)|false|true|false
+   exécutable app : public.reserves_confirmer_plan(p_plan_id uuid, p_storage_path text)|false|true|false
+   exécutable app : public.reserves_confirmer_plan_gp(p_plan_id uuid, p_chemin text)|false|true|false
+   exécutable app : public.reserves_conversation_marquer_lue(p_conversation_id uuid)|false|true|false
+   exécutable app : public.reserves_conversation_visible(p_conversation_id uuid)|false|true|false
+   exécutable app : public.reserves_conversations_visibles(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_creer(p_chantier_id uuid, p_titre text, p_description text, p_priorite text, p_intervenant_id uuid, p_plan_id uuid, p_position_x numeric, p_position_y numeric, p_photo_obligatoire_levee boolean, p_echeance date, p_origine_client_id uuid, p_plan_page integer)|false|true|false
+   exécutable app : public.reserves_demander_levee(p_reserve_id uuid, p_commentaire text)|false|true|false
+   exécutable app : public.reserves_designer_entreprise_intervenante(p_intervenant_id uuid, p_entreprise_intervenante_id uuid)|false|true|false
+   exécutable app : public.reserves_enregistrer_pagination(p_plan_id uuid, p_nb_pages integer)|false|true|false
+   exécutable app : public.reserves_etat_chantier_gp(p_chantier_gp_id uuid)|false|true|false
+   exécutable app : public.reserves_export_chantier(p_chantier_id uuid, p_intervenant_id uuid, p_statut text, p_priorite text, p_echeance_avant date, p_inclure_levees boolean)|false|true|false
+   exécutable app : public.reserves_export_entete(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_export_historique(p_chantier_id uuid, p_intervenant_id uuid)|false|true|false
+   exécutable app : public.reserves_export_intervenants(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_export_photos(p_chantier_id uuid, p_intervenant_id uuid)|false|true|false
+   exécutable app : public.reserves_garde_chantier_meme_tenant()|true|true|true
+   exécutable app : public.reserves_gp_champ(p_courant text, p_precedent text, p_nouveau text)|true|true|true
+   exécutable app : public.reserves_gp_champ_conserve(p_courant text, p_precedent text, p_nouveau text)|true|true|true
+   exécutable app : public.reserves_gp_email(p text)|true|true|true
+   exécutable app : public.reserves_gp_texte(p text, p_max integer)|true|true|true
+   exécutable app : public.reserves_importer_chantier_gp(p_chantier_gp_id uuid)|false|true|false
+   exécutable app : public.reserves_intervenant_courant(p_intervenant_id uuid)|false|true|false
+   exécutable app : public.reserves_invitation_accepter(p_token_hash text, p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_invitation_consulter(p_token_hash text)|true|true|false
+   exécutable app : public.reserves_invitation_marquer_envoyee(p_invitation_id uuid, p_echec text)|false|true|false
+   exécutable app : public.reserves_invitation_revoquer(p_invitation_id uuid)|false|true|false
+   exécutable app : public.reserves_invitations_chantier(p_chantier_id uuid)|false|true|false
+   exécutable app : public.reserves_invitations_en_attente()|false|true|false
+   exécutable app : public.reserves_inviter_intervenant(p_intervenant_id uuid, p_token_hash text, p_email text, p_contact_nom text, p_entreprise_cible_id uuid, p_duree_jours integer)|false|true|false
+   exécutable app : public.reserves_lecture_autorisee(p_reserve_id uuid)|false|true|false
+   exécutable app : public.reserves_lecture_seule_hote(p_reserve_id uuid)|false|true|false
+   exécutable app : public.reserves_lister_membres(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_messages_non_lus()|false|true|false
+   exécutable app : public.reserves_notifications_compteur()|false|true|false
+   exécutable app : public.reserves_notifications_in_app(p_limite integer, p_non_lues_seulement boolean)|false|true|false
+   exécutable app : public.reserves_notifications_marquer_lues(p_ids uuid[])|false|true|false
+   exécutable app : public.reserves_photos_visibles(p_reserve_id uuid)|false|true|false
+   exécutable app : public.reserves_plan_visible_intervenant(p_plan_id uuid)|false|true|false
+   exécutable app : public.reserves_preferences_definir(p_entreprise_id uuid, p_categorie text, p_email boolean)|false|true|false
+   exécutable app : public.reserves_preferences_lire(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_reactiver_intervenant(p_intervenant_id uuid)|false|true|false
+   exécutable app : public.reserves_rejoindre_intervention(p_intervenant_id uuid)|false|true|false
+   exécutable app : public.reserves_reperes_plan(p_plan_id uuid, p_page integer)|false|true|false
+   exécutable app : public.reserves_repondre_responsabilite(p_reserve_id uuid, p_accepte boolean, p_motif text)|false|true|false
+   exécutable app : public.reserves_repositionner(p_reserve_id uuid, p_plan_id uuid, p_plan_page integer, p_position_x numeric, p_position_y numeric)|false|true|false
+   exécutable app : public.reserves_resume_chantier_gp(p_chantier_gp_id uuid)|false|true|false
+   exécutable app : public.reserves_retirer_acces_membre(p_utilisateur_id uuid, p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_revoquer_intervenant(p_intervenant_id uuid, p_motif text)|false|true|false
+   exécutable app : public.reserves_role_courant(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.reserves_rouvrir(p_reserve_id uuid, p_commentaire text)|false|true|false
+   exécutable app : public.reserves_siret_normalise(p_valeur text)|false|true|false
+   exécutable app : public.reserves_statuer_levee(p_reserve_id uuid, p_validee boolean, p_commentaire text)|false|true|false
+   exécutable app : public.reserves_storage_photo_autorisee(p_chemin text, p_ecriture boolean)|false|true|false
+   exécutable app : public.reserves_storage_plan_autorisee(p_chemin text, p_ecriture boolean)|false|true|false
+   exécutable app : public.reserves_supprimer_photo(p_photo_id uuid, p_motif text)|false|true|false
+   exécutable app : public.reserves_supprimer_plan(p_plan_id uuid)|false|true|false
+   exécutable app : public.reserves_synchroniser_chantier_gp(p_chantier_gp_id uuid)|false|true|false
+   exécutable app : public.reserves_tableau_de_bord(p_entreprise_id uuid, p_chantier_id uuid, p_intervenant_id uuid, p_statut text, p_priorite text, p_echeance_avant date)|false|true|false
+   exécutable app : public.reserves_transferer_responsabilite(p_reserve_id uuid, p_intervenant_cible_id uuid, p_motif text)|false|true|false
+   exécutable app : public.reserves_transition_differee(p_reserve_id uuid, p_statut_apres text, p_commentaire text, p_intervenant_id uuid, p_origine_client_id uuid)|false|true|false
+   exécutable app : public.session_courante_revoquee()|false|true|true
+   exécutable app : public.session_jwt_courante()|true|true|true
+   exécutable app : public.studio_activate_timeline(p_project uuid, p_timeline uuid)|false|true|false
+   exécutable app : public.studio_archive_workspace(p_workspace_id uuid)|false|true|false
+   exécutable app : public.studio_cancel_analysis(p_project uuid)|false|true|false
+   exécutable app : public.studio_cancel_render(p_job uuid)|false|true|false
+   exécutable app : public.studio_create_project(p_workspace uuid, p_name text, p_type text)|false|true|false
+   exécutable app : public.studio_create_workspace(p_name text, p_type text)|false|true|false
+   exécutable app : public.studio_dashboard_stats(p_workspace uuid)|false|true|false
+   exécutable app : public.studio_delete_media(p_asset uuid)|false|true|false
+   exécutable app : public.studio_delete_timeline(p_project uuid, p_timeline uuid)|false|true|false
+   exécutable app : public.studio_duplicate_project(p_project uuid)|false|true|false
+   exécutable app : public.studio_get_timeline(p_project uuid, p_timeline uuid)|false|true|false
+   exécutable app : public.studio_list_analysis(p_project uuid)|false|true|false
+   exécutable app : public.studio_list_project_media(p_project uuid, p_offset integer, p_limit integer)|false|true|false
+   exécutable app : public.studio_my_role(p_workspace_id uuid)|false|true|false
+   exécutable app : public.studio_order_project_media(p_project uuid, p_ids uuid[], p_chronological boolean, p_revision integer)|false|true|false
+   exécutable app : public.studio_project_lifecycle(p_project uuid, p_action text)|false|true|false
+   exécutable app : public.studio_project_media_stats(p_project uuid)|false|true|false
+   exécutable app : public.studio_project_summaries(p_workspace uuid, p_query text, p_type text, p_status text, p_since date, p_sort text, p_offset integer)|false|true|false
+   exécutable app : public.studio_remove_project_media(p_project uuid, p_asset uuid)|false|true|false
+   exécutable app : public.studio_rename_workspace(p_workspace_id uuid, p_name text)|false|true|false
+   exécutable app : public.studio_request_analysis(p_project uuid, p_force boolean)|false|true|false
+   exécutable app : public.studio_request_editor_render(p_project uuid, p_request uuid, p_timeline uuid, p_revision integer, p_profile text, p_retry uuid)|false|true|false
+   exécutable app : public.studio_request_render(p_project uuid, p_request uuid, p_profile text, p_retry uuid)|false|true|false
+   exécutable app : public.studio_reserve_media(p_project uuid, p_request uuid, p_name text, p_mime text, p_bytes bigint)|false|true|false
+   exécutable app : public.studio_save_editor(p_project uuid, p_timeline uuid, p_revision integer, p_project_revision integer, p_draft jsonb)|false|true|false
+   exécutable app : public.studio_save_project(p_workspace uuid, p_project uuid, p_data jsonb, p_revision integer)|false|true|false
+   exécutable app : public.studio_save_timeline(p_project uuid, p_timeline uuid, p_revision integer, p_project_revision integer, p_draft jsonb)|false|true|false
+   exécutable app : public.studio_set_member(p_workspace_id uuid, p_user_id uuid, p_role text)|false|true|false
+   exécutable app : public.studio_set_project_cover(p_project uuid, p_asset uuid)|false|true|false
+   exécutable app : public.support_envoyer_message_entreprise(p_entreprise_id uuid, p_contenu text)|false|true|false
+   exécutable app : public.support_messages_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tables_anonymisees_purge()|true|true|true
+   exécutable app : public.tables_conservees_purge()|true|true|true
+   exécutable app : public.tools_a_droit_cloud_sync(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tools_a_droit_releve_metre()|false|true|false
+   exécutable app : public.tools_capabilities_addon()|false|true|false
+   exécutable app : public.tools_capabilities_catalogue()|false|true|false
+   exécutable app : public.tools_capabilities_etendues(p_capabilities text[])|false|true|true
+   exécutable app : public.tools_capabilities_offre(p_code text)|false|true|true
+   exécutable app : public.tools_capabilities_pro()|false|true|false
+   exécutable app : public.tools_changer_entreprise_active(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tools_demander_suppression_compte()|false|true|false
+   exécutable app : public.tools_lister_entreprises_autorisees()|false|true|false
+   exécutable app : public.tools_releve_action_autorisee(p_entreprise_id uuid, p_action text)|false|true|false
+   exécutable app : public.tools_releve_actions(p_releve_id uuid)|false|true|false
+   exécutable app : public.tools_releve_ancre_valide(p_ancre jsonb)|false|true|false
+   exécutable app : public.tools_releve_bibliotheque(p_releve_id uuid)|false|true|false
+   exécutable app : public.tools_releve_bibliotheque_enregistrer(p_releve_id uuid, p_id uuid, p_donnees jsonb)|false|true|false
+   exécutable app : public.tools_releve_bibliotheque_supprimer(p_releve_id uuid, p_id uuid)|false|true|false
+   exécutable app : public.tools_releve_contexte(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tools_releve_creer_version(p_releve_id uuid, p_libelle text, p_type_version text, p_version_base_id uuid)|false|true|false
+   exécutable app : public.tools_releve_dupliquer_noeud(p_type text, p_id uuid, p_nouvel_id uuid, p_nom text)|false|true|false
+   exécutable app : public.tools_releve_element_donnees_valides(p_type text, p_donnees jsonb)|false|true|false
+   exécutable app : public.tools_releve_entier_facultatif_valide(p_valeur jsonb, p_min numeric, p_max numeric)|false|true|false
+   exécutable app : public.tools_releve_etat_projet_valide(p jsonb)|false|true|true
+   exécutable app : public.tools_releve_fichier_fige(p_chemin text)|false|true|false
+   exécutable app : public.tools_releve_geometrie_photo_valide(p_forme text, p_geometrie jsonb)|false|true|false
+   exécutable app : public.tools_releve_liste_uuid_valide(p_valeur jsonb, p_max integer)|false|true|false
+   exécutable app : public.tools_releve_media_fige(p_media_id uuid)|false|true|false
+   exécutable app : public.tools_releve_media_metadata_valide(p_metadata jsonb)|false|true|false
+   exécutable app : public.tools_releve_metre_ajustement_retirer(p_id uuid, p_raison text)|false|true|false
+   exécutable app : public.tools_releve_metre_ajuster(p_plan_id uuid, p_piece_id uuid, p_revetement_id uuid, p_grandeur text, p_valeur_retenue numeric, p_raison text)|false|true|false
+   exécutable app : public.tools_releve_metre_synthese(p_releve_id uuid, p_etat text)|false|true|false
+   exécutable app : public.tools_releve_nombre_unitaire(p_valeur jsonb)|false|true|false
+   exécutable app : public.tools_releve_normaliser(p_texte text)|false|true|false
+   exécutable app : public.tools_releve_objet_facultatif_valide(p_valeur jsonb)|false|true|false
+   exécutable app : public.tools_releve_ouvrage_anomalie(p jsonb)|false|true|true
+   exécutable app : public.tools_releve_ouvrage_enregistrer(p_plan_id uuid, p_id uuid, p_donnees jsonb, p_bibliotheque_id uuid)|false|true|false
+   exécutable app : public.tools_releve_ouvrage_message(p_code text)|false|true|true
+   exécutable app : public.tools_releve_ouvrage_supprimer(p_plan_id uuid, p_id uuid)|false|true|false
+   exécutable app : public.tools_releve_ouvrages_importer(p_plan_id uuid, p_ouvrages jsonb)|false|true|false
+   exécutable app : public.tools_releve_peut(p_releve_id uuid, p_action text)|false|true|false
+   exécutable app : public.tools_releve_peut_ligne(p_entreprise_id uuid, p_proprietaire_id uuid, p_visibilite text, p_supprime boolean, p_action text)|false|true|false
+   exécutable app : public.tools_releve_plan_cadre_valide(p jsonb)|true|true|true
+   exécutable app : public.tools_releve_plan_contours_valides(p jsonb)|true|true|true
+   exécutable app : public.tools_releve_plan_cote_anomalie(p_donnees jsonb)|false|true|true
+   exécutable app : public.tools_releve_plan_cote_message(p_code text)|false|true|true
+   exécutable app : public.tools_releve_plan_creer(p_etage_id uuid, p_etat text, p_plan_base_id uuid, p_libelle text)|false|true|false
+   exécutable app : public.tools_releve_plan_elements(p_plan_id uuid)|false|true|false
+   exécutable app : public.tools_releve_plan_enregistrer(p_plan_id uuid, p_revision bigint, p_modifications jsonb)|false|true|false
+   exécutable app : public.tools_releve_plan_equipement_anomalie(p_donnees jsonb)|false|true|true
+   exécutable app : public.tools_releve_plan_equipement_message(p_code text)|false|true|true
+   exécutable app : public.tools_releve_plan_equipements_supprimes(p_plan_id uuid)|false|true|false
+   exécutable app : public.tools_releve_plan_figer(p_plan_id uuid, p_revision bigint, p_libelle text)|false|true|false
+   exécutable app : public.tools_releve_plan_metre(p_plan_id uuid)|false|true|false
+   exécutable app : public.tools_releve_plan_metre_regler(p_plan_id uuid, p_revision bigint, p_seuil_mm2 numeric)|false|true|false
+   exécutable app : public.tools_releve_plan_ouverture_anomalie(p_donnees jsonb, p_longueur numeric, p_hauteur_mur numeric)|false|true|true
+   exécutable app : public.tools_releve_plan_ouverture_message(p_code text)|false|true|true
+   exécutable app : public.tools_releve_plan_point_valide(p jsonb)|true|true|true
+   exécutable app : public.tools_releve_plan_quantitatif(p_plan_id uuid)|false|true|false
+   exécutable app : public.tools_releve_plan_revetement_anomalie(p_donnees jsonb)|false|true|true
+   exécutable app : public.tools_releve_plan_revetement_enregistrer(p_plan_id uuid, p_id uuid, p_piece_id uuid, p_donnees jsonb)|false|true|false
+   exécutable app : public.tools_releve_plan_revetement_message(p_code text)|false|true|true
+   exécutable app : public.tools_releve_plan_revetement_supprimer(p_plan_id uuid, p_id uuid)|false|true|false
+   exécutable app : public.tools_releve_plan_sans_meta(p jsonb)|true|true|true
+   exécutable app : public.tools_releve_plan_surface(p_points jsonb)|true|true|true
+   exécutable app : public.tools_releve_profil(p_role text)|false|true|false
+   exécutable app : public.tools_releve_qt_appliquer(p_base numeric, p_regle jsonb, p_perte numeric, p_arrondi jsonb)|false|true|true
+   exécutable app : public.tools_releve_qt_decimal_valide(p jsonb, p_decimales integer, p_min numeric, p_max numeric)|false|true|true
+   exécutable app : public.tools_releve_qt_rdiv(p_n numeric, p_d numeric)|false|true|true
+   exécutable app : public.tools_releve_quantitatif_ajustement_retirer(p_id uuid, p_raison text)|false|true|false
+   exécutable app : public.tools_releve_quantitatif_ajuster(p_plan_id uuid, p_ouvrage_id uuid, p_piece_id uuid, p_etat text, p_valeur_retenue numeric, p_raison text)|false|true|false
+   exécutable app : public.tools_releve_quantitatif_anomalie_message(p_code text, p_detail text)|false|true|true
+   exécutable app : public.tools_releve_quantitatif_evaluer(p_entree jsonb)|false|true|true
+   exécutable app : public.tools_releve_quantitatif_synthese(p_releve_id uuid, p_etat text)|false|true|false
+   exécutable app : public.tools_releve_rechercher(p_entreprise_id uuid, p_texte text, p_limite integer)|false|true|false
+   exécutable app : public.tools_releve_remplacer_photo(p_ancien uuid, p_nouveau uuid)|false|true|false
+   exécutable app : public.tools_releve_reordonner(p_type text, p_ids uuid[])|false|true|false
+   exécutable app : public.tools_releve_reperes_valides(p_reperes jsonb)|false|true|false
+   exécutable app : public.tools_releve_retirer_photo(p_media_id uuid)|false|true|false
+   exécutable app : public.tools_releve_role_courant(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tools_releve_storage_autorise(p_chemin text, p_operation text)|false|true|false
+   exécutable app : public.tools_releve_uuid_facultatif_valide(p_valeur jsonb)|false|true|false
+   exécutable app : public.tools_resoudre_entitlements()|false|true|false
+   exécutable app : public.tools_resoudre_entitlements_entreprise(p_entreprise_id uuid)|false|true|false
+   exécutable app : public.tools_sync_project(p_project jsonb, p_expected_revision bigint, p_device_id text)|false|true|false
+   exécutable app : public.tools_sync_project_entreprise(p_entreprise_id uuid, p_project jsonb, p_expected_revision bigint, p_device_id text)|false|true|false
+   exécutable app : public.tresorerie_donnees(p_entreprise_id uuid, p_depuis date)|false|true|false
+   exécutable app : public.trg_affectation_employe_actif()|true|true|true
+   exécutable app : public.trg_capacite_personnes_actives()|true|true|true
+   exécutable app : public.trg_commande_fournisseur_suppression_statut()|true|true|true
+   exécutable app : public.trg_maj_cache_dashboard_devis()|true|true|true
+   exécutable app : public.trg_maj_cache_dashboard_factures()|true|true|true
+   exécutable app : public.trg_recalc_avenant()|true|true|true
+   exécutable app : public.unaccent(regdictionary, text)|true|true|true
+   exécutable app : public.unaccent(text)|true|true|true
+   exécutable app : public.unaccent_init(internal)|true|true|true
+   exécutable app : public.unaccent_lexize(internal, internal, internal, internal)|true|true|true
+   exécutable app : public.verifier_capacite_personnes(p_entreprise_id uuid, p_delta integer)|false|true|false
+   exécutable app : public.verrouiller_avenant_accepte()|true|true|true
+   exécutable app : public.verrouiller_client_snapshot()|true|true|true
+   exécutable app : public.verrouiller_entreprise_snapshot_devis()|true|true|true
+   exécutable app : public.verrouiller_lignes_avenant_accepte()|true|true|true

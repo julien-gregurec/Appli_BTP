@@ -1,0 +1,25 @@
+1..24
+ok 1 - pro v1 historique annuel : 1 238,40 conservé
+ok 2 - pro v1 historique : périodicité annuelle conservée
+ok 3 - pro v1 historique : version 1 conservée
+ok 4 - essentiel v0 : 59 € conservé
+ok 5 - essentiel v0 : offre retirée du catalogue, contrat intact
+ok 6 - contrat négocié à 69 € : jamais remappé vers 79
+ok 7 - contrat négocié : périodicité conservée
+ok 8 - business v1 suspendu : 449 € conservé
+ok 9 - contrat suspendu : statut conservé (pas de réactivation implicite)
+ok 10 - essai expiré : statut contractuel inchangé par l'upgrade
+ok 11 - premium v0 annulé : intact
+ok 12 - identifiant d'abonnement Stripe synthétique conservé
+ok 13 - chaque contrat référence la version de plan de son code/version contractuels
+ok 14 - aucun contrat attaché aux versions transitoires 69 / 199 / 399 (TARIFS-V2)
+ok 15 - aucun changement d'offre programmé par l'upgrade
+ok 16 - plan essentiel v0 : 59 € conservé
+ok 17 - plan pro v1 historique : 129 € conservé
+ok 18 - plan premium v0 : 249 € conservé
+ok 19 - plan mini v1 (ère 210) : annuel 948 (12 ×) conservé
+ok 20 - offres historiques retirées : toujours inactives
+ok 21 - catalogue actif = grille canonique 79 / 249 / 449 / 599
+ok 22 - une seule version active par code
+ok 23 - entreprises.abonnement_prix_contractuel_ht : 69 € conservé
+ok 24 - entreprises : périodicité et version contractuelles conservées

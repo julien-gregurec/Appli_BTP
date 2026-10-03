@@ -1,0 +1,2 @@
+ordre de colonnes différent (toléré) : public.entreprises — premières colonnes déplacées : remise_motif_interne, remise_cree_par, remise_duree_mois
+schéma identique au fresh (36846 lignes normalisées ; 1 table(s) à ordre de colonnes différent)

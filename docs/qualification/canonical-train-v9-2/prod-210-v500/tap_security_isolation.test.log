@@ -1,0 +1,28 @@
+1..21
+ok 1 - anon : 0 entreprise visible
+ok 2 - anon : 0 facture visible
+ok 3 - anon : 0 IBAN visible
+ok 4 - anon : creer_entreprise_bootstrap non exécutable
+
+ok 5 - multi-entreprises : clients de sa seconde entreprise (active, abonnée) visibles
+ok 6 - essai expiré : 0 client de A, même pour son administrateur
+ok 7 - multi-entreprises : 0 client de B
+ok 8 - multi-entreprises : 0 facture de la petite
+
+ok 9 - membre désactivé : 0 client de l'entreprise quittée
+ok 10 - membre désactivé : 0 employé de l'entreprise quittée
+ok 11 - membre désactivé : contrat invisible
+
+ok 12 - sans appartenance : 0 entreprise visible malgré entreprise_active_id
+ok 13 - sans appartenance : entreprise sans membre inaccessible
+ok 14 - sans appartenance : 0 devis
+
+ok 15 - SEC-4 : bascule vers une entreprise étrangère refusée
+ok 16 - SEC-4 : bascule vers sa propre seconde entreprise acceptée
+
+ok 17 - ouvrier : 0 IBAN lisible
+
+ok 18 - gérant petite : aucune autre entreprise visible
+ok 19 - gérant petite : ses employés visibles
+ok 20 - SECURITY DEFINER : search_path figé partout
+ok 21 - RLS active sur toutes les tables public

@@ -1,0 +1,102 @@
+ELSATIA production → V9.x : cible 3fa52210973a87483999cea8bea79503cd3dae9d (408 migrations) ; source h210_v500_rem (profil ACL supabase) ; travail h210_v500_rem_v9x ; fresh fresh_3fa52210_sb ; preuves <sortie>
+NOTICE:  database "h210_v500_rem_v9x" does not exist, skipping
+
+== 1. Snapshot avant ==
+h210_v500_rem: 153 tables, 56188 lignes, 396 FK, 23 jeux critiques -> <sortie>/avant
+h210_v500_rem: inventaire sécurité/catalogue 15 familles, 6337 lignes -> <sortie>/securite_avant
+  ✅ empreintes, inventaire sécurité et sonde RLS de la source (jamais modifiée)
+
+== 2. Ledger avant ==
+  ledger : 210 versions, max 20260824000231
+
+== 3. Classification des migrations ==
+  déjà appliquées 210 ; en attente 198 (dont 13 hors ordre → --include-all) ; inattendues au ledger 0
+  ponts d'upgrade du train : 2 ; phase 0 (appliquée en premier) : 20261003000201_pont_upgrade_prod_phase0_lignes_entreprise_v1.sql
+
+== 4. Dry-run (copie jetable, chaque migration annulée après mesure) ==
+NOTICE:  database "h210_v500_rem_v9x_dry" does not exist, skipping
+  ✅ dry-run : 198 migrations rejouées sur copie jetable (16 s), base de travail intacte
+
+== 5. Application (une transaction par migration, ledger inclus) ==
+  198 migration(s) appliquée(s) en 32 s ; ledger 408 versions
+  ✅ ledger après = les 408 fichiers de la cible
+
+== 6. Snapshot après ==
+h210_v500_rem_v9x: 283 tables, 56535 lignes, 710 FK, 23 jeux critiques -> <sortie>/apres
+h210_v500_rem_v9x: inventaire sécurité/catalogue 15 familles, 12661 lignes -> <sortie>/securite_apres
+
+== 7. Comparaison schéma : upgradé vs fresh cible ==
+NOTICE:  database "fresh_3fa52210_sb" does not exist, skipping
+  ✅ fresh cible fresh_3fa52210_sb construite (408 migrations)
+  ordre de colonnes différent (toléré) : public.entreprises — premières colonnes déplacées : remise_motif_interne, remise_cree_par, remise_duree_mois
+  schéma identique au fresh (36846 lignes normalisées ; 1 table(s) à ordre de colonnes différent)
+  ✅ schéma upgradé = fresh cible (aux seules positions de colonnes près, listées)
+
+== 8. Contrôles métier (pgTAP, transactions annulées) ==
+  ✅ legacy_offers : 24/24
+  ✅ security_isolation : 21/21
+
+== 9-15. Sécurité et catalogue : upgradé = fresh cible (fermé) ; inventaire avant → après ==
+  Fermeture upgradé = fresh cible : ✅ (15 familles, 12549 lignes)
+  Avant → après : acl_colonnes 21→383 (-0/+362) ; acl_fonctions 834→2961 (-285/+2412) ; acl_schemas 12→15 (-0/+3) ; acl_tables 2689→3435 (-755/+1501) ; constraints 1039→2186 (-1/+1148) ; default_acl 19→5 (-14/+0) ; functions 278→987 (-59/+768) ; indexes 468→896 (-0/+428) ; policies 559→767 (-103/+311) ; rls 153→283 (-0/+130) ; storage 62→93 (-0/+31) ; triggers 91→531 (-2/+442) ; views 0→3 (-0/+3)
+  Signaux bloquants : 0 ; à justifier : 1
+     ⚠  privilège table ajouté à authenticated : public.lignes_inventaire|authenticated|SELECT|false
+     ℹ  table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.acceptations_documents_legaux
+     ℹ  table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.documents_legaux_versions
+  RLS flags : 0 table(s) existante(s) modifiée(s) ; 120 table(s) nouvelle(s), toutes RLS : True
+  Policies : 473 avant, 658 après ; supprimées 2, modifiées 85, ajoutées 187
+  Sonde RLS réelle : 17 utilisateurs, 255 cellules, 38 écart(s)
+  Accès : 19 appartenances historiques évaluées ; pertes 6 (déclarées 6) ; réductions de visibilité 1 ; hausses 0 ; bloquants 0
+     déclaré : admin-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : chef-equipe-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : comptable-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : conducteur-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : dirigeant-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : ouvrier-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     réduction : sans-poste@entreprise-test.invalid / affectations : 7800 → 0 — PL-05 (20260923000327 / 000346) : la lecture du planning d'autrui exige gerer_planning / voir_pointages_equipe / voir_heures_chantiers ; un membre sans ces permissions ne voit plus que ses propres affectations.
+
+== 16. Contrôles de données : zéro perte ==
+  Zéro perte : 153 tables / 56188 lignes d'avant comparées ; 7 table(s) différente(s) ; 12 écart(s) déclaré(s) ; P0 = 0
+     déclaré  : public.employes.taux_horaire déplacée vers public.employes_taux_facture.taux_horaire.employe_id : toutes les valeurs retrouvées
+     déclaré  : public.employes.cout_horaire déplacée vers public.employes_cout_horaire.cout_horaire.employe_id : toutes les valeurs retrouvées
+     déclaré  : public.employes : -0 ~68 +0 [] — 20260818000205 / 20260922000328 : coûts et taux horaires sortis de employes (données RH sensibles) vers des tables à accès restreint ; valeurs vérifiées une à une.
+     déclaré  : public.entreprises : -0 ~6 +0 [abonnement_essai_debut∅→(6), abonnement_essai_fin(1), abonnement_essai_fin∅→(5)] — 20260816000204 (C6-B, hors ordre) : fenêtre d'essai de 30 jours renseignée pour les entreprises antérieures à 231 (debut = création) ; UPG-P2-1 : une fin d'essai Stripe > création + 30 j est TRONQUÉE à création + 30 (changement rétroactif, sans effet sur un contrat payant).
+     déclaré  : public.factures : -0 ~232 +0 [entreprise_snapshot∅→(232)] — Idem devis : 20260921000300 (recalcul, montants identiques, updated_at rafraîchi) ; 20260908000272 / 20260926000501 : snapshot émetteur des factures émises renseigné s'il était NULL, marqué identite_incertaine (jamais écrasé).
+     déclaré  : public.historique_tarification : -0 ~0 +5 [] — 20260901000254 : journal de réconciliation du catalogue (ajouts seulement).
+     déclaré  : public.plans_abonnement : -0 ~5 +8 [actif(5), valide_au∅→(5)] — 20260815000200 / 20260816000201 (TARIFS-V2) / 20260901000254 / 20260928000802 : versions de catalogue désactivées (actif=false, valide_au) et nouvelles versions ajoutées ; prix, codes et ids des versions existantes INCHANGÉS ; aucun contrat remappé (checks/legacy_offers.test.sql).
+     déclaré  : public.plateforme_admins : -0 ~0 +1 [] — 20260825000233 : ajout du compte administrateur plateforme julien@elsatia.fr (rôle total) — décision propriétaire, jamais appliquée en Production 210 ; à confirmer au cutover (UPG-SEC-1).
+     déclaré  : storage.buckets : -0 ~0 +7 [] — Buckets privés des nouvelles applications (Colors, Réserves, Studio, Relevé, communications) ; aucun bucket existant modifié.
+     déclaré  : critique historiques : +5 / -0 — journal de réconciliation tarifaire
+     déclaré  : critique plans_historiques : +8 / -0 — nouvelles versions de catalogue ; toute version d'avant conservée à l'identique
+     déclaré  : critique support : +1 / -0 — administrateur plateforme ajouté par 20260825000233
+     VERDICT : ZERO_PERTE
+
+== 17. Performance sanity ==
+     ✓ moyenne      liste_devis               181.34 ms →      8.33 ms
+     ✓ moyenne      liste_factures            116.03 ms →      6.63 ms
+     ✓ moyenne      lignes_un_devis           170.13 ms →      8.35 ms
+     ✓ moyenne      lignes_une_facture        114.83 ms →      7.84 ms
+     ✓ moyenne      pointages_mois            921.81 ms →      6.38 ms
+     ✓ moyenne      planning_semaine           50.83 ms →      7.07 ms
+     ✓ moyenne      clients_recherche          55.34 ms →      5.91 ms
+     ✓ moyenne      journal_recent            170.55 ms →    358.45 ms
+     ✓ moyenne      documents_chantier         21.26 ms →      4.23 ms
+     ✓ volumetrique liste_devis               126.89 ms →      5.83 ms
+     ✓ volumetrique liste_factures             90.55 ms →      6.18 ms
+     ✓ volumetrique lignes_un_devis           133.65 ms →      7.34 ms
+     ✓ volumetrique lignes_une_facture         98.87 ms →      8.06 ms
+     ✓ volumetrique pointages_mois            736.16 ms →     11.48 ms
+     ✓ volumetrique planning_semaine           63.72 ms →      7.89 ms
+     ✓ volumetrique clients_recherche          51.98 ms →      8.56 ms
+     ✓ volumetrique journal_recent            324.64 ms →    498.12 ms
+     ✓ volumetrique documents_chantier         46.78 ms →      6.56 ms
+  Performance sanity : 18 mesures, 0 régression(s) bloquante(s)
+  Classification : 198 migrations
+    verrous  : SAFE=93, CAUTION=105, MAINTENANCE_WINDOW_REQUIRED=0
+    rollback : REVERSIBLE=58, FORWARD_ONLY=85, RESTORE_REQUIRED=55
+    plus lentes : 20260818000206_historiser_cout 318.5 ms, 20260927000601_tools_releve_me 218.7 ms, 20261003001502_relances_auto_c 167.5 ms
+    fenêtre de maintenance : aucune
+  plan qualifié écrit : <sortie>/target-3fa52210.json (198 migrations, préconditions bloquantes ['bloquant_essai_hors_fenetre', 'bloquant_essai_perpetuel', 'bloquant_essai_tronque_expire'])
+
+VERDICT HARNAIS : ✅ UPGRADE QUALIFIÉ (h210_v500_rem → 3fa52210973a87483999cea8bea79503cd3dae9d, 408 migrations). Preuves : <sortie>
+exit=0
