@@ -1,0 +1,41 @@
+BEGIN
+migrations appliquées (registre CLI)|399, dernière 20261003001408|registre absent (harnais local)|t|t
+extensions requises|pgcrypto, pg_trgm, unaccent, pgsodium (schéma)|pg_trgm, pgcrypto, unaccent + schéma pgsodium|t|t
+RLS active sur toutes les tables public|0 table sans RLS|0 table(s) sans RLS|t|t
+anon : aucun droit hors 4 catalogues publics et 2 états publics du mode sûr (lecture seule)|0 table hors liste, 0 écriture|aucune|t|t
+authenticated : droits explicites sur les tables cœur|select sur chantiers, clients, devis, factures ; employes : colonnes d'identité|tous accordés|t|t
+EXECUTE authenticated sur est_membre_actif / entreprise_sans_membres (régression 078, corrigée 187)|true / true|entreprise_sans_membres=true, est_membre_actif=true|t|t
+buckets Storage|19 attendus (dont tools-releves, V4), seul entreprise-assets public|19/19 présents, publics : entreprise-assets|t|t
+catalogue applications_elsatia|colors, drone, gestion_pro, reserves, tools|colors:disponible, drone:bientot, gestion_pro:disponible, reserves:interne, tools:disponible|t|t
+url_preview des applications (sélecteur d'apps)|renseignée pour les apps déployées|5 sans url_preview|f|f
+inscription Studio (studio_signup_policy)|closed|closed|t|t
+Boutique : verrou de concurrence (migration 330)|for no key update présent|présent|t|t
+protection des colonnes d'abonnement (trigger)|proteger_facturation_entreprise actif|O|t|t
+propriétaire plateforme actif (admin total)|1 après plateforme_proprietaire_revendiquer()|0 admin(s) total rattaché(s)|f|f
+RGPD contrats acceptés : politique retenue, aucune durée activée|conserver_contrat_minimise / durée non validée (fail-closed tant que le propriétaire n'a pas décidé)|conserver_contrat_minimise / durée non validée|t|t
+TRUNCATE refusé sur factures et contrats (501/502)|8 triggers refuser_truncate_*|8/8|t|t
+Réserves : gardes R-01 à R-05 (503)|7 triggers actifs|7/7|t|t
+Export RGPD : tables enfants (505)|lignes_avenants couverte|présente|t|t
+Stripe : ordre (506) + essai borné (507)|journal d'ordre, écarts d'essai, trigger borner_essai_entreprise, essai jamais > début + 30|contrôlé|t|t
+RGPD commandes fournisseurs engagées (20260926000506)|verrous commande + lignes, instantané purgé immuable|4/4 triggers|t|t
+RGPD dette résiduelle (20260927000508)|identité figée à l'envoi, historique des affectations en un passage|fournisseur_snapshot, capture, historique|t|t
+GP ↔ Réserves (20260927000402)|reserves_contacts + 4 gardes d'intégration GP|4/4|t|t
+Tools Relevé & Métré (601-801) : non commercial|Relevé Pro de référence (inclut Tools Pro), garde d'entitlement, 15 tables RLS|releve_pro:reference:inclut tools_pro, garde, 15 tables RLS|t|t
+Identité Studio (20260927100000) : fermée, inerte (Studio OFF)|tables RLS sans droit d'API ; 0 sujet émis|2/2 RLS, 0 droit(s) d'API, 0 sujet(s)|t|t
+Stripe : réabonnement (20260928000201)|historique des subscriptions remplacées, rattachement et facture v2 présents|contrôlé|t|t
+Réserves : hôte suspendu → intervenant en lecture seule (20260928000301)|11 tables gardées, prédicat non exposé|11/11 tables, prédicat exposé : false|t|t
+Tools Relevé & Métré : plan 2D (20260928000101)|tools_releves_plans RLS, écriture RPC seule, RPC fermées à anon|RLS, 0 droit(s) d'écriture API, 3/3 RPC fermées à anon|t|t
+Tools Relevé & Métré : ouvertures et géométrie (20260928000401)|lecture RPC authentifiés seuls, contrôle des murs interne, enregistrement fermé à anon|lecture RPC authentifiés, contrôle des murs interne|t|t
+RGPD contrats : paramétrage V2 (20260928000501), rien d'activé|départ aucun / repli aucun / photos non choisies|départ aucun / repli aucun / photos non choisies|t|t
+Tools Relevé & Métré : surface pièce synchronisée par le serveur (20260928000601)|autorisation sans droit d'API, synchronisation non exécutable par l'application, déclencheur actif|0 droit(s) d'API, synchronisation interne, déclencheur|t|t
+Tools Relevé & Métré : objets de plan et calques (20260928000701)|équipements admis dans un plan, corbeille authentifiés seuls, contrôles d'objet fermés à anon|équipements admis, corbeille authentifiés, contrôle d'objet fermé à anon|t|t
+Cycle commercial : facture sans effet sur annulé, grille canonique, essai expiré (20260928000801-803)|garde annule présente, mini/pro/business/entreprise = 79/249/449/599 (annuel ×10), essai expiré refusé|garde annule, business 449/4490 · entreprise 599/5990 · mini 79/790 · pro 249/2490, essai expiré refusé|t|t
+Suspension commerciale par application (20260928000804)|a_acces_application sans est_membre_actif, statut_commercial présent, suspensions globales motivées, webhook service seul, 0 perte|décision par application, suspensions globales : 0, pertes migration : 0, gains migration : 0|t|t
+Employés : colonnes personnelles fermées à la lecture directe (20260928000806)|0 colonne sensible lisible, employes_fiche authentifiés seuls, export filtré|0 colonne(s) sensible(s) lisible(s), employes_fiche authentifiés seuls, export filtré|t|t
+Mode sûr : gardes partout, aucun contrôle actif, bascules fermées (20260928000807-811)|0 table sans garde, 0 contrôle actif, bascule et motifs fermés à anon, opérateur fermé aux rôles d'API|0 table(s) sans garde, 0 contrôle(s) actif(s), bascule fermée à anon, opérateur fermé|t|t
+Tools Relevé & Métré : métré et quantitatifs (20260928000809-810)|RPC métré/quantitatif authentifiés seuls, moteurs internes fermés, 4 tables sous RLS|RPC authentifiés, moteurs internes, 4/4 tables sous RLS|t|t
+Red team V2 : garde tenant ↔ chantier Réserves, fonctions inter-tenant fermées (20260928000805)|gardes intervenants et plans actives, snapshot client et capacité Stripe fermés à authenticated|2/2 gardes tenant, fonctions inter-tenant fermées|t|t
+Devis : totaux recalculés par instruction (20260928000812)|3 triggers par instruction, aucun trigger par ligne, fonction fermée à l'API|3/3 triggers par instruction, trigger par ligne retiré|t|t
+Chiffrement bancaire : registre des clés et garde d'écriture (20261002001112)|1 clé active, 2 gardes, RPC fermées à authenticated, 0 donnée sous clé retirée/compromise/inconnue|1 active(s), 2/2 gardes, 0 donnée(s) sous clé interdite, 1 clé(s) à attester (bank-keys register)|t|t
+Post-V9 : RPC de service présentes (service_role seul) et garde SEC-4 (20261002001301-1302)|9/9 fonctions service_role seul, garde entreprise active activée|9/9 fonctions, 1/1 garde|t|t
+ROLLBACK

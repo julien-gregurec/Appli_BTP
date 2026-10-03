@@ -6,6 +6,7 @@
 {"id":"C05 montant devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté et ne peut plus être modifié.","verdict":"CONFORME"}
 {"id":"C06 prix ligne devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté : ses lignes ne peuvent plus être modifiées.","verdict":"CONFORME"}
 {"id":"C07 suppression lignes devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté : ses lignes ne peuvent plus être modifiées.","verdict":"CONFORME"}
+{"id":"C07b suppression d'un devis accepté non facturé (B33)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté et ne peut plus être supprimé.","verdict":"CONFORME"}
 {"id":"C08 annulation directe facture émise (B24)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Une facture émise ne peut pas être annulée : émettez un avoir","verdict":"CONFORME"}
 {"id":"C09 paiement partiel 1 000 €","attendu":"ok","http":200,"code":null,"obtenu":"ok","verdict":"CONFORME"}
 {"id":"C10 même paiement renvoyé (double clic, B17)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce paiement vient d'être enregistré (double envoi ignoré)","verdict":"CONFORME"}
@@ -39,4 +40,4 @@
 {"id":"I04 anon : RPC paiement","attendu":"refus","http":401,"code":"42501","obtenu":"42501 permission denied for function enregistrer_paiement_facture","verdict":"CONFORME"}
 {"id":"I05 service_role : flux de service (paramètres relances)","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
 {"id":"I06 service_role : aucune lecture directe des factures (ACL V9.1)","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table factures","verdict":"CONFORME"}
-{"total":41,"conformes":41,"ecarts":0}
+{"total":42,"conformes":42,"ecarts":0}

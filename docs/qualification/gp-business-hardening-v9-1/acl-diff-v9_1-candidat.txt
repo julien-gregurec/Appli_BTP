@@ -1,0 +1,35 @@
+151a152,177
+> colonne|pointages.affectation_id|authenticated=arw/postgres|
+> colonne|pointages.anomalie_motif|authenticated=arw/postgres|
+> colonne|pointages.anomalie_niveau|authenticated=arw/postgres|
+> colonne|pointages.chantier_id|authenticated=arw/postgres|
+> colonne|pointages.commentaire|authenticated=arw/postgres|
+> colonne|pointages.commentaire_verification|authenticated=arw/postgres|
+> colonne|pointages.created_at|authenticated=arw/postgres|
+> colonne|pointages.date|authenticated=arw/postgres|
+> colonne|pointages.employe_id|authenticated=arw/postgres|
+> colonne|pointages.entreprise_id|authenticated=arw/postgres|
+> colonne|pointages.heures_attendues|authenticated=arw/postgres|
+> colonne|pointages.heures_normales|authenticated=arw/postgres|
+> colonne|pointages.heures_supplementaires|authenticated=arw/postgres|
+> colonne|pointages.id|authenticated=arw/postgres|
+> colonne|pointages.latitude|authenticated=arw/postgres|
+> colonne|pointages.longitude|authenticated=arw/postgres|
+> colonne|pointages.origine_pointage|authenticated=arw/postgres|
+> colonne|pointages.pause_minutes|authenticated=arw/postgres|
+> colonne|pointages.photo_storage_path|authenticated=arw/postgres|
+> colonne|pointages.precision_metres|authenticated=arw/postgres|
+> colonne|pointages.regularise_par|authenticated=arw/postgres|
+> colonne|pointages.tache|authenticated=arw/postgres|
+> colonne|pointages.updated_at|authenticated=arw/postgres|
+> colonne|pointages.verification_at|authenticated=arw/postgres|
+> colonne|pointages.verification_par|authenticated=arw/postgres|
+> colonne|pointages.verification_statut|authenticated=arw/postgres|
+655a682
+> fonction|pointages_couts_appliques(uuid,date,date)|postgres=X/postgres,authenticated=X/postgres|true
+1029a1057
+> fonction|trg_facture_emise_non_annulable()|postgres=X/postgres|true
+2018c2046
+< table|pointages|postgres=arwdDxt/postgres,service_role=Dxt/postgres,authenticated=arwd/postgres|true
+---
+> table|pointages|postgres=arwdDxt/postgres,service_role=Dxt/postgres,authenticated=d/postgres|true
