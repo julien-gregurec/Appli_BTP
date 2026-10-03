@@ -29,7 +29,7 @@ POINT_PANNE="20260921000300"    # backfill lignes (le plus lent)
 res() { echo "$1|$2|$3" >> "$OUTI/resultats.txt"; echo "  $( [ "$2" = OK ] && echo ✅ || echo ❌) $1 : $3"; }
 : > "$OUTI/resultats.txt"
 etat() { # <base> <fichier> : schéma + ACL + ledger (empreinte d'état)
-  { su postgres -c "pg_dump -s -d $1" | grep -vE '^(--|SET |SELECT pg_catalog.set_config)' | sed '/^$/d'
+  { su postgres -c "pg_dump -s -d $1" | grep -vE '^(--|SET |SELECT pg_catalog.set_config|\\(un)?restrict )' | sed '/^$/d'
     upg_ledger "$1"; } | sha256sum | cut -c1-64 > "$2"
 }
 
@@ -39,7 +39,7 @@ echo "== S1 : coupure entre deux migrations (après $POINT_STOP) puis reprise ==
 lg=$(upg_q upg_s1 "select count(*) from supabase_migrations.schema_migrations")
 mx=$(upg_q upg_s1 "select max(version) from supabase_migrations.schema_migrations where version > '20260824000231'")
 attendu=$(python3 -c "
-import json;p=json.load(open('$OUTI/s1/plan.json'));e=[m.split('_')[0] for m in p['en_attente']];print(210+e.index('$POINT_STOP')+1)")
+import json;p=json.load(open('$OUTI/s1/plan.json'));e=[m.split('_')[0] for m in p['en_attente']];print(len(p['deja_appliquees'])+e.index('$POINT_STOP')+1)")
 [ "$rc" = 75 ] && [ "$lg" = "$attendu" ] && res S1a OK "arrêt propre (code 75), ledger $lg = 210 + préfixe jusqu'à $POINT_STOP" \
   || res S1a KO "code $rc, ledger $lg (attendu $attendu)"
 "$H" --target-sha "$SHA" --target-migration-count "$N" --source-db "$SRC" --work-db upg_s1 --sans-sonde "${PONTS[@]}" \
@@ -48,8 +48,7 @@ grep -q "UPGRADE QUALIFIÉ" "$OUTI/s1_b.log" && res S1b OK "reprise --resume : u
   || res S1b KO "reprise en échec (code $rc) : $(tail -3 "$OUTI/s1_b.log" | tr '\n' ' ')"
 
 echo "== S2 : panne DANS la transaction de $POINT_PANNE =="
-prec=$(python3 -c "
-import json;p=json.load(open('$OUTI/s1/plan.json'));e=[m.split('_')[0] for m in p['en_attente']];print(e[e.index('$POINT_PANNE')-1])")
+prec=$(ls "$OUTI/s1/target/supabase/migrations/" | cut -d_ -f1 | awk -v p="$POINT_PANNE" '$1 < p' | tail -1)
 "$H" --target-sha "$SHA" --target-migration-count "$N" --source-db "$SRC" --work-db upg_s2 --sans-sonde "${PONTS[@]}" \
   --stop-after "$prec" --out "$OUTI/s2" > "$OUTI/s2_a.log" 2>&1
 etat upg_s2 "$OUTI/s2_etat_avant.txt"
@@ -77,8 +76,9 @@ else res S3a OK "reprise naïve REFUSÉE par la migration elle-même (non idempo
 # Réparation manuelle : prouver que l'état = celui d'une base où la migration a été appliquée normalement, puis inscrire.
 "$H" --target-sha "$SHA" --target-migration-count "$N" --source-db "$SRC" --work-db upg_s3_ref --sans-sonde "${PONTS[@]}" \
   --stop-after "$POINT_PANNE" --out "$OUTI/s3r" > "$OUTI/s3_ref.log" 2>&1
-su postgres -c "pg_dump -s -d upg_s3" | grep -vE '^(--|SET )' | sed '/^$/d' | sha256sum > "$OUTI/s3_etat_sans_ledger.txt"
-su postgres -c "pg_dump -s -d upg_s3_ref" | grep -vE '^(--|SET )' | sed '/^$/d' | sha256sum > "$OUTI/s3_etat_reference.txt"
+# (\restrict / \unrestrict : jeton aléatoire de pg_dump ≥ 16.10, exclu de l'empreinte)
+su postgres -c "pg_dump -s -d upg_s3" | grep -vE '^(--|SET |SELECT pg_catalog.set_config|\\(un)?restrict )' | sed '/^$/d' | sha256sum > "$OUTI/s3_etat_sans_ledger.txt"
+su postgres -c "pg_dump -s -d upg_s3_ref" | grep -vE '^(--|SET |SELECT pg_catalog.set_config|\\(un)?restrict )' | sed '/^$/d' | sha256sum > "$OUTI/s3_etat_reference.txt"
 if diff -q "$OUTI/s3_etat_sans_ledger.txt" "$OUTI/s3_etat_reference.txt" >/dev/null; then
   upg_q upg_s3 "insert into supabase_migrations.schema_migrations(version, name) values ('$POINT_PANNE', '$(basename "$f" .sql | cut -d_ -f2-)')" >/dev/null
   "$H" --target-sha "$SHA" --target-migration-count "$N" --source-db "$SRC" --work-db upg_s3 --sans-sonde "${PONTS[@]}" \
@@ -98,6 +98,7 @@ if grep -qE "❌ (schéma upgradé ≠ fresh|sécurité / catalogue)" "$OUTI/s4_
 else res S4 KO "migration sautée NON détectée"; fi
 
 echo "== S5 : restauration du dump d'avant upgrade =="
+echo '{"tables": {}, "critiques": {}}' > "$OUTI/aucun-changement-declare.json"
 su postgres -c "pg_dump -Fc -d $SRC" > "$OUTI/source.dump"; chmod 644 "$OUTI/source.dump"
 sha256sum "$OUTI/source.dump" | cut -c1-64 > "$OUTI/source.dump.sha256"
 upg_drop upg_s5; su postgres -c "psql -X -q -d postgres -c 'create database upg_s5'" >/dev/null
@@ -106,7 +107,10 @@ python3 "$HERE/lib/fingerprint.py" capture "$SRC" "$OUTI/s5_src" > /dev/null
 python3 "$HERE/lib/fingerprint.py" capture upg_s5 "$OUTI/s5_rest" > /dev/null
 python3 "$HERE/lib/security_snapshot.py" "$SRC" "$OUTI/s5_sec_src" > /dev/null
 python3 "$HERE/lib/security_snapshot.py" upg_s5 "$OUTI/s5_sec_rest" > /dev/null
-python3 "$HERE/lib/fingerprint.py" compare "$OUTI/s5_src" "$OUTI/s5_rest" /dev/null "$OUTI/s5_zp.json" > "$OUTI/s5_zp.txt"; z=$?
+python3 "$HERE/lib/fingerprint.py" compare "$OUTI/s5_src" "$OUTI/s5_rest" "$OUTI/aucun-changement-declare.json" "$OUTI/s5_zp.json" > "$OUTI/s5_zp.txt" 2>&1; z=$?
+# Contraintes : pg_dump / pg_restore re-parse les expressions CHECK et APLATIT les AND imbriqués
+# (« ((a AND b) AND c) » → « (a AND b AND c) ») : comparaison sans parenthèses pour cette seule famille.
+for d in s5_sec_src s5_sec_rest; do tr -d '()' < "$OUTI/$d/constraints.txt" > "$OUTI/$d/constraints.txt.norm"; mv "$OUTI/$d/constraints.txt.norm" "$OUTI/$d/constraints.txt"; done
 dsec=$(diff -r "$OUTI/s5_sec_src" "$OUTI/s5_sec_rest" | grep -c '^[<>]')
 lgr=$(upg_q upg_s5 "select count(*) from supabase_migrations.schema_migrations")
 [ "$z" = 0 ] && [ "$dsec" = 0 ] && [ "$lgr" = 210 ] \
@@ -115,7 +119,9 @@ lgr=$(upg_q upg_s5 "select count(*) from supabase_migrations.schema_migrations")
 
 echo "== S6 : idempotence (chaque migration rejouée une 2e fois, transaction annulée) =="
 : > "$OUTI/s6.tsv"
-for m in $(python3 -c "import json;[print(x) for x in json.load(open('$OUTI/s1/plan.json'))['en_attente']]"); do
+# Liste COMPLÈTE des migrations du plan (cible − ledger de la source), indépendante des reprises.
+upg_ledger "$SRC" > "$OUTI/ledger_source.txt"
+for m in $(ls "$OUTI/s1/target/supabase/migrations/" | while read -r x; do grep -qx "${x%%_*}" "$OUTI/ledger_source.txt" || echo "$x"; done); do
   if { echo "begin;"; upg_contenu_migration "$OUTI/s1/target/supabase/migrations/$m" | python3 "$HERE/lib/strip_txn.py"; echo; echo "rollback;"; } \
       | su postgres -c "psql -X -q -v ON_ERROR_STOP=1 -d upg_s1" >/dev/null 2>"$OUTI/s6.err"; then
     echo -e "$m\tIDEMPOTENTE" >> "$OUTI/s6.tsv"

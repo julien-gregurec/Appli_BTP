@@ -1,0 +1,143 @@
+== actions_nom_propre.test.fresh_877a4b9f_p2_sb.log
+1..6
+== actions_nom_propre.test.h210_nodata.log
+1..6
+== alertes_operationnelles_delegations.test.fresh_877a4b9f_p2_sb.log
+1..22
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== alertes_operationnelles_delegations.test.h210_nodata.log
+1..22
+== alertes_operationnelles_ignorees.test.fresh_877a4b9f_p2_sb.log
+1..7
+== alertes_operationnelles_ignorees.test.h210_nodata.log
+1..7
+== archivage_notes_frais_rls.test.fresh_877a4b9f_p2_sb.log
+1..9
+== archivage_notes_frais_rls.test.h210_nodata.log
+1..9
+== borne_stock_securisee.test.fresh_877a4b9f_p2_sb.log
+1..11
+== borne_stock_securisee.test.h210_nodata.log
+1..11
+== correctif_isolation_devis_client.test.fresh_877a4b9f_p2_sb.log
+1..19
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== correctif_isolation_devis_client.test.h210_nodata.log
+1..19
+not ok 9 - 9. A ne peut pas modifier un devis A pour lui affecter un client B
+not ok 10 - 11. Un devis ne peut pas changer d'entreprise en conservant un client devenu incompatible (refus RLS ou FK)
+== correctif_isolation_relances_impayes.test.fresh_877a4b9f_p2_sb.log
+1..10
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== correctif_isolation_relances_impayes.test.h210_nodata.log
+1..10
+== correctif_rls_ecriture_chantiers.test.fresh_877a4b9f_p2_sb.log
+1..15
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== correctif_rls_ecriture_chantiers.test.h210_nodata.log
+1..15
+== correctif_rls_isolation_factures.test.fresh_877a4b9f_p2_sb.log
+1..28
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== correctif_rls_isolation_factures.test.h210_nodata.log
+1..28
+not ok 18 - 18. Facture A ne peut pas être modifiée pour pointer vers un client B
+not ok 19 - 19. Facture A ne peut pas être modifiée pour pointer vers un devis B
+== isolation_multitenant_comportement.test.fresh_877a4b9f_p2_sb.log
+1..56
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== isolation_multitenant_comportement.test.h210_nodata.log
+1..56
+== isolation_multitenant_roles.test.fresh_877a4b9f_p2_sb.log
+1..24
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== isolation_multitenant_roles.test.h210_nodata.log
+1..24
+== isolation_multitenant_surface.test.fresh_877a4b9f_p2_sb.log
+1..10
+not ok 8 - Aucune fonction SECURITY DEFINER métier n’est exécutable par anon
+== isolation_multitenant_surface.test.h210_nodata.log
+1..10
+not ok 8 - Aucune fonction SECURITY DEFINER métier n’est exécutable par anon
+== medias_messagerie_chantiers.test.fresh_877a4b9f_p2_sb.log
+1..8
+== medias_messagerie_chantiers.test.h210_nodata.log
+1..8
+== pieces_jointes_v1_lecture_documents_employes.test.fresh_877a4b9f_p2_sb.log
+1..9
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== pieces_jointes_v1_lecture_documents_employes.test.h210_nodata.log
+1..9
+== pieces_jointes_v1_photos_comptes_rendus.test.fresh_877a4b9f_p2_sb.log
+1..7
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== pieces_jointes_v1_photos_comptes_rendus.test.h210_nodata.log
+1..7
+== pieces_jointes_v1_suppression_devis.test.fresh_877a4b9f_p2_sb.log
+1..6
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== pieces_jointes_v1_suppression_devis.test.h210_nodata.log
+1..6
+== plateforme_impayes.test.fresh_877a4b9f_p2_sb.log
+1..12
+not ok 10 - Le règlement rétablit le compte
+== plateforme_impayes.test.h210_nodata.log
+1..12
+== rate_limiting_applicatif.test.fresh_877a4b9f_p2_sb.log
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:2: ERROR:  function plan(integer) does not exist
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:4: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:5: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== rate_limiting_applicatif.test.h210_nodata.log
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:2: ERROR:  function plan(integer) does not exist
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:4: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:<scratch>/oldtap/supabase/tests/rate_limiting_applicatif.test.sql:5: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== relances_auto_v1_reclamation.test.fresh_877a4b9f_p2_sb.log
+1..10
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== relances_auto_v1_reclamation.test.h210_nodata.log
+1..10
+== renommage_elsatia_boutique.test.fresh_877a4b9f_p2_sb.log
+1..18
+== renommage_elsatia_boutique.test.h210_nodata.log
+1..18
+== terrain_mobile_v1b_permission_documents.test.fresh_877a4b9f_p2_sb.log
+1..22
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== terrain_mobile_v1b_permission_documents.test.h210_nodata.log
+1..22
+== terrain_mobile_v1c_lecture_seule_et_actions_directes.test.fresh_877a4b9f_p2_sb.log
+1..13
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== terrain_mobile_v1c_lecture_seule_et_actions_directes.test.h210_nodata.log
+1..13
+== terrain_mobile_v1d2_validation_pointage_runtime.test.fresh_877a4b9f_p2_sb.log
+1..8
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== terrain_mobile_v1d2_validation_pointage_runtime.test.h210_nodata.log
+1..8
+== verrouiller_facture_emise.test.fresh_877a4b9f_p2_sb.log
+1..6
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== verrouiller_facture_emise.test.h210_nodata.log
+1..6
+== workflow_devis_v1_chantier_depuis_devis.test.fresh_877a4b9f_p2_sb.log
+1..10
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:159: ERROR:  CAPACITE_PERSONNES_ATTEINTE
+psql:<scratch>/oldtap/supabase/tests/fixtures/isolation_multitenant.inc:168: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+== workflow_devis_v1_chantier_depuis_devis.test.h210_nodata.log
+1..10

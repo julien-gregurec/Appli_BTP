@@ -1,0 +1,3 @@
+# project_ref=<ref du projet Production>
+# GABARIT — export LECTURE SEULE : select version from supabase_migrations.schema_migrations order by version;
+# une version par ligne ; lu par le preflight (P5) ; son sha256 doit figurer dans l'attestation Production.
