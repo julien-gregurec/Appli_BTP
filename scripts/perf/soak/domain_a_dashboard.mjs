@@ -44,7 +44,9 @@ for (const t of TENANTS) {
     documents_page: () => call(tok, `/documents_chantier?select=id,nom&entreprise_id=eq.${t.ent}&order=created_at.desc&limit=50`),
   };
   const row = { tenant: t.k, volume: n, verite, flux: {} };
-  for (const [nom, f] of Object.entries(flux)) {
+  // SOAK_SANS_DIRECT=1 : ne mesure que les chemins réels des pages (RPC), pas les lectures PostgREST directes.
+  const DIRECTS = ["factures_sans_limite", "taches_a_faire", "documents_page", "devis_direct_offset_profond"];
+  for (const [nom, f] of Object.entries(flux).filter(([n]) => !(process.env.SOAK_SANS_DIRECT && DIRECTS.includes(n)))) {
     await f(); // chauffe
     const s = []; for (let i = 0; i < REPS; i++) s.push(await f());
     const st = stats(s);
