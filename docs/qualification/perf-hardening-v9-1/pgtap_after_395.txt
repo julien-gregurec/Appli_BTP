@@ -144,7 +144,7 @@ rgpd_purge_contrats_acceptes_conserver_v1 plan=30 ok=30 not_ok=0 erreurs=0 PROPR
 rgpd_purge_contrats_acceptes_securite_v1 plan=46 ok=46 not_ok=0 erreurs=0 PROPRE
 rgpd_purge_contrats_acceptes_supprimer_v1 plan=16 ok=16 not_ok=0 erreurs=0 PROPRE
 rgpd_purge_facture_emise_reconciliation_v1 plan=48 ok=48 not_ok=0 erreurs=0 PROPRE
-rls_ensembles_entreprises_equivalence_v1 plan=50 ok=50 not_ok=0 erreurs=0 PROPRE
+rls_ensembles_entreprises_equivalence_v1 plan=54 ok=54 not_ok=0 erreurs=0 PROPRE
 securiser_taux_horaire_facture_employe plan=6 ok=6 not_ok=0 erreurs=0 PROPRE
 securite_residuel_entreprise_sans_membres_v1 plan=16 ok=16 not_ok=0 erreurs=0 PROPRE
 security_redteam_v2_hardening_v1 plan=9 ok=9 not_ok=0 erreurs=0 PROPRE
