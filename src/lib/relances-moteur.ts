@@ -120,8 +120,18 @@ async function lireDocumentService(
   return (data as (Record<string, unknown> & HistoriqueService) | null) ?? null;
 }
 
-async function lireCandidatsService(supabase: SupabaseClient, entrepriseId: string, typeDocument: TypeDocumentRelance): Promise<{ data: Array<{ id: string }> }> {
-  const { data, error } = await supabase.rpc("relances_auto_candidats_service", {
+// Sélection des candidats (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003000201) : le
+// plafond porte sur les documents POTENTIELLEMENT éligibles, les plus dus d'abord — 200 documents
+// définitivement inéligibles ne peuvent plus évincer une facture saine. Même sélection SQL pour le
+// cron (RPC de service) et la simulation (RPC SECURITY INVOKER, sous la RLS de la session).
+// Le moteur ci-dessous reste l'autorité sur l'éligibilité de chaque candidat.
+async function lireCandidats(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  typeDocument: TypeDocumentRelance,
+  service: boolean,
+): Promise<{ data: Array<{ id: string }> }> {
+  const { data, error } = await supabase.rpc(service ? "relances_auto_candidats_service" : "relances_auto_candidats_selection", {
     p_entreprise_id: entrepriseId,
     p_type_document: typeDocument,
     p_limite: PLAFOND_CANDIDATS_PAR_TYPE,
@@ -258,8 +268,9 @@ export async function evaluerEligibiliteFacture(
   };
 }
 
-// §44 : plafond de lot volontairement bas pour ce lancement V1 (documenté), pas d'architecture
-// de file d'attente — voir docs/commercial/RELANCES_AUTO_V1.md.
+// §44 : plafond de lot volontairement bas pour ce lancement V1 (documenté) — voir
+// docs/commercial/RELANCES_AUTO_V1.md. Il porte sur des candidats pré-filtrés et ordonnés (voir
+// lireCandidats) : au-delà de 200 documents réellement dus, le reste passe aux cron suivants.
 const PLAFOND_CANDIDATS_PAR_TYPE = 200;
 
 export async function listerCandidatsAutoDevis(
@@ -269,13 +280,7 @@ export async function listerCandidatsAutoDevis(
   aujourdhui: Date,
   opts: { service?: boolean } = {},
 ): Promise<{ candidats: CandidatRelance[]; ineligibles: Ineligibilite[] }> {
-  const { data } = opts.service ? await lireCandidatsService(supabase, entrepriseId, "devis") : await supabase
-    .from("devis")
-    .select("id")
-    .eq("entreprise_id", entrepriseId)
-    .eq("statut", "envoye")
-    .eq("relance_auto_exclue", false)
-    .limit(PLAFOND_CANDIDATS_PAR_TYPE);
+  const { data } = await lireCandidats(supabase, entrepriseId, "devis", Boolean(opts.service));
   const candidats: CandidatRelance[] = [];
   const ineligibles: Ineligibilite[] = [];
   for (const ligne of data ?? []) {
@@ -293,13 +298,7 @@ export async function listerCandidatsAutoFactures(
   aujourdhui: Date,
   opts: { service?: boolean } = {},
 ): Promise<{ candidats: CandidatRelance[]; ineligibles: Ineligibilite[] }> {
-  const { data } = opts.service ? await lireCandidatsService(supabase, entrepriseId, "facture") : await supabase
-    .from("factures")
-    .select("id")
-    .eq("entreprise_id", entrepriseId)
-    .in("statut", ["envoyee", "en_retard", "payee_partiel"])
-    .eq("relance_auto_exclue", false)
-    .limit(PLAFOND_CANDIDATS_PAR_TYPE);
+  const { data } = await lireCandidats(supabase, entrepriseId, "facture", Boolean(opts.service));
   const candidats: CandidatRelance[] = [];
   const ineligibles: Ineligibilite[] = [];
   for (const ligne of data ?? []) {

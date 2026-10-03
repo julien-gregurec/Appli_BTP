@@ -19,8 +19,12 @@ const NOTIFICATION = {
   abonnements: [{ id: "abo-1", endpoint: "https://push.invalid/1", p256dh: "p", auth: "a" }],
 };
 
-function adminFactice(preparation: { data: unknown; error: unknown }) {
-  const rpc = vi.fn(async (nom: string) => (nom === "push_preparer_notification_service" ? preparation : { data: null, error: null }));
+function adminFactice(preparation: { data: unknown; error: unknown }, reservation: { data: unknown; error: unknown } = { data: true, error: null }) {
+  const rpc = vi.fn(async (nom: string) => {
+    if (nom === "push_preparer_notification_service") return preparation;
+    if (nom === "push_reserver_notification_service") return reservation;
+    return { data: null, error: null };
+  });
   const from = vi.fn(() => { throw new Error("aucune lecture directe de table attendue"); });
   return { client: { rpc, from } as never, rpc, from };
 }
@@ -64,16 +68,50 @@ describe("traiterNotificationPush (chemin de service)", () => {
     expect(rpc).toHaveBeenCalledWith("push_supprimer_abonnement_service", { p_abonnement_id: "abo-1", p_utilisateur_id: "user-1" });
   });
 
-  it("laisse la notification en attente si sa lecture échoue (reprise par le cron)", async () => {
+  it("signale un échec (réessai différé) si sa lecture échoue, sans la marquer", async () => {
     const { client, rpc } = adminFactice({ data: null, error: { code: "42501" } });
-    await traiterNotificationPush(client, "notif-1");
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(await traiterNotificationPush(client, "notif-1")).toBe("echec");
+    expect(rpc).toHaveBeenCalledWith("push_echec_notification_service", { p_notification_id: "notif-1" });
+    expect(rpc).not.toHaveBeenCalledWith("push_marquer_notification_envoyee_service", expect.anything());
     expect(console.error).toHaveBeenCalled();
   });
 
   it("ne fait rien pour une notification absente ou déjà traitée", async () => {
     const { client, rpc } = adminFactice({ data: null, error: null });
-    await traiterNotificationPush(client, "notif-1");
+    expect(await traiterNotificationPush(client, "notif-1")).toBe("ignoree");
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("webhook : réserve d'abord la notification et s'abstient si un autre worker la tient", async () => {
+    const { client, rpc } = adminFactice({ data: NOTIFICATION, error: null }, { data: false, error: null });
+    expect(await traiterNotificationPush(client, "notif-1")).toBe("ignoree");
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("push_reserver_notification_service", { p_notification_id: "notif-1" });
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("cron : une notification déjà réservée par le lot n'est pas re-réservée", async () => {
+    webpush.sendNotification.mockResolvedValue({});
+    const { client, rpc } = adminFactice({ data: NOTIFICATION, error: null });
+    expect(await traiterNotificationPush(client, "notif-1", { dejaReservee: true })).toBe("envoyee");
+    expect(rpc).not.toHaveBeenCalledWith("push_reserver_notification_service", expect.anything());
+  });
+
+  it("tous les envois en échec transitoire : réessai, jamais marquée envoyée", async () => {
+    webpush.sendNotification.mockRejectedValue(Object.assign(new Error("Timeout"), { statusCode: 503 }));
+    const { client, rpc } = adminFactice({ data: NOTIFICATION, error: null });
+    expect(await traiterNotificationPush(client, "notif-1")).toBe("echec");
+    expect(rpc).toHaveBeenCalledWith("push_echec_notification_service", { p_notification_id: "notif-1" });
+    expect(rpc).not.toHaveBeenCalledWith("push_marquer_notification_envoyee_service", expect.anything());
+  });
+
+  it("un appareil servi sur deux : marquée envoyée (pas de double push au réessai)", async () => {
+    webpush.sendNotification
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(Object.assign(new Error("Timeout"), { statusCode: 503 }));
+    const deuxAppareils = { ...NOTIFICATION, abonnements: [...NOTIFICATION.abonnements, { id: "abo-2", endpoint: "https://push.invalid/2", p256dh: "p", auth: "a" }] };
+    const { client, rpc } = adminFactice({ data: deuxAppareils, error: null });
+    expect(await traiterNotificationPush(client, "notif-1")).toBe("envoyee");
+    expect(rpc).toHaveBeenCalledWith("push_marquer_notification_envoyee_service", { p_notification_id: "notif-1" });
   });
 });
