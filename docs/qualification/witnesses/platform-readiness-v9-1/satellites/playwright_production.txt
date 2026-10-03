@@ -1,0 +1,4 @@
+  ✓  15 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:294:7 › PRODUCTION simulée — hôtes canoniques › lanceur GP : url_production du catalogue ; Réserves (sans url_production) non cliquable (2.2s)
+  ✓  16 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:305:7 › PRODUCTION simulée — hôtes canoniques › Tools (build production) : liens canoniques (874ms)
+  14 skipped
+  2 passed (3.9s)

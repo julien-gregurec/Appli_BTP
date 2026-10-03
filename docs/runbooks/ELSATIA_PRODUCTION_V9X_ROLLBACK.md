@@ -59,9 +59,34 @@ tables 210 : appliquer trafic fermé, `lock_timeout` positionné.
 | R1 | **Preflight vert** : `npm run production:v9x:preflight -- --target-sha … --target-migration-count … --ledger … --production-attestation … --backup-attestation …` | sortie `PREFLIGHT OK` archivée |
 | R2 | **Sauvegarde double** : PITR managé noté (horodatage UTC) **et** `pg_dump -Fc` chiffré, SHA-256 consigné | attestation `backup_id`, `taken_at` ≤ 24 h |
 | R3 | **Restauration testée** de ce dump sur une base isolée (jamais Preview/Production) : empreintes zéro perte identiques | `restore_tested=true`, `restore_target` local |
-| R4 | Sonde lecture seule (`scripts/upgrade/sql/production_readonly_probe.sql`) : `bloquant_*` = 0, `lignes_factures_emises` = 0 **ou** ponts 298/399 intégrés à la cible | attestation `data_preconditions` |
+| R4 | Sonde lecture seule (`scripts/upgrade/sql/production_readonly_probe.sql`) : `bloquant_*` = 0 (hors `bloquant_lignes_factures_emises_non_preparees`, remis à 0 par la phase 0) | attestation `data_preconditions` |
 | R5 | Décision écrite sur UPG-P1-1 (essais « perpétuels ») et UPG-SEC-1 (admin plateforme ajouté par 233) | trace propriétaire |
 | R6 | Maintenance activée, webhooks Stripe **en attente** (Stripe ré-émet jusqu'à 3 jours), crons arrêtés | capture |
+
+## 2 bis. Phase 0 puis phase principale (train ≥ V9.1 readiness, ponts du train)
+
+Depuis `integration/elsatia-platform-readiness-v9-1`, UPG-P0-1 / UPG-LOCK-1 / UPG-P3-1 sont couverts par le pont
+**du train** `20261003000201_pont_upgrade_prod_phase0_lignes_entreprise_v1.sql` (version postérieure à tout le train,
+marqueur `-- elsatia:upgrade-phase0`). La CLI applique les versions en attente dans l'ordre : ce pont doit donc être
+appliqué **seul, en premier**, dans la fenêtre (trafic fermé) :
+
+1. `npm run production:v9x:preflight -- --phase 0 …` → `PREFLIGHT OK`.
+2. **Phase 0** : répertoire de migrations = les 210 fichiers historiques (manifeste `source-prod-210-5777abb.json`) +
+   `20261003000201_*.sql` (copié **à l'octet**) → `supabase db push` : une seule version en attente, sans
+   `--include-all`. Compatible ancien code (colonne nullable non lue). Durée mesurée : 1,6 s à 100 000 lignes.
+3. Sonde lecture seule rejouée : `bloquant_lignes_factures_emises_non_preparees` = 0, `phase0_au_ledger` présent.
+4. `npm run production:v9x:preflight -- --phase principale …` → `PREFLIGHT OK` (refusé tant que 201 n'est pas au ledger).
+5. **Phase principale** : train complet, `supabase db push --include-all` (181 historiques en attente, satellites, puis
+   `20261003000202` qui contrôle l'état final).
+
+Lancer la phase principale sans la phase 0 reproduit UPG-P0-1 (300 échoue, transaction annulée, ledger cohérent) :
+revenir à l'étape 1. Ne jamais intégrer les ponts proposés v1/v2 (`scripts/upgrade/bridges/`, versions 298/399) :
+ils s'insèrent avant des migrations appliquées en Preview.
+
+| Volume | Phase 0 + phase principale (ponts du train) |
+|---|---|
+| 500 | 24 s (201 : 26 ms, 300 : 34 ms, 0 ligne touchée) |
+| 100 000 | **28 s** (201 : 1,6 s ; 300 : 0,6 s, 0 ligne touchée ; ACCESS EXCLUSIVE lignes seulement) |
 
 ## 3. Fenêtre de compatibilité de l'ancien code (mesurée)
 

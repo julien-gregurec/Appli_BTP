@@ -1,0 +1,48 @@
+### S0
+est_plateforme_admin() par email juste après 233 (modèle 210, avant 235) : f
+plateforme_admins après upgrade :
+  julien.gregurec@gmail.com|total|f|en_attente|f|∅|∅
+  julien@elsatia.fr|total|f|en_attente|t|∅|hotfix:plateforme_admin_v1
+  julien@elsatia.fr (aal1) : est_plateforme_admin=f
+  julien@elsatia.fr (aal2) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal1) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal2) : est_plateforme_admin=f
+  revendication propriétaire julien@elsatia.fr (aal2) : ERROR:  Compte propriétaire non vérifié
+  après revendication (même transaction) : ERROR:  Compte propriétaire non vérifié
+  revendication par un autre compte (aal2) : ERROR:  Compte propriétaire non vérifié
+### S1
+est_plateforme_admin() par email juste après 233 (modèle 210, avant 235) : f
+plateforme_admins après upgrade :
+  julien.gregurec@gmail.com|total|t|active|f|a2330000-0000-0000-0000-000000000961|∅
+  julien@elsatia.fr|total|f|rattachee_non_confirmee|t|a2330000-0000-0000-0000-000000000e15|hotfix:plateforme_admin_v1
+  julien@elsatia.fr (aal1) : est_plateforme_admin=f
+  julien@elsatia.fr (aal2) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal1) : est_plateforme_admin=t
+  julien.gregurec@gmail.com (aal2) : est_plateforme_admin=t
+  revendication propriétaire julien@elsatia.fr (aal2) : ERROR:  Authentification forte requise
+  après revendication (même transaction) : ERROR:  Authentification forte requise
+  revendication par un autre compte (aal2) : ERROR:  Authentification forte requise
+### S2
+est_plateforme_admin() par email juste après 233 (modèle 210, avant 235) : f
+plateforme_admins après upgrade :
+  julien.gregurec@gmail.com|total|f|en_attente|f|∅|∅
+  julien@elsatia.fr|total|f|rattachee_non_confirmee|t|a2330000-0000-0000-0000-000000000e15|hotfix:plateforme_admin_v1
+  julien@elsatia.fr (aal1) : est_plateforme_admin=f
+  julien@elsatia.fr (aal2) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal1) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal2) : est_plateforme_admin=f
+  revendication propriétaire julien@elsatia.fr (aal2) : ERROR:  Compte propriétaire non vérifié
+  après revendication (même transaction) : ERROR:  Compte propriétaire non vérifié
+  revendication par un autre compte (aal2) : ERROR:  Compte propriétaire non vérifié
+### S3
+est_plateforme_admin() par email juste après 233 (modèle 210, avant 235) : f
+plateforme_admins après upgrade :
+  julien.gregurec@gmail.com|total|t|active|f|a2330000-0000-0000-0000-000000000961|∅
+  julien@elsatia.fr|total|f|rattachee_non_confirmee|t|a2330000-0000-0000-0000-000000000e15|hotfix:plateforme_admin_v1
+  julien@elsatia.fr (aal1) : est_plateforme_admin=f
+  julien@elsatia.fr (aal2) : est_plateforme_admin=f
+  julien.gregurec@gmail.com (aal1) : est_plateforme_admin=t
+  julien.gregurec@gmail.com (aal2) : est_plateforme_admin=t
+  revendication propriétaire julien@elsatia.fr (aal2) : 
+  après revendication (même transaction) : est_plateforme_admin=true
+  revendication par un autre compte (aal2) : ERROR:  Ce compte n'est pas le propriétaire ELSATIA

@@ -1,0 +1,6 @@
+  ✓  11 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:248:7 › PREVIEW simulée — aucun lien Preview → Production › lanceur GP : URL Preview du catalogue, jamais *.elsatia.fr ni localhost (2.1s)
+  ✓  12 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:260:7 › PREVIEW simulée — aucun lien Preview → Production › Colors : retour GP = Preview GP ; portail de compte localhost masqué plutôt que servi (1.0s)
+  ✓  13 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:271:7 › PREVIEW simulée — aucun lien Preview → Production › Réserves : liens Preview vers GP et Colors (1.1s)
+  ✓  14 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:279:7 › PREVIEW simulée — aucun lien Preview → Production › Tools (build NEXT_PUBLIC_TOOLS_ENV=preview) : création de compte et promotions en Preview (1.2s)
+  12 skipped
+  4 passed (6.3s)

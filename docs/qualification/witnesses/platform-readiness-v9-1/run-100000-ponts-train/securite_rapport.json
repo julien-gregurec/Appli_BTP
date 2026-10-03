@@ -1,0 +1,211 @@
+{
+ "fermeture": {
+  "acl_colonnes.txt": {
+   "lignes": 305,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "acl_fonctions.txt": {
+   "lignes": 2919,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "acl_schemas.txt": {
+   "lignes": 15,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "acl_tables.txt": {
+   "lignes": 3438,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "constraints.txt": {
+   "lignes": 2180,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "default_acl.txt": {
+   "lignes": 5,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "functions.txt": {
+   "lignes": 973,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "indexes.txt": {
+   "lignes": 893,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "policies.txt": {
+   "lignes": 760,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "rls.txt": {
+   "lignes": 283,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "roles.txt": {
+   "lignes": 4,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "secdef_sans_search_path.txt": {
+   "lignes": 0,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "storage.txt": {
+   "lignes": 93,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "triggers.txt": {
+   "lignes": 530,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  },
+  "views.txt": {
+   "lignes": 3,
+   "en_trop": [],
+   "manquantes": [],
+   "nb_en_trop": 0,
+   "nb_manquantes": 0
+  }
+ },
+ "avant_apres": {
+  "acl_colonnes.txt": {
+   "avant": 21,
+   "apres": 305,
+   "retirees": 0,
+   "ajoutees": 284
+  },
+  "acl_fonctions.txt": {
+   "avant": 834,
+   "apres": 2919,
+   "retirees": 285,
+   "ajoutees": 2370
+  },
+  "acl_schemas.txt": {
+   "avant": 12,
+   "apres": 15,
+   "retirees": 0,
+   "ajoutees": 3
+  },
+  "acl_tables.txt": {
+   "avant": 2689,
+   "apres": 3438,
+   "retirees": 752,
+   "ajoutees": 1501
+  },
+  "constraints.txt": {
+   "avant": 1039,
+   "apres": 2180,
+   "retirees": 1,
+   "ajoutees": 1142
+  },
+  "default_acl.txt": {
+   "avant": 19,
+   "apres": 5,
+   "retirees": 14,
+   "ajoutees": 0
+  },
+  "functions.txt": {
+   "avant": 278,
+   "apres": 973,
+   "retirees": 58,
+   "ajoutees": 753
+  },
+  "indexes.txt": {
+   "avant": 468,
+   "apres": 893,
+   "retirees": 0,
+   "ajoutees": 425
+  },
+  "policies.txt": {
+   "avant": 559,
+   "apres": 760,
+   "retirees": 47,
+   "ajoutees": 248
+  },
+  "rls.txt": {
+   "avant": 153,
+   "apres": 283,
+   "retirees": 0,
+   "ajoutees": 130
+  },
+  "roles.txt": {
+   "avant": 4,
+   "apres": 4,
+   "retirees": 0,
+   "ajoutees": 0
+  },
+  "secdef_sans_search_path.txt": {
+   "avant": 0,
+   "apres": 0,
+   "retirees": 0,
+   "ajoutees": 0
+  },
+  "storage.txt": {
+   "avant": 62,
+   "apres": 93,
+   "retirees": 0,
+   "ajoutees": 31
+  },
+  "triggers.txt": {
+   "avant": 91,
+   "apres": 530,
+   "retirees": 2,
+   "ajoutees": 441
+  },
+  "views.txt": {
+   "avant": 0,
+   "apres": 3,
+   "retirees": 0,
+   "ajoutees": 3
+  }
+ },
+ "bloquants": [],
+ "a_justifier": [
+  "privilège table ajouté à authenticated : public.lignes_inventaire|authenticated|SELECT|false"
+ ],
+ "info": [
+  "table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.acceptations_documents_legaux",
+  "table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.documents_legaux_versions"
+ ],
+ "ferme_vs_fresh": true,
+ "verdict": "OK"
+}

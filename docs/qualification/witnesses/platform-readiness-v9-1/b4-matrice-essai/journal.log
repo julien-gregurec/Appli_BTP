@@ -1,0 +1,20 @@
+A1 (pre231, essai, essai sans date, ancien (« essai perpétuel »)) : sonde 0|1|0|0 → OK ; après 2026-07-05|2026-08-04|suspended
+A2 (pre231, essai, essai sans date, récent) : sonde 0|0|0|0 → OK ; après 2026-09-23|2026-10-23|trial
+A3 (pre231, essai, essai, fin passée dans la fenêtre) : sonde 0|0|0|0 → OK ; après 2026-08-04|2026-09-03|suspended
+A4 (pre231, essai, essai, fin future dans la fenêtre) : sonde 0|0|0|0 → OK ; après 2026-09-23|2026-10-23|trial
+A5 (pre231, essai, essai Stripe, fin future > création + 30 (encore future après troncature)) : sonde 0|0|1|0 → OK ; après 2026-09-13|2026-10-13|trial
+A6 (pre231, essai, essai Stripe, fin future > création + 30 (passée après troncature)) : sonde 0|0|1|1 → OK ; après 2026-08-24|2026-09-23|suspended
+A7 (pre231, essai, fin d'essai antérieure à la création) : sonde 1|0|0|0 → ECHEC 20260816000204 : ERROR:  check constraint "entreprises_essai_dates_coherentes" of relation "entreprises" is violated by some row ; après —|—|—
+A8 (pre231, actif, legacy actif, aucune date (offre historique)) : sonde 0|0|0|0 → OK ; après 2025-08-29|2025-09-28|active
+A9 (pre231, actif, legacy actif, vieil essai Stripe de 14 j) : sonde 0|0|0|0 → OK ; après 2025-08-29|2025-09-12|active
+A10 (pre231, actif, actif, essai Stripe ancien > 30 j) : sonde 0|0|1|0 → OK ; après 2026-06-25|2026-07-25|active
+A11 (pre231, annule, annulé, aucune date) : sonde 0|0|0|0 → OK ; après 2025-12-07|2026-01-06|cancelled
+A12 (pre231, suspendu, suspendu, fin passée) : sonde 0|0|0|0 → OK ; après 2026-03-17|2026-04-16|suspended
+B1 (post231, essai, essai trigger 231, fin future) : sonde 0|0|0|0 → OK ; après 2026-09-23|2026-10-23|trial
+B2 (post231, essai, essai trigger 231, fin passée) : sonde 0|0|0|0 → OK ; après 2026-08-24|2026-09-23|suspended
+B3 (post231, essai, essai : fin réécrite par Stripe > debut + 30 (future)) : sonde 1|0|0|0 → ECHEC 20260816000204 : ERROR:  check constraint "entreprises_essai_dates_coherentes" of relation "entreprises" is violated by some row ; après —|—|—
+B4 (post231, actif, converti après un essai Stripe > debut + 30) : sonde 1|0|0|0 → ECHEC 20260816000204 : ERROR:  check constraint "entreprises_essai_dates_coherentes" of relation "entreprises" is violated by some row ; après —|—|—
+B5 (post231, annule, annulé après un essai Stripe > debut + 30) : sonde 1|0|0|0 → ECHEC 20260816000204 : ERROR:  check constraint "entreprises_essai_dates_coherentes" of relation "entreprises" is violated by some row ; après —|—|—
+B6 (post231, essai, debut posé, fin effacée) : sonde 0|0|0|0 → OK ; après 2026-09-23|2026-10-23|trial
+B7 (post231, actif, fin antérieure au début) : sonde 1|0|0|0 → ECHEC 20260816000204 : ERROR:  check constraint "entreprises_essai_dates_coherentes" of relation "entreprises" is violated by some row ; après —|—|—
+B8 (post231, suspendu, suspendu, fenêtre exacte) : sonde 0|0|0|0 → OK ; après 2026-08-29|2026-09-28|suspended

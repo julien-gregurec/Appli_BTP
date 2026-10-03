@@ -1,0 +1,155 @@
+{
+ "tables": {
+  "public.employes": {
+   "supprimees": 0,
+   "modifiees": 68,
+   "ajoutees": 0,
+   "colonnes_modifiees": {},
+   "colonnes_disparues": [
+    "taux_horaire",
+    "cout_horaire"
+   ],
+   "ex_supprimees": [],
+   "ex_modifiees": [
+    "14a179fa-d4b7-442a-a540-9cfde50f4704",
+    "1b45d26a-ba7b-4fb6-b3ae-7905be6f684a",
+    "20ce34a4-8ff3-4970-8fcd-c7899df611dc",
+    "23bd64ac-4917-4be5-a632-892d921eb73c",
+    "23f92c32-7ea2-4fbf-adc1-e3c08211471f"
+   ]
+  },
+  "public.entreprises": {
+   "supprimees": 0,
+   "modifiees": 6,
+   "ajoutees": 0,
+   "colonnes_modifiees": {
+    "abonnement_essai_fin∅→": 5,
+    "abonnement_essai_debut∅→": 6,
+    "abonnement_essai_fin": 1
+   },
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": [
+    "24f950f3-ddf3-4e8d-beb8-df7e9b022ba3",
+    "5ba7545b-59ae-402a-8787-f5567c708e43",
+    "b0000000-0000-0000-0000-000000000001",
+    "c2100000-0000-0000-0000-000000000001",
+    "c2100000-0000-0000-0000-000000000002"
+   ]
+  },
+  "public.factures": {
+   "supprimees": 0,
+   "modifiees": 1082,
+   "ajoutees": 0,
+   "colonnes_modifiees": {
+    "entreprise_snapshot∅→": 1082
+   },
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": [
+    "001288e8-d95f-431c-8764-32539169af88",
+    "0012f194-a9bd-4e88-a303-5e54181323e9",
+    "00330fe8-d36a-436c-ade3-0456128012f9",
+    "0080cd73-dbcb-4a13-810d-bea1a5d40228",
+    "00bc4746-35c2-486a-bc98-fe951c85ef12"
+   ]
+  },
+  "public.historique_tarification": {
+   "supprimees": 0,
+   "modifiees": 0,
+   "ajoutees": 5,
+   "colonnes_modifiees": {},
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": []
+  },
+  "public.plans_abonnement": {
+   "supprimees": 0,
+   "modifiees": 5,
+   "ajoutees": 8,
+   "colonnes_modifiees": {
+    "actif": 5,
+    "valide_au∅→": 5
+   },
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": [
+    "42ab9837-2ea6-4d4f-a13f-50a090ca4fd1",
+    "42c6d1fc-e9df-4d6f-9793-d73be31ff1ca",
+    "8d7c9a61-e4e0-4d8e-a3b0-7aa94350f9a9",
+    "9dd4e3af-2bb6-4329-bf46-b8911b5817c2",
+    "ca2d422f-2b04-446f-9d1b-6bddd3a3a201"
+   ]
+  },
+  "public.plateforme_admins": {
+   "supprimees": 0,
+   "modifiees": 0,
+   "ajoutees": 1,
+   "colonnes_modifiees": {},
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": []
+  },
+  "storage.buckets": {
+   "supprimees": 0,
+   "modifiees": 0,
+   "ajoutees": 7,
+   "colonnes_modifiees": {},
+   "colonnes_disparues": [],
+   "ex_supprimees": [],
+   "ex_modifiees": []
+  }
+ },
+ "p0": [],
+ "declares": [
+  "public.employes.taux_horaire déplacée vers public.employes_taux_facture.taux_horaire.employe_id : toutes les valeurs retrouvées",
+  "public.employes.cout_horaire déplacée vers public.employes_cout_horaire.cout_horaire.employe_id : toutes les valeurs retrouvées",
+  "public.employes : -0 ~68 +0 [] — 20260818000205 / 20260922000328 : coûts et taux horaires sortis de employes (données RH sensibles) vers des tables à accès restreint ; valeurs vérifiées une à une.",
+  "public.entreprises : -0 ~6 +0 [abonnement_essai_debut∅→(6), abonnement_essai_fin(1), abonnement_essai_fin∅→(5)] — 20260816000204 (C6-B, hors ordre) : fenêtre d'essai de 30 jours renseignée pour les entreprises antérieures à 231 (debut = création) ; UPG-P2-1 : une fin d'essai Stripe > création + 30 j est TRONQUÉE à création + 30 (changement rétroactif, sans effet sur un contrat payant).",
+  "public.factures : -0 ~1082 +0 [entreprise_snapshot∅→(1082)] — Idem devis : 20260921000300 (recalcul, montants identiques, updated_at rafraîchi) ; 20260908000272 / 20260926000501 : snapshot émetteur des factures émises renseigné s'il était NULL, marqué identite_incertaine (jamais écrasé).",
+  "public.historique_tarification : -0 ~0 +5 [] — 20260901000254 : journal de réconciliation du catalogue (ajouts seulement).",
+  "public.plans_abonnement : -0 ~5 +8 [actif(5), valide_au∅→(5)] — 20260815000200 / 20260816000201 (TARIFS-V2) / 20260901000254 / 20260928000802 : versions de catalogue désactivées (actif=false, valide_au) et nouvelles versions ajoutées ; prix, codes et ids des versions existantes INCHANGÉS ; aucun contrat remappé (checks/legacy_offers.test.sql).",
+  "public.plateforme_admins : -0 ~0 +1 [] — 20260825000233 : ajout du compte administrateur plateforme julien@elsatia.fr (rôle total) — décision propriétaire, jamais appliquée en Production 210 ; à confirmer au cutover (UPG-SEC-1).",
+  "storage.buckets : -0 ~0 +7 [] — Buckets privés des nouvelles applications (Colors, Réserves, Studio, Relevé, communications) ; aucun bucket existant modifié.",
+  "critique historiques : +5 / -0 — journal de réconciliation tarifaire",
+  "critique plans_historiques : +8 / -0 — nouvelles versions de catalogue ; toute version d'avant conservée à l'identique",
+  "critique support : +1 / -0 — administrateur plateforme ajouté par 20260825000233"
+ ],
+ "fk": [],
+ "critiques": [
+  {
+   "valeur": "historiques",
+   "disparues": [],
+   "apparues": [
+    "tarif|∅|reconciliation_tarifs_v2_canonicalization|{\"code\": \"business\", \"actif\": true, \"plan_id\": \"8d7c9a61-e4e0-4d8e-a3b0-7aa94350f9a9\", \"version\": 1, \"valide_au\": null, \"valide_du\": \"2026-10-03\", \"prix_annuel_ht\": 5388.00, \"prix_mensuel_ht\": 449.00, \"devis_obligatoire\": false}|{\"id\": \"8d7c9a61-e4e0-4d8e-a3b0-7aa94350f9a9\", \"nom\": \"Business\", \"code\": \"business\", \"actif\": false, \"devise\": \"EUR\", \"version\": 1, \"valide_au\": \"2026-10-03\", \"valide_du\": \"2026-10-03\", \"created_at\": \"2026-10-03T08:35:01.512737+00:00\", \"created_by\": null, \"prix_annuel_ht\": 5388.00, \"fonctionnalites\": [\"acces_dashboard\", \"acces_messagerie\", \"acces_clients\", \"acces_chantiers\", \"acces_devis\", \"acces_factures\", \"acces_facturation_avancee\", \"acces_planning\", \"acces_ia\", \"acces_pointage\", \"saisir_son_pointage\", \"acces_employes\", \"demander_ses_conges\", \"saisir_ses_notes_frais\", \"acces_achats\", \"acces_interventions\", \"acces_crm\", \"voir_devis_chantier_sans_prix\", \"acces_stock\", \"utiliser_borne_stock\", \"acces_outillage\", \"acces_flotte\", \"acces_ouvrages\", \"acces_rentabilite\", \"acces_exports\", \"consulter_sa_paie\", \"saisir_variables_paie\", \"controler_variables_paie\"], \"prix_mensuel_ht\": 449.00, \"devis_obligatoire\": false, \"stockage_go_inclus\": 150.00, \"utilisateurs_inclus\": 30, \"administrateurs_inclus\": 6, \"operations_ia_incluses\": 1500}",
+    "tarif|∅|reconciliation_tarifs_v2_canonicalization|{\"code\": \"entreprise\", \"actif\": true, \"plan_id\": \"42ab9837-2ea6-4d4f-a13f-50a090ca4fd1\", \"version\": 1, \"valide_au\": null, \"valide_du\": \"2026-10-03\", \"prix_annuel_ht\": 6468.00, \"prix_mensuel_ht\": 599.00, \"devis_obligatoire\": false}|{\"id\": \"42ab9837-2ea6-4d4f-a13f-50a090ca4fd1\", \"nom\": \"Entreprise\", \"code\": \"entreprise\", \"actif\": false, \"devise\": \"EUR\", \"version\": 1, \"valide_au\": \"2026-10-03\", \"valide_du\": \"2026-10-03\", \"created_at\": \"2026-10-03T08:35:01.512737+00:00\", \"created_by\": null, \"prix_annuel_ht\": 6468.00, \"fonctionnalites\": [\"acces_dashboard\", \"acces_messagerie\", \"acces_clients\", \"acces_chantiers\", \"acces_devis\", \"acces_factures\", \"acces_facturation_avancee\", \"acces_planning\", \"acces_ia\", \"acces_pointage\", \"saisir_son_pointage\", \"acces_employes\", \"demander_ses_conges\", \"saisir_ses_notes_frais\", \"acces_achats\", \"acces_interventions\", \"acces_crm\", \"voir_devis_chantier_sans_prix\", \"acces_stock\", \"utiliser_borne_stock\", \"acces_outillage\", \"acces_flotte\", \"acces_ouvrages\", \"acces_rentabilite\", \"acces_exports\", \"consulter_sa_paie\", \"saisir_variables_paie\", \"controler_variables_paie\", \"acces_connecteurs\", \"acces_appels_offres\", \"acces_sous_traitants\", \"acces_paiements_bancaires\", \"gerer_paie\", \"exporter_paie\", \"parametrer_paie\"], \"prix_mensuel_ht\": 599.00, \"devis_obligatoire\": false, \"stockage_go_inclus\": 300.00, \"utilisateurs_inclus\": 50, \"administrateurs_inclus\": 10, \"operations_ia_incluses\": 3000}",
+    "tarif|∅|reconciliation_tarifs_v2_canonicalization|{\"code\": \"mini\", \"actif\": true, \"plan_id\": \"42c6d1fc-e9df-4d6f-9793-d73be31ff1ca\", \"version\": 1, \"valide_au\": null, \"valide_du\": \"2026-10-03\", \"prix_annuel_ht\": 948.00, \"prix_mensuel_ht\": 79.00, \"devis_obligatoire\": false}|{\"id\": \"42c6d1fc-e9df-4d6f-9793-d73be31ff1ca\", \"nom\": \"Mini\", \"code\": \"mini\", \"actif\": false, \"devise\": \"EUR\", \"version\": 1, \"valide_au\": \"2026-10-03\", \"valide_du\": \"2026-10-03\", \"created_at\": \"2026-10-03T08:35:01.512737+00:00\", \"created_by\": null, \"prix_annuel_ht\": 948.00, \"fonctionnalites\": [\"acces_dashboard\", \"acces_messagerie\", \"acces_clients\", \"acces_chantiers\", \"acces_devis\", \"acces_factures\", \"acces_facturation_avancee\", \"acces_planning\", \"acces_ia\"], \"prix_mensuel_ht\": 79.00, \"devis_obligatoire\": false, \"stockage_go_inclus\": 10.00, \"utilisateurs_inclus\": 3, \"administrateurs_inclus\": 1, \"operations_ia_incluses\": 100}",
+    "tarif|∅|reconciliation_tarifs_v2_canonicalization|{\"code\": \"pro\", \"actif\": true, \"plan_id\": \"ca2d422f-2b04-446f-9d1b-6bddd3a3a201\", \"version\": 2, \"valide_au\": null, \"valide_du\": \"2026-10-03\", \"prix_annuel_ht\": 2988.00, \"prix_mensuel_ht\": 249.00, \"devis_obligatoire\": false}|{\"id\": \"ca2d422f-2b04-446f-9d1b-6bddd3a3a201\", \"nom\": \"Pro\", \"code\": \"pro\", \"actif\": false, \"devise\": \"EUR\", \"version\": 2, \"valide_au\": \"2026-10-03\", \"valide_du\": \"2026-10-03\", \"created_at\": \"2026-10-03T08:35:01.512737+00:00\", \"created_by\": null, \"prix_annuel_ht\": 2988.00, \"fonctionnalites\": [\"acces_dashboard\", \"acces_messagerie\", \"acces_clients\", \"acces_chantiers\", \"acces_devis\", \"acces_factures\", \"acces_facturation_avancee\", \"acces_planning\", \"acces_ia\", \"acces_pointage\", \"saisir_son_pointage\", \"acces_employes\", \"demander_ses_conges\", \"saisir_ses_notes_frais\", \"acces_achats\", \"acces_interventions\", \"acces_crm\", \"voir_devis_chantier_sans_prix\"], \"prix_mensuel_ht\": 249.00, \"devis_obligatoire\": false, \"stockage_go_inclus\": 50.00, \"utilisateurs_inclus\": 15, \"administrateurs_inclus\": 3, \"operations_ia_incluses\": 500}",
+    "tarif|∅|reconciliation_tarifs_v2_canonicalization|{\"code\": \"sur_mesure\", \"actif\": true, \"plan_id\": \"9dd4e3af-2bb6-4329-bf46-b8911b5817c2\", \"version\": 1, \"valide_au\": null, \"valide_du\": \"2026-10-03\", \"prix_annuel_ht\": 8388.00, \"prix_mensuel_ht\": 699.00, \"devis_obligatoire\": true}|{\"id\": \"9dd4e3af-2bb6-4329-bf46-b8911b5817c2\", \"nom\": \"Sur mesure\", \"code\": \"sur_mesure\", \"actif\": false, \"devise\": \"EUR\", \"version\": 1, \"valide_au\": \"2026-10-03\", \"valide_du\": \"2026-10-03\", \"created_at\": \"2026-10-03T08:35:01.512737+00:00\", \"created_by\": null, \"prix_annuel_ht\": 8388.00, \"fonctionnalites\": [\"acces_dashboard\", \"acces_messagerie\", \"acces_clients\", \"acces_chantiers\", \"acces_devis\", \"acces_factures\", \"acces_facturation_avancee\", \"acces_planning\", \"acces_ia\", \"acces_pointage\", \"saisir_son_pointage\", \"acces_employes\", \"demander_ses_conges\", \"saisir_ses_notes_frais\", \"acces_achats\", \"acces_interventions\", \"acces_crm\", \"voir_devis_chantier_sans_prix\", \"acces_stock\", \"utiliser_borne_stock\", \"acces_outillage\", \"acces_flotte\", \"acces_ouvrages\", \"acces_rentabilite\", \"acces_exports\", \"consulter_sa_paie\", \"saisir_variables_paie\", \"controler_variables_paie\", \"acces_connecteurs\", \"acces_appels_offres\", \"acces_sous_traitants\", \"acces_paiements_bancaires\", \"gerer_paie\", \"exporter_paie\", \"parametrer_paie\"], \"prix_mensuel_ht\": 699.00, \"devis_obligatoire\": true, \"stockage_go_inclus\": 500.00, \"utilisateurs_inclus\": 50, \"administrateurs_inclus\": null, \"operations_ia_incluses\": 3000}"
+   ]
+  },
+  {
+   "valeur": "plans_historiques",
+   "disparues": [],
+   "apparues": [
+    "business|v2|399.00|3990.00|d604141b-cb11-4dbd-8318-ec81625849bf",
+    "business|v3|449.00|4490.00|b3e1bd60-7a97-4045-9669-b3a61d56085f",
+    "entreprise|v2|599.00|5990.00|9cae355d-d143-4bfc-8712-8265a62f53de",
+    "mini|v2|69.00|690.00|69d234d6-9cc8-467f-b16b-01c85505a56f",
+    "mini|v3|79.00|790.00|f992db22-f6e6-4d09-bb83-9d8718dd3099",
+    "pro|v3|199.00|1990.00|95418313-567c-475a-84d8-794e026800f5",
+    "pro|v4|249.00|2490.00|cce2c30d-ddc5-45fa-98c4-80f5ca26a687",
+    "sur_mesure|v2|∅|∅|e6a609ae-8eee-486f-bb61-0c398497f467"
+   ]
+  },
+  {
+   "valeur": "support",
+   "disparues": [],
+   "apparues": [
+    "admin|julien@elsatia.fr|total"
+   ]
+  }
+ ],
+ "tables_disparues": [],
+ "verdict": "ZERO_PERTE"
+}
