@@ -10,10 +10,11 @@
 //       comptages ; toute ligne d'un autre tenant = FUITE (code de sortie 2)
 //   node charge_postgrest.mjs <url> <secret> endurance <secondes> <concurrence> [k,...]
 //       idem multitenant en boucle pendant une durée (long run)
-// Sortie : JSON sur stdout.
+// Sortie : JSON sur stdout. Délai client par requête : CHARGE_DELAI_MAX_MS (défaut 120 s, statut 599).
 import { createHmac } from "node:crypto";
 
 const [url, secret, mode, ...args] = process.argv.slice(2);
+const DELAI_MAX_MS = Number(process.env.CHARGE_DELAI_MAX_MS ?? 120_000);
 const ent = (k) => `e0000000-0000-4000-e000-0000000000${k}`;
 const adm = (k) => `facc0000-0000-4000-e000-0000000000${k}`;
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -25,9 +26,17 @@ const centile = (v, p) => (v.length ? [...v].sort((a, b) => a - b)[Math.min(v.le
 
 async function requete(k, chemin, opts = {}) {
   const debut = performance.now();
-  const r = await fetch(`${url}${chemin}`, { headers: { authorization: `Bearer ${jwt(adm(k))}`, ...(opts.headers ?? {}) } });
-  const texte = await r.text();
-  return { statut: r.status, ms: performance.now() - debut, corps: texte, entetes: r.headers };
+  try {
+    const r = await fetch(`${url}${chemin}`, {
+      headers: { authorization: `Bearer ${jwt(adm(k))}`, ...(opts.headers ?? {}) },
+      signal: AbortSignal.timeout(DELAI_MAX_MS),
+    });
+    const texte = await r.text();
+    return { statut: r.status, ms: performance.now() - debut, corps: texte, entetes: r.headers };
+  } catch {
+    // Délai client dépassé (ou connexion coupée) : compté comme erreur, jamais comme réponse vide.
+    return { statut: 599, ms: performance.now() - debut, corps: "[]", entetes: new Headers() };
+  }
 }
 
 const TABLES = ["devis", "factures", "clients", "documents_chantier", "chantiers"];

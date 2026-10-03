@@ -27,7 +27,7 @@ explain (analyze, format json) $SQLP; rollback;" | q | temps
   for i in 1 2 3; do
     echo "begin; $creer \\timing on
 insert into public.taches (chantier_id, libelle) select '$CH', 'Mesure ' || g from generate_series(1, 5000) g;
-rollback;" | q | grep -oE 'Time: [0-9.]+' | tail -1 | cut -d' ' -f2
+rollback;" | q | grep -m1 -oE 'Time: [0-9.]+' | cut -d' ' -f2
   done | sort -n | sed -n 2p | sed "s/^/5000 insertions $idx index (ms) : /"
 done
 echo "begin; create index taches_chantier_created_idx_mesure on public.taches (chantier_id, created_at);
