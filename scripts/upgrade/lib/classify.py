@@ -241,7 +241,7 @@ def manifeste(repo, sha_ref, sortie):
 if __name__ == "__main__":
     a = sys.argv
     if a[1] == "plan":
-        man = a[a.index("--manifest-source") + 1] if "--manifest-source" in a else os.environ.get("UPG_SOURCE_MANIFEST")
+        man = a[a.index("--manifest-source") + 1] if "--manifest-source" in a else None
         sys.exit(plan(a[2], a[3], a[4], man))
     if a[1] == "risques":
         fs = a[a.index("--source-securite") + 1] if "--source-securite" in a else None
