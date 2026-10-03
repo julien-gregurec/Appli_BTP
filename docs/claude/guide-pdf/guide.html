@@ -1,0 +1,1268 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>ELSATIA — Guide pratique des skills Claude</title>
+<style>
+@page { size: A4; margin: 16mm 14mm 18mm 14mm;
+  @bottom-left { content: "ELSATIA — Guide pratique des skills Claude"; font: 8pt sans-serif; color: #64748b; }
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 8pt sans-serif; color: #64748b; } }
+@page large { size: A4 landscape; margin: 12mm 12mm 16mm 12mm; }
+@page couverture { @bottom-left { content: none; } @bottom-right { content: none; } }
+* { box-sizing: border-box; }
+body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; font-size: 9.5pt; color: #0f172a; line-height: 1.42; margin: 0; }
+h1 { font-size: 20pt; color: #1e3a8a; margin: 0 0 8pt; }
+h2 { font-size: 15pt; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 3pt; margin: 0 0 10pt; break-after: avoid; }
+h3 { font-size: 11.5pt; color: #1e3a8a; margin: 14pt 0 5pt; break-after: avoid; }
+a { color: #1d4ed8; text-decoration: none; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.3pt; background: #eef2ff; padding: 0 2pt; border-radius: 2pt; overflow-wrap: anywhere; }
+.section { break-before: page; }
+.large { page: large; }
+.couv { page: couverture; height: 255mm; display: flex; flex-direction: column; justify-content: center; }
+.couv h1 { font-size: 30pt; }
+.couv .sous { font-size: 13pt; color: #334155; margin-bottom: 18pt; }
+.encadre { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 4pt; padding: 7pt 9pt; margin: 8pt 0; break-inside: avoid; }
+.alerte { border-left: 4px solid #b45309; background: #fffbeb; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; table-layout: fixed; }
+th, td { border: 1px solid #cbd5e1; padding: 3pt 4pt; vertical-align: top; text-align: left; overflow-wrap: anywhere; word-break: normal; }
+th { background: #1e3a8a; color: #fff; font-weight: bold; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+.recap td, .recap th { font-size: 7.4pt; line-height: 1.3; }
+.ok { color: #166534; font-weight: bold; } .nt { color: #92400e; font-weight: bold; } .ko { color: #b91c1c; font-weight: bold; }
+.orig { color: #64748b; font-size: 6.8pt; }
+.toc { list-style: none; padding: 0; margin: 0; }
+.toc li { display: flex; align-items: baseline; padding: 1.3pt 0; }
+.toc li a { flex: 0 1 auto; } .toc li .pts { flex: 1 1 auto; border-bottom: 1px dotted #94a3b8; margin: 0 4pt; transform: translateY(-3pt); }
+.toc li.n2 { padding-left: 14pt; font-size: 8.8pt; }
+.fiche { break-inside: avoid-page; border-top: 1px solid #cbd5e1; padding-top: 4pt; margin-top: 8pt; }
+.fiche h3 { margin-top: 4pt; }
+.fiche .meta { font-size: 8.3pt; color: #334155; margin-bottom: 4pt; }
+.fiche dl { display: grid; grid-template-columns: 34mm 1fr; gap: 2pt 6pt; margin: 0; }
+.fiche dt { font-weight: bold; color: #1e3a8a; font-size: 8.6pt; }
+.fiche dd { margin: 0; font-size: 8.8pt; }
+.copie { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; background: #0f172a; color: #e2e8f0; padding: 4pt 6pt; border-radius: 3pt; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 3pt; }
+ul.liste li { margin: 1.5pt 0; }
+.cols { columns: 2; column-gap: 10mm; }
+</style></head><body>
+
+<div class="couv"><h1>ELSATIA — Guide pratique des skills Claude</h1>
+<div class="sous">Tous les skills installés et accessibles, ce qu'ils font, quand les utiliser, comment les appeler.</div>
+<div class="encadre"><b>Date :</b> 3 octobre 2026<br><b>Environnement vérifié :</b> Session Claude Code sur le web (conteneur cloud Linux, Claude Code 2.1.288), dépôt julien-gregurec/Appli_BTP, branche claude/stoic-shannon-9ax0mp. Inventaire relevé avec l&#x27;événement « init » d&#x27;une session neuve (claude -p) et avec les fichiers SKILL.md présents sur disque.</div>
+<div class="encadre"><b>Bilan :</b> 63 skills recensés — 32 disponibles et testés, 27 installés non testés, 4 bloqués par un prérequis.
+Plus 2 connecteurs MCP et 5 logiciels associés, présentés à part.</div>
+<div class="encadre alerte"><b>Règles ELSATIA :</b> aucun skill ne publie sur les réseaux, ni ne se connecte à un compte social ou à la Production.
+Toujours utiliser des données fictives pour les démonstrations. Aucun secret dans une demande.</div></div>
+<div class="section" id="sommaire"><h2>Sommaire</h2><ul class="toc">
+<li class="n1"><a href="#lecture">1. Comment lire ce guide</a><span class="pts"></span><span class="pg">4</span></li>
+<li class="n1"><a href="#recap">2. Tableau récapitulatif</a><span class="pts"></span><span class="pg">5</span></li>
+<li class="n1"><a href="#classement">3. Classement par mode de déclenchement</a><span class="pts"></span><span class="pg">13</span></li>
+<li class="n1"><a href="#fiches">4. Fiches détaillées par domaine</a><span class="pts"></span><span class="pg">15</span></li>
+<li class="n2"><a href="#dom-securite">Sécurité (7)</a><span class="pts"></span><span class="pg">15</span></li>
+<li class="n2"><a href="#dom-dev">Développement et tests (13)</a><span class="pts"></span><span class="pg">19</span></li>
+<li class="n2"><a href="#dom-interfaces">Interfaces (9)</a><span class="pts"></span><span class="pg">26</span></li>
+<li class="n2"><a href="#dom-marketing">Marketing (10)</a><span class="pts"></span><span class="pg">31</span></li>
+<li class="n2"><a href="#dom-social">Réseaux sociaux (6)</a><span class="pts"></span><span class="pg">36</span></li>
+<li class="n2"><a href="#dom-video">Création et analyse vidéo (6)</a><span class="pts"></span><span class="pg">39</span></li>
+<li class="n2"><a href="#dom-organisation">Organisation et documents (12)</a><span class="pts"></span><span class="pg">42</span></li>
+<li class="n1"><a href="#mcp">5. Connecteurs MCP et logiciels associés</a><span class="pts"></span><span class="pg">48</span></li>
+<li class="n1"><a href="#envs">6. Cloud et poste local</a><span class="pts"></span><span class="pg">50</span></li>
+<li class="n1"><a href="#annexe">Annexe A — Non installés : à installer, reportés, non retenus</a><span class="pts"></span><span class="pg">51</span></li>
+<li class="n1"><a href="#annexe-b">Annexe B — Commandes intégrées non confirmées</a><span class="pts"></span><span class="pg">53</span></li>
+<li class="n1"><a href="#methode">Annexe C — Méthode de vérification</a><span class="pts"></span><span class="pg">54</span></li>
+</ul>
+<h3>Index des fiches</h3><ul class="toc cols">
+<li class="n2"><a href="#f-elsatia-securite">elsatia-securite</a><span class="pts"></span><span class="pg">15</span></li>
+<li class="n2"><a href="#f-supabase">supabase</a><span class="pts"></span><span class="pg">16</span></li>
+<li class="n2"><a href="#f-claude-security-claude-security">claude-security:claude-security</a><span class="pts"></span><span class="pg">16</span></li>
+<li class="n2"><a href="#f-claude-security-scan">claude-security:scan</a><span class="pts"></span><span class="pg">17</span></li>
+<li class="n2"><a href="#f-security-review">security-review</a><span class="pts"></span><span class="pg">17</span></li>
+<li class="n2"><a href="#f-supabase-postgres-best-practices">supabase-postgres-best-practices</a><span class="pts"></span><span class="pg">18</span></li>
+<li class="n2"><a href="#f-stripe-best-practices">stripe-best-practices</a><span class="pts"></span><span class="pg">18</span></li>
+<li class="n2"><a href="#f-code-review">code-review</a><span class="pts"></span><span class="pg">19</span></li>
+<li class="n2"><a href="#f-simplify">simplify</a><span class="pts"></span><span class="pg">19</span></li>
+<li class="n2"><a href="#f-run">run</a><span class="pts"></span><span class="pg">20</span></li>
+<li class="n2"><a href="#f-claude-code-setup-claude-automation-recommender">claude-code-setup:claude-automation-recommender</a><span class="pts"></span><span class="pg">20</span></li>
+<li class="n2"><a href="#f-anthropic-skills-skill-creator">anthropic-skills:skill-creator</a><span class="pts"></span><span class="pg">21</span></li>
+<li class="n2"><a href="#f-init">init</a><span class="pts"></span><span class="pg">21</span></li>
+<li class="n2"><a href="#f-session-start-hook">session-start-hook</a><span class="pts"></span><span class="pg">22</span></li>
+<li class="n2"><a href="#f-update-config">update-config</a><span class="pts"></span><span class="pg">22</span></li>
+<li class="n2"><a href="#f-fewer-permission-prompts">fewer-permission-prompts</a><span class="pts"></span><span class="pg">23</span></li>
+<li class="n2"><a href="#f-claude-api">claude-api</a><span class="pts"></span><span class="pg">23</span></li>
+<li class="n2"><a href="#f-workflow-authoring">workflow-authoring</a><span class="pts"></span><span class="pg">24</span></li>
+<li class="n2"><a href="#f-plugin-authoring">plugin-authoring</a><span class="pts"></span><span class="pg">24</span></li>
+<li class="n2"><a href="#f-vercel-react-best-practices">vercel-react-best-practices</a><span class="pts"></span><span class="pg">25</span></li>
+<li class="n2"><a href="#f-ui-ux-pro-max">ui-ux-pro-max</a><span class="pts"></span><span class="pg">26</span></li>
+<li class="n2"><a href="#f-frontend-design-frontend-design">frontend-design:frontend-design</a><span class="pts"></span><span class="pg">27</span></li>
+<li class="n2"><a href="#f-dataviz">dataviz</a><span class="pts"></span><span class="pg">27</span></li>
+<li class="n2"><a href="#f-artifact-design">artifact-design</a><span class="pts"></span><span class="pg">28</span></li>
+<li class="n2"><a href="#f-artifact-diagramming">artifact-diagramming</a><span class="pts"></span><span class="pg">28</span></li>
+<li class="n2"><a href="#f-artifact-capabilities">artifact-capabilities</a><span class="pts"></span><span class="pg">29</span></li>
+<li class="n2"><a href="#f-anthropic-skills-built-in-browser">anthropic-skills:built-in-browser</a><span class="pts"></span><span class="pg">29</span></li>
+<li class="n2"><a href="#f-anthropic-skills-chrome-browser">anthropic-skills:chrome-browser</a><span class="pts"></span><span class="pg">30</span></li>
+<li class="n2"><a href="#f-web-design-guidelines">web-design-guidelines</a><span class="pts"></span><span class="pg">30</span></li>
+<li class="n2"><a href="#f-elsatia-communication">elsatia-communication</a><span class="pts"></span><span class="pg">31</span></li>
+<li class="n2"><a href="#f-product-marketing">product-marketing</a><span class="pts"></span><span class="pg">31</span></li>
+<li class="n2"><a href="#f-copywriting">copywriting</a><span class="pts"></span><span class="pg">32</span></li>
+<li class="n2"><a href="#f-copy-editing">copy-editing</a><span class="pts"></span><span class="pg">32</span></li>
+<li class="n2"><a href="#f-cro">cro</a><span class="pts"></span><span class="pg">33</span></li>
+<li class="n2"><a href="#f-launch">launch</a><span class="pts"></span><span class="pg">33</span></li>
+<li class="n2"><a href="#f-seo-audit">seo-audit</a><span class="pts"></span><span class="pg">34</span></li>
+<li class="n2"><a href="#f-ai-seo">ai-seo</a><span class="pts"></span><span class="pg">34</span></li>
+<li class="n2"><a href="#f-content-strategy">content-strategy</a><span class="pts"></span><span class="pg">35</span></li>
+<li class="n2"><a href="#f-marketing-psychology">marketing-psychology</a><span class="pts"></span><span class="pg">35</span></li>
+<li class="n2"><a href="#f-social">social</a><span class="pts"></span><span class="pg">36</span></li>
+<li class="n2"><a href="#f-ig-reel">ig-reel</a><span class="pts"></span><span class="pg">36</span></li>
+<li class="n2"><a href="#f-ig-caption">ig-caption</a><span class="pts"></span><span class="pg">37</span></li>
+<li class="n2"><a href="#f-ig-carousel">ig-carousel</a><span class="pts"></span><span class="pg">37</span></li>
+<li class="n2"><a href="#f-ig-profile">ig-profile</a><span class="pts"></span><span class="pg">38</span></li>
+<li class="n2"><a href="#f-ig-plan">ig-plan</a><span class="pts"></span><span class="pg">38</span></li>
+<li class="n2"><a href="#f-remotion-create">remotion-create</a><span class="pts"></span><span class="pg">39</span></li>
+<li class="n2"><a href="#f-remotion-markup">remotion-markup</a><span class="pts"></span><span class="pg">39</span></li>
+<li class="n2"><a href="#f-remotion-studio">remotion-studio</a><span class="pts"></span><span class="pg">40</span></li>
+<li class="n2"><a href="#f-remotion-render">remotion-render</a><span class="pts"></span><span class="pg">40</span></li>
+<li class="n2"><a href="#f-remotion-captions">remotion-captions</a><span class="pts"></span><span class="pg">41</span></li>
+<li class="n2"><a href="#f-watch">watch</a><span class="pts"></span><span class="pg">41</span></li>
+<li class="n2"><a href="#f-loop">loop</a><span class="pts"></span><span class="pg">42</span></li>
+<li class="n2"><a href="#f-anthropic-skills-pdf">anthropic-skills:pdf</a><span class="pts"></span><span class="pg">42</span></li>
+<li class="n2"><a href="#f-anthropic-skills-docx">anthropic-skills:docx</a><span class="pts"></span><span class="pg">43</span></li>
+<li class="n2"><a href="#f-anthropic-skills-xlsx">anthropic-skills:xlsx</a><span class="pts"></span><span class="pg">43</span></li>
+<li class="n2"><a href="#f-anthropic-skills-pptx">anthropic-skills:pptx</a><span class="pts"></span><span class="pg">44</span></li>
+<li class="n2"><a href="#f-anthropic-skills-docs">anthropic-skills:docs</a><span class="pts"></span><span class="pg">44</span></li>
+<li class="n2"><a href="#f-anthropic-skills-google-workspace">anthropic-skills:google-workspace</a><span class="pts"></span><span class="pg">45</span></li>
+<li class="n2"><a href="#f-anthropic-skills-deep-research">anthropic-skills:deep-research</a><span class="pts"></span><span class="pg">45</span></li>
+<li class="n2"><a href="#f-anthropic-skills-morning">anthropic-skills:morning</a><span class="pts"></span><span class="pg">46</span></li>
+<li class="n2"><a href="#f-anthropic-skills-import-memory">anthropic-skills:import-memory</a><span class="pts"></span><span class="pg">46</span></li>
+<li class="n2"><a href="#f-anthropic-skills-computer-use">anthropic-skills:computer-use</a><span class="pts"></span><span class="pg">47</span></li>
+<li class="n2"><a href="#f-keybindings-help">keybindings-help</a><span class="pts"></span><span class="pg">47</span></li>
+</ul></div>
+<div class="section" id="lecture"><h2>1. Comment lire ce guide</h2>
+<div class="encadre"><b>Skill, plugin, connecteur, logiciel : quelle différence ?</b><ul class="liste">
+<li><b>Skill</b> : un mode d'emploi (fichier SKILL.md) que Claude charge pour une tâche précise. Il s'appelle avec <code>/nom</code>.</li>
+<li><b>Plugin</b> : un paquet qui peut contenir des skills, des agents, des hooks ou un connecteur. Ses skills s'appellent <code>/plugin:skill</code>.</li>
+<li><b>Connecteur MCP</b> : un accès à un service extérieur (documentation, GitHub…). Ce n'est pas un skill (voir section 5).</li>
+<li><b>Logiciel associé</b> : un programme installé sur la machine (Playwright, ffmpeg, yt-dlp, Remotion) dont certains skills ont besoin.</li></ul></div>
+<h3>Origine des skills</h3><table><thead><tr><th style='width:30%'>Origine</th><th>Signification</th><th style='width:12%'>Nombre</th></tr></thead><tbody>
+<tr><td><code>projet</code></td><td>Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission</td><td>23</td></tr>
+<tr><td><code>projet_pr5</code></td><td>Skill du projet déjà installé par la PR #5 (fusionnée dans main le 3 octobre 2026), non réinstallé</td><td>4</td></tr>
+<tr><td><code>projet_elsatia</code></td><td>Skill personnalisé ELSATIA (.claude/skills/), créé pendant cette mission</td><td>2</td></tr>
+<tr><td><code>plugin</code></td><td>Skill fourni par un plugin officiel (activé dans .claude/settings.json), installé pendant cette mission</td><td>4</td></tr>
+<tr><td><code>compte</code></td><td>Skill synchronisé depuis le compte claude.ai (préexistant)</td><td>13</td></tr>
+<tr><td><code>integre</code></td><td>Skill intégré à Claude Code (préexistant)</td><td>16</td></tr>
+<tr><td><code>utilisateur</code></td><td>Skill utilisateur du conteneur (~/.claude/skills, préexistant)</td><td>1</td></tr>
+</tbody></table>
+<h3>Mode de déclenchement</h3><ul class="liste">
+<li><b>Les deux</b> : Claude <i>peut</i> choisir le skill seul (sa description correspond à votre demande), et vous pouvez toujours l'appeler avec sa commande.</li>
+<li><b>Manuel uniquement</b> : le skill porte <code>disable-model-invocation: true</code>. Claude ne le choisit jamais seul.</li>
+<li><b>Automatique possible ; aucune commande vérifiée</b> : visible pour Claude, mais absent de la liste des commandes slash. Demandez-le par une phrase.</li>
+<li><b>Non confirmé</b> : le comportement n'a pas pu être établi.</li></ul>
+<div class="encadre alerte">La sélection automatique <b>n'est jamais garantie</b>. Elle dépend de la formulation de la demande, de la configuration et de la session.
+Pendant les essais, pour des questions courtes, Claude a souvent répondu directement sans charger le skill. La colonne « Observé » distingue un déclenchement
+<i>réellement observé</i> d'un déclenchement seulement <i>possible</i>. <b>Pour être sûr d'utiliser un skill, tapez sa commande.</b></div></div>
+<div class="section large" id="recap"><h2>2. Tableau récapitulatif</h2>
+<p>Sont classés ici les skills installés et accessibles, par domaine. Les connecteurs MCP et les logiciels figurent en section 5, les éléments non installés en annexe A.</p>
+<h3>Sécurité</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-elsatia-securite'><code>elsatia-securite</code></a><br><span class='orig'>ELSATIA, créé par cette mission</span></td><td>Audit de sécurité en lecture seule selon les règles ELSATIA.</td><td>Liria Gestion Pro (code, migrations Supabase, routes API, Server Actions) ; toute future app ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Observé à l&#x27;essai</td><td>Demande d&#x27;audit, revue sécurité d&#x27;une PR ou d&#x27;une migration, vérification RLS ou d&#x27;isolation, préparation d&#x27;une mise en production.</td><td><code>/elsatia-securite</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;15</td></tr>
+<tr><td><a href='#f-supabase'><code>supabase</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Bonnes pratiques officielles Supabase : Auth, RLS, Storage, SSR, CLI.</td><td>Liria Gestion Pro (base Supabase, authentification, stockage des documents).</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>Toute tâche Supabase : RLS, auth, sessions, migrations, Storage, erreurs « permission denied ».</td><td><code>/supabase</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;16</td></tr>
+<tr><td><a href='#f-claude-security-claude-security'><code>claude-security:claude-security</code></a><br><span class='orig'>plugin ajouté par cette mission</span></td><td>Menu Claude Security : scan approfondi du dépôt ou d&#x27;une diff, puis propositions de correctifs.</td><td>Liria Gestion Pro et tout dépôt ELSATIA.</td><td>Manuel uniquement</td><td>Sans objet</td><td>Jamais seul (manuel uniquement).</td><td><code>/claude-security:claude-security</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;16</td></tr>
+<tr><td><a href='#f-claude-security-scan'><code>claude-security:scan</code></a><br><span class='orig'>plugin ajouté par cette mission</span></td><td>Pipeline interne de scan du plugin Claude Security.</td><td>Utilisé par /claude-security:claude-security.</td><td>Non confirmé</td><td>Non testé</td><td>Pendant un scan lancé depuis /claude-security:claude-security.</td><td><code>/claude-security:claude-security (passer par le menu)</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;17</td></tr>
+<tr><td><a href='#f-security-review'><code>security-review</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Revue de sécurité des changements en attente sur la branche courante.</td><td>Liria Gestion Pro et tout dépôt ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de revue sécurité des changements de la branche.</td><td><code>/security-review</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;17</td></tr>
+<tr><td><a href='#f-supabase-postgres-best-practices'><code>supabase-postgres-best-practices</code></a><br><span class='orig'>PR #5 — déjà installé</span></td><td>Règles Postgres de Supabase : schéma, migrations, index, RLS, performance des requêtes.</td><td>Liria Gestion Pro (migrations supabase/migrations, policies RLS, fonctions SQL).</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>Toute création ou modification en base : tables, colonnes, migrations, RLS et leurs tests, index, fonctions, lenteurs, lignes visibles par le mauvais locataire.</td><td><code>/supabase-postgres-best-practices</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;18</td></tr>
+<tr><td><a href='#f-stripe-best-practices'><code>stripe-best-practices</code></a><br><span class='orig'>PR #5 — déjà installé</span></td><td>Bonnes pratiques d&#x27;intégration Stripe : webhooks, idempotence, abonnements, Connect, clés.</td><td>Liria Gestion Pro (abonnement SaaS Stripe Billing, paiements en ligne, Stripe Connect).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Planifier, construire, modifier, tester ou relire une intégration Stripe.</td><td><code>/stripe-best-practices</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;18</td></tr>
+</tbody></table>
+<h3>Développement et tests</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-code-review'><code>code-review</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Recherche de bugs dans une diff, une PR ou un chemin.</td><td>Liria Gestion Pro et tout dépôt ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de revue de code, de recherche de bugs avant fusion.</td><td><code>/code-review</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;19</td></tr>
+<tr><td><a href='#f-simplify'><code>simplify</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Nettoyage qualité du code modifié (réutilisation, simplification, efficacité).</td><td>Liria Gestion Pro.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de simplifier ou de nettoyer le code modifié.</td><td><code>/simplify</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;19</td></tr>
+<tr><td><a href='#f-run'><code>run</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Lancer et piloter l&#x27;application pour voir un changement fonctionner (captures, parcours).</td><td>Liria Gestion Pro (serveur Next.js local).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de lancer, démarrer ou capturer l&#x27;app, ou de confirmer un changement dans l&#x27;app réelle.</td><td><code>/run</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;20</td></tr>
+<tr><td><a href='#f-claude-code-setup-claude-automation-recommender'><code>claude-code-setup:claude-automation-recommender</code></a><br><span class='orig'>plugin ajouté par cette mission</span></td><td>Analyse du dépôt et recommandations d&#x27;automatisations Claude Code.</td><td>Liria Gestion Pro et tout dépôt ELSATIA.</td><td>Manuel uniquement</td><td>Sans objet</td><td>Jamais seul (manuel uniquement).</td><td><code>/claude-code-setup:claude-automation-recommender</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;20</td></tr>
+<tr><td><a href='#f-anthropic-skills-skill-creator'><code>anthropic-skills:skill-creator</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Créer, améliorer et évaluer des skills.</td><td>Procédures ELSATIA réutilisables (démo, audit, publication manuelle…).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de créer, modifier ou évaluer un skill.</td><td><code>/anthropic-skills:skill-creator</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;21</td></tr>
+<tr><td><a href='#f-init'><code>init</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Créer un fichier CLAUDE.md documentant le code.</td><td>Nouveaux dépôts ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Initialisation d&#x27;un nouveau dépôt.</td><td><code>/init</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;21</td></tr>
+<tr><td><a href='#f-session-start-hook'><code>session-start-hook</code></a><br><span class='orig'>préexistant (conteneur)</span></td><td>Créer un hook de démarrage pour les sessions Claude Code sur le web.</td><td>Liria Gestion Pro (préparer automatiquement les dépendances en session cloud).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Préparer un dépôt pour Claude Code sur le web : tests et linters prêts au démarrage.</td><td><code>/session-start-hook</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;22</td></tr>
+<tr><td><a href='#f-update-config'><code>update-config</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Configurer Claude Code (settings.json : permissions, hooks, variables).</td><td>Configuration de Claude pour ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« À partir de maintenant, quand X… », ajout de permission ou de variable.</td><td><code>/update-config</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;22</td></tr>
+<tr><td><a href='#f-fewer-permission-prompts'><code>fewer-permission-prompts</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Proposer une liste d&#x27;autorisations pour les commandes en lecture fréquentes.</td><td>Confort de travail sur les dépôts ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Trop de demandes d&#x27;autorisation répétitives.</td><td><code>/fewer-permission-prompts</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;23</td></tr>
+<tr><td><a href='#f-claude-api'><code>claude-api</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Référence de l&#x27;API Claude et du SDK Anthropic.</td><td>Liria Gestion Pro si l&#x27;assistant IA de l&#x27;app passe par Claude (aujourd&#x27;hui, l&#x27;app utilise le SDK openai).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Code qui appelle Claude ou Anthropic, choix d&#x27;un modèle, coût, cache de prompt.</td><td><code>/claude-api</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;23</td></tr>
+<tr><td><a href='#f-workflow-authoring'><code>workflow-authoring</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Référence pour écrire des workflows multi-agents.</td><td>Tâches lourdes et répétitives (audits, revues massives).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Écriture d&#x27;un script de workflow déjà demandé par l&#x27;utilisateur.</td><td><code>/workflow-authoring</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;24</td></tr>
+<tr><td><a href='#f-plugin-authoring'><code>plugin-authoring</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Créer des extensions (« mods ») de l&#x27;interface Claude Code.</td><td>Outillage interne.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Créer un panneau, une barre d&#x27;état ou un hook d&#x27;interface.</td><td><code>/plugin-authoring</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;24</td></tr>
+<tr><td><a href='#f-vercel-react-best-practices'><code>vercel-react-best-practices</code></a><br><span class='orig'>PR #5 — déjà installé</span></td><td>Règles de performance React et Next.js de Vercel (70 règles classées par impact).</td><td>Liria Gestion Pro (pages, Server Components, Server Actions, chargement des données).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Écriture, revue ou refactorisation de code React ou Next.js : composants, pages, chargement de données, poids du bundle, performance.</td><td><code>/vercel-react-best-practices</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;25</td></tr>
+</tbody></table>
+<h3>Interfaces</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-ui-ux-pro-max'><code>ui-ux-pro-max</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Base de connaissances UI/UX consultable : styles, palettes, typographies, graphiques, règles d&#x27;accessibilité, règles Next.js.</td><td>Liria Gestion Pro (écrans, tableaux de bord), site vitrine, visuels de communication.</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>Concevoir, relire ou corriger une interface, un design system, l&#x27;accessibilité ou des graphiques.</td><td><code>/ui-ux-pro-max</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;26</td></tr>
+<tr><td><a href='#f-frontend-design-frontend-design'><code>frontend-design:frontend-design</code></a><br><span class='orig'>plugin ajouté par cette mission</span></td><td>Direction artistique d&#x27;interfaces, en évitant l&#x27;esthétique « générique IA ».</td><td>Site vitrine, pages publiques, écrans clés de Liria Gestion Pro.</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>Création d&#x27;une interface, d&#x27;une page ou d&#x27;un composant à forte exigence visuelle.</td><td><code>/frontend-design:frontend-design</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;27</td></tr>
+<tr><td><a href='#f-dataviz'><code>dataviz</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Méthode pour tout graphique, tableau de bord ou indicateur.</td><td>Tableaux de bord de Liria Gestion Pro, rapports, visuels chiffrés.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Toute création de graphique, de tableau de bord ou de palette de données.</td><td><code>/dataviz</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;27</td></tr>
+<tr><td><a href='#f-artifact-design'><code>artifact-design</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Règles de conception des pages Artifact publiées sur claude.ai.</td><td>Pages de présentation, rapports partagés.</td><td>Automatique possible ; aucune commande vérifiée</td><td>Non testé</td><td>Avant d&#x27;écrire une page Artifact.</td><td>Aucune commande vérifiée. Demander : « Utilise le skill artifact-design pour… »</td><td class='nt'>Installé, non testé</td><td>p.&nbsp;28</td></tr>
+<tr><td><a href='#f-artifact-diagramming'><code>artifact-diagramming</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Schémas et diagrammes dans les Artifacts.</td><td>Documentation, explications d&#x27;architecture.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Quand un schéma explique mieux qu&#x27;un texte.</td><td><code>/artifact-diagramming</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;28</td></tr>
+<tr><td><a href='#f-artifact-capabilities'><code>artifact-capabilities</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Capacités dynamiques des pages Artifact (données partagées, formulaires…).</td><td>Pages internes interactives (sondage, suivi).</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Quand une page Artifact doit mémoriser ou partager des données.</td><td><code>/artifact-capabilities</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;29</td></tr>
+<tr><td><a href='#f-anthropic-skills-built-in-browser'><code>anthropic-skills:built-in-browser</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Utiliser le navigateur intégré de l&#x27;application Claude de bureau.</td><td>Vérification de pages publiques.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Tâche qui utilise le navigateur intégré de l&#x27;app de bureau.</td><td><code>/anthropic-skills:built-in-browser</code></td><td class='ko'>Bloqué par un prérequis</td><td>p.&nbsp;29</td></tr>
+<tr><td><a href='#f-anthropic-skills-chrome-browser'><code>anthropic-skills:chrome-browser</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Piloter votre Chrome via l&#x27;extension Claude in Chrome.</td><td>Vérification de pages publiques.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Tâche dans votre vrai navigateur Chrome.</td><td><code>/anthropic-skills:chrome-browser</code></td><td class='ko'>Bloqué par un prérequis</td><td>p.&nbsp;30</td></tr>
+<tr><td><a href='#f-web-design-guidelines'><code>web-design-guidelines</code></a><br><span class='orig'>PR #5 — déjà installé</span></td><td>Audit d&#x27;interface selon les Web Interface Guidelines de Vercel (accessibilité, UX).</td><td>Liria Gestion Pro (écrans, formulaires), site vitrine.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Relis mon interface », « vérifie l&#x27;accessibilité », « audite le design ».</td><td><code>/web-design-guidelines &lt;fichier-ou-motif&gt;</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;30</td></tr>
+</tbody></table>
+<h3>Marketing</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-elsatia-communication'><code>elsatia-communication</code></a><br><span class='orig'>ELSATIA, créé par cette mission</span></td><td>Garde-fous ELSATIA et aiguillage vers le bon skill marketing, réseaux sociaux ou vidéo.</td><td>Toute communication ELSATIA : Instagram, Facebook, LinkedIn, pages de vente, vidéos.</td><td>Les deux : automatique possible et manuel</td><td>Observé à l&#x27;essai</td><td>Toute production marketing, réseaux sociaux ou vidéo.</td><td><code>/elsatia-communication</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;31</td></tr>
+<tr><td><a href='#f-product-marketing'><code>product-marketing</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Positionnement et fichier de contexte produit partagé (.agents/product-marketing.md).</td><td>Liria Gestion Pro et chaque future app ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Positionnement, cible, profil client idéal, début de tout projet marketing.</td><td><code>/product-marketing</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;31</td></tr>
+<tr><td><a href='#f-copywriting'><code>copywriting</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Rédaction de textes marketing : accueil, pages de vente, fonctionnalités, tarifs.</td><td>Site vitrine, pages de vente, e-mails de présentation.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Écrire ou réécrire un texte de page, un titre, un appel à l&#x27;action.</td><td><code>/copywriting</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;32</td></tr>
+<tr><td><a href='#f-copy-editing'><code>copy-editing</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Relecture et humanisation des textes (seul humaniseur retenu).</td><td>Tous les textes ELSATIA : posts, pages, e-mails, scripts.</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>« Rends ce texte plus naturel », « ça sonne IA », relecture, mise à jour d&#x27;un contenu.</td><td><code>/copy-editing</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;32</td></tr>
+<tr><td><a href='#f-cro'><code>cro</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Optimisation de la conversion des pages de vente et formulaires.</td><td>Site vitrine, page d&#x27;essai, formulaire de contact.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Cette page ne convertit pas », optimisation d&#x27;une landing page ou d&#x27;un formulaire.</td><td><code>/cro</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;33</td></tr>
+<tr><td><a href='#f-launch'><code>launch</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Plan de lancement d&#x27;un produit ou d&#x27;une fonctionnalité.</td><td>Lancement d&#x27;une app ou d&#x27;un module ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Annonce, bêta, liste d&#x27;attente, mise sur le marché.</td><td><code>/launch</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;33</td></tr>
+<tr><td><a href='#f-seo-audit'><code>seo-audit</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Audit SEO technique et éditorial.</td><td>Site vitrine ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Pourquoi je ne suis pas classé », audit SEO, indexation, vitesse.</td><td><code>/seo-audit</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;34</td></tr>
+<tr><td><a href='#f-ai-seo'><code>ai-seo</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Visibilité dans les moteurs de réponse IA (ChatGPT, Perplexity, Claude…).</td><td>Site vitrine, contenus de blog.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Être cité par les IA », llms.txt, AEO/GEO.</td><td><code>/ai-seo</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;34</td></tr>
+<tr><td><a href='#f-content-strategy'><code>content-strategy</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Stratégie de contenus : piliers, sujets, calendrier éditorial.</td><td>Blog, réseaux sociaux, newsletters ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Sur quoi écrire », piliers de contenu, calendrier éditorial.</td><td><code>/content-strategy</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;35</td></tr>
+<tr><td><a href='#f-marketing-psychology'><code>marketing-psychology</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Leviers psychologiques et biais appliqués au marketing.</td><td>Pages de vente, offres d&#x27;essai, e-mails.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Persuasion, preuve sociale, ancrage, aversion à la perte.</td><td><code>/marketing-psychology</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;35</td></tr>
+</tbody></table>
+<h3>Réseaux sociaux</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-social'><code>social</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Contenus pour LinkedIn, Facebook, Instagram, X et TikTok.</td><td>Comptes sociaux ELSATIA (rédaction seulement).</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>Post LinkedIn, carrousel, calendrier social, réutilisation de contenu.</td><td><code>/social</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;36</td></tr>
+<tr><td><a href='#f-ig-reel'><code>ig-reel</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Script de Reel Instagram : accroches, texte parlé, texte à l&#x27;écran, timing.</td><td>Compte Instagram ELSATIA (rédaction seulement).</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>« Fais un Reel sur… », script vidéo court, accroche.</td><td><code>/ig-reel</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;36</td></tr>
+<tr><td><a href='#f-ig-caption'><code>ig-caption</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Légendes Instagram et hashtags.</td><td>Compte Instagram ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Écris la légende », hashtags.</td><td><code>/ig-caption</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;37</td></tr>
+<tr><td><a href='#f-ig-carousel'><code>ig-carousel</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Carrousels Instagram 1080×1350.</td><td>Compte Instagram ELSATIA ; adaptable à LinkedIn.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Carrousel », « slides », idée en liste ou en étapes.</td><td><code>/ig-carousel</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;37</td></tr>
+<tr><td><a href='#f-ig-profile'><code>ig-profile</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Notation et réécriture du profil Instagram.</td><td>Compte Instagram ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Optimise mon profil », « corrige ma bio ».</td><td><code>/ig-profile</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;38</td></tr>
+<tr><td><a href='#f-ig-plan'><code>ig-plan</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Planning Instagram de la semaine.</td><td>Compte Instagram ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Planifie ma semaine », « je n&#x27;ai rien à publier ».</td><td><code>/ig-plan</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;38</td></tr>
+</tbody></table>
+<h3>Création et analyse vidéo</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-remotion-create'><code>remotion-create</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Créer un projet vidéo Remotion (vidéo en code React).</td><td>Vidéos de démonstration, Reels 9:16, publicités vidéo.</td><td>Les deux : automatique possible et manuel</td><td>Non observé à l&#x27;essai</td><td>« Crée une vidéo Remotion ».</td><td><code>/remotion-create</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;39</td></tr>
+<tr><td><a href='#f-remotion-markup'><code>remotion-markup</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Animations, transitions, textes et effets dans Remotion.</td><td>Vidéos de démonstration et Reels.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Écrire ou animer le contenu d&#x27;une vidéo Remotion.</td><td><code>/remotion-markup</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;39</td></tr>
+<tr><td><a href='#f-remotion-studio'><code>remotion-studio</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Prévisualisation d&#x27;une vidéo Remotion (Studio).</td><td>Vidéos ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Prévisualise la vidéo ».</td><td><code>/remotion-studio</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;40</td></tr>
+<tr><td><a href='#f-remotion-render'><code>remotion-render</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Export d&#x27;une vidéo Remotion en MP4.</td><td>Vidéos ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Exporte la vidéo ».</td><td><code>/remotion-render</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;40</td></tr>
+<tr><td><a href='#f-remotion-captions'><code>remotion-captions</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Sous-titres dans Remotion : import SRT, affichage, animation, transcription.</td><td>Reels et démos sous-titrés.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Ajouter ou animer des sous-titres.</td><td><code>/remotion-captions</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;41</td></tr>
+<tr><td><a href='#f-watch'><code>watch</code></a><br><span class='orig'>ajouté par cette mission</span></td><td>Analyser une vidéo (fichier ou URL) : images clés et sous-titres.</td><td>Contrôle des démos ELSATIA ; analyse de Reels publics de référence.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Regarde cette vidéo », analyse d&#x27;une vidéo.</td><td><code>/watch</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;41</td></tr>
+</tbody></table>
+<h3>Organisation et documents</h3><table class='recap'><thead><tr><th style='width:13%'>Nom exact</th><th style='width:14%'>Fonction</th><th style='width:12%'>Apps / activités ELSATIA</th><th style='width:10%'>Déclenchement vérifié</th><th style='width:7%'>Observé</th><th style='width:17%'>Quand Claude le sélectionne</th><th style='width:15%'>Commande manuelle</th><th style='width:8%'>Statut</th><th style='width:4%'>Fiche</th></tr></thead><tbody>
+<tr><td><a href='#f-loop'><code>loop</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Répéter une demande ou une commande à intervalle régulier.</td><td>Suivi de CI, surveillance d&#x27;une tâche longue.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>« Vérifie toutes les 5 minutes… », tâche récurrente.</td><td><code>/loop</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;42</td></tr>
+<tr><td><a href='#f-anthropic-skills-pdf'><code>anthropic-skills:pdf</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Lire, créer, fusionner et remplir des PDF.</td><td>Guides, documents commerciaux, notices ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Toute demande impliquant un fichier PDF.</td><td><code>/anthropic-skills:pdf</code></td><td class='ok'>Disponible et testé</td><td>p.&nbsp;42</td></tr>
+<tr><td><a href='#f-anthropic-skills-docx'><code>anthropic-skills:docx</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Documents Word (.docx).</td><td>Contrats, propositions commerciales, documents à envoyer.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Toute demande de fichier Word.</td><td><code>/anthropic-skills:docx</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;43</td></tr>
+<tr><td><a href='#f-anthropic-skills-xlsx'><code>anthropic-skills:xlsx</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Tableurs (.xlsx, .csv).</td><td>Imports de données, budgets, suivis.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Toute demande de fichier tableur.</td><td><code>/anthropic-skills:xlsx</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;43</td></tr>
+<tr><td><a href='#f-anthropic-skills-pptx'><code>anthropic-skills:pptx</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Présentations PowerPoint (.pptx).</td><td>Présentations commerciales et salons.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Toute demande de fichier PowerPoint.</td><td><code>/anthropic-skills:pptx</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;44</td></tr>
+<tr><td><a href='#f-anthropic-skills-docs'><code>anthropic-skills:docs</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Documents partagés et commentables (Claude Docs).</td><td>Guides internes, procédures, comptes rendus.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Demande de document à partager ou à commenter.</td><td><code>/anthropic-skills:docs</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;44</td></tr>
+<tr><td><a href='#f-anthropic-skills-google-workspace'><code>anthropic-skills:google-workspace</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Créer ou modifier des fichiers Google Docs, Sheets et Slides.</td><td>Documents Google d&#x27;ELSATIA.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Modifier un fichier Google nommé.</td><td><code>/anthropic-skills:google-workspace</code></td><td class='ko'>Bloqué par un prérequis</td><td>p.&nbsp;45</td></tr>
+<tr><td><a href='#f-anthropic-skills-deep-research'><code>anthropic-skills:deep-research</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Recherche approfondie multi-sources avec rapport.</td><td>Veille concurrentielle, études de marché BTP.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Comparer des options, étudier un marché, analyser des tendances.</td><td><code>/anthropic-skills:deep-research</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;45</td></tr>
+<tr><td><a href='#f-anthropic-skills-morning'><code>anthropic-skills:morning</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Brief du matin (page récapitulative).</td><td>Organisation personnelle.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Uniquement sur demande explicite du brief.</td><td><code>/anthropic-skills:morning</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;46</td></tr>
+<tr><td><a href='#f-anthropic-skills-import-memory'><code>anthropic-skills:import-memory</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Importer une mémoire exportée d&#x27;un autre assistant IA.</td><td>Transfert de contexte vers Claude.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Import d&#x27;un export de mémoire.</td><td><code>/anthropic-skills:import-memory</code></td><td class='nt'>Installé, non testé</td><td>p.&nbsp;46</td></tr>
+<tr><td><a href='#f-anthropic-skills-computer-use'><code>anthropic-skills:computer-use</code></a><br><span class='orig'>préexistant (compte)</span></td><td>Contrôler les applications de votre ordinateur (captures, clics).</td><td>Tâches sur poste local.</td><td>Les deux : automatique possible et manuel</td><td>Non testé</td><td>Tâche dans une application de bureau.</td><td><code>/anthropic-skills:computer-use</code></td><td class='ko'>Bloqué par un prérequis</td><td>p.&nbsp;47</td></tr>
+<tr><td><a href='#f-keybindings-help'><code>keybindings-help</code></a><br><span class='orig'>préexistant (intégré)</span></td><td>Personnaliser les raccourcis clavier de Claude Code.</td><td>Confort de travail.</td><td>Automatique possible ; aucune commande vérifiée</td><td>Non testé</td><td>« Change le raccourci… ».</td><td>Aucune commande vérifiée. Demander : « Utilise le skill keybindings-help pour… »</td><td class='nt'>Installé, non testé</td><td>p.&nbsp;47</td></tr>
+</tbody></table>
+</div>
+<div class="section" id="classement"><h2>3. Classement par mode de déclenchement</h2>
+<h3>3.1 Skills que Claude peut sélectionner automatiquement</h3>
+<p>Tous peuvent <b>aussi</b> être appelés manuellement avec leur commande, sauf ceux marqués « aucune commande vérifiée » (à demander par une phrase). <b>Observé</b> signale un déclenchement automatique constaté pendant les essais.</p><ul class='liste cols'>
+<li><a href='#f-elsatia-securite'>elsatia-securite</a> : <code>/elsatia-securite</code> — <b>observé</b></li>
+<li><a href='#f-supabase'>supabase</a> : <code>/supabase</code></li>
+<li><a href='#f-security-review'>security-review</a> : <code>/security-review</code></li>
+<li><a href='#f-code-review'>code-review</a> : <code>/code-review</code></li>
+<li><a href='#f-simplify'>simplify</a> : <code>/simplify</code></li>
+<li><a href='#f-run'>run</a> : <code>/run</code></li>
+<li><a href='#f-anthropic-skills-skill-creator'>anthropic-skills:skill-creator</a> : <code>/anthropic-skills:skill-creator</code></li>
+<li><a href='#f-init'>init</a> : <code>/init</code></li>
+<li><a href='#f-session-start-hook'>session-start-hook</a> : <code>/session-start-hook</code></li>
+<li><a href='#f-update-config'>update-config</a> : <code>/update-config</code></li>
+<li><a href='#f-fewer-permission-prompts'>fewer-permission-prompts</a> : <code>/fewer-permission-prompts</code></li>
+<li><a href='#f-claude-api'>claude-api</a> : <code>/claude-api</code></li>
+<li><a href='#f-workflow-authoring'>workflow-authoring</a> : <code>/workflow-authoring</code></li>
+<li><a href='#f-plugin-authoring'>plugin-authoring</a> : <code>/plugin-authoring</code></li>
+<li><a href='#f-loop'>loop</a> : <code>/loop</code></li>
+<li><a href='#f-ui-ux-pro-max'>ui-ux-pro-max</a> : <code>/ui-ux-pro-max</code></li>
+<li><a href='#f-frontend-design-frontend-design'>frontend-design:frontend-design</a> : <code>/frontend-design:frontend-design</code></li>
+<li><a href='#f-dataviz'>dataviz</a> : <code>/dataviz</code></li>
+<li><a href='#f-artifact-design'>artifact-design</a> : <i>aucune commande vérifiée</i></li>
+<li><a href='#f-artifact-diagramming'>artifact-diagramming</a> : <code>/artifact-diagramming</code></li>
+<li><a href='#f-artifact-capabilities'>artifact-capabilities</a> : <code>/artifact-capabilities</code></li>
+<li><a href='#f-anthropic-skills-built-in-browser'>anthropic-skills:built-in-browser</a> : <code>/anthropic-skills:built-in-browser</code></li>
+<li><a href='#f-anthropic-skills-chrome-browser'>anthropic-skills:chrome-browser</a> : <code>/anthropic-skills:chrome-browser</code></li>
+<li><a href='#f-elsatia-communication'>elsatia-communication</a> : <code>/elsatia-communication</code> — <b>observé</b></li>
+<li><a href='#f-product-marketing'>product-marketing</a> : <code>/product-marketing</code></li>
+<li><a href='#f-copywriting'>copywriting</a> : <code>/copywriting</code></li>
+<li><a href='#f-copy-editing'>copy-editing</a> : <code>/copy-editing</code></li>
+<li><a href='#f-cro'>cro</a> : <code>/cro</code></li>
+<li><a href='#f-launch'>launch</a> : <code>/launch</code></li>
+<li><a href='#f-seo-audit'>seo-audit</a> : <code>/seo-audit</code></li>
+<li><a href='#f-ai-seo'>ai-seo</a> : <code>/ai-seo</code></li>
+<li><a href='#f-content-strategy'>content-strategy</a> : <code>/content-strategy</code></li>
+<li><a href='#f-marketing-psychology'>marketing-psychology</a> : <code>/marketing-psychology</code></li>
+<li><a href='#f-social'>social</a> : <code>/social</code></li>
+<li><a href='#f-ig-reel'>ig-reel</a> : <code>/ig-reel</code></li>
+<li><a href='#f-ig-caption'>ig-caption</a> : <code>/ig-caption</code></li>
+<li><a href='#f-ig-carousel'>ig-carousel</a> : <code>/ig-carousel</code></li>
+<li><a href='#f-ig-profile'>ig-profile</a> : <code>/ig-profile</code></li>
+<li><a href='#f-ig-plan'>ig-plan</a> : <code>/ig-plan</code></li>
+<li><a href='#f-remotion-create'>remotion-create</a> : <code>/remotion-create</code></li>
+<li><a href='#f-remotion-markup'>remotion-markup</a> : <code>/remotion-markup</code></li>
+<li><a href='#f-remotion-studio'>remotion-studio</a> : <code>/remotion-studio</code></li>
+<li><a href='#f-remotion-render'>remotion-render</a> : <code>/remotion-render</code></li>
+<li><a href='#f-remotion-captions'>remotion-captions</a> : <code>/remotion-captions</code></li>
+<li><a href='#f-watch'>watch</a> : <code>/watch</code></li>
+<li><a href='#f-anthropic-skills-pdf'>anthropic-skills:pdf</a> : <code>/anthropic-skills:pdf</code></li>
+<li><a href='#f-anthropic-skills-docx'>anthropic-skills:docx</a> : <code>/anthropic-skills:docx</code></li>
+<li><a href='#f-anthropic-skills-xlsx'>anthropic-skills:xlsx</a> : <code>/anthropic-skills:xlsx</code></li>
+<li><a href='#f-anthropic-skills-pptx'>anthropic-skills:pptx</a> : <code>/anthropic-skills:pptx</code></li>
+<li><a href='#f-anthropic-skills-docs'>anthropic-skills:docs</a> : <code>/anthropic-skills:docs</code></li>
+<li><a href='#f-anthropic-skills-google-workspace'>anthropic-skills:google-workspace</a> : <code>/anthropic-skills:google-workspace</code></li>
+<li><a href='#f-anthropic-skills-deep-research'>anthropic-skills:deep-research</a> : <code>/anthropic-skills:deep-research</code></li>
+<li><a href='#f-anthropic-skills-morning'>anthropic-skills:morning</a> : <code>/anthropic-skills:morning</code></li>
+<li><a href='#f-anthropic-skills-import-memory'>anthropic-skills:import-memory</a> : <code>/anthropic-skills:import-memory</code></li>
+<li><a href='#f-anthropic-skills-computer-use'>anthropic-skills:computer-use</a> : <code>/anthropic-skills:computer-use</code></li>
+<li><a href='#f-keybindings-help'>keybindings-help</a> : <i>aucune commande vérifiée</i></li>
+<li><a href='#f-vercel-react-best-practices'>vercel-react-best-practices</a> : <code>/vercel-react-best-practices</code></li>
+<li><a href='#f-web-design-guidelines'>web-design-guidelines</a> : <code>/web-design-guidelines &lt;fichier-ou-motif&gt;</code></li>
+<li><a href='#f-supabase-postgres-best-practices'>supabase-postgres-best-practices</a> : <code>/supabase-postgres-best-practices</code></li>
+<li><a href='#f-stripe-best-practices'>stripe-best-practices</a> : <code>/stripe-best-practices</code></li>
+</ul><h3>3.2 Skills à déclencher manuellement</h3><ul class='liste'>
+<li><a href='#f-claude-security-claude-security'>claude-security:claude-security</a> : <code>/claude-security:claude-security</code></li>
+<li><a href='#f-claude-code-setup-claude-automation-recommender'>claude-code-setup:claude-automation-recommender</a> : <code>/claude-code-setup:claude-automation-recommender</code></li>
+</ul><h3>3.3 Skills dont le déclenchement ou la disponibilité reste à confirmer</h3><ul class='liste'>
+<li><a href='#f-claude-security-scan'>claude-security:scan</a> : Installé, non testé — Visible dans la liste des skills, mais décrit comme « Run by the Security Lead from the scan job » : il est prévu pour être lancé par le menu, pas directement.</li>
+<li><a href='#f-anthropic-skills-built-in-browser'>anthropic-skills:built-in-browser</a> : Bloqué par un prérequis — Présent dans la liste ; non testé. Ses outils ne sont pas disponibles dans cette session cloud.</li>
+<li><a href='#f-anthropic-skills-chrome-browser'>anthropic-skills:chrome-browser</a> : Bloqué par un prérequis — Présent dans la liste ; non testé. Extension non connectée à cette session cloud.</li>
+<li><a href='#f-anthropic-skills-google-workspace'>anthropic-skills:google-workspace</a> : Bloqué par un prérequis — Présent dans la liste ; connecteur Google non configuré dans cette session.</li>
+<li><a href='#f-anthropic-skills-computer-use'>anthropic-skills:computer-use</a> : Bloqué par un prérequis — Présent dans la liste ; non disponible dans cette session cloud.</li>
+<li>Commandes intégrées sans description vérifiée : <code>/design</code>, <code>/slides</code>, <code>/design-sync</code>, <code>/verify</code>, <code>/debug</code>, <code>/batch</code>, <code>/doctor</code>, <code>/run-skill-generator</code> (<a href='#annexe-b'>annexe B</a>).</li>
+<li>Connecteur <code>context7</code> : installé, mais bloqué par le réseau (<a href='#mcp'>section 5</a>).</li></ul></div>
+<div class="section" id="fiches"><h2>4. Fiches détaillées par domaine</h2>
+<p>Chaque fiche se termine par une demande prête à copier-coller. Les commandes indiquées ont été relevées dans l'inventaire de session. Les exemples utilisent des données fictives.</p>
+<div class="" id="dom-securite"><h2 style="margin-top:6pt">Sécurité</h2>
+<div class="fiche" id="f-elsatia-securite"><h3>elsatia-securite</h3><div class="meta">Skill personnalisé ELSATIA (.claude/skills/), créé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/elsatia-securite</code></div><dl>
+<dt>À quoi il sert</dt><dd>Contrôler, sans rien modifier, les secrets, l&#x27;authentification, les autorisations côté serveur, l&#x27;isolation entre entreprises (RLS, fonctions SECURITY DEFINER), le stockage, la validation des entrées et la protection contre les abus.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant de fusionner une migration, une Server Action ou une route API ; avant toute mise en production.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire le code et les migrations, lancer des contrôles locaux (npm run verify:secrets), produire un rapport classé par gravité avec preuves et correctifs proposés.</dd>
+<dt>À fournir</dt><dd>Le périmètre (fichier, PR, migration, fonctionnalité) et le niveau de détail attendu.</dd>
+<dt>Résultat attendu</dt><dd>Un tableau Gravité | Domaine | Constat | Preuve | Correctif proposé, plus la liste des points non vérifiables.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Audit statique : ce n&#x27;est ni un test d&#x27;intrusion ni un audit certifié. Aucun accès à la Production.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt ; commandes locales en lecture. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Le skill interdit l&#x27;usage de la clé service_role, du MCP Supabase et de toute base distante. N&#x27;affiche jamais la valeur d&#x27;un secret.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique observée pendant l&#x27;essai (« mini audit sécurité de admin.ts »).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Audit de src/lib/supabase/admin.ts : secrets conformes, recommandation d&#x27;ajouter import &quot;server-only&quot;.</dd>
+<dt>Exemple 1</dt><dd>Auditer la dernière migration ajoutée et les actions serveur qui l&#x27;utilisent.</dd>
+<dt>Exemple 2</dt><dd>Vérifier qu&#x27;aucun composant client n&#x27;importe createAdminClient avant la mise en production.</dd>
+</dl><div class="copie">/elsatia-securite Audite en lecture seule la migration la plus récente et les Server Actions qui l&#x27;utilisent. Rapport en tableau, sans modifier aucun fichier.</div></div>
+<div class="fiche" id="f-supabase"><h3>supabase</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/supabase</code></div><dl>
+<dt>À quoi il sert</dt><dd>Appliquer les recommandations de Supabase : RLS dans les schémas exposés, clés à ne jamais exposer, SSR avec @supabase/ssr, sécurité du Storage.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour concevoir ou relire une table, une policy RLS, un flux d&#x27;authentification ou un bucket.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Expliquer, relire du SQL ou du code, proposer des policies et des tests pgTAP.</dd>
+<dt>À fournir</dt><dd>Le fichier SQL ou TS concerné, et la règle d&#x27;accès attendue (qui doit voir quoi).</dd>
+<dt>Résultat attendu</dt><dd>Une revue argumentée ou une proposition de migration à relire.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le skill propose aussi le MCP Supabase et execute_sql : dans ce dépôt, c&#x27;est interdit vers la Production (règle elsatia-securite). Les tests se font avec npm run test:db sur une base locale.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune connexion configurée. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Refuser toute création de .mcp.json ou toute exécution SQL distante sans accord écrit. Ne jamais exposer la clé service_role.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée lors de l&#x27;essai (question courte : réponse directe). Appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>4 points de contrôle RLS pour une table multi-entreprises, sans accès à une base.</dd>
+<dt>Exemple 1</dt><dd>Vérifier qu&#x27;une nouvelle table « interventions » est isolée par entreprise_id.</dd>
+<dt>Exemple 2</dt><dd>Relire la policy de stockage d&#x27;un nouveau bucket privé de photos de chantier.</dd>
+</dl><div class="copie">/supabase Vérifie que la nouvelle table respecte l&#x27;isolation par entreprise (RLS, policies, index). Lecture seule, sans MCP ni base distante.</div></div>
+<div class="fiche" id="f-claude-security-claude-security"><h3>claude-security:claude-security</h3><div class="meta">Skill fourni par un plugin officiel (activé dans .claude/settings.json), installé pendant cette mission · <b>Déclenchement :</b> Manuel uniquement · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/claude-security:claude-security</code></div><dl>
+<dt>À quoi il sert</dt><dd>Lancer une équipe d&#x27;agents qui cartographie le code, cherche des vulnérabilités, vérifie chaque trouvaille et propose des patchs.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Ponctuellement : avant un lancement, ou sur la diff d&#x27;une grosse PR.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Scanner tout le dépôt, une partie, une branche ou une PR ; générer des fichiers de patch vérifiés.</dd>
+<dt>À fournir</dt><dd>Le type de job (scan du code, scan des changements, suggestion de patchs) et le niveau d&#x27;effort.</dd>
+<dt>Résultat attendu</dt><dd>Un rapport de vulnérabilités vérifiées et, si demandé, des patchs à relire avant application.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Coût en tokens élevé pour un scan complet. Plugin v0.11.0, sous licence propriétaire Anthropic (usage interne).</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt dans la session ; hooks locaux (bannière, compteurs). Aucun appel réseau dans ses scripts.</dd>
+<dt>Précautions de sécurité</dt><dd>Les patchs ne sont jamais appliqués automatiquement : les relire. À ne lancer que sur du code ELSATIA.</dd>
+<dt>Déclenchement observé</dt><dd>Manuel uniquement (disable-model-invocation: true dans le plugin). Reconnu dans l&#x27;inventaire.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu dans l&#x27;inventaire ; scan non lancé, conformément à la mission.</dd>
+<dt>Exemple 1</dt><dd>Scanner les changements de la branche avant la fusion d&#x27;un lot « paiements ».</dd>
+<dt>Exemple 2</dt><dd>Scanner le dossier src/app/api avant la mise en production.</dd>
+</dl><div class="copie">/claude-security:claude-security</div></div>
+<div class="fiche" id="f-claude-security-scan"><h3>claude-security:scan</h3><div class="meta">Skill fourni par un plugin officiel (activé dans .claude/settings.json), installé pendant cette mission · <b>Déclenchement :</b> Non confirmé · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/claude-security:claude-security (passer par le menu)</code></div><dl>
+<dt>À quoi il sert</dt><dd>Exécuter les étapes du scan : inventaire, modèle de menace, recherche, panel de vérification, décompte.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Ne pas l&#x27;appeler seul : utiliser le menu Claude Security.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Voir /claude-security:claude-security.</dd>
+<dt>À fournir</dt><dd>Rien directement : ses paramètres viennent du menu.</dd>
+<dt>Résultat attendu</dt><dd>Les données du rapport de scan.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Appel direct non documenté pour l&#x27;utilisateur.</dd>
+<dt>Permissions et données</dt><dd>Identiques à claude-security.</dd>
+<dt>Précautions de sécurité</dt><dd>Identiques à claude-security.</dd>
+<dt>Déclenchement observé</dt><dd>Visible dans la liste des skills, mais décrit comme « Run by the Security Lead from the scan job » : il est prévu pour être lancé par le menu, pas directement.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu dans l&#x27;inventaire ; non lancé.</dd>
+<dt>Exemple 1</dt><dd>(Indirect) Scan de la branche courante lancé depuis le menu.</dd>
+<dt>Exemple 2</dt><dd>(Indirect) Scan du dépôt complet avant une mise en production.</dd>
+</dl><div class="copie">/claude-security:claude-security</div></div>
+<div class="fiche" id="f-security-review"><h3>security-review</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/security-review</code></div><dl>
+<dt>À quoi il sert</dt><dd>Relire la diff de la branche à la recherche de failles de sécurité.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant d&#x27;ouvrir ou de fusionner une PR.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire la diff et signaler les risques.</dd>
+<dt>À fournir</dt><dd>Rien : il prend les changements de la branche.</dd>
+<dt>Résultat attendu</dt><dd>Une liste de constats de sécurité sur la diff.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il ne couvre que la diff, pas l&#x27;existant.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>À compléter par /elsatia-securite pour les règles propres à ELSATIA.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté pendant cette mission.</dd>
+<dt>Exemple 1</dt><dd>Relire la branche d&#x27;un nouveau module avant la PR.</dd>
+<dt>Exemple 2</dt><dd>Vérifier une branche qui modifie l&#x27;authentification.</dd>
+</dl><div class="copie">/security-review</div></div>
+<div class="fiche" id="f-supabase-postgres-best-practices"><h3>supabase-postgres-best-practices</h3><div class="meta">Skill du projet déjà installé par la PR #5 (fusionnée dans main le 3 octobre 2026), non réinstallé · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/supabase-postgres-best-practices</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire des migrations et des policies RLS correctes et rapides.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant d&#x27;écrire ou de relire une migration, une policy ou une fonction SQL.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Relire du SQL, proposer des index, réécrire une policy, expliquer un plan EXPLAIN.</dd>
+<dt>À fournir</dt><dd>Le fichier de migration ou la requête, et le problème observé.</dd>
+<dt>Résultat attendu</dt><dd>Du SQL corrigé et argumenté, à relire.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il complète /supabase (Auth, SSR, Storage) et /elsatia-securite (règles ELSATIA), qui prime en cas de conflit.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne jamais modifier une migration déjà appliquée ; tester sur la base locale (npm run test:db), jamais en Production.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non observée lors de l&#x27;essai (question sur une migration : réponse directe).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Indexation de entreprise_id pour les policies RLS (index B-tree, index composite).</dd>
+<dt>Exemple 1</dt><dd>Vérifier les index d&#x27;une nouvelle table filtrée par entreprise_id.</dd>
+<dt>Exemple 2</dt><dd>Diagnostiquer une page lente du suivi de chantier.</dd>
+</dl><div class="copie">/supabase-postgres-best-practices Relis la dernière migration : types de colonnes, index et policies RLS. Propose les corrections sans toucher à une base.</div></div>
+<div class="fiche" id="f-stripe-best-practices"><h3>stripe-best-practices</h3><div class="meta">Skill du projet déjà installé par la PR #5 (fusionnée dans main le 3 octobre 2026), non réinstallé · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/stripe-best-practices</code></div><dl>
+<dt>À quoi il sert</dt><dd>Sécuriser et fiabiliser les paiements et abonnements.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant de toucher aux routes src/app/api/stripe/** ou à la facturation.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Relire une intégration et proposer des corrections.</dd>
+<dt>À fournir</dt><dd>La route ou le flux concerné (abonnement, boutique, Connect).</dd>
+<dt>Résultat attendu</dt><dd>Une revue argumentée.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le skill recommande « toujours la dernière version d&#x27;API » : ne pas changer la version utilisée par le projet sans décision explicite (règle de .claude/skills/README.md). Ne jamais mélanger Stripe Billing et Stripe Connect.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune clé Stripe utilisée.</dd>
+<dt>Précautions de sécurité</dt><dd>Les clés et secrets de webhook restent dans les variables serveur ; ne jamais les coller dans une demande.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Contrôles d&#x27;un webhook : signature sur le corps brut, idempotence par event.id, événements d&#x27;abonnement.</dd>
+<dt>Exemple 1</dt><dd>Relire le webhook d&#x27;abonnement avant l&#x27;activation de Stripe en Production.</dd>
+<dt>Exemple 2</dt><dd>Vérifier la séparation Billing / Connect dans la boutique.</dd>
+</dl><div class="copie">/stripe-best-practices Relis src/app/api/stripe/abonnement/webhook/route.ts : signature, idempotence, événements. Ne change pas la version d&#x27;API.</div></div>
+</div>
+<div class="section" id="dom-dev"><h2 style="margin-top:6pt">Développement et tests</h2>
+<div class="fiche" id="f-code-review"><h3>code-review</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/code-review</code></div><dl>
+<dt>À quoi il sert</dt><dd>Trouver les bugs de correction dans les changements, à un niveau d&#x27;effort choisi (low à max).</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant chaque PR, ou sur une PR existante.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Revoir la diff ; publier des commentaires sur la PR avec --comment ; appliquer les corrections avec --fix.</dd>
+<dt>À fournir</dt><dd>La cible (rien = diff courante, ou numéro de PR, branche, chemin) et éventuellement le niveau.</dd>
+<dt>Résultat attendu</dt><dd>Une liste de constats classés.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il ne remplace pas npm run verify ni les tests.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt ; écriture seulement avec --fix ; commentaires PR seulement avec --comment.</dd>
+<dt>Précautions de sécurité</dt><dd>N&#x27;utiliser --comment ou --fix qu&#x27;en connaissance de cause.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté. Il remplace le plugin code-review, qui n&#x27;est pas installé (dépend de gh, indisponible).</dd>
+<dt>Exemple 1</dt><dd>Revoir la branche du module de pointage avant la PR.</dd>
+<dt>Exemple 2</dt><dd>Revoir une PR ouverte par un collaborateur.</dd>
+</dl><div class="copie">/code-review high</div></div>
+<div class="fiche" id="f-simplify"><h3>simplify</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/simplify</code></div><dl>
+<dt>À quoi il sert</dt><dd>Améliorer la qualité du code modifié et appliquer les corrections. Ne cherche pas les bugs.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Après une fonctionnalité, avant la revue.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Modifier le code changé pour le rendre plus simple.</dd>
+<dt>À fournir</dt><dd>Rien : il travaille sur les changements en cours.</dd>
+<dt>Résultat attendu</dt><dd>Des modifications appliquées dans l&#x27;arbre de travail.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il écrit dans les fichiers : relire la diff ensuite.</dd>
+<dt>Permissions et données</dt><dd>Lecture et écriture du dépôt.</dd>
+<dt>Précautions de sécurité</dt><dd>Lancer npm run verify après son passage.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Simplifier une Server Action devenue trop longue.</dd>
+<dt>Exemple 2</dt><dd>Supprimer des duplications dans les helpers de devis.</dd>
+</dl><div class="copie">/simplify</div></div>
+<div class="fiche" id="f-run"><h3>run</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/run</code></div><dl>
+<dt>À quoi il sert</dt><dd>Démarrer l&#x27;app et la manipuler (navigateur automatisé) pour vérifier un écran ou un parcours.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour une capture de démonstration ou la vérification d&#x27;un écran mobile.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lancer npm run dev, ouvrir des pages, cliquer, prendre des captures.</dd>
+<dt>À fournir</dt><dd>L&#x27;écran ou le parcours à vérifier, la taille d&#x27;écran, le compte de démonstration à utiliser.</dd>
+<dt>Résultat attendu</dt><dd>Des captures et un constat de fonctionnement.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le mode prototype ou une base locale est nécessaire. Jamais de compte réel de Production.</dd>
+<dt>Permissions et données</dt><dd>Exécution locale (serveur de dev, navigateur headless).</dd>
+<dt>Précautions de sécurité</dt><dd>Données de démonstration uniquement ; ne jamais saisir d&#x27;identifiants réels.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; non testé. Playwright 1.56.1 et Chromium sont préinstallés dans le cloud (essai de capture réussi hors skill).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu. Le logiciel associé (Playwright) a été testé : page fictive ouverte, capture 390×844.</dd>
+<dt>Exemple 1</dt><dd>Capturer l&#x27;écran Devis en format mobile pour un visuel Instagram.</dd>
+<dt>Exemple 2</dt><dd>Vérifier qu&#x27;un nouveau bouton apparaît bien selon la permission.</dd>
+</dl><div class="copie">/run Lance l&#x27;app en local et fais une capture mobile 390×844 de la page de connexion, avec des données de démonstration.</div></div>
+<div class="fiche" id="f-claude-code-setup-claude-automation-recommender"><h3>claude-code-setup:claude-automation-recommender</h3><div class="meta">Skill fourni par un plugin officiel (activé dans .claude/settings.json), installé pendant cette mission · <b>Déclenchement :</b> Manuel uniquement · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/claude-code-setup:claude-automation-recommender</code></div><dl>
+<dt>À quoi il sert</dt><dd>Proposer des hooks, skills, sous-agents et serveurs MCP adaptés au projet.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Après un changement d&#x27;outillage, ou pour automatiser des contrôles répétitifs.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire la structure du dépôt et formuler des recommandations.</dd>
+<dt>À fournir</dt><dd>L&#x27;objectif (qualité, sécurité, rapidité) et les contraintes.</dd>
+<dt>Résultat attendu</dt><dd>Une liste de recommandations argumentées.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il recommande sans rien appliquer. Toute permission ou tout hook proposé doit être relu.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Refuser toute recommandation qui ajoute une permission globale ou un accès Production.</dd>
+<dt>Déclenchement observé</dt><dd>Manuel uniquement (disable-model-invocation: true). Appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>3 recommandations (hook lint/typecheck, sous-agent de relecture RLS…), aucun fichier écrit.</dd>
+<dt>Exemple 1</dt><dd>Automatiser npm run verify:migrations à chaque nouvelle migration.</dd>
+<dt>Exemple 2</dt><dd>Proposer un sous-agent de relecture RLS.</dd>
+</dl><div class="copie">/claude-code-setup:claude-automation-recommender Propose 3 automatisations pour mieux contrôler les migrations Supabase. N&#x27;écris aucun fichier.</div></div>
+<div class="fiche" id="f-anthropic-skills-skill-creator"><h3>anthropic-skills:skill-creator</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:skill-creator</code></div><dl>
+<dt>À quoi il sert</dt><dd>Transformer une procédure ELSATIA en skill testable.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Quand une même consigne revient souvent.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Rédiger un SKILL.md, créer des cas de test, mesurer le déclenchement.</dd>
+<dt>À fournir</dt><dd>La procédure, ses étapes, ses interdits et des exemples de demandes.</dd>
+<dt>Résultat attendu</dt><dd>Un dossier de skill prêt à relire.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Ses scripts d&#x27;évaluation consomment des tokens. Un nouveau skill ne remplace pas AGENTS.md.</dd>
+<dt>Permissions et données</dt><dd>Écriture des fichiers du skill dans le dépôt ou dans ~/.claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Relire chaque nouveau skill avant de l&#x27;ajouter. Aucun secret dans un skill.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté. Le plugin skill-creator n&#x27;est pas installé, pour éviter un doublon.</dd>
+<dt>Exemple 1</dt><dd>Créer « elsatia-demo » pour préparer une entreprise fictive avant une capture.</dd>
+<dt>Exemple 2</dt><dd>Améliorer la description d&#x27;elsatia-communication pour qu&#x27;il se déclenche mieux.</dd>
+</dl><div class="copie">/anthropic-skills:skill-creator Crée un skill « elsatia-demo » qui prépare une entreprise de démonstration fictive pour des captures. Ne touche à aucune base.</div></div>
+<div class="fiche" id="f-init"><h3>init</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/init</code></div><dl>
+<dt>À quoi il sert</dt><dd>Générer une première documentation pour Claude dans un dépôt.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Uniquement pour un nouveau dépôt sans CLAUDE.md.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire le dépôt et écrire CLAUDE.md.</dd>
+<dt>À fournir</dt><dd>Rien, ou les conventions à mentionner.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier CLAUDE.md.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Ne pas l&#x27;utiliser sur ce dépôt : CLAUDE.md et AGENTS.md existent déjà et ne doivent pas être remplacés.</dd>
+<dt>Permissions et données</dt><dd>Écriture de CLAUDE.md.</dd>
+<dt>Précautions de sécurité</dt><dd>Vérifier qu&#x27;aucun document de règles existant n&#x27;est écrasé.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Démarrer le dépôt d&#x27;une future app ELSATIA.</dd>
+<dt>Exemple 2</dt><dd>Documenter un petit outil interne.</dd>
+</dl><div class="copie">/init</div></div>
+<div class="fiche" id="f-session-start-hook"><h3>session-start-hook</h3><div class="meta">Skill utilisateur du conteneur (~/.claude/skills, préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/session-start-hook</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire un hook SessionStart qui installe les dépendances au démarrage d&#x27;une session cloud.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Si vous voulez que chaque session cloud ait npm ci, yt-dlp, etc. prêts.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer le script et sa déclaration dans .claude/settings.json.</dd>
+<dt>À fournir</dt><dd>Les commandes à exécuter au démarrage.</dd>
+<dt>Résultat attendu</dt><dd>Un hook versionné.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Un hook s&#x27;exécute à chaque session : à garder court et sûr.</dd>
+<dt>Permissions et données</dt><dd>Écriture de .claude/settings.json et d&#x27;un script.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucun téléchargement non épinglé, aucun secret dans le hook.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Installer yt-dlp==2026.8.19 au démarrage pour /watch.</dd>
+<dt>Exemple 2</dt><dd>Lancer npm ci au démarrage pour les tests.</dd>
+</dl><div class="copie">/session-start-hook Crée un hook qui lance npm ci et installe yt-dlp==2026.8.19 via uv, sans autre action.</div></div>
+<div class="fiche" id="f-update-config"><h3>update-config</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/update-config</code></div><dl>
+<dt>À quoi il sert</dt><dd>Modifier proprement les réglages de Claude Code.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour ajouter un hook ou une variable, ou ajuster une permission.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Éditer .claude/settings.json ou settings.local.json.</dd>
+<dt>À fournir</dt><dd>Le comportement voulu et son périmètre (projet ou local).</dd>
+<dt>Résultat attendu</dt><dd>Un fichier de configuration modifié.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Ne pas l&#x27;utiliser pour élargir les permissions sans réflexion.</dd>
+<dt>Permissions et données</dt><dd>Écriture des fichiers de configuration.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de permission globale ; ne jamais retirer WATCH_ENGINE=local sans accord.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Ajouter un hook qui lance le lint après chaque édition.</dd>
+<dt>Exemple 2</dt><dd>Ajouter une variable d&#x27;environnement de développement non secrète.</dd>
+</dl><div class="copie">/update-config Ajoute un hook projet qui lance npm run lint après chaque modification de fichier .ts.</div></div>
+<div class="fiche" id="f-fewer-permission-prompts"><h3>fewer-permission-prompts</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/fewer-permission-prompts</code></div><dl>
+<dt>À quoi il sert</dt><dd>Analyser les sessions passées et autoriser les commandes en lecture fréquentes.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Quand les demandes d&#x27;autorisation ralentissent le travail.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Écrire une liste d&#x27;autorisations dans .claude/settings.json.</dd>
+<dt>À fournir</dt><dd>Rien, ou les commandes à exclure.</dd>
+<dt>Résultat attendu</dt><dd>Une liste d&#x27;autorisations priorisée.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Ne concerne que des commandes en lecture.</dd>
+<dt>Permissions et données</dt><dd>Écriture de .claude/settings.json.</dd>
+<dt>Précautions de sécurité</dt><dd>Relire la liste : aucune commande d&#x27;écriture, de déploiement ou de base distante.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Autoriser git status et ls sans confirmation.</dd>
+<dt>Exemple 2</dt><dd>Autoriser npm run lint sans confirmation.</dd>
+</dl><div class="copie">/fewer-permission-prompts</div></div>
+<div class="fiche" id="f-claude-api"><h3>claude-api</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/claude-api</code></div><dl>
+<dt>À quoi il sert</dt><dd>Donner les bons identifiants de modèles, paramètres, prix et pratiques.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Si une fonctionnalité IA d&#x27;ELSATIA doit utiliser Claude.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Expliquer et écrire du code d&#x27;appel à l&#x27;API.</dd>
+<dt>À fournir</dt><dd>Le cas d&#x27;usage et le langage.</dd>
+<dt>Résultat attendu</dt><dd>Des recommandations et du code.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le skill indique lui-même qu&#x27;il ne s&#x27;applique pas quand un autre fournisseur (OpenAI…) est en jeu.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt.</dd>
+<dt>Précautions de sécurité</dt><dd>La clé d&#x27;API reste côté serveur, dans les variables d&#x27;environnement.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Évaluer le coût d&#x27;un résumé automatique de compte rendu de chantier.</dd>
+<dt>Exemple 2</dt><dd>Écrire un appel serveur avec cache de prompt.</dd>
+</dl><div class="copie">/claude-api Quel modèle et quel coût pour résumer 200 comptes rendus de chantier par mois ?</div></div>
+<div class="fiche" id="f-workflow-authoring"><h3>workflow-authoring</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/workflow-authoring</code></div><dl>
+<dt>À quoi il sert</dt><dd>Aider à écrire un workflow qui orchestre plusieurs agents.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Seulement si vous demandez explicitement un workflow.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Rédiger le script du workflow.</dd>
+<dt>À fournir</dt><dd>La tâche et l&#x27;échelle voulue.</dd>
+<dt>Résultat attendu</dt><dd>Un script de workflow.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Un workflow peut lancer de nombreux agents : coût élevé.</dd>
+<dt>Permissions et données</dt><dd>Celles des agents lancés.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas d&#x27;accès Production dans un workflow.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Relire toutes les migrations RLS en parallèle.</dd>
+<dt>Exemple 2</dt><dd>Contrôler la traduction de toutes les pages publiques.</dd>
+</dl><div class="copie">/workflow-authoring</div></div>
+<div class="fiche" id="f-plugin-authoring"><h3>plugin-authoring</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/plugin-authoring</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire un plugin de hooks qui se recharge à chaud.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Rarement : seulement pour personnaliser l&#x27;outil.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Écrire et déboguer un module de hooks.</dd>
+<dt>À fournir</dt><dd>Le comportement voulu.</dd>
+<dt>Résultat attendu</dt><dd>Un plugin local.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Usage avancé.</dd>
+<dt>Permissions et données</dt><dd>Écriture de fichiers de plugin.</dd>
+<dt>Précautions de sécurité</dt><dd>Un hook s&#x27;exécute automatiquement : le relire.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Afficher la branche et l&#x27;état de verify dans la barre d&#x27;état.</dd>
+<dt>Exemple 2</dt><dd>Afficher une alerte quand un fichier de migration est modifié.</dd>
+</dl><div class="copie">/plugin-authoring</div></div>
+<div class="fiche" id="f-vercel-react-best-practices"><h3>vercel-react-best-practices</h3><div class="meta">Skill du projet déjà installé par la PR #5 (fusionnée dans main le 3 octobre 2026), non réinstallé · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/vercel-react-best-practices</code></div><dl>
+<dt>À quoi il sert</dt><dd>Éviter les lenteurs : requêtes en cascade, bundles trop lourds, rendus inutiles.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>En écrivant ou en relisant une page ou un composant de l&#x27;app, surtout un tableau de bord chargé.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Relire du code, proposer des corrections et expliquer la règle appliquée.</dd>
+<dt>À fournir</dt><dd>Le fichier ou la page concernée, et le symptôme (lenteur, poids).</dd>
+<dt>Résultat attendu</dt><dd>Des corrections classées par impact.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Règles génériques : AGENTS.md et la documentation Next.js 16 locale (node_modules/next/dist/docs/) priment. Le projet utilise src/proxy.ts et non middleware.ts.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Le skill rappelle de vérifier l&#x27;authentification dans chaque Server Action : à appliquer avec /elsatia-securite.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Trois règles citées par leur identifiant (async-parallel, server-parallel-nested-fetching…).</dd>
+<dt>Exemple 1</dt><dd>Accélérer le tableau de bord en parallélisant les requêtes Supabase.</dd>
+<dt>Exemple 2</dt><dd>Réduire le JavaScript envoyé sur la page Devis.</dd>
+</dl><div class="copie">/vercel-react-best-practices Relis src/app/(app)/dashboard et propose les corrections de performance par ordre d&#x27;impact, sans modifier les fichiers.</div></div>
+</div>
+<div class="section" id="dom-interfaces"><h2 style="margin-top:6pt">Interfaces</h2>
+<div class="fiche" id="f-ui-ux-pro-max"><h3>ui-ux-pro-max</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ui-ux-pro-max</code></div><dl>
+<dt>À quoi il sert</dt><dd>Choisir des couleurs, typographies, types de graphiques et vérifier une check-list UX avant livraison.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un nouvel écran, une refonte, un tableau de bord ou un visuel.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lancer python3 .claude/skills/ui-ux-pro-max/scripts/search.py &quot;&lt;requête&gt;&quot; --design-system, puis proposer une charte argumentée.</dd>
+<dt>À fournir</dt><dd>Le type de produit, le public, la densité d&#x27;information voulue, les contraintes (lecture en plein soleil, mobile).</dd>
+<dt>Résultat attendu</dt><dd>Un design system proposé (palette, typographies, style, effets, anti-patterns) et des règles UX.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Des suggestions, pas une charte. L&#x27;option --persist écrit un dossier design-system/ : à demander explicitement.</dd>
+<dt>Permissions et données</dt><dd>Exécution locale de python3 (bibliothèque standard, aucun réseau).</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de risque particulier ; garder la charte ELSATIA existante comme référence.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée lors de l&#x27;essai ; appel explicite testé ; script testé directement.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>search.py a généré un design system « Démo fictive » ; le skill répond en appel explicite (le script demande une autorisation d&#x27;exécution).</dd>
+<dt>Exemple 1</dt><dd>Proposer une palette lisible en plein soleil pour l&#x27;écran de pointage.</dd>
+<dt>Exemple 2</dt><dd>Choisir le bon type de graphique pour la rentabilité par chantier.</dd>
+</dl><div class="copie">/ui-ux-pro-max Propose un design system pour le tableau de bord chantier de Liria Gestion Pro : densité élevée, accessible, lisible en plein soleil.</div></div>
+<div class="fiche" id="f-frontend-design-frontend-design"><h3>frontend-design:frontend-design</h3><div class="meta">Skill fourni par un plugin officiel (activé dans .claude/settings.json), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/frontend-design:frontend-design</code></div><dl>
+<dt>À quoi il sert</dt><dd>Donner une identité visuelle forte et cohérente à une page.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour une nouvelle page publique ou une refonte.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Proposer une direction, puis écrire le code de l&#x27;interface si vous le demandez.</dd>
+<dt>À fournir</dt><dd>Le but de la page, le public, les contraintes de marque.</dd>
+<dt>Résultat attendu</dt><dd>Une direction artistique, puis du code si demandé.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Peut proposer des choix trop audacieux pour un logiciel de gestion dense.</dd>
+<dt>Permissions et données</dt><dd>Écriture de code seulement si demandée. Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucun secret ni donnée réelle dans les maquettes.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée lors de l&#x27;essai ; appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Direction visuelle « plan de chantier annoté », avec palette et typographies, sans code.</dd>
+<dt>Exemple 1</dt><dd>Direction visuelle de la page d&#x27;accueil publique.</dd>
+<dt>Exemple 2</dt><dd>Refonte de la page Abonnement.</dd>
+</dl><div class="copie">/frontend-design:frontend-design Direction visuelle pour la page d&#x27;accueil publique de Liria Gestion Pro, sans code, en 6 points.</div></div>
+<div class="fiche" id="f-dataviz"><h3>dataviz</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/dataviz</code></div><dl>
+<dt>À quoi il sert</dt><dd>Choisir la bonne forme de graphique, des couleurs accessibles et des interactions cohérentes.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant d&#x27;écrire le code d&#x27;un graphique.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Guider le choix et la réalisation d&#x27;un graphique.</dd>
+<dt>À fournir</dt><dd>Les données (fictives pour une démo) et la question à laquelle le graphique répond.</dd>
+<dt>Résultat attendu</dt><dd>Un graphique cohérent en mode clair et sombre.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>La palette fournie est neutre : à remplacer par la charte ELSATIA.</dd>
+<dt>Permissions et données</dt><dd>Aucune particulière.</dd>
+<dt>Précautions de sécurité</dt><dd>Données fictives pour toute communication externe.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Graphique de marge par chantier pour le tableau de bord.</dd>
+<dt>Exemple 2</dt><dd>Visuel chiffré pour un carrousel LinkedIn (données fictives).</dd>
+</dl><div class="copie">/dataviz Propose le graphique adapté pour comparer la marge prévue et réelle de 8 chantiers fictifs.</div></div>
+<div class="fiche" id="f-artifact-design"><h3>artifact-design</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Automatique possible ; aucune commande vérifiée · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> Aucune commande vérifiée. Demander : « Utilise le skill artifact-design pour… »</div><dl>
+<dt>À quoi il sert</dt><dd>Produire des pages Artifact soignées (thème, mise en page, mobile).</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour partager un rapport ou une page web privée.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Guider la conception d&#x27;une page HTML publiée.</dd>
+<dt>À fournir</dt><dd>Le contenu et le public de la page.</dd>
+<dt>Résultat attendu</dt><dd>Une page conforme au format Artifact.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Uniquement pour les Artifacts.</dd>
+<dt>Permissions et données</dt><dd>La publication d&#x27;un Artifact est privée par défaut.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne rien publier qui contienne des données clients.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; aucune commande slash dans l&#x27;inventaire de session.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Page récapitulative d&#x27;une recette pour l&#x27;équipe.</dd>
+<dt>Exemple 2</dt><dd>Présentation d&#x27;une feuille de route produit.</dd>
+</dl><div class="copie">Utilise le skill artifact-design pour créer une page récapitulative de la feuille de route de Liria Gestion Pro.</div></div>
+<div class="fiche" id="f-artifact-diagramming"><h3>artifact-diagramming</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/artifact-diagramming</code></div><dl>
+<dt>À quoi il sert</dt><dd>Dessiner des schémas SVG lisibles.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour expliquer un flux (ex. isolation RLS, parcours de devis).</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer un diagramme dans une page.</dd>
+<dt>À fournir</dt><dd>Le mécanisme à représenter.</dd>
+<dt>Résultat attendu</dt><dd>Un schéma intégré à une page.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Pour les Artifacts.</dd>
+<dt>Permissions et données</dt><dd>Aucune particulière.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de détails d&#x27;infrastructure sensibles dans un schéma partagé.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Schéma du parcours devis → facture → paiement.</dd>
+<dt>Exemple 2</dt><dd>Schéma de l&#x27;isolation entre entreprises.</dd>
+</dl><div class="copie">/artifact-diagramming Schéma simple du parcours devis, signature, facture, paiement dans Liria Gestion Pro.</div></div>
+<div class="fiche" id="f-artifact-capabilities"><h3>artifact-capabilities</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/artifact-capabilities</code></div><dl>
+<dt>À quoi il sert</dt><dd>Donner à une page publiée des fonctions dynamiques.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un outil interne léger (suivi, sondage).</dd>
+<dt>Ce que Claude peut faire</dt><dd>Configurer les capacités de la page.</dd>
+<dt>À fournir</dt><dd>Le besoin fonctionnel.</dd>
+<dt>Résultat attendu</dt><dd>Une page interactive.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>À ne pas utiliser pour des données clients.</dd>
+<dt>Permissions et données</dt><dd>Selon les capacités déclarées.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune donnée personnelle de client dans ces pages.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Suivi interne des idées de contenus réseaux sociaux.</dd>
+<dt>Exemple 2</dt><dd>Sondage d&#x27;équipe sur une future fonctionnalité.</dd>
+</dl><div class="copie">/artifact-capabilities Crée un tableau partagé de suivi des idées de posts, sans données clients.</div></div>
+<div class="fiche" id="f-anthropic-skills-built-in-browser"><h3>anthropic-skills:built-in-browser</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ko">Bloqué par un prérequis</span> · <b>Commande :</b> <code>/anthropic-skills:built-in-browser</code></div><dl>
+<dt>À quoi il sert</dt><dd>Naviguer et lire des pages dans le panneau navigateur de l&#x27;app de bureau.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Depuis l&#x27;app Claude de bureau.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Ouvrir des pages, les lire, prévisualiser un site.</dd>
+<dt>À fournir</dt><dd>L&#x27;URL et l&#x27;objectif.</dd>
+<dt>Résultat attendu</dt><dd>Le contenu ou le constat demandé.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Nécessite l&#x27;app de bureau.</dd>
+<dt>Permissions et données</dt><dd>Accès aux sites approuvés.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne jamais se connecter à un compte réseau social ou bancaire via l&#x27;agent.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé. Ses outils ne sont pas disponibles dans cette session cloud.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Prérequis absent : application de bureau reliée à la session.</dd>
+<dt>Exemple 1</dt><dd>Relire la page publique de tarifs.</dd>
+<dt>Exemple 2</dt><dd>Vérifier l&#x27;affichage du site vitrine.</dd>
+</dl><div class="copie">/anthropic-skills:built-in-browser Ouvre la page publique de tarifs et vérifie les montants affichés.</div></div>
+<div class="fiche" id="f-anthropic-skills-chrome-browser"><h3>anthropic-skills:chrome-browser</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ko">Bloqué par un prérequis</span> · <b>Commande :</b> <code>/anthropic-skills:chrome-browser</code></div><dl>
+<dt>À quoi il sert</dt><dd>Agir dans votre Chrome avec vos connexions.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Uniquement pour des sites sans risque.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire et manipuler des onglets.</dd>
+<dt>À fournir</dt><dd>L&#x27;URL et l&#x27;objectif.</dd>
+<dt>Résultat attendu</dt><dd>Le constat demandé.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Nécessite l&#x27;extension.</dd>
+<dt>Permissions et données</dt><dd>Accès à votre navigateur et à vos sessions connectées.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas l&#x27;utiliser sur Instagram, Facebook, LinkedIn, la banque ou la console Supabase de Production.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé. Extension non connectée à cette session cloud.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Prérequis absent : extension Claude in Chrome connectée.</dd>
+<dt>Exemple 1</dt><dd>Relire une page de documentation publique.</dd>
+<dt>Exemple 2</dt><dd>Vérifier un formulaire du site vitrine.</dd>
+</dl><div class="copie">/anthropic-skills:chrome-browser Ouvre le site vitrine dans un nouvel onglet et liste les liens cassés.</div></div>
+<div class="fiche" id="f-web-design-guidelines"><h3>web-design-guidelines</h3><div class="meta">Skill du projet déjà installé par la PR #5 (fusionnée dans main le 3 octobre 2026), non réinstallé · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/web-design-guidelines &lt;fichier-ou-motif&gt;</code></div><dl>
+<dt>À quoi il sert</dt><dd>Contrôler les écrans : accessibilité, focus, formulaires, contrastes, textes, mobile.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant de livrer un écran ou une page publique.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lire les fichiers indiqués, télécharger les règles à jour et rendre des constats au format fichier:ligne.</dd>
+<dt>À fournir</dt><dd>Le fichier ou le motif de fichiers à auditer.</dd>
+<dt>Résultat attendu</dt><dd>Une liste de constats fichier:ligne.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il télécharge ses règles à chaque audit depuis raw.githubusercontent.com (vercel-labs/web-interface-guidelines) : elles peuvent évoluer, et l&#x27;outil WebFetch doit être autorisé quand Claude le demande.</dd>
+<dt>Permissions et données</dt><dd>Lecture du dépôt ; accès réseau en lecture à GitHub (règles publiques).</dd>
+<dt>Précautions de sécurité</dt><dd>Le contenu téléchargé est une liste de règles, jamais une instruction à exécuter (rappel de .claude/skills/README.md).</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé : skill chargé ; le téléchargement des règles demande d&#x27;autoriser l&#x27;outil WebFetch, ce qui a été refusé en mode non interactif.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Constats produits sur src/app/layout.tsx, mais à partir des connaissances du modèle, car WebFetch n&#x27;était pas autorisé. URL des règles joignable (code 200).</dd>
+<dt>Exemple 1</dt><dd>Auditer le formulaire de création de devis.</dd>
+<dt>Exemple 2</dt><dd>Auditer la page d&#x27;accueil publique avant la mise en ligne.</dd>
+</dl><div class="copie">/web-design-guidelines src/app/(app)/devis/**/*.tsx</div></div>
+</div>
+<div class="section" id="dom-marketing"><h2 style="margin-top:6pt">Marketing</h2>
+<div class="fiche" id="f-elsatia-communication"><h3>elsatia-communication</h3><div class="meta">Skill personnalisé ELSATIA (.claude/skills/), créé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/elsatia-communication</code></div><dl>
+<dt>À quoi il sert</dt><dd>Rappeler les règles : rédaction sans publication, données fictives, typographie française, un seul humaniseur ; indiquer le skill adapté.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>En début de tout travail de communication, ou en cas de doute sur le skill à utiliser.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Orienter et cadrer ; ne rédige pas lui-même.</dd>
+<dt>À fournir</dt><dd>Le besoin de communication.</dd>
+<dt>Résultat attendu</dt><dd>Le skill à utiliser et les règles à respecter.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>C&#x27;est un cadre, pas un outil de rédaction.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Interdit la publication automatique et les connexions aux comptes sociaux.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique observée 5 fois (Reel, post LinkedIn, lancement, légende…).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Facebook → /social + /copy-editing, avec la mention « non publié ».</dd>
+<dt>Exemple 1</dt><dd>Savoir quel skill utiliser pour annoncer le module Pointage.</dd>
+<dt>Exemple 2</dt><dd>Vérifier les règles avant de préparer une vidéo de démo.</dd>
+</dl><div class="copie">/elsatia-communication Quel skill utiliser pour annoncer le module Pointage sur LinkedIn et Facebook ?</div></div>
+<div class="fiche" id="f-product-marketing"><h3>product-marketing</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/product-marketing</code></div><dl>
+<dt>À quoi il sert</dt><dd>Définir la cible, le problème, la différenciation et les objections, puis les écrire dans un fichier que les autres skills relisent.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>En premier, une fois par app.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Poser des questions, lire le dépôt, rédiger .agents/product-marketing.md.</dd>
+<dt>À fournir</dt><dd>La cible, les tarifs validés, les concurrents, les preuves réelles et le ton.</dd>
+<dt>Résultat attendu</dt><dd>Un document de positionnement réutilisable.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Chaque affirmation (fonction, prix) doit être vérifiée avant validation.</dd>
+<dt>Permissions et données</dt><dd>Écriture de .agents/product-marketing.md.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune donnée client réelle dans ce fichier.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Il liste les informations nécessaires, sans créer de fichier.</dd>
+<dt>Exemple 1</dt><dd>Positionner Liria Gestion Pro face aux tableurs.</dd>
+<dt>Exemple 2</dt><dd>Définir la cible du module de pointage.</dd>
+</dl><div class="copie">/product-marketing Construis le contexte produit de Liria Gestion Pro à partir du dépôt et de mes réponses. Pose-moi les questions manquantes.</div></div>
+<div class="fiche" id="f-copywriting"><h3>copywriting</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/copywriting</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire des textes clairs et persuasifs, sans tics d&#x27;écriture IA.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour toute nouvelle page ou section de vente.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Proposer titres, sous-titres, blocs de bénéfices, appels à l&#x27;action, variantes.</dd>
+<dt>À fournir</dt><dd>La page, la cible, le bénéfice principal, les preuves réelles.</dd>
+<dt>Résultat attendu</dt><dd>Un texte prêt à relire, avec ses variantes.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Aucun chiffre ni témoignage inventé ne doit être publié.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Promesses vérifiables uniquement (pas d&#x27;eIDAS qualifié, pas d&#x27;audit certifié).</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Titre et sous-titre ; le chiffre fictif est signalé « à remplacer ».</dd>
+<dt>Exemple 1</dt><dd>Texte de la page « Devis ».</dd>
+<dt>Exemple 2</dt><dd>Bloc héros de la page d&#x27;accueil.</dd>
+</dl><div class="copie">/copywriting Titre, sous-titre et 3 blocs de bénéfices pour la page « Devis » de Liria Gestion Pro. Vouvoiement.</div></div>
+<div class="fiche" id="f-copy-editing"><h3>copy-editing</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/copy-editing</code></div><dl>
+<dt>À quoi il sert</dt><dd>Supprimer les formules creuses et les tics d&#x27;écriture IA, resserrer et clarifier.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant de publier tout texte.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Réécrire, expliquer chaque changement, proposer des variantes.</dd>
+<dt>À fournir</dt><dd>Le texte et le ton voulu.</dd>
+<dt>Résultat attendu</dt><dd>Un texte relu et naturel.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Ses références sont en anglais : vérifier la typographie française (espaces insécables, « »).</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée lors de l&#x27;essai ; appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Texte « IA » réécrit, avec la liste des changements.</dd>
+<dt>Exemple 1</dt><dd>Humaniser un post LinkedIn généré.</dd>
+<dt>Exemple 2</dt><dd>Relire la page Abonnement.</dd>
+</dl><div class="copie">/copy-editing Rends ce texte plus naturel en gardant les espaces insécables français : &lt;collez le texte&gt;</div></div>
+<div class="fiche" id="f-cro"><h3>cro</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/cro</code></div><dl>
+<dt>À quoi il sert</dt><dd>Diagnostiquer pourquoi une page convertit mal et proposer des améliorations.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant ou après le lancement d&#x27;une page de vente.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Analyser un texte, une capture ou une URL publique.</dd>
+<dt>À fournir</dt><dd>La page (texte, capture ou URL publique) et l&#x27;objectif de conversion.</dd>
+<dt>Résultat attendu</dt><dd>Une liste priorisée de modifications.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Sans données de trafic, les recommandations restent des hypothèses.</dd>
+<dt>Permissions et données</dt><dd>Accès réseau seulement si vous fournissez une URL.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne fournir que des URL publiques.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>3 recommandations pour une page fictive.</dd>
+<dt>Exemple 1</dt><dd>Améliorer la page d&#x27;essai gratuit.</dd>
+<dt>Exemple 2</dt><dd>Réduire l&#x27;abandon du formulaire de démo.</dd>
+</dl><div class="copie">/cro Analyse cette page de vente et propose 5 améliorations priorisées : &lt;texte ou capture&gt;</div></div>
+<div class="fiche" id="f-launch"><h3>launch</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/launch</code></div><dl>
+<dt>À quoi il sert</dt><dd>Organiser les étapes et canaux d&#x27;un lancement.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Quelques semaines avant une sortie.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Construire un plan, un calendrier, des messages par canal.</dd>
+<dt>À fournir</dt><dd>Ce qui est lancé, la date, la cible, les canaux disponibles.</dd>
+<dt>Résultat attendu</dt><dd>Un plan de lancement structuré.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le skill mentionne des intégrations d&#x27;outils tiers : non configurées ici.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune publication automatique.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé (elsatia-communication chargé automatiquement en plus).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Plan en 4 étapes pour un module fictif.</dd>
+<dt>Exemple 1</dt><dd>Lancer le module Pointage auprès des clients existants.</dd>
+<dt>Exemple 2</dt><dd>Ouvrir une liste d&#x27;attente pour une future app.</dd>
+</dl><div class="copie">/launch Plan de lancement du module Pointage chantier pour les clients existants, puis les prospects.</div></div>
+<div class="fiche" id="f-seo-audit"><h3>seo-audit</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/seo-audit</code></div><dl>
+<dt>À quoi il sert</dt><dd>Diagnostiquer les problèmes de référencement.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant la mise en ligne du site, puis périodiquement.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Établir une check-list, analyser une page publique.</dd>
+<dt>À fournir</dt><dd>L&#x27;URL publique ou les fichiers de la page.</dd>
+<dt>Résultat attendu</dt><dd>Un audit priorisé.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>L&#x27;analyse d&#x27;une URL réelle passe par le réseau.</dd>
+<dt>Permissions et données</dt><dd>Accès réseau seulement pour les URL fournies.</dd>
+<dt>Précautions de sécurité</dt><dd>L&#x27;application connectée doit rester hors index.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>4 points à vérifier, dont « l&#x27;app connectée en noindex ».</dd>
+<dt>Exemple 1</dt><dd>Auditer la page d&#x27;accueil du site vitrine.</dd>
+<dt>Exemple 2</dt><dd>Vérifier le sitemap et le robots.txt.</dd>
+</dl><div class="copie">/seo-audit Check-list SEO pour le site vitrine de Liria Gestion Pro, sans accéder à l&#x27;application connectée.</div></div>
+<div class="fiche" id="f-ai-seo"><h3>ai-seo</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ai-seo</code></div><dl>
+<dt>À quoi il sert</dt><dd>Rendre les contenus faciles à citer par les assistants IA.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>En complément du SEO classique.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Recommander une structure, une FAQ, un llms.txt.</dd>
+<dt>À fournir</dt><dd>Les requêtes visées et les pages concernées.</dd>
+<dt>Résultat attendu</dt><dd>Des recommandations concrètes.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Certaines suggestions mentionnent des outils tiers : optionnels.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne publier que des informations publiques et exactes.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>3 conseils (réponse directe, données publiques, FAQ).</dd>
+<dt>Exemple 1</dt><dd>Être cité sur « logiciel devis BTP ».</dd>
+<dt>Exemple 2</dt><dd>Préparer un llms.txt pour le site vitrine.</dd>
+</dl><div class="copie">/ai-seo Comment être cité par les assistants IA sur « logiciel gestion chantier » ? Recommandations concrètes.</div></div>
+<div class="fiche" id="f-content-strategy"><h3>content-strategy</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/content-strategy</code></div><dl>
+<dt>À quoi il sert</dt><dd>Décider quels contenus produire, et dans quel ordre.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour planifier un trimestre de contenus.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Définir des piliers, des sujets et un calendrier.</dd>
+<dt>À fournir</dt><dd>La cible, les objectifs et les canaux.</dd>
+<dt>Résultat attendu</dt><dd>Un plan de contenus.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il mentionne des CMS tiers : non configurés.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>4 piliers de contenu pour un SaaS fictif.</dd>
+<dt>Exemple 1</dt><dd>Calendrier de 4 semaines pour Liria Gestion Pro.</dd>
+<dt>Exemple 2</dt><dd>Sujets de blog sur la rentabilité des chantiers.</dd>
+</dl><div class="copie">/content-strategy 4 piliers de contenu et un calendrier sur 4 semaines pour Liria Gestion Pro.</div></div>
+<div class="fiche" id="f-marketing-psychology"><h3>marketing-psychology</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/marketing-psychology</code></div><dl>
+<dt>À quoi il sert</dt><dd>Expliquer et appliquer des leviers de décision.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour améliorer une offre ou un argumentaire.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Proposer des leviers et leur application.</dd>
+<dt>À fournir</dt><dd>Le contexte de décision du client.</dd>
+<dt>Résultat attendu</dt><dd>Des leviers argumentés.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Usage éthique uniquement : pas de fausse rareté ni de faux témoignages.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Respect du droit de la consommation et de la loyauté commerciale.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>3 leviers éthiques.</dd>
+<dt>Exemple 1</dt><dd>Convertir un essai gratuit en abonnement.</dd>
+<dt>Exemple 2</dt><dd>Présenter l&#x27;offre annuelle.</dd>
+</dl><div class="copie">/marketing-psychology Quels leviers éthiques pour convertir un essai gratuit de Liria Gestion Pro en abonnement ?</div></div>
+</div>
+<div class="section" id="dom-social"><h2 style="margin-top:6pt">Réseaux sociaux</h2>
+<div class="fiche" id="f-social"><h3>social</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/social</code></div><dl>
+<dt>À quoi il sert</dt><dd>Rédiger et adapter des posts à chaque réseau.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour tout post LinkedIn ou Facebook.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Rédiger des posts, des carrousels, un calendrier ; proposer des modèles LinkedIn.</dd>
+<dt>À fournir</dt><dd>Le réseau, le sujet, le ton, la longueur.</dd>
+<dt>Résultat attendu</dt><dd>Un post prêt à relire, non publié.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Facebook est peu couvert (pas de modèles dédiés). La section « publier depuis l&#x27;agent » ne doit pas être utilisée.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune connexion aux comptes ; c&#x27;est vous qui publiez.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée (elsatia-communication a été choisi) ; appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Post LinkedIn de 51 mots, mention « non publié ».</dd>
+<dt>Exemple 1</dt><dd>Post LinkedIn annonçant la signature des devis.</dd>
+<dt>Exemple 2</dt><dd>Post Facebook pour un groupe d&#x27;artisans locaux.</dd>
+</dl><div class="copie">/social Post LinkedIn de 120 mots pour annoncer la signature électronique simple des devis, ton expert, données fictives. Ne publie rien.</div></div>
+<div class="fiche" id="f-ig-reel"><h3>ig-reel</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ig-reel</code></div><dl>
+<dt>À quoi il sert</dt><dd>Transformer une idée en script de Reel prêt à tourner.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Avant chaque tournage.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Proposer des accroches, les noter (hookscore.py), créer un découpage minuté (beats.py).</dd>
+<dt>À fournir</dt><dd>L&#x27;idée, la durée, le public.</dd>
+<dt>Résultat attendu</dt><dd>Un script avec accroches, texte et timing.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Les scores des scripts reposent sur des heuristiques anglaises : indicatifs en français. La voix est lue dans ~/.claude/instagram/voice.md, non conservé d&#x27;une session cloud à l&#x27;autre.</dd>
+<dt>Permissions et données</dt><dd>Exécution locale de python3 ; écriture possible dans ~/.claude/instagram/.</dd>
+<dt>Précautions de sécurité</dt><dd>Données fictives à l&#x27;écran ; aucune publication.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée (elsatia-communication a été choisi) ; appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>3 accroches et un script ; hookscore.py fonctionne (barème anglais).</dd>
+<dt>Exemple 1</dt><dd>Reel « devis fait depuis le chantier ».</dd>
+<dt>Exemple 2</dt><dd>Reel « pointage en 10 secondes ».</dd>
+</dl><div class="copie">/ig-reel Reel de 20 s : un chef d&#x27;équipe fictif pointe ses heures depuis le chantier avec Liria Gestion Pro.</div></div>
+<div class="fiche" id="f-ig-caption"><h3>ig-caption</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ig-caption</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire la légende qui passe la coupure « … plus », avec un seul appel à l&#x27;action et 3 hashtags.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour chaque Reel ou carrousel.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Rédiger et vérifier la légende (caption.py).</dd>
+<dt>À fournir</dt><dd>Le contenu du post et les mots-clés.</dd>
+<dt>Résultat attendu</dt><dd>Une légende vérifiée.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Contrôles automatiques en anglais.</dd>
+<dt>Permissions et données</dt><dd>Exécution locale de python3.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune publication.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé (elsatia-communication chargé automatiquement en plus).</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Légende produite ; caption.py n&#x27;a pas détecté l&#x27;appel à l&#x27;action français (heuristique anglaise).</dd>
+<dt>Exemple 1</dt><dd>Légende du Reel sur le pointage.</dd>
+<dt>Exemple 2</dt><dd>Légende d&#x27;un carrousel « 3 erreurs de devis ».</dd>
+</dl><div class="copie">/ig-caption Légende pour un carrousel « 3 erreurs de devis », 3 hashtags, vouvoiement.</div></div>
+<div class="fiche" id="f-ig-carousel"><h3>ig-carousel</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ig-carousel</code></div><dl>
+<dt>À quoi il sert</dt><dd>Construire la couverture, le texte de chaque slide et, sur demande, les fichiers images.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un contenu pédagogique en étapes.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Rédiger les slides, puis générer les images via HTML et Chromium.</dd>
+<dt>À fournir</dt><dd>Le sujet, le nombre de slides, la charte.</dd>
+<dt>Résultat attendu</dt><dd>Le texte des slides, puis les fichiers après validation.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>La génération des images nécessite Chromium (présent dans le cloud).</dd>
+<dt>Permissions et données</dt><dd>Écriture de fichiers images seulement après validation.</dd>
+<dt>Précautions de sécurité</dt><dd>Données fictives sur les slides.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Plan en 5 slides, aucun fichier généré.</dd>
+<dt>Exemple 1</dt><dd>« 3 erreurs qui font perdre de l&#x27;argent sur un devis ».</dd>
+<dt>Exemple 2</dt><dd>« Les 5 étapes d&#x27;un chantier bien suivi ».</dd>
+</dl><div class="copie">/ig-carousel 6 slides « 3 erreurs qui font perdre de l&#x27;argent sur un devis ». Texte seulement, aucun fichier.</div></div>
+<div class="fiche" id="f-ig-profile"><h3>ig-profile</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ig-profile</code></div><dl>
+<dt>À quoi il sert</dt><dd>Noter le profil sur 100 et réécrire les éléments faibles.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>À la création du compte, puis chaque trimestre.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Analyser ce que vous collez ou montrez (capture).</dd>
+<dt>À fournir</dt><dd>La bio, le nom, le lien, les épingles (texte ou capture).</dd>
+<dt>Résultat attendu</dt><dd>Un score et des propositions.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Il ne se connecte pas au compte : il faut lui fournir les éléments.</dd>
+<dt>Permissions et données</dt><dd>Aucune donnée transmise à un service tiers : tout se passe dans la session Claude.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas lui donner d&#x27;identifiants Instagram.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Bio de 3 lignes et champ nom proposés.</dd>
+<dt>Exemple 1</dt><dd>Réécrire la bio du compte.</dd>
+<dt>Exemple 2</dt><dd>Choisir les 3 publications à épingler.</dd>
+</dl><div class="copie">/ig-profile Voici la bio actuelle du compte : &lt;texte&gt;. Note-la et propose une meilleure version.</div></div>
+<div class="fiche" id="f-ig-plan"><h3>ig-plan</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/ig-plan</code></div><dl>
+<dt>À quoi il sert</dt><dd>Décider quoi publier, sous quel format et quand.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Chaque début de semaine.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Établir le planning et l&#x27;écrire dans ~/.claude/instagram/plan.md.</dd>
+<dt>À fournir</dt><dd>Les sujets du moment et la disponibilité de tournage.</dd>
+<dt>Résultat attendu</dt><dd>Un planning hebdomadaire.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le fichier de planning n&#x27;est pas conservé d&#x27;une session cloud à l&#x27;autre.</dd>
+<dt>Permissions et données</dt><dd>Écriture dans ~/.claude/instagram/.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune publication automatique.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Semaine fictive avec 3 Reels ; aucune écriture dans le dépôt.</dd>
+<dt>Exemple 1</dt><dd>Planning de la semaine de lancement du module Pointage.</dd>
+<dt>Exemple 2</dt><dd>Planning d&#x27;une semaine creuse.</dd>
+</dl><div class="copie">/ig-plan Planning Instagram de la semaine du 12 octobre pour Liria Gestion Pro.</div></div>
+</div>
+<div class="section" id="dom-video"><h2 style="margin-top:6pt">Création et analyse vidéo</h2>
+<div class="fiche" id="f-remotion-create"><h3>remotion-create</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/remotion-create</code></div><dl>
+<dt>À quoi il sert</dt><dd>Préparer un projet vidéo séparé et sa composition.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour une vidéo de démo reproductible.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer le projet (npx create-video), installer les dépendances, écrire la composition.</dd>
+<dt>À fournir</dt><dd>Le format (9:16, 16:9), la durée, le scénario, le dossier cible hors de l&#x27;app.</dd>
+<dt>Résultat attendu</dt><dd>Un projet Remotion prêt à prévisualiser.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Licence Remotion : gratuite jusqu&#x27;à 3 salariés, licence Company payante au-delà. Node et Chromium nécessaires. Préférer une version épinglée (4.0.532 testée) à @latest.</dd>
+<dt>Permissions et données</dt><dd>Téléchargement de paquets npm ; écriture dans le dossier du projet vidéo.</dd>
+<dt>Précautions de sécurité</dt><dd>Jamais dans les dépendances de l&#x27;app métier. Données fictives.</dd>
+<dt>Déclenchement observé</dt><dd>Sélection automatique non observée lors de l&#x27;essai ; appel explicite testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Étapes correctes, rien exécuté. Moteur testé à part : rendu 1080×1920 réussi.</dd>
+<dt>Exemple 1</dt><dd>Démo 15 s du devis en 9:16.</dd>
+<dt>Exemple 2</dt><dd>Vidéo 16:9 de présentation du tableau de bord.</dd>
+</dl><div class="copie">/remotion-create Crée dans un dossier séparé, hors de l&#x27;app, un projet vidéo 1080×1920 de 15 s présentant un devis fictif. Version Remotion épinglée 4.0.532.</div></div>
+<div class="fiche" id="f-remotion-markup"><h3>remotion-markup</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/remotion-markup</code></div><dl>
+<dt>À quoi il sert</dt><dd>Écrire les animations selon les bonnes pratiques Remotion.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pendant la création de la vidéo.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Écrire des séquences, transitions, textes animés.</dd>
+<dt>À fournir</dt><dd>Le scénario et la charte.</dd>
+<dt>Résultat attendu</dt><dd>Du code de composition.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Le sous-skill « cartes » (remotion-maps) n&#x27;est pas installé. La voix off IA (ElevenLabs) n&#x27;est pas configurée.</dd>
+<dt>Permissions et données</dt><dd>Écriture dans le projet vidéo.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune clé d&#x27;API demandée dans cette configuration.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Fondu de titre sur 20 images (interpolate).</dd>
+<dt>Exemple 1</dt><dd>Animer l&#x27;apparition des lignes d&#x27;un devis.</dd>
+<dt>Exemple 2</dt><dd>Transition entre deux écrans de l&#x27;app.</dd>
+</dl><div class="copie">/remotion-markup Anime l&#x27;apparition successive de 3 lignes de devis fictives sur 2 secondes.</div></div>
+<div class="fiche" id="f-remotion-studio"><h3>remotion-studio</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/remotion-studio</code></div><dl>
+<dt>À quoi il sert</dt><dd>Ouvrir le Studio pour voir la vidéo avant l&#x27;export.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pendant la création.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lancer le Studio local.</dd>
+<dt>À fournir</dt><dd>Le projet vidéo.</dd>
+<dt>Résultat attendu</dt><dd>Une prévisualisation dans le navigateur.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Dans le cloud, aucun navigateur visible : préférer un rendu d&#x27;essai.</dd>
+<dt>Permissions et données</dt><dd>Serveur local.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucune.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Commande npx remotion studio [--no-open].</dd>
+<dt>Exemple 1</dt><dd>Vérifier le rythme du Reel de démo.</dd>
+<dt>Exemple 2</dt><dd>Ajuster une transition.</dd>
+</dl><div class="copie">/remotion-studio Lance la prévisualisation du projet vidéo, sans ouvrir de navigateur.</div></div>
+<div class="fiche" id="f-remotion-render"><h3>remotion-render</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/remotion-render</code></div><dl>
+<dt>À quoi il sert</dt><dd>Produire le fichier vidéo final.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Après validation de la prévisualisation.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lancer npx remotion render &lt;id&gt; out/video.mp4.</dd>
+<dt>À fournir</dt><dd>L&#x27;identifiant de composition et le format de sortie.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier MP4.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Rendu gourmand en CPU. Dans le cloud, utiliser --browser-executable vers le headless shell préinstallé.</dd>
+<dt>Permissions et données</dt><dd>Exécution locale.</dd>
+<dt>Précautions de sécurité</dt><dd>Vérifier le fichier final (données fictives) avant diffusion.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Commande donnée ; rendu réel testé : MP4 h264 1080×1920 contrôlé visuellement.</dd>
+<dt>Exemple 1</dt><dd>Exporter le Reel de démo devis.</dd>
+<dt>Exemple 2</dt><dd>Exporter une publicité de 6 s.</dd>
+</dl><div class="copie">/remotion-render Exporte la composition DemoReel en MP4 dans out/.</div></div>
+<div class="fiche" id="f-remotion-captions"><h3>remotion-captions</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/remotion-captions</code></div><dl>
+<dt>À quoi il sert</dt><dd>Afficher des sous-titres lisibles sur mobile.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour toute vidéo destinée aux réseaux (souvent regardée sans le son).</dd>
+<dt>Ce que Claude peut faire</dt><dd>Importer un SRT, afficher et animer des sous-titres.</dd>
+<dt>À fournir</dt><dd>Le fichier SRT ou le texte.</dd>
+<dt>Résultat attendu</dt><dd>Une vidéo sous-titrée.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>La transcription locale (Whisper WebGPU) exige un GPU, non disponible dans le cloud.</dd>
+<dt>Permissions et données</dt><dd>Écriture dans le projet vidéo.</dd>
+<dt>Précautions de sécurité</dt><dd>Aucun envoi d&#x27;audio vers un service externe dans cette configuration.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Import SRT via parseSrt expliqué.</dd>
+<dt>Exemple 1</dt><dd>Sous-titrer le Reel de démo devis.</dd>
+<dt>Exemple 2</dt><dd>Ajouter des sous-titres animés à une publicité.</dd>
+</dl><div class="copie">/remotion-captions Importe le fichier public/sous-titres.srt et affiche-le en bas de l&#x27;écran, en gros caractères.</div></div>
+<div class="fiche" id="f-watch"><h3>watch</h3><div class="meta">Skill du projet (.claude/skills/, versionné dans le dépôt), installé pendant cette mission · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/watch</code></div><dl>
+<dt>À quoi il sert</dt><dd>Permettre à Claude de « voir » une vidéo à partir d&#x27;images extraites et de sous-titres.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour vérifier une démo avant diffusion, ou étudier un format.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Télécharger (yt-dlp), extraire des images (ffmpeg), lire les sous-titres, répondre à une question.</dd>
+<dt>À fournir</dt><dd>Le chemin ou l&#x27;URL de la vidéo et la question.</dd>
+<dt>Résultat attendu</dt><dd>Une analyse fondée sur des images horodatées.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Mode local imposé : aucune transcription audio sans sous-titres. Dans une nouvelle session cloud, réinstaller yt-dlp (uv tool install yt-dlp==2026.8.19).</dd>
+<dt>Permissions et données</dt><dd>Exécution locale (python3, ffmpeg, yt-dlp). WATCH_ENGINE=local et WATCH_WHISPER_BACKEND=none, fixés dans .claude/settings.json : rien n&#x27;est envoyé à Gemini, Groq ou OpenAI.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas utiliser --cookies-from-browser. Supprimer le dossier watch-* après usage. Seulement des URL publiques.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite testé ; sélection automatique non testée.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Vidéo fictive de 6 s analysée en local : 1 image extraite, transcription désactivée.</dd>
+<dt>Exemple 1</dt><dd>Vérifier qu&#x27;aucune donnée réelle n&#x27;apparaît dans une démo.</dd>
+<dt>Exemple 2</dt><dd>Analyser la structure d&#x27;un Reel public qui fonctionne bien.</dd>
+</dl><div class="copie">/watch ./demo.mp4 &quot;Le texte à l&#x27;écran est-il lisible sur mobile et les données sont-elles bien fictives ?&quot;</div></div>
+</div>
+<div class="section" id="dom-organisation"><h2 style="margin-top:6pt">Organisation et documents</h2>
+<div class="fiche" id="f-loop"><h3>loop</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/loop</code></div><dl>
+<dt>À quoi il sert</dt><dd>Relancer une demande périodiquement.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour surveiller quelque chose pendant la session.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Planifier des réveils de la session.</dd>
+<dt>À fournir</dt><dd>L&#x27;intervalle (optionnel) et la demande.</dd>
+<dt>Résultat attendu</dt><dd>Des vérifications répétées.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Chaque itération consomme des tokens.</dd>
+<dt>Permissions et données</dt><dd>Celles de la commande répétée.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas boucler sur une action d&#x27;écriture.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Surveiller la CI d&#x27;une PR toutes les 10 minutes.</dd>
+<dt>Exemple 2</dt><dd>Relancer un contrôle de build pendant une correction.</dd>
+</dl><div class="copie">/loop 10m Vérifie l&#x27;état de la CI de la PR en cours et résume en une ligne.</div></div>
+<div class="fiche" id="f-anthropic-skills-pdf"><h3>anthropic-skills:pdf</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ok">Disponible et testé</span> · <b>Commande :</b> <code>/anthropic-skills:pdf</code></div><dl>
+<dt>À quoi il sert</dt><dd>Manipuler et produire des PDF.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un guide, une fiche produit ou une extraction de tableau.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Extraire texte et tableaux, fusionner, découper, remplir des formulaires, créer des PDF.</dd>
+<dt>À fournir</dt><dd>Le fichier ou le contenu, et le résultat attendu.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier PDF.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Certaines opérations exigent des bibliothèques Python à installer.</dd>
+<dt>Permissions et données</dt><dd>Lecture et écriture de fichiers locaux.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de documents clients réels dans une session de test.</dd>
+<dt>Déclenchement observé</dt><dd>Appel explicite utilisé pour produire ce guide.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Utilisé pour la production de ce guide.</dd>
+<dt>Exemple 1</dt><dd>Produire une fiche produit PDF.</dd>
+<dt>Exemple 2</dt><dd>Extraire un tableau d&#x27;une facture fournisseur fictive.</dd>
+</dl><div class="copie">/anthropic-skills:pdf Crée une fiche produit PDF d&#x27;une page pour le module Pointage, données fictives.</div></div>
+<div class="fiche" id="f-anthropic-skills-docx"><h3>anthropic-skills:docx</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:docx</code></div><dl>
+<dt>À quoi il sert</dt><dd>Créer ou modifier des documents Word.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Quand un document doit être au format Word.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer, éditer, suivre les modifications.</dd>
+<dt>À fournir</dt><dd>Le contenu ou le modèle.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier .docx.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Les documents juridiques restent à faire valider.</dd>
+<dt>Permissions et données</dt><dd>Fichiers locaux.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de données personnelles réelles en test.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Proposition commerciale type.</dd>
+<dt>Exemple 2</dt><dd>Modèle de convention de démonstration.</dd>
+</dl><div class="copie">/anthropic-skills:docx Crée une proposition commerciale type pour Liria Gestion Pro, sans données client.</div></div>
+<div class="fiche" id="f-anthropic-skills-xlsx"><h3>anthropic-skills:xlsx</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:xlsx</code></div><dl>
+<dt>À quoi il sert</dt><dd>Créer, nettoyer ou analyser des tableurs.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un budget, un import ou un suivi.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Formules, mise en forme, graphiques, conversion.</dd>
+<dt>À fournir</dt><dd>Le fichier ou les données.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier .xlsx.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>—</dd>
+<dt>Permissions et données</dt><dd>Fichiers locaux.</dd>
+<dt>Précautions de sécurité</dt><dd>Pas de données clients réelles en test.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Modèle d&#x27;import de stock fictif.</dd>
+<dt>Exemple 2</dt><dd>Budget de communication trimestriel.</dd>
+</dl><div class="copie">/anthropic-skills:xlsx Crée un budget de communication trimestriel avec totaux par canal.</div></div>
+<div class="fiche" id="f-anthropic-skills-pptx"><h3>anthropic-skills:pptx</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:pptx</code></div><dl>
+<dt>À quoi il sert</dt><dd>Créer ou modifier des présentations.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour un rendez-vous client ou un salon.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer des slides, lire un deck existant.</dd>
+<dt>À fournir</dt><dd>Le plan et les contenus.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier .pptx.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>—</dd>
+<dt>Permissions et données</dt><dd>Fichiers locaux.</dd>
+<dt>Précautions de sécurité</dt><dd>Données fictives dans les captures.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Présentation de 10 slides de Liria Gestion Pro.</dd>
+<dt>Exemple 2</dt><dd>Support pour un salon du BTP.</dd>
+</dl><div class="copie">/anthropic-skills:pptx Présentation de 10 slides de Liria Gestion Pro pour un rendez-vous artisan.</div></div>
+<div class="fiche" id="f-anthropic-skills-docs"><h3>anthropic-skills:docs</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:docs</code></div><dl>
+<dt>À quoi il sert</dt><dd>Créer des documents vivants, exportables en PDF ou Word.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour une procédure à faire évoluer en équipe.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer, éditer et commenter un document.</dd>
+<dt>À fournir</dt><dd>Le sujet et la structure.</dd>
+<dt>Résultat attendu</dt><dd>Un document en ligne privé.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Document en ligne (claude.ai), privé par défaut.</dd>
+<dt>Permissions et données</dt><dd>Création d&#x27;un document dans votre compte.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas y mettre de secrets ni de données clients.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Procédure de préparation d&#x27;une démo.</dd>
+<dt>Exemple 2</dt><dd>Charte éditoriale réseaux sociaux.</dd>
+</dl><div class="copie">/anthropic-skills:docs Crée la charte éditoriale réseaux sociaux d&#x27;ELSATIA.</div></div>
+<div class="fiche" id="f-anthropic-skills-google-workspace"><h3>anthropic-skills:google-workspace</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ko">Bloqué par un prérequis</span> · <b>Commande :</b> <code>/anthropic-skills:google-workspace</code></div><dl>
+<dt>À quoi il sert</dt><dd>Travailler directement dans Google Drive.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Si vos documents sont dans Google Drive.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer et modifier des fichiers Google.</dd>
+<dt>À fournir</dt><dd>Le lien du fichier ou son nom.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier Google modifié.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Nécessite le connecteur Google.</dd>
+<dt>Permissions et données</dt><dd>Accès à votre Google Drive.</dd>
+<dt>Précautions de sécurité</dt><dd>N&#x27;accorder l&#x27;accès qu&#x27;aux dossiers nécessaires.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; connecteur Google non configuré dans cette session.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Prérequis absent : connecteur Google Drive.</dd>
+<dt>Exemple 1</dt><dd>Mettre à jour le planning éditorial dans Google Sheets.</dd>
+<dt>Exemple 2</dt><dd>Créer un Google Doc de procédure.</dd>
+</dl><div class="copie">/anthropic-skills:google-workspace Ajoute un onglet « Octobre » au planning éditorial Google Sheets.</div></div>
+<div class="fiche" id="f-anthropic-skills-deep-research"><h3>anthropic-skills:deep-research</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:deep-research</code></div><dl>
+<dt>À quoi il sert</dt><dd>Mener une recherche structurée et produire un rapport sourcé.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Pour une décision stratégique.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Lancer des sous-agents de recherche web et synthétiser.</dd>
+<dt>À fournir</dt><dd>La question précise et le périmètre.</dd>
+<dt>Résultat attendu</dt><dd>Un rapport avec sources.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Consommation de tokens importante.</dd>
+<dt>Permissions et données</dt><dd>Recherche web.</dd>
+<dt>Précautions de sécurité</dt><dd>Ne pas inclure d&#x27;informations confidentielles dans les requêtes.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Comparer les logiciels de gestion BTP concurrents.</dd>
+<dt>Exemple 2</dt><dd>Étudier les obligations de facturation électronique 2026.</dd>
+</dl><div class="copie">/anthropic-skills:deep-research Compare les 5 principaux logiciels de gestion pour artisans du BTP en France : prix, fonctions, cible.</div></div>
+<div class="fiche" id="f-anthropic-skills-morning"><h3>anthropic-skills:morning</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:morning</code></div><dl>
+<dt>À quoi il sert</dt><dd>Afficher un brief quotidien.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Si vous voulez un résumé matinal.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Créer le brief ou le programmer.</dd>
+<dt>À fournir</dt><dd>Les sources souhaitées.</dd>
+<dt>Résultat attendu</dt><dd>Une page de brief.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Dépend des connecteurs disponibles.</dd>
+<dt>Permissions et données</dt><dd>Selon les connecteurs.</dd>
+<dt>Précautions de sécurité</dt><dd>—</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Brief du lundi.</dd>
+<dt>Exemple 2</dt><dd>Brief programmé en semaine.</dd>
+</dl><div class="copie">/anthropic-skills:morning</div></div>
+<div class="fiche" id="f-anthropic-skills-import-memory"><h3>anthropic-skills:import-memory</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> <code>/anthropic-skills:import-memory</code></div><dl>
+<dt>À quoi il sert</dt><dd>Ajouter à la mémoire de Claude des informations venant d&#x27;un autre assistant.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Une fois, lors d&#x27;une migration.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Importer de façon additive.</dd>
+<dt>À fournir</dt><dd>Le fichier d&#x27;export.</dd>
+<dt>Résultat attendu</dt><dd>Une mémoire enrichie.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>—</dd>
+<dt>Permissions et données</dt><dd>Écriture de la mémoire du compte.</dd>
+<dt>Précautions de sécurité</dt><dd>Retirer tout secret de l&#x27;export avant l&#x27;import.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non testé.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Importer le contexte ELSATIA depuis ChatGPT.</dd>
+<dt>Exemple 2</dt><dd>Importer les préférences de rédaction.</dd>
+</dl><div class="copie">/anthropic-skills:import-memory</div></div>
+<div class="fiche" id="f-anthropic-skills-computer-use"><h3>anthropic-skills:computer-use</h3><div class="meta">Skill synchronisé depuis le compte claude.ai (préexistant) · <b>Déclenchement :</b> Les deux : automatique possible et manuel · <b>Statut :</b> <span class="ko">Bloqué par un prérequis</span> · <b>Commande :</b> <code>/anthropic-skills:computer-use</code></div><dl>
+<dt>À quoi il sert</dt><dd>Agir dans vos applications de bureau.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Seulement depuis l&#x27;app de bureau, pour des tâches sans risque.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Faire des captures, cliquer, saisir du texte.</dd>
+<dt>À fournir</dt><dd>La tâche précise.</dd>
+<dt>Résultat attendu</dt><dd>La tâche effectuée.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Nécessite l&#x27;app de bureau et une autorisation.</dd>
+<dt>Permissions et données</dt><dd>Contrôle de l&#x27;écran.</dd>
+<dt>Précautions de sécurité</dt><dd>Jamais sur les applications bancaires, les comptes sociaux ou la Production.</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste ; non disponible dans cette session cloud.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Prérequis absent : ordinateur relié à la session.</dd>
+<dt>Exemple 1</dt><dd>Renommer des fichiers de visuels dans le Finder.</dd>
+<dt>Exemple 2</dt><dd>Ouvrir un dossier de captures.</dd>
+</dl><div class="copie">/anthropic-skills:computer-use Ouvre le dossier Captures et trie les fichiers par date.</div></div>
+<div class="fiche" id="f-keybindings-help"><h3>keybindings-help</h3><div class="meta">Skill intégré à Claude Code (préexistant) · <b>Déclenchement :</b> Automatique possible ; aucune commande vérifiée · <b>Statut :</b> <span class="nt">Installé, non testé</span> · <b>Commande :</b> Aucune commande vérifiée. Demander : « Utilise le skill keybindings-help pour… »</div><dl>
+<dt>À quoi il sert</dt><dd>Modifier ~/.claude/keybindings.json.</dd>
+<dt>Quand l&#x27;utiliser</dt><dd>Si un raccourci gêne.</dd>
+<dt>Ce que Claude peut faire</dt><dd>Ajouter ou modifier des raccourcis.</dd>
+<dt>À fournir</dt><dd>Le raccourci voulu.</dd>
+<dt>Résultat attendu</dt><dd>Un fichier de raccourcis modifié.</dd>
+<dt>Limites, prérequis, coûts</dt><dd>Concerne le terminal.</dd>
+<dt>Permissions et données</dt><dd>Écriture de ~/.claude/keybindings.json.</dd>
+<dt>Précautions de sécurité</dt><dd>—</dd>
+<dt>Déclenchement observé</dt><dd>Présent dans la liste des skills sélectionnables ; aucune commande slash dans l&#x27;inventaire.</dd>
+<dt>Résultat de l&#x27;essai</dt><dd>Reconnu ; non exécuté.</dd>
+<dt>Exemple 1</dt><dd>Changer la touche d&#x27;envoi.</dd>
+<dt>Exemple 2</dt><dd>Ajouter un raccourci en deux temps.</dd>
+</dl><div class="copie">Utilise le skill keybindings-help pour changer la touche d&#x27;envoi en Ctrl+Entrée.</div></div>
+</div>
+</div>
+<div class="section" id="mcp"><h2>5. Connecteurs MCP et logiciels associés</h2>
+<p>Ce ne sont pas des skills. Ils donnent un accès ou un outil dont certains skills ont besoin.</p>
+<h3>Connecteurs MCP</h3><table><thead><tr><th style='width:18%'>Nom</th><th style='width:14%'>Statut</th><th>Rôle et état</th><th style='width:24%'>Données transmises</th><th style='width:20%'>Appel</th></tr></thead><tbody>
+<tr><td><code>context7 (plugin context7)</code></td><td class='ko'>Bloqué par un prérequis</td><td>Documentation technique à jour (Upstash). Installé et activé (.claude/settings.json). Statut « failed » : le proxy de l&#x27;environnement cloud refuse mcp.context7.com (403). À débloquer : menu de l&#x27;environnement cloud, Edit, Network access, Custom, ajouter mcp.context7.com aux domaines autorisés.</td><td>Noms de bibliothèques et questions envoyés à Upstash. CONTEXT7_API_KEY optionnelle, non configurée.</td><td>Pas de commande slash ; demander « Utilise Context7 pour… ». Noms d&#x27;outils non vérifiables tant que le serveur est injoignable.</td></tr>
+<tr><td><code>github (connecteur de session)</code></td><td class='ok'>Disponible et testé</td><td>Lecture des PR, création de PR. Fourni par la session ; utilisé pour vérifier l&#x27;état de la PR #5.</td><td>Échanges avec GitHub limités au dépôt julien-gregurec/Appli_BTP.</td><td>Utilisé par Claude sur demande (« vérifie l&#x27;état de la PR… »).</td></tr>
+</tbody></table><h3>Logiciels associés</h3><table><thead><tr><th style='width:20%'>Logiciel</th><th style='width:12%'>Statut</th><th style='width:20%'>Emplacement</th><th>Vérification</th><th style='width:22%'>Sur poste local</th></tr></thead><tbody>
+<tr><td>Playwright 1.56.1 + Chromium 1194</td><td class='ok'>Disponible et testé</td><td>Préinstallé dans l&#x27;image cloud (/opt/node22, /opt/pw-browsers)</td><td>Essai : page HTML fictive ouverte, titre lu, capture 390×844. Le MCP Playwright n&#x27;est pas installé (version @latest non épinglée).</td><td>npm i -g playwright@1.56.1 &amp;&amp; npx playwright install chromium</td></tr>
+<tr><td>yt-dlp 2026.8.19</td><td class='ok'>Disponible et testé</td><td>~/.local/bin via « uv tool » (conteneur actuel uniquement)</td><td>Requis par /watch. À réinstaller dans chaque nouvelle session cloud : uv tool install yt-dlp==2026.8.19.</td><td>uv tool install yt-dlp==2026.8.19 (ou pipx)</td></tr>
+<tr><td>ffmpeg</td><td class='ok'>Disponible et testé</td><td>/usr/bin/ffmpeg (image cloud)</td><td>Utilisé par /watch ; essai réussi.</td><td>Installer ffmpeg (Homebrew, apt…)</td></tr>
+<tr><td>Moteur Remotion 4.0.532</td><td class='ok'>Disponible et testé</td><td>Dossier de travail temporaire de la session, hors du dépôt</td><td>252 paquets npm (--ignore-scripts). Rendu d&#x27;un MP4 h264 1080×1920 de 2 s avec le headless shell préinstallé. Non conservé : à recréer dans un dossier dédié hors de l&#x27;app.</td><td>Projet séparé ; Remotion télécharge son Chrome headless au premier rendu. Licence Remotion à respecter.</td></tr>
+<tr><td>python3</td><td class='ok'>Disponible et testé</td><td>Image cloud</td><td>Utilisé par ui-ux-pro-max, ig-reel, ig-caption et watch (bibliothèque standard).</td><td>Python 3.10 ou plus.</td></tr>
+</tbody></table>
+<div class='encadre alerte'>Les skills Instagram rédigent : ils ne sont <b>pas</b> connectés à un compte Instagram. Les skills Remotion sont des instructions : le moteur de rendu est un logiciel séparé, à installer hors de l'application métier.</div></div>
+<div class="section" id="envs"><h2>6. Cloud et poste local</h2><table><thead><tr><th style="width:24%">Élément</th><th>Cette session cloud</th><th>Nouvelle session cloud</th><th>Poste local</th></tr></thead><tbody>
+<tr><td>Skills du dépôt (.claude/skills)</td><td>Disponibles</td><td>Disponibles sur cette branche, puis sur main après fusion</td><td>Disponibles après git pull</td></tr>
+<tr><td>Plugins (.claude/settings.json)</td><td>Installés</td><td>Déclarés dans le projet ; installation automatique au démarrage non vérifiée. À défaut : claude plugin install &lt;nom&gt; --scope project</td><td>Le marketplace peut s&#x27;appeler claude-plugins-official : /plugin install context7@claude-plugins-official, etc. (non testé)</td></tr>
+<tr><td>Skills du compte (anthropic-skills:*)</td><td>Disponibles</td><td>Disponibles (synchronisés avec le compte)</td><td>Selon la synchronisation du compte (non vérifié)</td></tr>
+<tr><td>context7</td><td>Bloqué par le réseau</td><td>Bloqué tant que mcp.context7.com n&#x27;est pas autorisé</td><td>Devrait fonctionner (non testé)</td></tr>
+<tr><td>watch (yt-dlp)</td><td>Opérationnel</td><td>Réinstaller : uv tool install yt-dlp==2026.8.19</td><td>Installer python3, ffmpeg et yt-dlp</td></tr>
+<tr><td>Playwright / Chromium</td><td>Préinstallés</td><td>Préinstallés dans l&#x27;image</td><td>npm i -g playwright@1.56.1 &amp;&amp; npx playwright install chromium</td></tr>
+<tr><td>Rendu Remotion</td><td>Essai réussi (hors dépôt)</td><td>À recréer dans un dossier dédié</td><td>Projet séparé ; licence Remotion</td></tr>
+<tr><td>Navigateur intégré, Chrome, computer-use</td><td>Indisponibles</td><td>Indisponibles</td><td>Avec l&#x27;app Claude de bureau ou l&#x27;extension Chrome</td></tr>
+</tbody></table></div>
+<div class="section" id="annexe"><h2>Annexe A — Non installés : à installer, reportés, non retenus</h2>
+<div class='encadre alerte'>Les éléments de cette annexe <b>ne sont pas disponibles</b>. Ils ne doivent pas être utilisés comme s'ils l'étaient.</div>
+<h3>A.1 Restent à installer (après prérequis ou validation)</h3><table><thead><tr><th style='width:32%'>Élément</th><th>Raison et prérequis</th></tr></thead><tbody>
+<tr><td>Strix (usestrix/strix, Apache-2.0)</td><td>Pentest automatisé, à installer plus tard dans une mission dédiée. Prérequis : démon Docker (absent ici), Python 3.12+, pipx install strix-agent épinglé (pas de curl | bash), STRIX_LLM et LLM_API_KEY, STRIX_TELEMETRY=false. Code local et environnement de test uniquement.</td></tr>
+<tr><td>trailofbits/skills : insecure-defaults, sharp-edges</td><td>Utiles pour les secrets et les configurations. À installer seulement après validation de la licence CC-BY-SA-4.0 (partage à l&#x27;identique).</td></tr>
+<tr><td>Accès réseau à mcp.context7.com</td><td>Le plugin context7 est installé, mais bloqué. Il faut autoriser ce domaine dans les réglages réseau de l&#x27;environnement cloud.</td></tr>
+</tbody></table>
+<h3>A.2 Reportés</h3><table><thead><tr><th style='width:32%'>Élément</th><th>Raison et prérequis</th></tr></thead><tbody>
+<tr><td>security-guidance (plugin officiel)</td><td>Ses hooks installent un SDK par pip au démarrage et envoient les diffs à un LLM à chaque fin de tour. À réévaluer.</td></tr>
+<tr><td>OmniRoute, ClaudeMem, Headroom, Task Observer, Claude Squad, catalogues massifs</td><td>Reportés conformément à la mission.</td></tr>
+<tr><td>Meta Ads, Windsor.ai, publication automatique sur les réseaux</td><td>Non activés conformément à la mission.</td></tr>
+</tbody></table>
+<h3>A.3 Examinés et non retenus</h3><table><thead><tr><th style='width:32%'>Élément</th><th>Raison et prérequis</th></tr></thead><tbody>
+<tr><td>LinkedIn : sergebulaev/linkedin-skills</td><td>Il embarque des clients de planification et de publication (Publora, Apify) et sert d&#x27;entonnoir commercial. LinkedIn est couvert par /social.</td></tr>
+<tr><td>Facebook : skill dédié</td><td>Aucune source fiable trouvée. Manque documenté : utiliser /social.</td></tr>
+<tr><td>ig-human, ig-dm, ig-comment, ig-reply, ig-viral, ig-audit, ig-story</td><td>Doublon avec l&#x27;humaniseur unique (copy-editing), ou interaction avec le compte.</td></tr>
+<tr><td>ad-creative, video (marketingskills)</td><td>Ils renvoient vers les intégrations Ads, des clés d&#x27;API et des installateurs tiers.</td></tr>
+<tr><td>Plugins code-review et skill-creator, MCP Playwright</td><td>Déjà couverts par /code-review, /anthropic-skills:skill-creator et Playwright préinstallé.</td></tr>
+<tr><td>ui-ux-pro-max : design, banner-design, ui-styling, brand, slides, design-system</td><td>Appels aux API Gemini et autres, lecture de fichiers .env, génération Tailwind 3 : hors besoin.</td></tr>
+</tbody></table>
+</div>
+<div class="section" id="annexe-b"><h2>Annexe B — Commandes intégrées non confirmées</h2>
+<p>Ces commandes figurent dans l'inventaire des commandes slash d'une session neuve, mais pas dans la liste des skills que Claude peut choisir seul. Leur description n'était pas visible : leur fonction n'est donc <b>pas décrite ici</b>, pour ne rien inventer. Statut : <b>non confirmé</b>.</p><ul class='liste cols'>
+<li><code>/design</code></li>
+<li><code>/slides</code></li>
+<li><code>/design-sync</code></li>
+<li><code>/verify</code></li>
+<li><code>/debug</code></li>
+<li><code>/batch</code></li>
+<li><code>/doctor</code></li>
+<li><code>/run-skill-generator</code></li>
+</ul></div>
+<div class="section" id="methode"><h2>Annexe C — Méthode de vérification</h2><ul class="liste"><li>Inventaire : événement <code>init</code> d'une session neuve <code>claude -p</code> lancée dans le dépôt (skills, commandes slash, plugins, serveurs MCP), et lecture des en-têtes SKILL.md (<code>disable-model-invocation</code>).</li><li>Essais : 40 sessions non interactives avec des données fictives. 27 demandes formulées naturellement ou par commande, 8 appels explicites complémentaires, puis 5 essais des skills de la PR #5. En mode non interactif, les écritures de fichiers et les commandes non autorisées sont refusées : aucun essai n'a modifié le dépôt.</li><li>Déclenchement automatique « observé » : appel effectif de l'outil Skill constaté dans le journal de la session.</li><li>Logiciels : Playwright (capture d'une page fictive), watch (vidéo fictive générée avec ffmpeg), Remotion (rendu MP4 1080×1920), scripts Python des skills (données fictives).</li><li>Intégrité : contenu des plugins identique au commit audité. Provenance et empreintes des skills copiés : <code>.claude/skills/ELSATIA-SOURCES.lock.json</code> et, pour la PR #5, <code>skills-lock.json</code>.</li><li>Source modifiable de ce guide : <code>docs/claude/guide-pdf/skills_data.py</code>. Régénération : <code>python3 docs/claude/guide-pdf/build_guide.py</code>.</li></ul></div>
+</body></html>

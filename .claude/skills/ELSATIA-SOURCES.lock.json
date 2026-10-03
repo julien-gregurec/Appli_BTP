@@ -1,0 +1,249 @@
+{
+  "_note": "Provenance des skills tiers vendorisés pour ELSATIA (mission du 2026-10-03). Ne pas mettre à jour automatiquement : re-auditer chaque nouveau commit avant copie. Empreinte = sha256 de l'arborescence (chemin + sha256 de chaque fichier).",
+  "skills": {
+    "product-marketing": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/product-marketing/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "357ec4a6c072397c98e1ed72de64b20c3729199a98f14a23135f3f9f1b7faa4d",
+      "files": 1
+    },
+    "copywriting": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/copywriting/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "e18f6c006da41a7d54470a405d31be6fee82c287ce54dd17e80aed6a1a4249f7",
+      "files": 4
+    },
+    "copy-editing": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/copy-editing/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "7ce7691c6ef3040867938a75899b10cdb3466af344d2593d0d0c229e06bb6ef9",
+      "files": 4
+    },
+    "cro": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/cro/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "b303a616e97cf41c3cceeb0634008a6be24caba683d3582df4f26b8073c35fdd",
+      "files": 3
+    },
+    "launch": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/launch/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "e74e09732655d70393b7c94824b86cc86a6179048ccc7ef4f6f79d3104612458",
+      "files": 1
+    },
+    "seo-audit": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/seo-audit/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "a5cd365b75aa98d3479f527eb3052f319b7e3ebfca68316fa8e6cc4c0d54a6a5",
+      "files": 3
+    },
+    "ai-seo": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/ai-seo/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "883c52a43f9a5fea6ab913cc36391aea9b94521eaa1cbe7051e216f1412340c1",
+      "files": 11
+    },
+    "social": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/social/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "bf4fcae71a09a71034dd0867187c737afe6fdd67da7ef7d49020d47b105e1df4",
+      "files": 10
+    },
+    "content-strategy": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/content-strategy/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "a56c469f4d43e7ace1f7f827cab3da892e7d493598b2e24d837de2ecae442126",
+      "files": 3
+    },
+    "marketing-psychology": {
+      "source": "https://github.com/coreyhaines31/marketingskills",
+      "commit": "dda3841f0b294e01e93b1541486beefbfab0915e",
+      "license": "MIT",
+      "path": "skills/marketing-psychology/ (evals/ retiré)",
+      "local_patches": [],
+      "tree_sha256": "b1396b6bf1e118e0d5a85638fe304bcfdb56d92443a3774086e281f53ae64540",
+      "files": 1
+    },
+    "ig-reel": {
+      "source": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "license": "MIT",
+      "path": "skills/ig-reel/",
+      "local_patches": [
+        "Renvoi /ig-human remplacé par /copy-editing (humaniseur unique ELSATIA ; ig-human non installé)"
+      ],
+      "tree_sha256": "b4bc550e44b6f2d15c4c8f18628f4fad3fa745917786394d4cefeb5e4e477fcd",
+      "files": 4
+    },
+    "ig-caption": {
+      "source": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "license": "MIT",
+      "path": "skills/ig-caption/",
+      "local_patches": [
+        "Renvoi /ig-human remplacé par /copy-editing (humaniseur unique ELSATIA ; ig-human non installé)"
+      ],
+      "tree_sha256": "8dcfaad48e1366e6314c30df860458323c125efb7cf4b0cb9835e69c3aa9812e",
+      "files": 2
+    },
+    "ig-carousel": {
+      "source": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "license": "MIT",
+      "path": "skills/ig-carousel/",
+      "local_patches": [
+        "Renvoi /ig-human remplacé par /copy-editing (humaniseur unique ELSATIA ; ig-human non installé)"
+      ],
+      "tree_sha256": "d338936f24ae75216b8afd1f5c6ddaa8061936063314a5b4f97d6244400da369",
+      "files": 1
+    },
+    "ig-profile": {
+      "source": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "license": "MIT",
+      "path": "skills/ig-profile/",
+      "local_patches": [
+        "Renvoi /ig-human remplacé par /copy-editing (humaniseur unique ELSATIA ; ig-human non installé)"
+      ],
+      "tree_sha256": "fe81c77d405f348ff883efae68f747dc0db52b3e90e550d838b4703448635403",
+      "files": 2
+    },
+    "ig-plan": {
+      "source": "https://github.com/Jakeschincariol/instagram-agent-skill",
+      "commit": "d03c56bb598be770c60b201f94237e5d1a4268a6",
+      "license": "MIT",
+      "path": "skills/ig-plan/",
+      "local_patches": [
+        "Renvoi /ig-human remplacé par /copy-editing (humaniseur unique ELSATIA ; ig-human non installé)"
+      ],
+      "tree_sha256": "5e6b9f97bbfd8194a073b035c0216f46e83b7655a4ecd2900fd0aff839d9eace",
+      "files": 1
+    },
+    "remotion-create": {
+      "source": "https://github.com/remotion-dev/skills",
+      "commit": "0b5db9daae40f42c73544d1cc0a8c733bd530eaa",
+      "license": "Remotion License (voir THIRD_PARTY_LICENSES)",
+      "path": "skills/remotion-create/ (agents/ retiré)",
+      "local_patches": [
+        "remotion-markup : sous-dossier remotion-maps/ retiré (fichiers .ts/.tsx, clés MapTiler/Google) et 2 liens remplacés par une note"
+      ],
+      "tree_sha256": "769785d7afe379bd86188383fa841677d3127321b6e385485720d4cf7742fc2e",
+      "files": 4
+    },
+    "remotion-markup": {
+      "source": "https://github.com/remotion-dev/skills",
+      "commit": "0b5db9daae40f42c73544d1cc0a8c733bd530eaa",
+      "license": "Remotion License (voir THIRD_PARTY_LICENSES)",
+      "path": "skills/remotion-markup/ (agents/ retiré)",
+      "local_patches": [
+        "remotion-markup : sous-dossier remotion-maps/ retiré (fichiers .ts/.tsx, clés MapTiler/Google) et 2 liens remplacés par une note"
+      ],
+      "tree_sha256": "dc6f00b676595a80bc6126d04146fef92a60fc2e73e9f7fd11d238d985224131",
+      "files": 33
+    },
+    "remotion-studio": {
+      "source": "https://github.com/remotion-dev/skills",
+      "commit": "0b5db9daae40f42c73544d1cc0a8c733bd530eaa",
+      "license": "Remotion License (voir THIRD_PARTY_LICENSES)",
+      "path": "skills/remotion-studio/ (agents/ retiré)",
+      "local_patches": [
+        "remotion-markup : sous-dossier remotion-maps/ retiré (fichiers .ts/.tsx, clés MapTiler/Google) et 2 liens remplacés par une note"
+      ],
+      "tree_sha256": "26621f1590106332aae4fb532c0cf95074e665024c5c4be921a7fdf881451415",
+      "files": 2
+    },
+    "remotion-render": {
+      "source": "https://github.com/remotion-dev/skills",
+      "commit": "0b5db9daae40f42c73544d1cc0a8c733bd530eaa",
+      "license": "Remotion License (voir THIRD_PARTY_LICENSES)",
+      "path": "skills/remotion-render/ (agents/ retiré)",
+      "local_patches": [
+        "remotion-markup : sous-dossier remotion-maps/ retiré (fichiers .ts/.tsx, clés MapTiler/Google) et 2 liens remplacés par une note"
+      ],
+      "tree_sha256": "327150f02ddb6b821f30e7f48868d78d5a1d3435b30386a00f33fd27d341c510",
+      "files": 3
+    },
+    "remotion-captions": {
+      "source": "https://github.com/remotion-dev/skills",
+      "commit": "0b5db9daae40f42c73544d1cc0a8c733bd530eaa",
+      "license": "Remotion License (voir THIRD_PARTY_LICENSES)",
+      "path": "skills/remotion-captions/ (agents/ retiré)",
+      "local_patches": [
+        "remotion-markup : sous-dossier remotion-maps/ retiré (fichiers .ts/.tsx, clés MapTiler/Google) et 2 liens remplacés par une note"
+      ],
+      "tree_sha256": "9f2054577b1c3fb0bb16040fc43ad451d3d92c3d5b6702241814c2acf79c358d",
+      "files": 5
+    },
+    "watch": {
+      "source": "https://github.com/bradautomates/claude-video",
+      "commit": "03ceb42f7fa2c4439aca01752118044baabffb8f",
+      "license": "MIT",
+      "path": "skills/watch/ (build-skill.sh retiré ; hook SessionStart non installé)",
+      "local_patches": [
+        "Aucune modification du contenu ; mode local imposé par .claude/settings.json env WATCH_ENGINE=local, WATCH_WHISPER_BACKEND=none"
+      ],
+      "tree_sha256": "51ffac5458da234e9ef9d3c87296a513eeb5c658f8f928c63e7fbef5784ffad0",
+      "files": 21
+    },
+    "ui-ux-pro-max": {
+      "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "09170eec67eefd46a7ae85de61b40c194020f997",
+      "license": "MIT",
+      "path": ".claude/skills/ui-ux-pro-max/",
+      "local_patches": [
+        "SKILL.md : ${CLAUDE_PLUGIN_ROOT}/.claude/skills/... remplacé par .claude/skills/... et python par python3",
+        "Retirés : scripts/tests/, scripts/validate_data.py, data/phosphor-icons-upstream.json, data/google-font-licenses.json (utilisés seulement par le validateur de maintenance)"
+      ],
+      "tree_sha256": "309bfde7a737e4f7e97a943b4787d750b2fa29bf47306f143f7afda24e276d23",
+      "files": 47
+    },
+    "supabase": {
+      "source": "https://github.com/supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "license": "MIT",
+      "path": "skills/supabase/",
+      "local_patches": [],
+      "tree_sha256": "a5f461e428839907c2bf03bb5adfd5f7642ecf2105644ae00b0a90f73e55175b",
+      "files": 4
+    },
+    "elsatia-securite": {
+      "source": "ELSATIA (créé dans ce dépôt)",
+      "license": "propriétaire ELSATIA",
+      "tree_sha256": "2cf33cdb5037944a688c5f99910511ae798a43208cc46e0a3c702bd44285d5a7",
+      "files": 1
+    },
+    "elsatia-communication": {
+      "source": "ELSATIA (créé dans ce dépôt)",
+      "license": "propriétaire ELSATIA",
+      "tree_sha256": "3d2e0ff592a74331c05c3232fc6b2b1eefba8f6c15fb760e1bd8ba9aa08bbbe3",
+      "files": 1
+    }
+  }
+}

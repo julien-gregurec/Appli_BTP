@@ -1,0 +1,5 @@
+remotion-dev/skills (commit 0b5db9daae40f42c73544d1cc0a8c733bd530eaa) does not ship a LICENSE file.
+It mirrors packages/skills of the Remotion monorepo (https://github.com/remotion-dev/remotion),
+whose license is the Remotion License: https://github.com/remotion-dev/remotion/blob/main/LICENSE.md
+Free for individuals, for-profit organizations with up to 3 employees, non-profits, and evaluation.
+Other companies need a Remotion Company License (https://remotion.pro) to use Remotion.
