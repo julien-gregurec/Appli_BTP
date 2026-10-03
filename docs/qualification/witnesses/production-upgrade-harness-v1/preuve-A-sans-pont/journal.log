@@ -1,0 +1,24 @@
+ELSATIA production → V9.x : cible 877a4b9f284150e5d4f06fd68250f3ea19ff62a1 (391 migrations) ; source h210_v500 (profil ACL supabase) ; travail h210_v500_a ; fresh fresh_877a4b9f_sb ; preuves <scratch>/runA
+
+== 1. Snapshot avant ==
+h210_v500: 153 tables, 56188 lignes, 396 FK, 23 jeux critiques -> <scratch>/runA/avant
+h210_v500: inventaire sécurité/catalogue 15 familles, 6337 lignes -> <scratch>/runA/securite_avant
+  ✅ empreintes, inventaire sécurité et sonde RLS de la source (jamais modifiée)
+
+== 2. Ledger avant ==
+  ledger : 210 versions, max 20260824000231
+
+== 3. Classification des migrations ==
+  déjà appliquées 210 ; en attente 181 (dont 13 hors ordre → --include-all) ; inattendues au ledger 0
+
+== 4. Dry-run (copie jetable, chaque migration annulée après mesure) ==
+  ❌ dry-run : échec 20260921000300_correctif_perf_rls_lignes_devis_factures.sql
+ERROR:  Les lignes d'une facture émise ne peuvent plus être modifiées
+CONTEXT:  PL/pgSQL function trg_lignes_factures_brouillon_only() line 10 at RAISE
+
+== 5. Application (une transaction par migration, ledger inclus) ==
+  ⛔ échec de 20260921000300_correctif_perf_rls_lignes_devis_factures.sql (transaction annulée) :
+     ERROR:  Les lignes d'une facture émise ne peuvent plus être modifiées
+     CONTEXT:  PL/pgSQL function trg_lignes_factures_brouillon_only() line 10 at RAISE
+  ledger : 290 versions (inchangé pour 20260921000300)
+❌ upgrade interrompu par une panne sur 20260921000300_correctif_perf_rls_lignes_devis_factures.sql — reprise : même commande + --resume

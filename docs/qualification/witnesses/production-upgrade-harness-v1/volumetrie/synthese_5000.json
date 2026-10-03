@@ -1,0 +1,199 @@
+{
+ "palier": 5000,
+ "lignes_totales": 81298,
+ "code": 0,
+ "construction_s": 37,
+ "harnais_s": 263,
+ "application_s": 27,
+ "migrations": 183,
+ "somme_ms_migrations": 10702,
+ "plus_lentes": [
+  {
+   "migration": "20260921000300_correctif_perf_rls_lignes_devis_factures",
+   "ms": 7355.9
+  },
+  {
+   "migration": "20260926000501_rgpd_purge_facture_emise_reconciliation",
+   "ms": 234.3
+  },
+  {
+   "migration": "20260908000272_client_document_snapshot_v1",
+   "ms": 232.7
+  },
+  {
+   "migration": "20260818000206_historiser_cout_horaire_pointage",
+   "ms": 199.2
+  },
+  {
+   "migration": "20260908000277_platform_support_access_communications_v1",
+   "ms": 97.9
+  },
+  {
+   "migration": "20260927000601_tools_releve_metre_foundation_v1",
+   "ms": 94.9
+  },
+  {
+   "migration": "20260902000255_acl_reconciliation_v1",
+   "ms": 78.6
+  },
+  {
+   "migration": "20260906000268_reserves_v1_foundation_workflow_v1",
+   "ms": 68.6
+  }
+ ],
+ "verrous_access_exclusive_tables_peuplees": [
+  {
+   "version": "20260818000206",
+   "nom": "historiser_cout_horaire_pointage",
+   "rel": "public.pointages",
+   "lignes": 12803
+  },
+  {
+   "version": "20260923000352",
+   "nom": "pt08_regularisation_pointage_responsable",
+   "rel": "public.pointages",
+   "lignes": 12803
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.pointages",
+   "lignes": 12803
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.pointages",
+   "lignes": 12803
+  },
+  {
+   "version": "20260923000327",
+   "nom": "pl05_cloisonnement_lecture_affectations",
+   "rel": "public.affectations",
+   "lignes": 12800
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.affectations",
+   "lignes": 12800
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.affectations",
+   "lignes": 12800
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.journal_audit_paie",
+   "lignes": 9682
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.journal_audit_paie",
+   "lignes": 9682
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.temps_travail_paie",
+   "lignes": 9600
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.temps_travail_paie",
+   "lignes": 9600
+  },
+  {
+   "version": "20260818000210",
+   "nom": "verrou_devis_accepte",
+   "rel": "public.lignes_devis",
+   "lignes": 5900
+  },
+  {
+   "version": "20260921000300",
+   "nom": "correctif_perf_rls_lignes_devis_factures",
+   "rel": "public.lignes_devis",
+   "lignes": 5900
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.lignes_devis",
+   "lignes": 5900
+  },
+  {
+   "version": "20260928000812",
+   "nom": "devis_recalc_totaux_par_instruction_v1",
+   "rel": "public.lignes_devis",
+   "lignes": 5900
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.lignes_devis",
+   "lignes": 5900
+  },
+  {
+   "version": "20260921000300",
+   "nom": "correctif_perf_rls_lignes_devis_factures",
+   "rel": "public.lignes_factures",
+   "lignes": 5540
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.lignes_factures",
+   "lignes": 5540
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.lignes_factures",
+   "lignes": 5540
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.journal_activite",
+   "lignes": 5000
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.journal_activite",
+   "lignes": 5000
+  },
+  {
+   "version": "20260922000309",
+   "nom": "gp_pilot_support_session_no_permanent_ro",
+   "rel": "public.permissions_poste",
+   "lignes": 4087
+  },
+  {
+   "version": "20260928000811",
+   "nom": "v8_convergence_incident_gardes_v1",
+   "rel": "public.permissions_poste",
+   "lignes": 4087
+  },
+  {
+   "version": "20261002001001",
+   "nom": "securite_residuel_entreprise_sans_membre",
+   "rel": "public.permissions_poste",
+   "lignes": 4087
+  },
+  {
+   "version": "20261002001112",
+   "nom": "banking_encryption_key_rotation_v1",
+   "rel": "public.permissions_poste",
+   "lignes": 4087
+  }
+ ],
+ "memoire_backend_max_ko": 9287.4921875,
+ "rss_client_harnais_max_ko": 25760,
+ "verdict": "OK"
+}

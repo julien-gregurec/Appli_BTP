@@ -11,7 +11,7 @@ ACL_DIFF=0 vs fresh cible (inventaire fermé 15 familles, 12 397 lignes) ; avant
 RLS_DIFF=0 vs fresh cible ; continuité d'accès : 0 perte non déclarée (après régularisation UPG-P1-1)
 ROLLBACK_TESTED=OUI — restauration du dump d'avant upgrade : empreintes + ACL/RLS identiques, ledger 210 (S5)
 INTERRUPTION_RECOVERY=OUI — coupure, panne intra-transaction, ledger en retard, ledger en avance, idempotence (S1–S6)
-VOLUMETRIC_MAX=100 000 lignes par table critique (⟨LIGNES_100K⟩ lignes au total)
+VOLUMETRIC_MAX=100 000 lignes par table critique (602 632 lignes au total)
 ```
 
 ## Verdict
@@ -27,7 +27,7 @@ PAS possible avec le train tel quel**. Le harnais l'a démontré et a produit le
 | **UPG-P0-1** `20260921000300` échoue dès qu'une facture émise a des lignes | **P0 — bloquant** | upgrade arrêté au rang ~110 (transaction annulée, sans dégât) | ponts proposés `scripts/upgrade/bridges/` (v1 minimal, **v2 recommandé**) |
 | **UPG-P0-2** `20260816000204` pose une contrainte « essai ≤ 30 j » | P0 conditionnel | upgrade arrêté si une entreprise post-231 a un `trial_end` Stripe hors fenêtre | précondition `bloquant_essai_hors_fenetre` (sonde + preflight) |
 | **UPG-P1-1** « essai perpétuel » (statut `essai`, dates NULL, cas documenté de l'entreprise réelle ELSATIA) | **P1** | tous ses membres perdent l'accès à l'instant de l'upgrade | précondition `bloquant_essai_perpetuel` + SQL de régularisation **proposé** |
-| **UPG-LOCK-1** `300` : cascade de recalcul quadratique sous ACCESS EXCLUSIVE | P1 opérationnel | 7,4 s (5 000) → 64,6 s (20 000) → ⟨MS_100K⟩ (100 000) de blocage devis/factures | fenêtre de maintenance ; pont v2 : ⟨MS_100K_V2⟩ |
+| **UPG-LOCK-1** `300` : cascade de recalcul quadratique sous ACCESS EXCLUSIVE | P1 opérationnel | 7,4 s (5 000) → 64,6 s (20 000) → **1 266 s = 21 min** (100 000) de blocage devis/factures | fenêtre de maintenance ; pont v2 : ⟨MS_100K_V2⟩ |
 | UPG-P2-1 | P2 | fin d'essai Stripe > 30 j tronquée rétroactivement par 204 | déclarée, sondée (`info_essai_tronque`) |
 | UPG-P3-1 | P3 | `devis/factures.updated_at` réécrits à l'instant de l'upgrade (montants identiques) | déclarée ; supprimée par le pont v2 |
 | UPG-PERF-1 | P2 | lectures sous RLS ≈ ×2 (gardes enrichies) ; planning d'autrui ×10–×20 | mesuré, non bloquant (< 2 s) |
@@ -201,12 +201,12 @@ que 802 désactive ; versions historiques intactes (59 / 129 / 249, mini v1 annu
 | 500 | 56 398 | 19 s | 0,8 s | ~4 min | ✅ |
 | 5 000 | 81 298 | 27 s | 7,4 s | 263 s | ✅ |
 | 20 000 | 163 932 | 85 s | 64,6 s | 521 s | ✅ |
-| 100 000 | ⟨LIGNES_100K⟩ | ⟨APP_100K⟩ | ⟨MS_100K⟩ | ⟨H_100K⟩ | ⟨V_100K⟩ |
+| 100 000 | 602 632 | **1 287 s** | **1 266 s** | 3 694 s | ✅ |
 
-Mémoire backend max (contextes) : 9,3 Mo (5 000) → 14,2 Mo (20 000) → ⟨MEM_100K⟩ ; RSS client du harnais ≤ ⟨RSS⟩.
+Mémoire backend max (contextes) : 9,3 Mo (5 000) → 14,2 Mo (20 000) → 33,6 Mo (100 000) ; RSS client du harnais ≤ 110 Mo.
 
 Classement verrous (mesuré au palier max : verrous réellement tenus par la transaction, tables réécrites, lignes
-existantes touchées) : **SAFE ⟨SAFE⟩ · CAUTION ⟨CAUTION⟩ · MAINTENANCE_WINDOW_REQUIRED ⟨MW⟩**. Seule
+existantes touchées) : **SAFE 83 · CAUTION 99 · MAINTENANCE_WINDOW_REQUIRED 1**. Seule
 `20260921000300` exige une fenêtre (cascade de recalcul, coût quadratique, ACCESS EXCLUSIVE sur devis /
 factures / lignes). Les CAUTION prennent un verrou fort **bref** sur des tables 210 (création de triggers,
 contraintes, backfills < 0,5 s) : en Production, appliquer avec `lock_timeout` et trafic coupé.
@@ -217,7 +217,20 @@ Pont v2 (`bridges/v2/`) au palier 100 000 : ⟨PONT_V2⟩.
 
 `scripts/upgrade/interruption.sh` :
 
-⟨INTERRUPTIONS⟩
+| Scénario | Simulation | Résultat |
+|---|---|---|
+| S1a | coupure propre après `20260902000255` (point de non-retour ACL) | ✅ code 75 ; ledger 253 = 210 + préfixe exact du plan |
+| S1b | reprise `--resume` | ✅ upgrade complet qualifié (ledger 393) |
+| S2a | panne injectée DANS la transaction de `300` | ✅ code 76 ; schéma + ACL + ledger **identiques** à l'état d'avant (empreinte `592cef31d7dd`) |
+| S2b | reprise après panne | ✅ upgrade complet qualifié |
+| S3a | ledger EN RETARD (300 appliquée sans sa ligne) — reprise naïve | ✅ 300 rejouée sans erreur (idempotente) ; état final qualifié |
+| S3b | réparation manuelle : état prouvé = référence, version inscrite | ✅ reprise qualifiée |
+| S4 | ledger EN AVANCE (version inscrite, migration jamais appliquée) | ✅ **détecté** : schéma ≠ fresh, fermeture sécurité KO → restauration |
+| S5 | restauration du dump d'avant upgrade | ✅ 153 tables / 56 188 lignes identiques, ACL/RLS identiques, ledger 210, 0 erreur `pg_restore` |
+| S6 | idempotence (chaque migration rejouée une 2ᵉ fois) | 128 idempotentes / **55 non idempotentes** → la reprise se fonde sur le ledger, jamais sur l'idempotence |
+
+Deux faux positifs de l'outillage ont été corrigés pendant la phase (et non masqués) : le jeton aléatoire
+`\restrict` de `pg_dump` ≥ 16.10 et l'aplatissement des `AND` d'une contrainte CHECK par dump / restore.
 
 ## 10. Phase J — Rollback
 

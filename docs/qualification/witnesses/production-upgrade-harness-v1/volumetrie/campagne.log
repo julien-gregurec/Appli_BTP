@@ -1,0 +1,3 @@
+palier   5000 : 81298 lignes ; application 27 s (Σ 10702 ms) ; harnais 263 s ; plus lente 20260921000300_correctif_perf_rls_lignes 7355.9 ms ; verdict OK
+palier  20000 : 163932 lignes ; application 85 s (Σ 68489 ms) ; harnais 521 s ; plus lente 20260921000300_correctif_perf_rls_lignes 64572.9 ms ; verdict OK
+palier 100000 : 602632 lignes ; application 1287 s (Σ 1272221 ms) ; harnais 3694 s ; plus lente 20260921000300_correctif_perf_rls_lignes 1266397.1 ms ; verdict OK
