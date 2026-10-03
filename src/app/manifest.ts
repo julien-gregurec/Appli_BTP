@@ -1,21 +1,22 @@
 import type { MetadataRoute } from "next";
+import { ASSETS_MARQUE, MARQUE } from "@/lib/branding";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Liria Gestion Pro",
-    short_name: "Liria Pro",
+    name: MARQUE.nom,
+    short_name: MARQUE.nomCourt,
     description: "Gestion des chantiers, équipes, devis, factures, stock et matériel pour les entreprises du BTP.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
-    background_color: "#0d1b2a",
-    theme_color: "#0d1b2a",
+    background_color: MARQUE.couleurFond,
+    theme_color: MARQUE.couleurFond,
     lang: "fr",
     categories: ["business", "productivity"],
     icons: [
-      { src: "/icons/liria-gestion-pro-v3-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: ASSETS_MARQUE.icone192, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: ASSETS_MARQUE.icone512, sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: ASSETS_MARQUE.iconeMaskable512, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

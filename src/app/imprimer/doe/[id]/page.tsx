@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { AutoPrint } from "@/components/AutoPrint";
+import { ASSETS_MARQUE } from "@/lib/branding";
 
 type RelationArticle = { id: string; reference: string; designation: string; marque: string | null };
 const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
@@ -41,7 +42,7 @@ export default async function ImprimerDoePage({ params }: { params: Promise<{ id
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={entreprise?.logo_url || "/liria-gestion-pro-logo-v5.png"} alt="Logo de l'entreprise" style={{ width: "105px", height: "64px", objectFit: "contain" }} />
+            <img src={entreprise?.logo_url || ASSETS_MARQUE.logo} alt="Logo de l'entreprise" style={{ width: "105px", height: "64px", objectFit: "contain" }} />
             <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise?.nom ?? ctx.entrepriseNom}</div>
           </div>
           <div style={{ textAlign: "right" }}>

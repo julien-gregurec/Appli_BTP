@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
 import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
+import { ASSETS_MARQUE, MARQUE } from "@/lib/branding";
 
 export const metadata: Metadata = {
   title: "Liria Gestion Pro V3 — Le logiciel de gestion pour les entreprises du BTP",
@@ -51,7 +52,7 @@ export default async function AccueilPage() {
       <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-2">
-            <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={32} height={32} className="shrink-0 rounded" />
+            <Image src={ASSETS_MARQUE.logo} alt={MARQUE.nom} width={32} height={32} className="shrink-0 rounded" />
             <span className="truncate text-base font-bold text-[#0d1b2a] dark:text-white sm:text-lg">Liria Gestion Pro <span className="text-[#c9a24a]">V3</span></span>
           </div>
           <nav className="flex shrink-0 items-center gap-2 text-xs font-medium sm:gap-4 sm:text-sm">
