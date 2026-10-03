@@ -2,7 +2,7 @@ BASE_SHA=24a0c2e993ec0836b492ea72f27ed7dc347a20fa
 GP_BUSINESS_SHA=d617f7e
 PERFORMANCE_SHA=a9b46f01
 PLATFORM_SHA=2cd5ca6e
-FINAL_SHA=@@FINAL_SHA@@
+FINAL_SHA=88ba6bfe5caf31fa5aa4368d1b51b9c2b419f898 (tête qualifiée ; le commit suivant ne modifie que cette ligne du rapport)
 MIGRATION_COUNT=408
 
 FRESH_INSTALL=ALL_MIGRATIONS_APPLIED (408/408 ; catalogue = V9.1 + union exacte des 3 lots : 10 967 objets, 0 chevauchement, 0 conflit, 0 écart)
