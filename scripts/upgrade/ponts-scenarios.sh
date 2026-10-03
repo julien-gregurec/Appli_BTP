@@ -32,14 +32,19 @@ appliquer() { # <base> <fichier> [ledger=1]
     if [ "${3:-1}" = 1 ]; then echo "insert into supabase_migrations.schema_migrations(version, name) values ('$v', '$nom');"; fi; } \
     | su postgres -c "psql -X -q -1 -v ON_ERROR_STOP=1 -d $1" > "$OUT/derniere.out" 2>&1
 }
-empreinte() { # <base> : lignes + parents + triggers des tables concernées
+empreinte() { # <base> : lignes + parents (données) des tables concernées
   upg_q "$1" "select md5(string_agg(x, '|' order by x)) from (
       select 'ld:'||md5(ld::text) x from public.lignes_devis ld union all
       select 'lf:'||md5(lf::text) from public.lignes_factures lf union all
       select 'd:'||id||':'||coalesce(updated_at::text,'')||':'||coalesce(montant_ttc::text,'') from public.devis union all
-      select 'f:'||id||':'||coalesce(updated_at::text,'')||':'||coalesce(montant_ttc::text,'') from public.factures union all
-      select 't:'||c.relname||'.'||g.tgname||':'||g.tgenabled::text from pg_trigger g join pg_class c on c.oid = g.tgrelid
-       where c.relname in ('lignes_devis','lignes_factures','devis','factures') and not g.tgisinternal) s"
+      select 'f:'||id||':'||coalesce(updated_at::text,'')||':'||coalesce(montant_ttc::text,'') from public.factures) s"
+}
+# Triggers des tables concernées, un par ligne (nom:état). Train V9.2 : les migrations post-V9.1 peuvent
+# AJOUTER des triggers (ex. 20261003001403 facture_emise_non_annulable) ; les ponts ne doivent ni retirer
+# ni désactiver un trigger existant : PS2 compare les triggers préexistants et liste les ajouts.
+triggers() {
+  upg_q "$1" "select c.relname||'.'||g.tgname||':'||g.tgenabled::text from pg_trigger g join pg_class c on c.oid = g.tgrelid
+       where c.relname in ('lignes_devis','lignes_factures','devis','factures') and not g.tgisinternal order by 1"
 }
 
 echo "== PS1 fresh sans ledger Supabase (rebuild_db.sh) =="
@@ -62,7 +67,7 @@ for s in seed_entreprise_pilote_btp seed_entreprise_test_5_ans; do
 done
 # Factures émises avec lignes, comme en Preview pilotée.
 emises=$(upg_q $db "select count(*) from public.lignes_factures lf join public.factures f on f.id = lf.facture_id where f.statut <> 'brouillon'")
-avant=$(empreinte $db); n91=$(upg_q $db "select count(*) from supabase_migrations.schema_migrations")
+avant=$(empreinte $db); trig_avant=$(triggers $db); n91=$(upg_q $db "select count(*) from supabase_migrations.schema_migrations")
 notices=""
 for f in "$MIG"/*.sql; do
   v=$(basename "$f" | cut -d_ -f1)
@@ -70,9 +75,12 @@ for f in "$MIG"/*.sql; do
   appliquer $db "$f" || { ko "PS2 échec $(basename "$f")"; head -5 "$OUT/derniere.out"; break; }
   case "$f" in *_pont_upgrade_*) notices="$notices $(grep -ho 'pont phase 0 : [^—]*— aucune action' "$OUT/derniere.out")";; esac
 done
-apres=$(empreinte $db)
+apres=$(empreinte $db); trig_apres=$(triggers $db)
+trig_retires=$(comm -23 <(echo "$trig_avant") <(echo "$trig_apres") | tr '\n' ' ')
+trig_ajoutes=$(comm -13 <(echo "$trig_avant") <(echo "$trig_apres") | tr '\n' ' ')
+echo "  triggers préexistants retirés ou modifiés : ${trig_retires:-aucun} ; ajoutés par le train : ${trig_ajoutes:-aucun}"
 echo "  ledger $n91 → $(upg_q $db "select count(*) from supabase_migrations.schema_migrations") ; lignes de factures émises : $emises ;$notices"
-[ -n "$avant" ] && [ "$avant" = "$apres" ] && [ "${emises:-0}" -gt 0 ] && ok "PS2 empreinte lignes / devis / factures / triggers identique ($avant)" \
+[ -n "$avant" ] && [ "$avant" = "$apres" ] && [ -z "$trig_retires" ] && [ "${emises:-0}" -gt 0 ] && ok "PS2 empreinte lignes / devis / factures identique ($avant), triggers préexistants identiques" \
   || ko "PS2 empreinte modifiée ($avant → $apres) ou aucune facture émise ($emises)"
 upg_drop $db
 
