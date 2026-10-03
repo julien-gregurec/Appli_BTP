@@ -30,3 +30,7 @@
 - B24 P1 facture émise annulable sans avoir (FAC-2026-008) CORRIGÉ transitions + migr 190 (FAC-2026-008 remise en envoyée)
 - B25 P2 rentabilité/IA/copilote comptent les factures brouillon dans le CA (39 801 € affichés vs 19 504 € émis); copilote ignorait les avoirs; alertes "à encaisser" sur brouillons/avoirs CORRIGÉ
 - B26 P3 chantier "terminé" sans date de fin réelle renseignée
+- B27 P1 intégrité: via API (PostgREST, jeton utilisateur) comptable/gérant modifiaient TTC d'une facture émise (7 964,33 → 1 €), la renumérotaient (FAC-2026-999), et modifiaient les prix d'un devis accepté. CORRIGÉ migr 191 (données restaurées)
+- B28 P1 confidentialité NON CORRIGÉ: salarié lit par API cout_horaire/taux_horaire de 4 collègues (policy employes = membre actif, toutes colonnes). UI ne l'affiche pas. Correctif proposé: même modèle que articles_stock (revoke colonne + RPC avec contrôle voir_cout_interne_employe)
+- Permissions: 221 contrôles (132 écrans conformité config, 37 attentes métier, 6 données écran, 34 sondes API, 2 multi-tenant/anon) → 220 PASS
+- suppression d'un paiement d'une facture soldée possible (UI et API) — observation, pas d'audit visible

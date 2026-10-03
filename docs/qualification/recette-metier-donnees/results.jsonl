@@ -221,3 +221,224 @@
 {"ts":"2026-10-03T00:07:31.518Z","parcours":"S4 Facturation","nom":"Clôture : chantier passé en « terminé »","statut":"PASS","detail":"termine fin réelle=null"}
 {"ts":"2026-10-03T00:07:31.883Z","parcours":"S4 Facturation","nom":"Clôture : chantier terminé avec factures non soldées signalé","statut":"PASS","detail":"factures ouvertes: FAC-2026-006 0/6499.67, FAC-2026-003 1500.00/5518.52"}
 {"ts":"2026-10-03T00:07:31.886Z","parcours":"S4 Facturation","nom":"Erreurs console/serveur (clôture)","statut":"PASS","detail":""}
+{"ts":"2026-10-03T00:12:22.492Z","parcours":"Permissions","nom":"[écran] gerant /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:22.841Z","parcours":"Permissions","nom":"[écran] gerant /clients conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:12:23.127Z","parcours":"Permissions","nom":"[écran] gerant /clients/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients/nouveau"}
+{"ts":"2026-10-03T00:12:23.462Z","parcours":"Permissions","nom":"[écran] gerant /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:23.865Z","parcours":"Permissions","nom":"[écran] gerant /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:12:24.191Z","parcours":"Permissions","nom":"[écran] gerant /devis conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis"}
+{"ts":"2026-10-03T00:12:24.515Z","parcours":"Permissions","nom":"[écran] gerant /devis/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis/nouveau"}
+{"ts":"2026-10-03T00:12:24.850Z","parcours":"Permissions","nom":"[écran] gerant /factures conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /factures"}
+{"ts":"2026-10-03T00:12:24.851Z","parcours":"Permissions","nom":"[métier] gerant /factures autorisé","statut":"PASS","detail":"obtenu=autorisé → /factures"}
+{"ts":"2026-10-03T00:12:25.159Z","parcours":"Permissions","nom":"[écran] gerant /prestations conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /prestations"}
+{"ts":"2026-10-03T00:12:25.517Z","parcours":"Permissions","nom":"[écran] gerant /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:25.808Z","parcours":"Permissions","nom":"[écran] gerant /pointage conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:12:26.142Z","parcours":"Permissions","nom":"[écran] gerant /pointage/gestion conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage/gestion"}
+{"ts":"2026-10-03T00:12:26.578Z","parcours":"Permissions","nom":"[écran] gerant /employes conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /employes"}
+{"ts":"2026-10-03T00:12:26.910Z","parcours":"Permissions","nom":"[écran] gerant /employes/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /employes/nouveau"}
+{"ts":"2026-10-03T00:12:27.247Z","parcours":"Permissions","nom":"[écran] gerant /depenses conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /depenses"}
+{"ts":"2026-10-03T00:12:27.567Z","parcours":"Permissions","nom":"[écran] gerant /fournisseurs conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /fournisseurs"}
+{"ts":"2026-10-03T00:12:27.887Z","parcours":"Permissions","nom":"[écran] gerant /rentabilite conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /rentabilite"}
+{"ts":"2026-10-03T00:12:27.887Z","parcours":"Permissions","nom":"[métier] gerant /rentabilite autorisé","statut":"PASS","detail":"obtenu=autorisé → /rentabilite"}
+{"ts":"2026-10-03T00:12:28.165Z","parcours":"Permissions","nom":"[écran] gerant /tresorerie conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /tresorerie"}
+{"ts":"2026-10-03T00:12:28.421Z","parcours":"Permissions","nom":"[écran] gerant /exports conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /exports"}
+{"ts":"2026-10-03T00:12:28.779Z","parcours":"Permissions","nom":"[écran] gerant /parametres conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /parametres"}
+{"ts":"2026-10-03T00:12:29.574Z","parcours":"Permissions","nom":"[écran] gerant /parametres/acces conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /parametres/acces"}
+{"ts":"2026-10-03T00:12:29.575Z","parcours":"Permissions","nom":"[métier] gerant /parametres/acces autorisé","statut":"PASS","detail":"obtenu=autorisé → /parametres/acces"}
+{"ts":"2026-10-03T00:12:29.906Z","parcours":"Permissions","nom":"[écran] gerant /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:29.906Z","parcours":"Permissions","nom":"[métier] gerant /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:30.582Z","parcours":"Permissions","nom":"[écran] conducteur /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:30.939Z","parcours":"Permissions","nom":"[écran] conducteur /clients conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:12:31.197Z","parcours":"Permissions","nom":"[écran] conducteur /clients/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients/nouveau"}
+{"ts":"2026-10-03T00:12:31.522Z","parcours":"Permissions","nom":"[écran] conducteur /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:31.522Z","parcours":"Permissions","nom":"[métier] conducteur /chantiers autorisé","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:31.793Z","parcours":"Permissions","nom":"[écran] conducteur /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:12:32.188Z","parcours":"Permissions","nom":"[écran] conducteur /devis conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis"}
+{"ts":"2026-10-03T00:12:32.188Z","parcours":"Permissions","nom":"[métier] conducteur /devis autorisé","statut":"PASS","detail":"obtenu=autorisé → /devis"}
+{"ts":"2026-10-03T00:12:32.533Z","parcours":"Permissions","nom":"[écran] conducteur /devis/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis/nouveau"}
+{"ts":"2026-10-03T00:12:32.831Z","parcours":"Permissions","nom":"[écran] conducteur /factures conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /factures"}
+{"ts":"2026-10-03T00:12:33.112Z","parcours":"Permissions","nom":"[écran] conducteur /prestations conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /prestations"}
+{"ts":"2026-10-03T00:12:33.425Z","parcours":"Permissions","nom":"[écran] conducteur /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:33.817Z","parcours":"Permissions","nom":"[écran] conducteur /pointage conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:34.212Z","parcours":"Permissions","nom":"[écran] conducteur /pointage/gestion conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:34.529Z","parcours":"Permissions","nom":"[écran] conducteur /employes conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /employes"}
+{"ts":"2026-10-03T00:12:35.018Z","parcours":"Permissions","nom":"[écran] conducteur /employes/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /employes?error=Acc%C3%A8s%20en%20lecture%20seule"}
+{"ts":"2026-10-03T00:12:35.291Z","parcours":"Permissions","nom":"[écran] conducteur /depenses conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /depenses"}
+{"ts":"2026-10-03T00:12:35.596Z","parcours":"Permissions","nom":"[écran] conducteur /fournisseurs conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /fournisseurs"}
+{"ts":"2026-10-03T00:12:35.887Z","parcours":"Permissions","nom":"[écran] conducteur /rentabilite conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /rentabilite"}
+{"ts":"2026-10-03T00:12:36.220Z","parcours":"Permissions","nom":"[écran] conducteur /tresorerie conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /tresorerie"}
+{"ts":"2026-10-03T00:12:36.599Z","parcours":"Permissions","nom":"[écran] conducteur /exports conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:37.022Z","parcours":"Permissions","nom":"[écran] conducteur /parametres conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:37.375Z","parcours":"Permissions","nom":"[écran] conducteur /parametres/acces conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:37.375Z","parcours":"Permissions","nom":"[métier] conducteur /parametres/acces refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:37.639Z","parcours":"Permissions","nom":"[écran] conducteur /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:37.639Z","parcours":"Permissions","nom":"[métier] conducteur /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:38.228Z","parcours":"Permissions","nom":"[écran] chef /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:38.553Z","parcours":"Permissions","nom":"[écran] chef /clients conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:12:38.845Z","parcours":"Permissions","nom":"[écran] chef /clients/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients/nouveau"}
+{"ts":"2026-10-03T00:12:39.167Z","parcours":"Permissions","nom":"[écran] chef /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:39.474Z","parcours":"Permissions","nom":"[écran] chef /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:12:39.857Z","parcours":"Permissions","nom":"[écran] chef /devis conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:40.220Z","parcours":"Permissions","nom":"[écran] chef /devis/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:40.602Z","parcours":"Permissions","nom":"[écran] chef /factures conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:40.970Z","parcours":"Permissions","nom":"[écran] chef /prestations conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:41.330Z","parcours":"Permissions","nom":"[écran] chef /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:41.330Z","parcours":"Permissions","nom":"[métier] chef /planning autorisé","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:41.606Z","parcours":"Permissions","nom":"[écran] chef /pointage conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:12:41.949Z","parcours":"Permissions","nom":"[écran] chef /pointage/gestion conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage/gestion"}
+{"ts":"2026-10-03T00:12:41.949Z","parcours":"Permissions","nom":"[métier] chef /pointage/gestion autorisé","statut":"PASS","detail":"obtenu=autorisé → /pointage/gestion"}
+{"ts":"2026-10-03T00:12:42.331Z","parcours":"Permissions","nom":"[écran] chef /employes conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /employes"}
+{"ts":"2026-10-03T00:12:42.814Z","parcours":"Permissions","nom":"[écran] chef /employes/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /employes?error=Acc%C3%A8s%20en%20lecture%20seule"}
+{"ts":"2026-10-03T00:12:43.078Z","parcours":"Permissions","nom":"[écran] chef /depenses conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /depenses"}
+{"ts":"2026-10-03T00:12:43.373Z","parcours":"Permissions","nom":"[écran] chef /fournisseurs conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /fournisseurs"}
+{"ts":"2026-10-03T00:12:43.760Z","parcours":"Permissions","nom":"[écran] chef /rentabilite conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:44.157Z","parcours":"Permissions","nom":"[écran] chef /tresorerie conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:44.158Z","parcours":"Permissions","nom":"[métier] chef /tresorerie refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:44.516Z","parcours":"Permissions","nom":"[écran] chef /exports conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:44.869Z","parcours":"Permissions","nom":"[écran] chef /parametres conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:45.237Z","parcours":"Permissions","nom":"[écran] chef /parametres/acces conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:45.237Z","parcours":"Permissions","nom":"[métier] chef /parametres/acces refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:45.553Z","parcours":"Permissions","nom":"[écran] chef /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:45.553Z","parcours":"Permissions","nom":"[métier] chef /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:46.197Z","parcours":"Permissions","nom":"[écran] salarie /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:46.197Z","parcours":"Permissions","nom":"[métier] salarie /dashboard autorisé","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:46.611Z","parcours":"Permissions","nom":"[écran] salarie /clients conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:46.611Z","parcours":"Permissions","nom":"[métier] salarie /clients refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:46.991Z","parcours":"Permissions","nom":"[écran] salarie /clients/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:47.251Z","parcours":"Permissions","nom":"[écran] salarie /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:47.513Z","parcours":"Permissions","nom":"[écran] salarie /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:12:47.878Z","parcours":"Permissions","nom":"[écran] salarie /devis conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:47.878Z","parcours":"Permissions","nom":"[métier] salarie /devis refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:48.236Z","parcours":"Permissions","nom":"[écran] salarie /devis/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:48.586Z","parcours":"Permissions","nom":"[écran] salarie /factures conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:48.587Z","parcours":"Permissions","nom":"[métier] salarie /factures refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:48.927Z","parcours":"Permissions","nom":"[écran] salarie /prestations conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:49.206Z","parcours":"Permissions","nom":"[écran] salarie /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:49.499Z","parcours":"Permissions","nom":"[écran] salarie /pointage conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:12:49.500Z","parcours":"Permissions","nom":"[métier] salarie /pointage autorisé","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:12:50.001Z","parcours":"Permissions","nom":"[écran] salarie /pointage/gestion conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /pointage?error=Acc%C3%A8s%20r%C3%A9serv%C3%A9%20aux%20responsables%20du%20pointage"}
+{"ts":"2026-10-03T00:12:50.351Z","parcours":"Permissions","nom":"[écran] salarie /employes conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:50.737Z","parcours":"Permissions","nom":"[écran] salarie /employes/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:50.737Z","parcours":"Permissions","nom":"[métier] salarie /employes/nouveau refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:51.165Z","parcours":"Permissions","nom":"[écran] salarie /depenses conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:51.166Z","parcours":"Permissions","nom":"[métier] salarie /depenses refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:51.580Z","parcours":"Permissions","nom":"[écran] salarie /fournisseurs conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:51.929Z","parcours":"Permissions","nom":"[écran] salarie /rentabilite conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:51.929Z","parcours":"Permissions","nom":"[métier] salarie /rentabilite refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:52.326Z","parcours":"Permissions","nom":"[écran] salarie /tresorerie conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:52.326Z","parcours":"Permissions","nom":"[métier] salarie /tresorerie refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:52.710Z","parcours":"Permissions","nom":"[écran] salarie /exports conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:52.710Z","parcours":"Permissions","nom":"[métier] salarie /exports refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:53.045Z","parcours":"Permissions","nom":"[écran] salarie /parametres conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:53.046Z","parcours":"Permissions","nom":"[métier] salarie /parametres refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:53.400Z","parcours":"Permissions","nom":"[écran] salarie /parametres/acces conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:53.400Z","parcours":"Permissions","nom":"[métier] salarie /parametres/acces refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:12:53.703Z","parcours":"Permissions","nom":"[écran] salarie /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:53.704Z","parcours":"Permissions","nom":"[métier] salarie /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:12:54.361Z","parcours":"Permissions","nom":"[écran] comptable /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:12:54.723Z","parcours":"Permissions","nom":"[écran] comptable /clients conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:12:54.988Z","parcours":"Permissions","nom":"[écran] comptable /clients/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients/nouveau"}
+{"ts":"2026-10-03T00:12:55.359Z","parcours":"Permissions","nom":"[écran] comptable /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:12:55.651Z","parcours":"Permissions","nom":"[écran] comptable /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:12:56.057Z","parcours":"Permissions","nom":"[écran] comptable /devis conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis"}
+{"ts":"2026-10-03T00:12:56.372Z","parcours":"Permissions","nom":"[écran] comptable /devis/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /devis/nouveau"}
+{"ts":"2026-10-03T00:12:56.701Z","parcours":"Permissions","nom":"[écran] comptable /factures conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /factures"}
+{"ts":"2026-10-03T00:12:56.701Z","parcours":"Permissions","nom":"[métier] comptable /factures autorisé","statut":"PASS","detail":"obtenu=autorisé → /factures"}
+{"ts":"2026-10-03T00:12:57.009Z","parcours":"Permissions","nom":"[écran] comptable /prestations conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /prestations"}
+{"ts":"2026-10-03T00:12:57.309Z","parcours":"Permissions","nom":"[écran] comptable /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:12:57.567Z","parcours":"Permissions","nom":"[écran] comptable /pointage conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:12:57.959Z","parcours":"Permissions","nom":"[écran] comptable /pointage/gestion conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /pointage?error=Acc%C3%A8s%20r%C3%A9serv%C3%A9%20aux%20responsables%20du%20pointage"}
+{"ts":"2026-10-03T00:12:58.341Z","parcours":"Permissions","nom":"[écran] comptable /employes conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /employes"}
+{"ts":"2026-10-03T00:12:58.814Z","parcours":"Permissions","nom":"[écran] comptable /employes/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /employes?error=Acc%C3%A8s%20en%20lecture%20seule"}
+{"ts":"2026-10-03T00:12:58.815Z","parcours":"Permissions","nom":"[métier] comptable /employes/nouveau refusé","statut":"PASS","detail":"obtenu=refusé → /employes?error=Acc%C3%A8s%20en%20lecture%20seule"}
+{"ts":"2026-10-03T00:12:59.100Z","parcours":"Permissions","nom":"[écran] comptable /depenses conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /depenses"}
+{"ts":"2026-10-03T00:12:59.341Z","parcours":"Permissions","nom":"[écran] comptable /fournisseurs conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /fournisseurs"}
+{"ts":"2026-10-03T00:12:59.616Z","parcours":"Permissions","nom":"[écran] comptable /rentabilite conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /rentabilite"}
+{"ts":"2026-10-03T00:12:59.920Z","parcours":"Permissions","nom":"[écran] comptable /tresorerie conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /tresorerie"}
+{"ts":"2026-10-03T00:13:00.232Z","parcours":"Permissions","nom":"[écran] comptable /exports conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /exports"}
+{"ts":"2026-10-03T00:13:00.575Z","parcours":"Permissions","nom":"[écran] comptable /parametres conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:00.920Z","parcours":"Permissions","nom":"[écran] comptable /parametres/acces conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:00.920Z","parcours":"Permissions","nom":"[métier] comptable /parametres/acces refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:01.188Z","parcours":"Permissions","nom":"[écran] comptable /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:13:01.188Z","parcours":"Permissions","nom":"[métier] comptable /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:13:01.779Z","parcours":"Permissions","nom":"[écran] limite /dashboard conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /dashboard"}
+{"ts":"2026-10-03T00:13:02.093Z","parcours":"Permissions","nom":"[écran] limite /clients conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:13:02.094Z","parcours":"Permissions","nom":"[métier] limite /clients autorisé","statut":"PASS","detail":"obtenu=autorisé → /clients"}
+{"ts":"2026-10-03T00:13:02.353Z","parcours":"Permissions","nom":"[écran] limite /clients/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /clients/nouveau"}
+{"ts":"2026-10-03T00:13:02.630Z","parcours":"Permissions","nom":"[écran] limite /chantiers conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:13:02.630Z","parcours":"Permissions","nom":"[métier] limite /chantiers autorisé","statut":"PASS","detail":"obtenu=autorisé → /chantiers"}
+{"ts":"2026-10-03T00:13:02.909Z","parcours":"Permissions","nom":"[écran] limite /chantiers/nouveau conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /chantiers/nouveau"}
+{"ts":"2026-10-03T00:13:03.234Z","parcours":"Permissions","nom":"[écran] limite /devis conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:03.234Z","parcours":"Permissions","nom":"[métier] limite /devis refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:03.514Z","parcours":"Permissions","nom":"[écran] limite /devis/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:03.817Z","parcours":"Permissions","nom":"[écran] limite /factures conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:03.818Z","parcours":"Permissions","nom":"[métier] limite /factures refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:04.103Z","parcours":"Permissions","nom":"[écran] limite /prestations conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:04.379Z","parcours":"Permissions","nom":"[écran] limite /planning conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /planning"}
+{"ts":"2026-10-03T00:13:04.660Z","parcours":"Permissions","nom":"[écran] limite /pointage conforme à la configuration du poste (autorisé)","statut":"PASS","detail":"obtenu=autorisé → /pointage"}
+{"ts":"2026-10-03T00:13:05.056Z","parcours":"Permissions","nom":"[écran] limite /pointage/gestion conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /pointage?error=Acc%C3%A8s%20r%C3%A9serv%C3%A9%20aux%20responsables%20du%20pointage"}
+{"ts":"2026-10-03T00:13:05.353Z","parcours":"Permissions","nom":"[écran] limite /employes conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:05.353Z","parcours":"Permissions","nom":"[métier] limite /employes refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:05.654Z","parcours":"Permissions","nom":"[écran] limite /employes/nouveau conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:06.035Z","parcours":"Permissions","nom":"[écran] limite /depenses conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:06.399Z","parcours":"Permissions","nom":"[écran] limite /fournisseurs conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:06.711Z","parcours":"Permissions","nom":"[écran] limite /rentabilite conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:06.711Z","parcours":"Permissions","nom":"[métier] limite /rentabilite refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:07.006Z","parcours":"Permissions","nom":"[écran] limite /tresorerie conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:07.368Z","parcours":"Permissions","nom":"[écran] limite /exports conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:07.683Z","parcours":"Permissions","nom":"[écran] limite /parametres conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:07.683Z","parcours":"Permissions","nom":"[métier] limite /parametres refusé","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:08.006Z","parcours":"Permissions","nom":"[écran] limite /parametres/acces conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:08.257Z","parcours":"Permissions","nom":"[écran] limite /plateforme conforme à la configuration du poste (refusé)","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:13:08.257Z","parcours":"Permissions","nom":"[métier] limite /plateforme refusé","statut":"PASS","detail":"obtenu=refusé → /plateforme"}
+{"ts":"2026-10-03T00:13:08.893Z","parcours":"Permissions","nom":"[données] salarié : fiche chantier sans budget, prix ni montants de devis","statut":"PASS","detail":"/chantiers/083da38d-1167-4366-9ccf-f0cd60782d51 fuites=aucune"}
+{"ts":"2026-10-03T00:13:10.692Z","parcours":"Permissions","nom":"[données] salarié : aucun coût horaire / taux d'un collègue à l'écran","statut":"PASS","detail":"aucune"}
+{"ts":"2026-10-03T00:13:11.777Z","parcours":"Permissions","nom":"[données] salarié : aucun IBAN / RIB visible","statut":"PASS","detail":"aucun"}
+{"ts":"2026-10-03T00:13:12.543Z","parcours":"Permissions","nom":"[données] salarié : impression devis/facture refusée","statut":"PASS","detail":"/dashboard?acces=refuse | /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:12.623Z","parcours":"Permissions","nom":"[données] salarié : export comptable (API) refusé","statut":"PASS","detail":"HTTP 307 /dashboard?acces=refuse"}
+{"ts":"2026-10-03T00:13:12.711Z","parcours":"Permissions","nom":"[mutation] salarié : POST serveur sur /clients/nouveau refusé par le proxy","statut":"PASS","detail":"HTTP 307 créé=false"}
+{"ts":"2026-10-03T00:13:13.552Z","parcours":"Permissions","nom":"[API lecture] salarie → coordonnees_bancaires aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.573Z","parcours":"Permissions","nom":"[API lecture] chef → coordonnees_bancaires aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.594Z","parcours":"Permissions","nom":"[API lecture] conducteur → coordonnees_bancaires aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.615Z","parcours":"Permissions","nom":"[API lecture] limite → coordonnees_bancaires aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.626Z","parcours":"Permissions","nom":"[API lecture] salarie → factures aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.638Z","parcours":"Permissions","nom":"[API lecture] limite → factures aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.648Z","parcours":"Permissions","nom":"[API lecture] chef → factures aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.658Z","parcours":"Permissions","nom":"[API lecture] salarie → paiements aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.670Z","parcours":"Permissions","nom":"[API lecture] limite → paiements aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.681Z","parcours":"Permissions","nom":"[API lecture] chef → paiements aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.691Z","parcours":"Permissions","nom":"[API lecture] salarie → devis aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.701Z","parcours":"Permissions","nom":"[API lecture] limite → devis aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.712Z","parcours":"Permissions","nom":"[API lecture] salarie → lignes_devis aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.722Z","parcours":"Permissions","nom":"[API lecture] limite → lignes_devis aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.727Z","parcours":"Permissions","nom":"[API lecture] salarie → depenses_fournisseurs aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.732Z","parcours":"Permissions","nom":"[API lecture] limite → depenses_fournisseurs aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.739Z","parcours":"Permissions","nom":"[API lecture] salarie → clients aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.745Z","parcours":"Permissions","nom":"[API lecture] limite → clients lignes visibles","statut":"PASS","detail":"lignes=3 "}
+{"ts":"2026-10-03T00:13:13.747Z","parcours":"Permissions","nom":"[API lecture] limite → bulletins_paie aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.751Z","parcours":"Permissions","nom":"[API lecture] chef → bulletins_paie aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.754Z","parcours":"Permissions","nom":"[API lecture] conducteur → bulletins_paie aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.763Z","parcours":"Permissions","nom":"[API lecture] salarie → journal_activite aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.773Z","parcours":"Permissions","nom":"[API lecture] limite → journal_activite aucune ligne","statut":"PASS","detail":"lignes=0 "}
+{"ts":"2026-10-03T00:13:13.797Z","parcours":"Permissions","nom":"[API lecture] gerant → plateforme_admins aucune ligne","statut":"PASS","detail":"lignes=0 permission denied for table plateforme_admins"}
+{"ts":"2026-10-03T00:13:13.800Z","parcours":"Permissions","nom":"[API lecture] salarie → plateforme_admins aucune ligne","statut":"PASS","detail":"lignes=0 permission denied for table plateforme_admins"}
+{"ts":"2026-10-03T00:13:13.806Z","parcours":"Permissions","nom":"[API lecture] salarié → coût/taux horaire des collègues masqués","statut":"FAIL","detail":"collègues avec coût visible=4/5"}
+{"ts":"2026-10-03T00:13:13.823Z","parcours":"Permissions","nom":"[API lecture] salarié → pointages des collègues invisibles","statut":"PASS","detail":"pointages visibles=5 dont collègues=0"}
+{"ts":"2026-10-03T00:13:13.830Z","parcours":"Permissions","nom":"[API écriture] escalade: salarié se met au poste Gérant → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.837Z","parcours":"Permissions","nom":"[API écriture] escalade: salarié s'ajoute gerer_utilisateurs → refusé","statut":"PASS","detail":"new row violates row-level security policy \"role_gestion_insert\" for table \"permissions_poste\""}
+{"ts":"2026-10-03T00:13:13.843Z","parcours":"Permissions","nom":"[API écriture] escalade: RPC enregistrer_permissions_poste → refusé","statut":"PASS","detail":"Accès refusé"}
+{"ts":"2026-10-03T00:13:13.850Z","parcours":"Permissions","nom":"[API écriture] salarié modifie le SIRET de l'entreprise → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.856Z","parcours":"Permissions","nom":"[API écriture] salarié crée un client → refusé","statut":"PASS","detail":"new row violates row-level security policy \"role_gestion_insert\" for table \"clients\""}
+{"ts":"2026-10-03T00:13:13.869Z","parcours":"Permissions","nom":"[API écriture] salarié crée un pointage au nom d'un collègue → refusé","statut":"PASS","detail":"new row violates row-level security policy \"role_gestion_insert\" for table \"pointages\""}
+{"ts":"2026-10-03T00:13:13.875Z","parcours":"Permissions","nom":"[API écriture] salarié valide son propre pointage → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.881Z","parcours":"Permissions","nom":"[API écriture] salarié modifie ses heures déjà validées → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.887Z","parcours":"Permissions","nom":"[API écriture] salarié modifie son coût horaire → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.894Z","parcours":"Permissions","nom":"[API écriture] limité crée un client (lecture seule) → refusé","statut":"PASS","detail":"new row violates row-level security policy \"role_gestion_insert\" for table \"clients\""}
+{"ts":"2026-10-03T00:13:13.900Z","parcours":"Permissions","nom":"[API écriture] limité modifie un chantier → refusé","statut":"PASS","detail":"lignes renvoyées=0"}
+{"ts":"2026-10-03T00:13:13.920Z","parcours":"Permissions","nom":"[API écriture] comptable modifie les droits d'un poste → refusé","statut":"PASS","detail":"Accès refusé"}
+{"ts":"2026-10-03T00:13:13.929Z","parcours":"Permissions","nom":"[API écriture] comptable modifie le montant d'une facture émise → refusé","statut":"PASS","detail":"Facture FAC-2026-001 émise : numéro, client, date et montants ne sont plus modifiables (émettez un avoir)"}
+{"ts":"2026-10-03T00:13:13.937Z","parcours":"Permissions","nom":"[API écriture] gérant modifie directement le total d'une facture émise (API) → refusé","statut":"PASS","detail":"Facture FAC-2026-001 émise : numéro, client, date et montants ne sont plus modifiables (émettez un avoir)"}
+{"ts":"2026-10-03T00:13:13.979Z","parcours":"Permissions","nom":"[API écriture] gérant modifie une ligne d'un devis accepté (API) → refusé","statut":"PASS","detail":"Seules les lignes d'un devis brouillon sont modifiables"}
+{"ts":"2026-10-03T00:13:13.986Z","parcours":"Permissions","nom":"[API écriture] gérant renumérote une facture émise (API) → refusé","statut":"PASS","detail":"Facture FAC-2026-001 émise : numéro, client, date et montants ne sont plus modifiables (émettez un avoir)"}
+{"ts":"2026-10-03T00:13:14.226Z","parcours":"Permissions","nom":"[multi-tenant] seconde entreprise : aucune donnée d'ALSACE TEST BTP visible ni modifiable","statut":"PASS","detail":"lectures={\"clients\":0,\"chantiers\":0,\"devis\":0,\"factures\":0,\"employes\":0,\"pointages\":0,\"paiements\":0,\"coordonnees_bancaires\":0,\"documents_chantier\":0} maj=0 rpc=Accès refusé droitsGérant=98"}
+{"ts":"2026-10-03T00:13:14.251Z","parcours":"Permissions","nom":"[anonyme] clé anon sans session : aucune donnée métier","statut":"PASS","detail":"{\"clients\":\"refus\",\"devis\":\"refus\",\"factures\":\"refus\",\"employes\":\"refus\",\"entreprises\":\"refus\",\"compteurs_reference\":\"refus\",\"coordonnees_bancaires\":\"refus\"} maj compteurs=refusée"}
