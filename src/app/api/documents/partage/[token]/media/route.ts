@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cheminStockageSur } from "@/lib/storage-path";
 
 // Sert les photos/signatures affichées sur un document commercial partagé
 // (/document/[token], /imprimer/partage/[token]) : ces pages n'ont pas de
@@ -28,9 +29,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     return NextResponse.json({ error: "Lien invalide, expiré, ou média introuvable" }, { status: 404 });
   }
 
+  const media = data as { bucket: string; storage_path: string };
+  // Chemin lu en base (colonne alimentée par le tenant) : aucune traversée `..`
+  // ne doit atteindre un autre bucket ou un autre tenant via la signature service_role.
+  if (!cheminStockageSur(media.storage_path)) {
+    return NextResponse.json({ error: "Lien invalide, expiré, ou média introuvable" }, { status: 404 });
+  }
   const { data: signee, error: erreurSignature } = await admin.storage
-    .from((data as { bucket: string; storage_path: string }).bucket)
-    .createSignedUrl((data as { bucket: string; storage_path: string }).storage_path, 300);
+    .from(media.bucket)
+    .createSignedUrl(media.storage_path, 300);
   if (erreurSignature || !signee?.signedUrl) {
     return NextResponse.json({ error: "Le fichier ne peut pas être ouvert" }, { status: 503 });
   }

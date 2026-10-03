@@ -33,7 +33,11 @@ export const config = {
   // les exclure évite un aller-retour d'authentification vers Supabase pour
   // chacun. Le manuel (9,7 Mo) et les vidéos (20 Mo) le payaient à chaque
   // téléchargement.
+  // L'exclusion par extension ne vaut que pour un fichier À LA RACINE
+  // (`[^/]+`) : `.*\.png$` exemptait aussi `/<route dynamique>/<x>.png`, donc
+  // une page rendue sans CSP ni contrôles du proxy. Les dossiers statiques
+  // imbriqués de public/ sont listés nommément.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|guides/|videos/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|mp3|wav|vtt|pdf|woff|woff2|ttf|txt)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|guides/|videos/|icons/|demo/|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|mp3|wav|vtt|pdf|woff|woff2|ttf|txt)$).*)",
   ],
 };

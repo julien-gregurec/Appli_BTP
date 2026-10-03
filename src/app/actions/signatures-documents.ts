@@ -13,6 +13,7 @@ import {
   serialiserDocumentStable,
   type TypeDocumentSignature,
 } from "@/lib/signatures-documents";
+import { cheminStockageSur } from "@/lib/storage-path";
 
 type DocumentCharge = { document: Record<string, unknown>; lignes?: Record<string, unknown>[] };
 
@@ -99,7 +100,8 @@ export async function signerDocumentMetierAction(typeBrut: string, documentId: s
   // pointer sa ligne vers le fichier d'un autre employé — voire d'un autre tenant
   // dont il connaîtrait le chemin (REDTEAM-V2, confused deputy Storage).
   const prefixeAttendu = `${ctx.entrepriseId}/${employe.id}/`;
-  if (!employe.signature_storage_path?.startsWith(prefixeAttendu)) {
+  // `startsWith` seul ne suffit pas : `prefixe/../../autre/…` est résolu par fetch.
+  if (!cheminStockageSur(employe.signature_storage_path, prefixeAttendu)) {
     redirect(`${retour}?error=${encodeURIComponent("La signature enregistrée est indisponible")}`);
   }
   const { data: fichier, error: lectureErreur } = await admin.storage

@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { endpointPushAutorise } from "@/lib/push-endpoint";
 
 export type PayloadPush = { titre: string; message: string | null; lien: string | null; niveau: string };
 
@@ -25,6 +26,9 @@ export async function envoyerNotificationPush(
   abonnement: { endpoint: string; p256dh: string; auth: string },
   payload: PayloadPush,
 ): Promise<{ ok: true } | { ok: false; abonnementExpire: boolean; erreur: string }> {
+  // Revérifié à l'envoi : une ligne écrite directement (PostgREST) n'est pas passée par
+  // l'action d'enregistrement. Hôte hors liste → abonnement traité comme mort (nettoyé).
+  if (!endpointPushAutorise(abonnement.endpoint)) return { ok: false, abonnementExpire: true, erreur: "Endpoint push hors liste autorisée" };
   garantirConfiguration();
   try {
     await webpush.sendNotification(

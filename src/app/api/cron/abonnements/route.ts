@@ -6,6 +6,7 @@ import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
 import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
 import { rapprocherAbonnementsStripe } from "@/lib/stripe-abonnement-rapprochement";
 import { creerPortPurgeSupabase, lireConfigPlanificateurPurge, planifierPurgesRgpd } from "@/lib/rgpd-purge-planificateur";
+import { autorisationCronValide } from "@/lib/security/cron-auth";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -148,7 +149,7 @@ export async function GET(request: Request) {
   }
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
+  if (!autorisationCronValide(request.headers.get("authorization"), secret)) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
 
   const admin = createAdminClient();
 

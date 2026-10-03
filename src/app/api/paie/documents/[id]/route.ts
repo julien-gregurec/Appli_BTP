@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { detecterMimeReel } from "@/lib/expenses/files";
 import { sha256 } from "@/lib/expenses/integrity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +23,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
   const admin = createAdminClient();
   await admin.from("journal_audit_paie").insert({ entreprise_id: ctx.entrepriseId, periode_id: null, dossier_id: piece.dossier_id, utilisateur_id: ctx.userId, action: "telechargement_piece", ressource_type: "piece_jointe_paie", ressource_id: piece.id, nouvelle_valeur: { empreinte } });
-  const telecharger = new URL(request.url).searchParams.get("download") === "1";
+  // Type servi re-détecté sur les octets, jamais `piece.mime_type` (colonne libre,
+  // modifiable par un gestionnaire de paie) : contenu non reconnu → téléchargement opaque.
+  const mime = detecterMimeReel(contenu);
+  const telecharger = !mime || new URL(request.url).searchParams.get("download") === "1";
   const body = contenu.buffer.slice(contenu.byteOffset, contenu.byteOffset + contenu.byteLength) as ArrayBuffer;
-  return new Response(body, { headers: { "Content-Type": piece.mime_type, "Content-Disposition": `${telecharger ? "attachment" : "inline"}; filename="document"; filename*=UTF-8''${encodeURIComponent(piece.nom_original)}`, "Cache-Control": "private, no-store", "X-Content-SHA256": empreinte } });
+  return new Response(body, { headers: { "Content-Type": mime ?? "application/octet-stream", "X-Content-Type-Options": "nosniff", "Content-Disposition": `${telecharger ? "attachment" : "inline"}; filename="document"; filename*=UTF-8''${encodeURIComponent(piece.nom_original)}`, "Cache-Control": "private, no-store", "X-Content-SHA256": empreinte } });
 }

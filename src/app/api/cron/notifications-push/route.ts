@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traiterNotificationPush, type IssueTraitementPush } from "@/lib/push";
 import { cronsSontActifs } from "@/lib/preview-features";
+import { autorisationCronValide } from "@/lib/security/cron-auth";
 
 // Filet de secours : le webhook Supabase (POST /api/webhooks/notifications-push, déclenché en
 // temps réel sur chaque insertion) est le chemin normal. Ce cron rattrape toute notification
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   if (!cronsSontActifs()) return NextResponse.json({ error: "Tâches planifiées désactivées" }, { status: 404 });
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
+  if (!autorisationCronValide(request.headers.get("authorization"), secret)) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
 
   const admin = createAdminClient();
   const debut = Date.now();

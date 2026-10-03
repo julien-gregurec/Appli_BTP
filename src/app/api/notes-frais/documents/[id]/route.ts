@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { verifierEmpreinte } from "@/lib/expenses/integrity";
+import { detecterMimeReel } from "@/lib/expenses/files";
 import { ajouterAudit, journaliserAccesRefuse } from "@/lib/expenses/audit";
 
 export const runtime = "nodejs";
@@ -43,11 +44,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ressourceId: version.id,
     empreinteDocument: version.empreinte_sha256,
   });
-  const telecharger = new URL(request.url).searchParams.get("download") === "1";
+  // Type servi re-détecté sur les octets, jamais lu en base : `type_mime_detecte` est une
+  // colonne libre qu'un employé peut renseigner lui-même (« text/html » servi inline sur
+  // l'origine GP). Contenu non reconnu → téléchargement opaque.
+  const mime = detecterMimeReel(bytes);
+  const telecharger = !mime || new URL(request.url).searchParams.get("download") === "1";
   const nom=version.nom_fichier_original.replace(/[\r\n"]/g,"_");
   const contenu=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
   return new NextResponse(contenu,{headers:{
-    "Content-Type":version.type_mime_detecte||"application/octet-stream",
+    "Content-Type":mime??"application/octet-stream",
     "Content-Length":String(bytes.byteLength),
     "Cache-Control":"private, no-store",
     "Content-Disposition":`${telecharger?"attachment":"inline"}; filename="justificatif"; filename*=UTF-8''${encodeURIComponent(nom)}`,

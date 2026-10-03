@@ -933,7 +933,14 @@ export function formatQuantiteOuvrage(milli: bigint | number | null, unite: Ouvr
 
 // ── Exports : CSV et contrat Gestion Pro ──────────────────────────────────────
 
-const csvCell = (value: string) => (/[;"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+// Injection de formule (Excel / LibreOffice) : une cellule TEXTE commençant par = + - @
+// tabulation ou retour chariot est neutralisée par une apostrophe de tête, puis citée.
+// Les nombres au format d'échange (« -1,25 », « 1 250,5 ») restent tels quels.
+const NOMBRE_CSV = /^-?\d[\d\u00a0\u202f ]*(?:,\d+)?$/;
+const csvCell = (value: string) => {
+  if (/^[=+\-@\t\r]/.test(value) && !NOMBRE_CSV.test(value)) return `"'${value.replace(/"/g, '""')}"`;
+  return /[;"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+};
 const csvNumber = (milli: bigint | null) => (milli === null ? "" : milliText(milli).replace(".", ","));
 
 export const QUANTITATIF_CSV_COLUMNS = [

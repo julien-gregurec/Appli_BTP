@@ -62,5 +62,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw-reserves.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2)$).*)"],
+  // Extension exemptée seulement à la racine (`[^/]+`) : `.*\.png$` exemptait aussi
+  // `/<route dynamique>/<x>.png`, rendue alors sans CSP ni contrôles du proxy.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw-reserves.js|[^/]+\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2)$).*)"],
 };

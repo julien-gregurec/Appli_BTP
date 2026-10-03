@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { BRAND } from "@/lib/brand";
 import { genererPdfDepuisUrl, nomFichierPdf, reponseErreurPdf } from "@/lib/pdf/generer";
+import { urlImpressionInterne } from "@/lib/pdf/url-impression";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,10 +21,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: devis } = await supabase.from("devis").select("numero").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!devis) return NextResponse.json({ error: "Devis introuvable" }, { status: 404 });
 
-  const url = new URL(`/imprimer/devis/${id}`, request.url);
+  // Origine configurée, jamais `request.url` (dérivée de l'en-tête Host) : cf. urlImpressionInterne.
+  const url = urlImpressionInterne(`/imprimer/devis/${encodeURIComponent(id)}`, BRAND.urlPublique);
+  if (!url) return NextResponse.json({ error: "Génération du PDF indisponible" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"), { signal: request.signal });
+    pdf = await genererPdfDepuisUrl(url, request.headers.get("cookie"), { signal: request.signal });
   } catch (erreur) {
     // File saturée → 503 (Retry-After), délai → 504 ; sinon statut historique.
     return reponseErreurPdf(erreur, 502, "Génération du PDF impossible");

@@ -5,11 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { TYPES_NOTIFICATIONS } from "@/lib/notifications-registre";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { endpointPushAutorise } from "@/lib/push-endpoint";
 
 export async function enregistrerAbonnementPushAction(abonnement: { endpoint: string; p256dh: string; auth: string; appareil?: string }): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!abonnement.endpoint || !abonnement.p256dh || !abonnement.auth) return { error: "Abonnement push invalide." };
+  if (!endpointPushAutorise(abonnement.endpoint)) return { error: "Service de notifications push non reconnu." };
   const { error } = await supabase.from("push_abonnements").upsert(
     { entreprise_id: ctx.entrepriseId, utilisateur_id: ctx.userId, endpoint: abonnement.endpoint, p256dh: abonnement.p256dh, auth: abonnement.auth, appareil: abonnement.appareil ?? null },
     { onConflict: "endpoint" },

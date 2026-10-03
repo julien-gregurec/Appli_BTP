@@ -77,11 +77,13 @@ export async function connexionAction(formData: FormData) {
     .maybeSingle();
   if (erreurContexte) {
     journaliserEchecTechnique("connexion.contexte", erreurContexte);
-    await supabase.auth.signOut();
+    // Portée locale : un refus d'accès à CETTE application ne révoque pas les sessions
+    // de la personne dans les autres applications ELSATIA ni sur ses autres appareils.
+    await supabase.auth.signOut({ scope: "local" });
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (!contexte) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
   }
 
@@ -92,7 +94,7 @@ export async function connexionAction(formData: FormData) {
   });
   if (erreurAcces) {
     journaliserEchecTechnique("connexion.acces", erreurAcces);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (autorise === true) redirect(destination);
@@ -100,7 +102,7 @@ export async function connexionAction(formData: FormData) {
   // Une authentification valide ne doit jamais être présentée comme un échec
   // de mot de passe. On ferme néanmoins la session non autorisée avant de
   // revenir au formulaire avec le message produit attendu.
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
 }
 

@@ -822,7 +822,14 @@ function exchangeText(value: number | null, kind: MetreLigne["kind"]): string {
   return toExchangeText(value, kind, kind === "longueur" ? 2 : kind === "surface" ? 2 : 3);
 }
 
-const csvCell = (value: string) => (/[;"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+// Injection de formule (Excel / LibreOffice) : une cellule TEXTE commençant par = + - @
+// tabulation ou retour chariot est neutralisée par une apostrophe de tête, puis citée.
+// Les nombres au format d'échange (« -1,25 », « 1 250,5 ») restent tels quels.
+const NOMBRE_CSV = /^-?\d[\d\u00a0\u202f ]*(?:,\d+)?$/;
+const csvCell = (value: string) => {
+  if (/^[=+\-@\t\r]/.test(value) && !NOMBRE_CSV.test(value)) return `"'${value.replace(/"/g, '""')}"`;
+  return /[;"\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+};
 
 export const METRE_CSV_COLUMNS = ["Chantier", "Bâtiment", "Étage", "Zone", "Pièce", "Désignation", "Quantité", "Unité", "Quantité avec perte", "Valeur calculée", "Ajustée", "Raison", "État projeté"] as const;
 

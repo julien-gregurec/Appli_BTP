@@ -44,7 +44,7 @@ export type OptionsXlsx = {
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const FORMULE_DANGEREUSE = /^[=+\-@]/;
+const FORMULE_DANGEREUSE = /^[=+\-@\t\r]/;
 
 function lettreColonne(index: number) {
   let resultat = "";

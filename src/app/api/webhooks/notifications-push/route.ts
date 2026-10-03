@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traiterNotificationPush } from "@/lib/push";
+import { secretsEgaux } from "@/lib/security/cron-auth";
 
 // Cible d'un Supabase Database Webhook (Dashboard > Database > Webhooks) déclenché sur
 // INSERT dans notifications_utilisateurs : livraison quasi temps réel, dès qu'une
@@ -11,7 +12,7 @@ type PayloadWebhookSupabase = { type: string; table: string; record?: { id?: str
 export async function POST(request: Request) {
   const secret = process.env.NOTIFICATIONS_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ error: "NOTIFICATIONS_WEBHOOK_SECRET absent" }, { status: 503 });
-  if (request.headers.get("x-notifications-secret") !== secret) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
+  if (!secretsEgaux(request.headers.get("x-notifications-secret"), secret)) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
 
   const payload = (await request.json().catch(() => null)) as PayloadWebhookSupabase | null;
   if (!payload || payload.table !== "notifications_utilisateurs" || payload.type !== "INSERT" || !payload.record?.id) {

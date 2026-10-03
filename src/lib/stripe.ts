@@ -58,7 +58,8 @@ export function verifierSignatureStripe(payload: string, signature: string | nul
   const morceaux = signature.split(",");
   const horodatage = morceaux.find(v => v.startsWith("t="))?.slice(2);
   const signatures = morceaux.filter(v => v.startsWith("v1=")).map(v => v.slice(3));
-  if (!horodatage || Math.abs(Date.now() / 1000 - Number(horodatage)) > 300) return false;
+  // `t=` non numérique → NaN, qui passait la tolérance (NaN > 300 est faux) : refusé explicitement.
+  if (!horodatage || !Number.isFinite(Number(horodatage)) || Math.abs(Date.now() / 1000 - Number(horodatage)) > 300) return false;
   const attendu = createHmac("sha256", secret).update(`${horodatage}.${payload}`, "utf8").digest("hex");
   const attenduBuffer = Buffer.from(attendu, "hex");
   return signatures.some(valeur => {

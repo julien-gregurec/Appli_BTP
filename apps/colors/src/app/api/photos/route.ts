@@ -66,7 +66,11 @@ export async function POST(request: Request) {
     return NextResponse.json({erreur:"Association de la photo impossible"},{status:400});
   }
   let nettoyageRequis=false;let nettoyageSuivi=true;
-  if(seau.photo_principale_path&&seau.photo_principale_path!==chemin){
+  // L'ancien chemin est lu en base (colonne écrite à l'INSERT par le client) : la
+  // suppression service_role n'est tentée que sous le préfixe de CE seau, sans traversée.
+  const prefixeSeau=`${contexte.entrepriseId}/${seauId}/`;
+  const ancienCheminSur=(p:string)=>p.startsWith(prefixeSeau)&&!/[\\%\u0000-\u001f]/.test(p)&&!p.split("/").some((s)=>s===""||s==="."||s==="..");
+  if(seau.photo_principale_path&&seau.photo_principale_path!==chemin&&ancienCheminSur(seau.photo_principale_path)){
     const ancienChemin=seau.photo_principale_path;
     const {error:erreurSuivi}=await supabase.rpc("colors_signaler_nettoyage_photo",{p_seau_id:seauId,p_photo_path:ancienChemin,p_erreur:null});
     nettoyageSuivi=!erreurSuivi;

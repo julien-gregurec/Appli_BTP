@@ -107,9 +107,9 @@ export async function updateSession(request: NextRequest) {
                                 "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health",
                                 // API de facturation Tools : appelée depuis l'origine Tools avec un jeton Bearer (vérifié par
                                 // authenticatedToolsUser) ou par Stripe (signature vérifiée par la route) — jamais par cookie.
-                                // Barre finale : le test par préfixe ci-dessous n'a pas de frontière de segment.
+                                // Barre finale : préfixe pur ; sans barre, le test exige une frontière de segment.
                                 "/api/tools/monetization/"];
-  if (estAccueil || CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
+  if (estAccueil || CHEMINS_SANS_SESSION.some((c) => (c.endsWith("/") ? request.nextUrl.pathname.startsWith(c) : request.nextUrl.pathname === c || request.nextUrl.pathname.startsWith(c + "/")))) {
     return response;
   }
 

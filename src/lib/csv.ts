@@ -1,6 +1,6 @@
 function celluleTexte(value: unknown) {
   let texte = value == null ? "" : String(value);
-  if (/^[=+\-@]/.test(texte)) texte = `'${texte}`;
+  if (/^[=+\-@\t\r]/.test(texte)) texte = `'${texte}`;
   return `"${texte.replaceAll('"', '""')}"`;
 }
 export function nombreCsv(value: unknown) { const nombre = Number(value ?? 0); return Number.isFinite(nombre) ? nombre.toFixed(2).replace(".", ",") : "0,00"; }

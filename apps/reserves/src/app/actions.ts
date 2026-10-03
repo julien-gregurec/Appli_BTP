@@ -75,7 +75,9 @@ export async function connexionAction(formData: FormData) {
     .rpc("contexte_application_courant")
     .maybeSingle();
   if (erreurContexte || !contexte) {
-    await supabase.auth.signOut();
+    // Portée locale : un refus d'accès à CETTE application ne révoque pas les sessions
+    // de la personne dans les autres applications ELSATIA ni sur ses autres appareils.
+    await supabase.auth.signOut({ scope: "local" });
     redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
   }
 
@@ -85,7 +87,7 @@ export async function connexionAction(formData: FormData) {
     p_application_code: "reserves",
   });
   if (erreurAcces) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
   }
   if (autorise === true) redirect(destination);
@@ -110,7 +112,7 @@ export async function connexionAction(formData: FormData) {
   // Sinon, l'authentification est valide mais l'accès ne l'est pas. On ne présente
   // jamais cela comme un mot de passe erroné : la session est fermée et le message dit
   // la vraie raison.
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
 }
 
