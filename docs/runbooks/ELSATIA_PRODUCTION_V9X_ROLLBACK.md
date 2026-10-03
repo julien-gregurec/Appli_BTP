@@ -45,7 +45,7 @@ révoqués / supprimés). Le détail par migration est dans le plan qualifié `s
 
 | Volume (lignes / table critique) | Sans pont v2 | Avec pont v2 |
 |---|---|---|
-| 500 | 19 s | ~15 s |
+| 500 | 19 s | 18–19 s (le coût fixe domine à ce volume) |
 | 20 000 | 85 s (dont `300` : 65 s) | — |
 | 100 000 | **1 287 s** (dont `300` : 1 266 s sous ACCESS EXCLUSIVE devis / factures / lignes) | **23 s** (`300` : 3,6 s, lignes seulement) |
 
