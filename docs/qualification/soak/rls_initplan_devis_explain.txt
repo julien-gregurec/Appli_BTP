@@ -1,0 +1,93 @@
+Timing is on.
+BEGIN
+Time: 0.153 ms
+SET
+Time: 0.081 ms
+ ?column? 
+----------
+ t
+(1 row)
+
+Time: 0.376 ms
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Limit (actual time=6.711..848.320 rows=1000 loops=1)
+   ->  Index Scan using devis_entreprise_created_idx on devis (actual time=6.710..847.900 rows=1000 loops=1)
+         Index Cond: (entreprise_id = 'e0000000-0000-4000-e000-000000000014'::uuid)
+         Filter: (a_permission(entreprise_id, 'acces_devis'::text) AND est_membre_actif(entreprise_id))
+ Planning Time: 1.139 ms
+ Execution Time: 848.534 ms
+(6 rows)
+
+Time: 851.166 ms
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
+ Limit (actual time=3115.937..3115.937 rows=0 loops=1)
+   ->  Index Only Scan using devis_client_created_idx on devis (actual time=3115.935..3115.936 rows=0 loops=1)
+         Index Cond: (entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid)
+         Filter: (a_permission(entreprise_id, 'acces_devis'::text) AND est_membre_actif(entreprise_id))
+         Rows Removed by Filter: 5012
+         Heap Fetches: 0
+ Planning Time: 0.100 ms
+ Execution Time: 3115.950 ms
+(8 rows)
+
+Time: 3116.437 ms (00:03.116)
+RESET
+Time: 0.186 ms
+CREATE FUNCTION
+Time: 0.845 ms
+CREATE FUNCTION
+Time: 0.200 ms
+GRANT
+Time: 0.298 ms
+ALTER POLICY
+Time: 0.676 ms
+ALTER POLICY
+Time: 0.588 ms
+SET
+Time: 0.072 ms
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Limit (actual time=2.037..7.155 rows=1000 loops=1)
+   ->  Index Scan using devis_entreprise_created_idx on devis (actual time=2.035..7.056 rows=1000 loops=1)
+         Index Cond: (entreprise_id = 'e0000000-0000-4000-e000-000000000014'::uuid)
+         Filter: ((hashed SubPlan 1) AND (hashed SubPlan 2))
+         SubPlan 1
+           ->  ProjectSet (actual time=1.363..1.375 rows=1 loops=1)
+                 ->  Result (actual time=0.000..0.001 rows=1 loops=1)
+         SubPlan 2
+           ->  ProjectSet (actual time=0.588..0.625 rows=1 loops=1)
+                 ->  Result (actual time=0.000..0.001 rows=1 loops=1)
+ Planning Time: 0.175 ms
+ Execution Time: 7.255 ms
+(12 rows)
+
+Time: 7.734 ms
+                                               QUERY PLAN                                                
+---------------------------------------------------------------------------------------------------------
+ Limit (actual time=2.056..2.057 rows=0 loops=1)
+   ->  Index Only Scan using devis_client_created_idx on devis (actual time=2.055..2.056 rows=0 loops=1)
+         Index Cond: (entreprise_id = 'a0000000-0000-4000-a000-000000000001'::uuid)
+         Filter: ((hashed SubPlan 1) AND (hashed SubPlan 2))
+         Rows Removed by Filter: 5012
+         Heap Fetches: 0
+         SubPlan 1
+           ->  ProjectSet (actual time=1.211..1.225 rows=1 loops=1)
+                 ->  Result (actual time=0.000..0.001 rows=1 loops=1)
+         SubPlan 2
+           ->  ProjectSet (never executed)
+                 ->  Result (never executed)
+ Planning Time: 0.082 ms
+ Execution Time: 2.078 ms
+(14 rows)
+
+Time: 2.349 ms
+ lignes_visibles_sans_filtre 
+-----------------------------
+                       50000
+(1 row)
+
+Time: 10.994 ms
+ROLLBACK
+Time: 0.232 ms
