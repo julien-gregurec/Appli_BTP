@@ -120,7 +120,7 @@ async function lireDocumentService(
   return (data as (Record<string, unknown> & HistoriqueService) | null) ?? null;
 }
 
-// Sélection des candidats (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003000201) : le
+// Sélection des candidats (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003001502, ex-20261003000201 du lot perf) : le
 // plafond porte sur les documents POTENTIELLEMENT éligibles, les plus dus d'abord — 200 documents
 // définitivement inéligibles ne peuvent plus évincer une facture saine. Même sélection SQL pour le
 // cron (RPC de service) et la simulation (RPC SECURITY INVOKER, sous la RLS de la session).

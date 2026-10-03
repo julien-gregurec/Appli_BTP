@@ -19,7 +19,7 @@ select no_plan();
 
 -- ── Données propres au lot (propriétaire, avant tout changement de rôle) ──────────────
 update public.clients set email = 'client-a@invalid.local' where id = 'a3000000-0000-0000-0000-000000000001';
--- Depuis 20261003000201 (PERFORMANCE HARDENING V9.1, P1-B), la sélection ne rend que les
+-- Depuis 20261003001502 (PERFORMANCE HARDENING V9.1, P1-B), la sélection ne rend que les
 -- documents potentiellement éligibles : facture témoin échue (celle de la fixture n'a pas
 -- d'échéance et n'a jamais été relançable par le moteur).
 insert into public.factures(id, entreprise_id, numero, client_id, chantier_id, statut, date_echeance,

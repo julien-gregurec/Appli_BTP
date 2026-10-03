@@ -1,5 +1,5 @@
 -- ELSATIA PERFORMANCE HARDENING V9.1 — P1-C : contre-épreuves de sécurité de la RLS
--- « ensemble d'entreprises autorisées » (migration 20261003000301).
+-- « ensemble d'entreprises autorisées » (migration 20261003001503, ex-20261003000301 du lot perf).
 --
 -- GÉNÉRÉ par scripts/perf/hardening/rls/generer_test_equivalence.py — ne pas éditer à la main.
 --

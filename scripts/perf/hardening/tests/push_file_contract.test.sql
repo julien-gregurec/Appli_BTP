@@ -5,7 +5,7 @@
 --     push_notifications_en_attente_service(now - 25 h, 200), chaque id marqué ;
 --     une notification « poison » (préparation en échec) reste en attente (le code
 --     historique sort sans marquer) ;
---   * après (migration 20261003000101) : passage = nouvelle route : lots
+--   * après (migration 20261003001501, ex-20261003000101 du lot perf) : passage = nouvelle route : lots
 --     push_reserver_lot_service(100, 25) jusqu'à file vide (ou budget simulé),
 --     chaque id marqué ; un poison appelle push_echec_notification_service.
 -- Le temps est simulé en DÉCALANT les données vers le passé (created_at, bail,

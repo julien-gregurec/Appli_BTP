@@ -47,7 +47,7 @@ export async function envoyerNotificationPush(
 // ACL canonique (migration 255) : le client service_role ne lit ni n'écrit plus en direct les
 // notifications, préférences et abonnements push ; tout passe par des RPC de service.
 //
-// File durable (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003000101) : une notification
+// File durable (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003001501, ex-20261003000101 du lot perf) : une notification
 // n'est traitée que sous réservation (bail). Le cron réserve ses lots lui-même
 // (push_reserver_lot_service) ; le webhook réserve la sienne ici. Deux workers ne tiennent donc
 // jamais la même notification en même temps (plus de double push cron/cron ni cron/webhook).

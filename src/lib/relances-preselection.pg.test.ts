@@ -11,7 +11,7 @@ import { PARAMETRES_RELANCES_DEFAUT, type ParametresRelances } from "./relances"
 // relances_auto_candidats_service. Aucun mock de règle : seul le transport RPC est remplacé par
 // une lecture psql des mêmes fonctions de service.
 //
-// Actif seulement si HARDENING_PG_DB désigne une base migrée (≥ 20261003000201) jetable :
+// Actif seulement si HARDENING_PG_DB désigne une base migrée (≥ 20261003001502) jetable :
 //   HARDENING_PG_DB=<base> npx vitest run src/lib/relances-preselection.pg.test.ts
 const BASE = process.env.HARDENING_PG_DB;
 // Entreprise neuve à chaque exécution : la population ne s'accumule pas d'un passage à l'autre.

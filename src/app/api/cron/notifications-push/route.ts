@@ -7,7 +7,7 @@ import { cronsSontActifs } from "@/lib/preview-features";
 // temps réel sur chaque insertion) est le chemin normal. Ce cron rattrape toute notification
 // qui n'aurait pas été poussée (webhook non configuré, panne temporaire...).
 //
-// File durable (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003000101) : plus de fenêtre
+// File durable (ELSATIA PERFORMANCE HARDENING V9.1, migration 20261003001501, ex-20261003000101 du lot perf) : plus de fenêtre
 // glissante de 25 h ni de lot unique de 200. Le cron réserve des lots bornés et équitables entre
 // tenants (push_reserver_lot_service : bail + FOR UPDATE SKIP LOCKED) et boucle jusqu'à ce que la
 // file soit vide ou que son budget de temps soit consommé ; ce qui reste est repris au passage

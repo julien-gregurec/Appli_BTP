@@ -1,6 +1,6 @@
 -- ELSATIA PERFORMANCE HARDENING V9.1 — P1-B : contrat de sélection des relances automatiques.
 -- Même fichier avant (V9.1 @ 24a0c2e9 : RED attendu) et après la migration
--- 20261003000201 (GREEN attendu). Appelle uniquement relances_auto_candidats_service
+-- 20261003001502 (GREEN attendu). Appelle uniquement relances_auto_candidats_service
 -- (signature inchangée), comme le cron.
 -- Base : migrations + scripts/perf/generate_fixture.sql.
 --   su postgres -c "pg_prove -d <base> scripts/perf/hardening/tests/relances_auto_contract.test.sql"

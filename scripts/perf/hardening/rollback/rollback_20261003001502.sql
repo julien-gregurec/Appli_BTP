@@ -1,4 +1,4 @@
--- Retour arrière de 20261003000201_relances_auto_candidats_eligibles_v1 (revenir d'abord au code applicatif précédent).
+-- Retour arrière de 20261003001502_relances_auto_candidats_eligibles_v1 (revenir d'abord au code applicatif précédent).
 begin;
 -- Corps V9.1 (20261002001301, section A2) :
 create or replace function public.relances_auto_candidats_service(

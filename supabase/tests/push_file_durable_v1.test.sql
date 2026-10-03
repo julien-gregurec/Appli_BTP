@@ -1,5 +1,5 @@
 -- ELSATIA PERFORMANCE HARDENING V9.1 — P1-A : file durable des notifications push
--- (migration 20261003000101). Témoin : ROUGE sur V9.1 (fonctions absentes), VERT après.
+-- (migration 20261003001501, ex-20261003000101 du lot perf). Témoin : ROUGE sur V9.1 (fonctions absentes), VERT après.
 -- Contrat complet (50 → 10 000, budget, jours sans cron) :
 --   scripts/perf/hardening/tests/push_file_contract.test.sql
 begin;

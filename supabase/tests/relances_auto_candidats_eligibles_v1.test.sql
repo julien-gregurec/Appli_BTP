@@ -1,5 +1,5 @@
 -- ELSATIA PERFORMANCE HARDENING V9.1 — P1-B : sélection des candidats de relance automatique
--- (migration 20261003000201). Témoin : ROUGE sur V9.1 (famine), VERT après.
+-- (migration 20261003001502, ex-20261003000201 du lot perf). Témoin : ROUGE sur V9.1 (famine), VERT après.
 -- Contrat complet (dates, fournisseur indisponible, replay, 10 000 factures) :
 --   scripts/perf/hardening/tests/relances_auto_contract.test.sql
 begin;
