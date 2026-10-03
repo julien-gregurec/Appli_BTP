@@ -13,6 +13,13 @@ for (const u of [BASE, DB_URL]) {
 }
 fs.mkdirSync(OUT, { recursive: true });
 
+// Clé publique « anon » de la base locale : lue dans l'environnement ou .env.local, jamais en dur.
+export const SUPABASE_URL = process.env.RECETTE_SUPABASE_URL ?? "http://127.0.0.1:54321";
+export const SUPABASE_ANON = process.env.RECETTE_SUPABASE_ANON_KEY ?? (() => {
+  try { return fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf8").match(/^NEXT_PUBLIC_SUPABASE_ANON_KEY=(.+)$/m)?.[1]?.trim(); } catch { return undefined; }
+})();
+if (!/127\.0\.0\.1|localhost/.test(SUPABASE_URL)) throw new Error(`Recette refusée : Supabase non local ${SUPABASE_URL}`);
+
 export const MDP = "Recette!Alsace2026";
 export const COMPTES = {
   gerant: { email: "gerant@alsace-test-btp.test", prenom: "Gérard", nom: "Muller", modele: "gerant" },

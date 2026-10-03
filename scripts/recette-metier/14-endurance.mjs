@@ -2,13 +2,12 @@
 // sous l'identité des utilisateurs (RLS, RPC et déclencheurs identiques à l'application),
 // puis contrôle des invariants pour détecter toute dérive.
 import { createClient } from "@supabase/supabase-js";
-import { check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, r2, eq2 } from "./lib.mjs";
+import { check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, r2, eq2, SUPABASE_ANON } from "./lib.mjs";
 import { totauxAttendus } from "./devis-helpers.mjs";
 const P = "Endurance";
 const CYCLES = Number(process.env.CYCLES ?? 3);
 const eid = await entrepriseId();
-const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-const sess = async (role) => { const sb = createClient("http://127.0.0.1:54321", ANON, { auth: { persistSession: false } }); const { error } = await sb.auth.signInWithPassword({ email: COMPTES[role].email, password: MDP }); if (error) throw error; return sb; };
+const sess = async (role) => { const sb = createClient("http://127.0.0.1:54321", SUPABASE_ANON, { auth: { persistSession: false } }); const { error } = await sb.auth.signInWithPassword({ email: COMPTES[role].email, password: MDP }); if (error) throw error; return sb; };
 const g = await sess("gerant"), sal = await sess("salarie"), chef = await sess("chef");
 const clients = (await q("select id from clients where entreprise_id=$1 and (nom is not null or societe is not null) order by created_at", [eid])).map((x) => x.id);
 let seed = 42; const alea = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;

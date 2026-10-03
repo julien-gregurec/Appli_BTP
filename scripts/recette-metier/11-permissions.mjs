@@ -1,11 +1,10 @@
 // Matrice fonction × rôle : (A) accès aux écrans par rôle, (B) sondes API/RLS avec le jeton de chaque utilisateur.
 import { createClient } from "@supabase/supabase-js";
-import { contexte, check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, OUT } from "./lib.mjs";
+import { contexte, check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, OUT, SUPABASE_ANON } from "./lib.mjs";
 import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES } from "../../src/lib/module-permissions.ts";
 import fs from "node:fs";
 const P = "Permissions";
 const URL_SB = "http://127.0.0.1:54321";
-const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 const eid = await entrepriseId();
 const { chantierId } = JSON.parse(fs.readFileSync(`${OUT}/etat-chantier.json`, "utf8"));
 const etatF = JSON.parse(fs.readFileSync(`${OUT}/etat-factures.json`, "utf8"));
@@ -104,7 +103,7 @@ fs.writeFileSync(`${OUT}/matrice-ecrans.json`, JSON.stringify(matrice, null, 1))
 // (B) Sondes API/RLS directes avec le jeton de chaque utilisateur.
 const clients = {};
 for (const role of Object.keys(COMPTES)) {
-  const sb = createClient(URL_SB, ANON, { auth: { persistSession: false } });
+  const sb = createClient(URL_SB, SUPABASE_ANON, { auth: { persistSession: false } });
   const { error } = await sb.auth.signInWithPassword({ email: COMPTES[role].email, password: MDP });
   if (error) console.log("connexion", role, error.message); clients[role] = sb;
 }
@@ -168,7 +167,7 @@ for (const [role, nom, action, verif] of ecritures) {
 // Cloisonnement inter-entreprises : un second tenant créé à la volée.
 await check(P, "[multi-tenant] seconde entreprise : aucune donnée d'ALSACE TEST BTP visible ni modifiable", async () => {
   const email = "intrus@autre-entreprise.test";
-  const sb = createClient(URL_SB, ANON, { auth: { persistSession: false } });
+  const sb = createClient(URL_SB, SUPABASE_ANON, { auth: { persistSession: false } });
   let { error } = await sb.auth.signInWithPassword({ email, password: MDP });
   if (error) { await sb.auth.signUp({ email, password: MDP, options: { data: { nom: "Intrus", prenom: "Ivan" } } }); await sb.rpc("creer_entreprise_bootstrap", { p_nom: "AUTRE ENTREPRISE TEST" }); }
   const res = {};
@@ -182,7 +181,7 @@ await check(P, "[multi-tenant] seconde entreprise : aucune donnée d'ALSACE TEST
   return { ok: fuites.length === 0 && (maj?.length ?? 0) === 0 && n > 50, detail: `lectures=${JSON.stringify(res)} maj=${maj?.length ?? 0} rpc=${e2?.message ?? "ok?"} droitsGérant=${n}` };
 });
 await check(P, "[anonyme] clé anon sans session : aucune donnée métier", async () => {
-  const sb = createClient(URL_SB, ANON, { auth: { persistSession: false } }); const res = {};
+  const sb = createClient(URL_SB, SUPABASE_ANON, { auth: { persistSession: false } }); const res = {};
   for (const t of ["clients", "devis", "factures", "employes", "entreprises", "compteurs_reference", "coordonnees_bancaires"]) { const { data, error } = await sb.from(t).select("*").limit(3); res[t] = data?.length ?? (error ? "refus" : 0); }
   const { error } = await sb.from("compteurs_reference").update({ dernier_numero: 0 }).neq("type", "x");
   return { ok: Object.values(res).every((v) => v === 0 || v === "refus") && !!error, detail: `${JSON.stringify(res)} maj compteurs=${error ? "refusée" : "ACCEPTÉE"}` };

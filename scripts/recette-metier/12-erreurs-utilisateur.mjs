@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { contexte, check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, OUT, surveiller } from "./lib.mjs";
+import { contexte, check, q, q1, fermer, record, entrepriseId, COMPTES, MDP, OUT, surveiller, SUPABASE_ANON } from "./lib.mjs";
 import { remplirDevis } from "./devis-helpers.mjs";
 import fs from "node:fs";
 const P = "Erreurs utilisateur";
@@ -74,7 +74,7 @@ await check(P, "Montant négatif : budget prévisionnel de chantier", async () =
 });
 
 // Suppressions liées via l'API (jeton du gérant).
-const sb = createClient("http://127.0.0.1:54321", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0", { auth: { persistSession: false } });
+const sb = createClient("http://127.0.0.1:54321", SUPABASE_ANON, { auth: { persistSession: false } });
 await sb.auth.signInWithPassword({ email: COMPTES.gerant.email, password: MDP });
 const suppressions = [
   ["client ayant devis et factures", () => sb.from("clients").delete().eq("societe", "SCI DES VOSGES TEST").select(), async () => !!(await q1("select 1 x from clients where societe='SCI DES VOSGES TEST'"))],
