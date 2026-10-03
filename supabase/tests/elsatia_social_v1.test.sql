@@ -8,7 +8,7 @@
 --   6. Verrou anti-doublon, quotas, journal en ajout seul, bucket privé.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(64);
+select plan(66);
 
 -- ─── Fixtures ─────────────────────────────────────────────────────────
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at) values
@@ -66,6 +66,8 @@ select ok(has_function_privilege('authenticated', 'public.social_session_courant
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'social\_%' and has_function_privilege('anon', p.oid, 'execute')), 0, 'anon : aucune fonction Social exécutable');
 select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'social\_%' and p.prosecdef and not coalesce(array_to_string(p.proconfig, ',') ilike '%search_path=%', false)), 0, 'toute fonction SECURITY DEFINER fixe son search_path');
 select ok((select not public from storage.buckets where id = 'social-medias'), 'bucket social-medias privé');
+select is((select count(*)::int from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname like 'social\_%' and t.tgname = 'incident_garde_ecriture'), 16, 'mode sûr incident : garde posée sur les 16 tables Social');
+select is(public.incident_application_table('social_publications'), 'gestion_pro', 'mode sûr incident : Social relève de Gestion Pro');
 
 -- ─── 2. Identité canonique ────────────────────────────────────────────
 select is(public.social_role_de('c0000000-0000-4000-8000-000000000001'), 'administrateur', 'plateforme « total » actif -> Administrateur par défaut');

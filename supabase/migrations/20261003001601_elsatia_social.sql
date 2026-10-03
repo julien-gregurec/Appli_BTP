@@ -733,4 +733,9 @@ grant execute on function public.social_role_de(uuid) to service_role;
 revoke all on function public.social_touch_updated_at() from public, anon, authenticated;
 revoke all on function public.social_audit_ajout_seul() from public, anon, authenticated;
 
+-- Nouvelles tables : garde du mode sûr incident (règle de 20260928000807_incident_safe_mode_v1).
+-- Les tables social_* relèvent de l'application « gestion_pro » : le mode lecture seule
+-- ou la coupure de l'application gèlent aussi ELSATIA Social, publication comprise.
+select public.incident_installer_gardes();
+
 notify pgrst, 'reload schema';

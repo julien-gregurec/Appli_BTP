@@ -10,11 +10,13 @@ Workflow V1 imposé : **Brouillon → Prévisualisation → Validation humaine �
 
 Partout ailleurs (local, prévisualisation, variable absente), le bandeau « MODE SIMULATION — aucune publication réelle ne sera envoyée » s'affiche sur chaque page. Une publication réelle est aussi refusée tant que le logo officiel ELSATIA est absent.
 
-Recette : `docs/ELSATIA_SOCIAL_RECETTE.md`. Identité visuelle : `docs/ELSATIA_IDENTITE.md`.
+Recette : `docs/ELSATIA_SOCIAL_RECETTE.md`. Pré-production (ledger Preview, Meta, LinkedIn) : `docs/ELSATIA_SOCIAL_PREPRODUCTION.md`. Identité visuelle : `docs/ELSATIA_IDENTITE.md`. Suppression des données : page publique `/suppression-donnees`.
+
+**Train canonique.** Depuis le 3 octobre 2026, le module est intégré au train canonique V9.2 (branche `integration/elsatia-social-v1`, migration `20261003001601_elsatia_social.sql`). Il suit le modèle d'administration du train : `auth.uid()` → `plateforme_admins.utilisateur_id` → `actif`, et la politique MFA/AAL2.
 
 ## 1. Architecture
 
-Le module réutilise la pile existante : Next.js 16, Supabase, l'équipe plateforme (`plateforme_admins`), le fournisseur IA (`ProviderIA` de `src/lib/ai/provider.ts`), le cron Vercel, `sharp` et les liens de téléversement signés. Aucune architecture parallèle n'a été créée.
+Le module réutilise la pile existante : Next.js 16, Supabase, l'équipe plateforme (`plateforme_admins`, identité par UID, garde AAL2 du train), le fournisseur IA (`ProviderIA` de `src/lib/ai/provider.ts`), le cron Vercel, `sharp` et les liens de téléversement signés. Aucune architecture parallèle n'a été créée.
 
 ```
 UI (src/app/(app)/plateforme/social/*)  ──►  actions serveur (src/app/actions/social.ts)
@@ -43,7 +45,7 @@ UI (src/app/(app)/plateforme/social/*)  ──►  actions serveur (src/app/acti
 
 | Zone | Fichiers |
 |---|---|
-| Migration | `supabase/migrations/20261003000184_elsatia_social.sql` |
+| Migration | `supabase/migrations/20261003001601_elsatia_social.sql` (ex-`20261003000184`, réhorodatée sur le train V9.2) |
 | Domaine | `src/lib/social/{types,roles,config,crypto,http,provider,contenu,empreinte,meta,linkedin,securite,acces,audit,comptes,publication,workflow,identite,ia,synchronisation,taches,medias,temps,webhook-reception}.ts` |
 | Actions serveur | `src/app/actions/social.ts` |
 | API | `src/app/api/social/oauth/[fournisseur]/route.ts`, `.../callback/route.ts`, `src/app/api/social/webhooks/{meta,linkedin}/route.ts`, `src/app/api/social/cron/route.ts`, `src/app/api/social/medias/preparer/route.ts` |
@@ -52,11 +54,11 @@ UI (src/app/(app)/plateforme/social/*)  ──►  actions serveur (src/app/acti
 | Modifiés | `src/components/Sidebar.tsx` (menu), `src/app/(app)/plateforme/page.tsx` (lien), `src/lib/supabase/proxy.ts` (webhooks et cron sans session), `src/app/api/cron/abonnements/route.ts` (rattrapage quotidien), `.env.local.example` |
 | Tests | `src/lib/social.test.ts` (30 tests) |
 
-## 3. Base de données (migration 184)
+## 3. Base de données (migration 20261003001601)
 
 | Table | Rôle |
 |---|---|
-| `social_membres` | Rôle social par membre plateforme. Par défaut, « Accès total » donne Administrateur et les autres membres sont en Lecture seule. |
+| `social_membres` | Rôle social par **UID** d'administrateur plateforme actif. Par défaut, le rôle plateforme `total` donne Administrateur et les autres rôles (`support`, `facturation`, `lecture`) donnent Lecture seule. Une identité inactive, en attente ou révoquée n'a aucun rôle. |
 | `social_parametres` | `automatisation_active`, `false` par défaut et sans effet en V1. |
 | `social_comptes` | Un compte actif par réseau : statut, permissions, expiration du jeton, de l'accès aux données et du renouvellement. |
 | `social_identifiants` | Jetons chiffrés AES-256-GCM. **Aucune policy** : seul `service_role` y accède. |
@@ -68,11 +70,11 @@ UI (src/app/(app)/plateforme/social/*)  ──►  actions serveur (src/app/acti
 | `social_commentaires`, `social_messages` | Boîte de réception avec brouillons de réponse (IA ou humain) et trace de l'envoi validé. |
 | `social_webhook_evenements` | Idempotence (empreinte du corps), reprise, puis statut `abandonne` (file des échecs) après 5 essais. |
 | `social_quotas` | Limitation de débit : OAuth, IA, publications, réponses, synchronisations, téléversements. |
-| `social_audit` | Journal **en ajout seul** (trigger) : utilisateur, action, date, réseau, publication, avant et après. |
+| `social_audit` | Journal **en ajout seul** (trigger et privilèges : ni UPDATE, ni DELETE, ni TRUNCATE, même pour `service_role`) : UID (`acteur_id`) et email de l'utilisateur, action, date, réseau, publication, avant et après. |
 
 Garde-fous en base, testés sur PostgreSQL 16 :
 - une publication est toujours créée en idée ou en brouillon ;
-- une validation ne peut venir que d'un Administrateur ou d'un Validateur (trigger) ;
+- une validation ne peut venir que d'un Administrateur ou d'un Validateur, **sous sa propre session AAL2** (trigger : `auth.uid()` = `approuve_par_id` et claim `aal2`) ; le `service_role` seul ne peut jamais poser une validation ;
 - un statut validé, programmé ou publié exige une approbation (contrainte CHECK) ;
 - une modification après soumission ou validation renvoie en brouillon ;
 - le contenu d'une publication envoyée est verrouillé ;
@@ -94,6 +96,13 @@ Garde-fous en base, testés sur PostgreSQL 16 :
 | Comptes, jetons, équipe | ✓ | | | | |
 
 Le mode prototype sans connexion (`DISABLE_EMAIL_LOGIN=true`) n'a **pas** accès au module.
+
+### Sécurité : modèle canonique du train
+
+- **Entrée** : le layout `/plateforme` impose déjà `est_plateforme_admin()` et AAL2 (`exigerAal2Plateforme`). Le module ne crée pas de second système d'authentification : `social_membres` ne fait que spécialiser les droits fonctionnels (rédaction / validation) au sein de l'équipe plateforme active.
+- **Garde serveur unique** `exigerSocial(action)` (`src/lib/social/acces.ts`) : rôle et niveau AAL lus par la RPC `social_session_courante()` dans le JWT vérifié ; **toute** action et route Social exige AAL2 (connexion/déconnexion de comptes, configuration, validation, publication, réponses, rôles, révocations OAuth, rédaction).
+- **AAL2 en base** pour les mutations exécutées sous le JWT de l'utilisateur : `social_definir_role()` et `social_valider_publication()` appellent `plateforme_exiger_session_aal2()`, vérifient le rôle et journalisent dans la même transaction.
+- Quotas, état OAuth anti-CSRF et connexions OAuth en attente sont liés à l'**UID**, jamais à l'email.
 
 ## 5. Variables d'environnement (Vercel, jamais dans Git)
 
@@ -141,19 +150,14 @@ Chaque appel serveur porte un `appsecret_proof`. Activer **« Exiger la clé sec
    - Le jeton dure 60 jours.
    - Les jetons de renouvellement (365 jours) ne sont accordés qu'aux partenaires approuvés. Sans eux, il faut **se reconnecter tous les 60 jours**. Une alerte apparaît dans le journal 10 jours avant l'échéance.
 
-## 8. Déploiement de la migration 184
+## 8. Déploiement de la migration Social
 
-1. **Vérifier la cible**. Ouvrir l'éditeur SQL du projet Supabase et contrôler son nom (production ou test). Exécuter `supabase/production/verifier_elsatia_social.sql` : la section 2 (prérequis) doit valoir `true` partout, avec `aucune_collision_avant = true`.
-2. **Ledger**. La section 1 indique la dernière migration enregistrée, qui doit être `20260729000183`. La 184 est la suivante dans l'ordre.
-   - Si les migrations passent par `supabase db push`, le ledger est mis à jour automatiquement.
-   - Si elles passent par l'éditeur SQL, ajouter ensuite `insert into supabase_migrations.schema_migrations(version, name) values ('20261003000184', 'elsatia_social');`
-3. **Appliquer** `supabase/migrations/20261003000184_elsatia_social.sql`, puis relancer `verifier_elsatia_social.sql`. Résultats attendus :
-   - 16 tables avec RLS ;
-   - côté `authenticated`, uniquement des `SELECT` ;
-   - côté `anon`, rien ;
-   - le bucket `social-medias` privé ;
-   - les membres « total » en Administrateur.
-4. **En cas d'échec à mi-parcours**, ou pour retirer le module avant toute donnée réelle, exécuter `supabase/production/retour_arriere_elsatia_social.sql`. Le bucket est conservé (Supabase interdit sa suppression en SQL). Le cycle retour arrière + réapplication a été testé.
+La procédure exacte, fondée sur le ledger réel de Preview, est dans `docs/ELSATIA_SOCIAL_PREPRODUCTION.md`. En résumé :
+
+1. **Vérifier la cible** et exécuter `supabase/production/verifier_elsatia_social.sql` (sections 1 et 2) : train V9.2 présent (`20261003001504`), migration Social absente, ancienne `20261003000184` absente, prérequis canoniques présents.
+2. **Appliquer** le train puis `20261003001601_elsatia_social.sql` avec `supabase db push` (migrations en attente uniquement, jamais `--include-all`).
+3. **Contrôler** avec `verifier_elsatia_social.sql` : 16 tables avec RLS, `authenticated` limité à `SELECT`, `anon` à rien, bucket `social-medias` privé, rôles par défaut sur les identités actives.
+4. **Retour arrière** (avant toute donnée réelle) : `supabase/production/retour_arriere_elsatia_social.sql`. Cycle application → retour arrière → réapplication testé sur le train complet.
 
 ## 8 bis. Assistant de configuration et diagnostic
 

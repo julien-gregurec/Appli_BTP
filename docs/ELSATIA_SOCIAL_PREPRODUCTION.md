@@ -1,185 +1,180 @@
-# ELSATIA Social : dossier de pré-production (3 octobre 2026)
+# ELSATIA Social : dossier de pré-production sur le train canonique V9.2
 
-> Aucune action distante n'a été effectuée : aucune migration appliquée, aucun déploiement, aucune variable Vercel lue ni écrite. Les environnements distants n'étaient **pas accessibles** depuis la session (aucun jeton Vercel ni Supabase). Leur état est donc **inconnu**, et rien n'est déduit de la documentation historique.
+_Mis à jour le 3 octobre 2026, après intégration au train (branche `integration/elsatia-social-v1`)._
 
-## 1. Ledger des migrations : faits vérifiés dans Git
+> **Rien n'a été déployé ni appliqué à distance.** Les seules opérations distantes sont des **lectures** (GET) via les API Supabase et Vercel du projet Preview, le 3 octobre 2026 à 16:43 UTC : liste des migrations appliquées, noms des variables (jamais les valeurs), domaines. Aucun ancien document n'est considéré comme une preuve de l'état actuel de Preview ou de Production.
 
-| Ligne | Fichiers | Dernière version | Remarque |
-|---|---|---|---|
-| `main` (`4f71317`) | 178 | `20260729000183_medias_devis` | Base de la branche ELSATIA Social |
-| `claude/nice-shannon-2506yt` (cette branche) | **179** | `20261003000184_elsatia_social` | `main` + la migration Social |
-| `integration/elsatia-canonical-train-v9.2` (`dfb59cc`) | **408** | `20261003001504_taches_chantier_created_idx_v1` | Ligne canonique préparée pour Preview |
-
-Dans cette branche :
-- `20261003000184_elsatia_social.sql` se trouve dans `supabase/migrations/` ;
-- les 179 noms et horodatages sont uniques, aucun doublon ;
-- les numéros de suffixe 28, 87, 88, 133 et 163 n'ont **jamais existé dans l'historique Git** : la numérotation a des trous, sans fichier perdu ni ignoré ;
-- les 179 fichiers sont applicables à la suite : rejoués sur Supabase Postgres 17 local sans erreur.
-
-**Écart 179 / 180.** Il y a 179 fichiers. Le chiffre 180 était une erreur de ma part, dans un message d'avancement (« j'applique les 180 migrations »), avant comptage. Tous les comptages outillés (`npm run verify:migrations`, boucle d'application) ont toujours donné 179.
-
-**Écart beaucoup plus important : `main` n'est pas la ligne canonique.**
-- 391 branches distantes portent environ 395 migrations absentes de `main`.
-- Le train canonique V9.2 contient 408 migrations. `main` n'est pas un de ses ancêtres.
-- Ledgers observés **selon la documentation du train** (non vérifiés ici) : Preview à 372 versions (fixture `ledger-socle-v8-ok.json`), Production à 210 versions au 1er septembre 2026. Ce sont des indications, pas des faits.
-
-## 2. Blocage : intégrer ELSATIA Social au train canonique
-
-La migration 184 et le code Social sont construits sur `main`. En l'état, ils **ne peuvent pas** partir en Preview :
-
-1. **Ordre.** `20261003000184` est antérieure à des versions déjà présentes dans le train (jusqu'à `20261003001504`). `supabase db push` la refuserait, ou exigerait `--include-all`, que le train interdit. Il faut la réhorodater **après** la dernière version du train, par exemple `20261003001601_elsatia_social.sql`.
-2. **Modèle d'administration plateforme.** Dans le train (migrations 202, 235 à 238), l'autorisation passe par `plateforme_admins.utilisateur_id = auth.uid()` et `actif`, plus par l'email. `social_role_de` et `social_role_courant` doivent suivre ce modèle. La clé `email` et le rôle `total` existent toujours.
-3. **AAL2.** Le train impose l'authentification forte (MFA) aux mutations plateforme sensibles. Il faut l'appliquer aussi à valider, publier, envoyer une réponse, connecter ou révoquer un compte et gérer l'équipe Social.
-4. **Registre des variables.** Ajouter les variables Social à `config/env-manifest.json` (inventaire Preview généré).
-5. **Re-qualification sur le train.** Rejouer les 408 + 1 migrations, puis les suites SQL/RLS du train, les 141 tests Social et le parcours navigateur.
-
-Une fusion du train dans cette branche a été **refusée par le garde-fou de la session**. Le choix de la ligne d'intégration te revient (§ 8).
-
-## 3. Procédure Preview, puis Production (à exécuter après le § 2)
-
-### Preview
-
-1. **Cible.** Dans le tableau de bord Supabase, noter le nom et la référence du projet Preview. Vérifier que `NEXT_PUBLIC_SUPABASE_URL` du déploiement Preview Vercel pointe sur cette référence et **pas** sur Production.
-2. **Prérequis.** Exécuter `supabase/production/verifier_elsatia_social.sql` (sections 1 et 2). Résultats attendus :
-   - `aucune_collision_avant = true` ;
-   - `plateforme_admins` et `storage.buckets` présents.
-3. **Ledger.** `select version from supabase_migrations.schema_migrations order by version desc limit 5;` La dernière version doit être celle du train qui précède la migration Social. Sinon, **stop** : appliquer d'abord le train avec sa propre procédure.
-4. **Application.** `supabase db push` sur le projet Preview lié : uniquement les migrations en attente, jamais `--include-all`.
-5. **Contrôles post-migration.** Relancer `verifier_elsatia_social.sql`. Résultats attendus :
-   - 16 tables, toutes avec RLS ;
-   - `authenticated` limité à `SELECT`, `anon` à rien ;
-   - triggers présents ;
-   - bucket `social-medias` privé.
-6. **RLS par rôle** (requêtes PostgREST de la recette, `docs/ELSATIA_SOCIAL_RECETTE.md` § 3) :
-
-   | Rôle | Attendu |
-   |---|---|
-   | `service_role` | Écrit. Verrou pris une seule fois. Journal non modifiable. |
-   | Utilisateur authentifié | Lecture seule. Jetons inaccessibles. |
-   | Anonyme | Tout refusé. |
-
-7. **Application Social contre la vraie base.**
-   - Bandeau MODE SIMULATION visible ; page Configuration sans contrôle bloquant ;
-   - connexion OAuth des comptes ELSATIA, diagnostic lecture seule réussi ;
-   - parcours brouillon → IA → aperçus → validation → simulation.
-8. **Non-régression.** Suites du train (SQL/RLS, Vitest, Playwright Preview), connexion, tableau de bord, facturation, et applications satellites Tools, Colors et Réserves sur la même base.
-
-### Production
-
-Uniquement après qualification de Preview, une sauvegarde vérifiable et ton accord explicite. Mêmes étapes 1 à 8 sur le projet Production, en fenêtre annoncée. Retour arrière éventuel : `supabase/production/retour_arriere_elsatia_social.sql`, avant toute donnée réelle seulement. Ensuite, migration corrective.
-
-## 4. Secrets : présence ou absence, jamais les valeurs
-
-| Variable | Local (session) | Preview | Production |
-|---|---|---|---|
-| `SOCIAL_TOKEN_ENCRYPTION_KEY` | absente | inconnu | inconnu |
-| `META_APP_ID` | absente | inconnu | inconnu |
-| `META_APP_SECRET` | absente | inconnu | inconnu |
-| `META_WEBHOOK_VERIFY_TOKEN` | absente | inconnu | inconnu |
-| `LINKEDIN_CLIENT_ID` | absente | inconnu | inconnu |
-| `LINKEDIN_CLIENT_SECRET` | absente | inconnu | inconnu |
-| `CRON_SECRET` | absente | inconnu | inconnu (absent lors d'un audit noté le 18/07/2026, à revérifier) |
-| `SOCIAL_DRY_RUN` | absente (donc simulation) | inconnu | inconnu |
-
-Le fichier `.env.local` de recette, qui contenait des valeurs factices, a été supprimé.
-
-Pour vérifier Preview et Production sans afficher de valeur : `npx vercel env ls preview` puis `npx vercel env ls production`, qui listent les noms uniquement. La page `/plateforme/social/configuration` du déploiement fait le même contrôle côté serveur.
-
-`SOCIAL_DRY_RUN=false` :
-- n'a d'effet qu'avec `VERCEL_ENV=production` (vérifié par le code) ;
-- ne doit être posé qu'en Production, après ton accord ;
-- en Preview, ne jamais le définir.
-
-## 5. Meta : prêt à configurer
+## 1. Ligne d'intégration
 
 | Élément | Valeur |
 |---|---|
-| Type d'application | Business, rattachée au portefeuille Meta Business ELSATIA. Produit **Facebook Login for Business**. |
-| URI de redirection OAuth (Production) | `https://app.elsatia.fr/api/social/oauth/meta/callback` |
-| URI de redirection OAuth (Preview) | `https://<domaine Preview>/api/social/oauth/meta/callback`. Le domaine Preview n'est pas établi : à confirmer. |
-| URL de rappel Webhooks | `https://app.elsatia.fr/api/social/webhooks/meta`, avec le jeton `META_WEBHOOK_VERIFY_TOKEN` |
-| Événements webhook | Objet **Page** : `feed`, `messages`. Objet **Instagram** : `comments`, `messages`. |
-| Domaines de l'application | `app.elsatia.fr` |
-| Paramètres de sécurité | « Exiger la clé secrète » **activé** (le code envoie `appsecret_proof`). Mode strict des URI de redirection activé. HTTPS imposé. |
-| Version Graph API | `v26.0` (variable `META_GRAPH_API_VERSION`) |
+| Train canonique de départ | `integration/elsatia-canonical-train-v9.2`, HEAD `dfb59cc61e45991165ef5dd8af04f1934ae28ab7` (408 migrations, dernière `20261003001504`) |
+| Branche d'intégration Social | `integration/elsatia-social-v1`, créée depuis ce HEAD |
+| Méthode | Report contrôlé des fichiers Social (commits `7c595ae5`, `b3b0f98a`, `22c270d7` de `claude/nice-shannon-2506yt`), sans fusion de l'ancien `main` |
+| Migration Social | `20261003001601_elsatia_social.sql` (ex-`20261003000184`) |
+| Train obtenu | **409 migrations**, dernière `20261003001601`, noms et horodatages uniques (`npm run verify:migrations`) |
 
-**Permissions Facebook :**
-- `pages_show_list`, `pages_read_engagement`, `pages_manage_posts` ;
-- `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata` ;
-- `read_insights`, `business_management` ;
-- `pages_messaging` (facultatif en V1).
+Vérification de non-collision faite immédiatement avant le choix de l'horodatage : aucune migration `≥ 20261003001505` n'existe sur le train ni sur aucune des branches distantes.
 
-**Permissions Instagram :**
-- `instagram_basic`, `instagram_content_publish` ;
-- `instagram_manage_comments`, `instagram_manage_insights` ;
-- `instagram_manage_messages` (facultatif, exige une entreprise vérifiée).
+## 2. Ledger réel de la base Preview (lecture du 03/10/2026, 16:43 UTC)
 
-**Configuration Facebook Login for Business :**
-- type de jeton « User access token » ;
-- actifs : la Page ELSATIA et son compte Instagram ;
-- permissions : la liste ci-dessus ;
-- reporter l'identifiant obtenu dans `META_LOGIN_CONFIG_ID` (facultatif : sans lui, le code envoie la liste de permissions).
+Projet Supabase Preview `pgvvpqyjziyapbbkydmc`. Export brut : `docs/qualification/elsatia-social/preview_ledger_pgvvpqyjziyapbbkydmc_2026-10-03.json`.
 
-**Procédure de test :**
-1. « Tester l'application Meta » dans Configuration, qui vérifie la paire identifiant / secret ;
-2. Comptes › Connecter via Meta, puis choisir la Page ELSATIA ;
-3. vérifier le diagnostic automatique : identité, ID, permissions par ressource, expiration ;
-4. « Activer les webhooks » ;
-5. commenter une publication existante depuis un compte personnel, puis vérifier sa réception dans Commentaires.
-
-Aucune écriture tant que la simulation est active.
-
-**Passage en Live :**
-- [ ] l'administrateur de l'application est un administrateur de la Page ELSATIA (Accès standard suffisant, sans App Review) ;
-- [ ] URL de politique de confidentialité : `https://app.elsatia.fr/confidentialite` ;
-- [ ] URL des conditions : `https://app.elsatia.fr/cgu` ;
-- [ ] URL d'instructions de suppression des données (obligatoire) : à fournir, par exemple une section dédiée de la page de confidentialité ;
-- [ ] icône de l'application 1024 × 1024 : **elle nécessite le logo officiel** ;
-- [ ] catégorie de l'application et adresse e-mail de contact ;
-- [ ] vérification d'entreprise, si la messagerie Instagram est voulue ;
-- [ ] basculer l'application en **Live** : en mode Développement, les webhooks réels ne sont pas livrés.
-
-## 6. LinkedIn : prêt à demander
-
-| Élément | Valeur |
+| Mesure | Valeur |
 |---|---|
-| Application | **Dédiée**, rattachée à la Page ELSATIA et vérifiée par un administrateur de la Page. La Community Management API doit être le seul produit de l'application. |
-| URL de redirection (Production) | `https://app.elsatia.fr/api/social/oauth/linkedin/callback` |
-| URL de redirection (Preview) | `https://<domaine Preview>/api/social/oauth/linkedin/callback` |
-| Webhook | `https://app.elsatia.fr/api/social/webhooks/linkedin`. Le défi `challengeCode` et la signature `X-LI-Signature` sont gérés par le code. |
-| Scopes | `w_organization_social`, `r_organization_social`, `rw_organization_admin` |
-| Version d'API | `202609` (variable `LINKEDIN_API_VERSION`) |
+| Versions appliquées sur Preview | **372** |
+| Dernière version appliquée | `20261002000813` |
+| Versions de Preview absentes du train | **0** |
+| Même version, nom différent | **0** |
+| Migrations en attente (train V9.2 + Social) | **37** : 36 du train (`20261002000901` → `20261003001504`) + `20261003001601_elsatia_social` |
+| En attente mais antérieures à la dernière version Preview | **0** (aucun `--include-all` nécessaire) |
 
-**Éligibilité à vérifier :**
-- entité juridique enregistrée (ELSATIA) ;
-- Page Entreprise existante, avec un administrateur qui demande l'accès ;
-- site et politique de confidentialité publics ;
-- cas d'usage : gestion de la Page de l'entreprise elle-même.
+Analyse par l'outil canonique du train : `node scripts/preview/v9/check-ledger-v9.mjs <export> --expect pre --attendu-courant 372` → `PREVIEW_LEDGER_PREFIX_OK`, `PENDING_MIGRATIONS=37`. Réserve de l'outil : « contenu de 813 non prouvé par ce fichier (version et nom seulement) » ; la preuve de contenu exige une lecture SQL (`--require-813-proof` avec `ELSATIA_PREVIEW_DB_URL`).
 
-**Demande d'accès :**
-1. sur linkedin.com/developers, créer l'application, associer la Page ELSATIA, puis faire vérifier l'association par un administrateur de la Page ;
-2. onglet *Products*, demander **Community Management API** : formulaire avec entité juridique, site, description du cas d'usage ;
-3. palier Development d'abord. Le palier Standard se demande dans les 12 mois, avec une vidéo de démonstration par cas d'usage ;
-4. après approbation, ajouter l'URL de redirection dans l'onglet *Auth* et vérifier que les trois scopes apparaissent ;
-5. dans ELSATIA Social : Comptes › Connecter (LinkedIn), puis diagnostic. La page Configuration indique « accès confirmé » dès que `w_organization_social` est accordé.
+**Ce ledger doit être relu juste avant toute application** : il peut avoir changé depuis.
 
-En attendant l'approbation, tout le reste avance sans LinkedIn : Meta, migration, Preview. LinkedIn se branche ensuite sans changement de code.
+## 3. Variables Vercel Preview et Production (noms seulement, 03/10/2026)
 
-## 7. Réception du logo officiel
+| Variable | Preview (`elsatia-preview`) | Production (`elsatia-production`) |
+|---|---|---|
+| `SOCIAL_TOKEN_ENCRYPTION_KEY` | absente | absente |
+| `SOCIAL_DRY_RUN` | absente (donc simulation) | absente (donc simulation) |
+| `META_APP_ID`, `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN` | absentes | absentes |
+| `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` | absentes | absentes |
+| `CRON_SECRET` | **absente** | présente |
+| `SUPPORT_EMAIL` | **absente** (la page `/suppression-donnees` afficherait « — ») | présente |
+| `NEXT_PUBLIC_APP_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `FEATURE_CRONS_ENABLED` | présentes | — |
 
-Fichiers attendus, conformément à ta consigne : `public/elsatia/logo-officiel.svg`, `public/elsatia/symbole.svg`, `public/elsatia/logo-officiel-blanc.svg`.
+Domaines : Preview `elsatia-preview.vercel.app` ; Production Gestion Pro `app.elsatia.fr` (et `elsatia-production.vercel.app`).
 
-À réception :
-1. `npm run elsatia:logo` : contrôle, génération et couleurs dominantes ;
-2. contrôle visuel des 9 déclinaisons ;
-3. palette recalée dans `src/lib/elsatia/marque.ts` et `--elsatia-*` ;
-4. vérification des favicons, du PWA, de l'Open Graph et des aperçus Social ;
-5. retrait de toute identité provisoire.
+## 4. Plan exact de déploiement Preview (à exécuter uniquement sur ton accord)
 
-Doublon à arbitrer : la branche non fusionnée `claude/adoring-volta-3jk98y` (« Branding ELSATIA V2 ») prévoit une autre convention, `public/branding/source/elsatia-logo-primary.svg` avec `npm run branding:icones`. Il faudra n'en garder qu'une.
+Pré-requis : accord explicite ; mot de passe base Preview (`SUPABASE_DB_PASSWORD`) et URL en lecture (`ELSATIA_PREVIEW_DB_URL`) fournis à l'opérateur, jamais dans Git.
 
-## 8. Décision attendue
+1. **Relire le ledger réel** (lecture seule) et le comparer : `node scripts/preview/v9/check-ledger-v9.mjs <export> --expect pre --attendu-courant 372 --require-813-proof`. Si le nombre n'est plus 372 ou si le préfixe diverge : **arrêt**, nouvelle analyse.
+2. **Sauvegarde déclarée** de la base Preview selon `docs/runbooks/ELSATIA_V9_PREVIEW_BACKUP_AND_RESTORE.md` (`npm run preview:v9:backup-manifest`, puis `preview:v9:backup-check`).
+3. **Train V9.2 d'abord, seul** : depuis un worktree propre au HEAD `dfb59cc` du train, `scripts/preview/v9/v9-cutover.sh --out <dossier hors dépôt> --backup-manifest <manifeste>` en dry-run, puis avec `--apply-preview --confirm-ref pgvvpqyjziyapbbkydmc`. Attendu : 36 migrations, ledger 408, dernière `20261003001504`, DB verify et contrôles V9 au vert. Ainsi, un incident du train ne se mélange pas à Social.
+4. **Contrôles avant Social** : `supabase/production/verifier_elsatia_social.sql` sections 1 et 2 → `train_v92_present = true`, `migration_social_enregistree = false`, `ancienne_migration_184_presente = false`, prérequis canoniques `true`, `aucune_collision_avant = true`.
+5. **Social ensuite** : depuis la branche `integration/elsatia-social-v1`, même script en dry-run puis application. Attendu : `PENDING_MIGRATIONS=1` (`20261003001601`), ledger **409**.
+6. **Contrôles après Social** : `verifier_elsatia_social.sql` sections 3 à 7 → 16 tables avec RLS ; `authenticated` = `SELECT` seul, jamais sur `social_identifiants`, `social_connexions_en_attente`, `social_quotas` ; `anon` = rien ; bucket `social-medias` privé ; rôle Administrateur pour les identités `total` actives.
+7. **Variables Preview** (valeurs propres à Preview, jamais copiées de Production) : `SOCIAL_TOKEN_ENCRYPTION_KEY` (`openssl rand -hex 32`), `SOCIAL_DRY_RUN=true` (exigé par le manifeste), `SUPPORT_EMAIL`, et `CRON_SECRET` si `/api/social/cron` doit être appelé. Meta/LinkedIn seulement quand les applications existent (§ 5 et § 6). Puis `npm run preflight:env` sur la cible Preview (mode `enforce`).
+8. **Déploiement du code** de `integration/elsatia-social-v1` sur `elsatia-preview` (porte `npm run preview:v9:code-gate`).
+9. **Requalification Preview** : connexion d'un administrateur plateforme, challenge MFA, accès `/plateforme/social`, bandeau MODE SIMULATION, page Configuration, parcours brouillon → validation → publication **simulée** ; `/suppression-donnees` accessible sans session ; non-régression Gestion Pro (connexion, tableau de bord, facturation) et satellites Colors, Tools, Réserves sur la même base.
+10. **Retour arrière** si besoin, avant toute donnée réelle : `supabase/production/retour_arriere_elsatia_social.sql` (retire Social seul, laisse le train intact ; testé localement).
 
-Sur quelle ligne intégrer ELSATIA Social ?
-- **Option recommandée** : intégrer au train canonique (`integration/elsatia-canonical-train-v9.2` ou son successeur) avec les adaptations du § 2. C'est la seule ligne qui peut aller en Preview.
-- Autre option : garder `main` comme cible. Ce n'est cohérent que si `main` redevient la ligne de déploiement, ce que l'état actuel des branches contredit.
+Production : uniquement après qualification Preview, sauvegarde vérifiée et ton accord. `SOCIAL_DRY_RUN` n'est **jamais** passé à `false` sans ton accord explicite.
+
+## 5. Meta : dossier final
+
+### Ce qu'il faut créer
+
+| Étape | Où | Valeur |
+|---|---|---|
+| Application | developers.facebook.com › Mes apps › Créer une app | Cas d'usage « Autre », type **Entreprise (Business)**, nom « ELSATIA Social », e-mail de contact `support@elsatia.fr`, portefeuille Meta Business ELSATIA |
+| Produit | Tableau de bord de l'app › Ajouter un produit | **Facebook Login for Business** ; **Webhooks** ; **Instagram** (« API Instagram avec Facebook Login ») |
+| Page Facebook | Business Suite › Paramètres › Pages | Page ELSATIA dans le portefeuille ; la personne qui connecte a un rôle sur l'app (admin ou développeur) **et** le contrôle total de la Page |
+| Instagram | Instagram › Paramètres › Type de compte | Compte **professionnel** ELSATIA, **lié à la Page** Facebook ELSATIA |
+
+### Paramètres › Général (Basic)
+
+| Champ | Valeur |
+|---|---|
+| Domaines de l'app | `app.elsatia.fr` |
+| URL de la politique de confidentialité | `https://app.elsatia.fr/confidentialite` |
+| URL des conditions d'utilisation | `https://app.elsatia.fr/cgu` |
+| **URL des instructions de suppression des données** | `https://app.elsatia.fr/suppression-donnees` (nouvelle page, à publier en Production sur ton accord) |
+| Catégorie | Entreprise et pages |
+| Icône 1024 × 1024 | `public/elsatia/genere/avatar-1080.png` réduit, **dès que le logo officiel est déposé** |
+
+### Facebook Login for Business
+
+| Champ | Valeur |
+|---|---|
+| URI de redirection OAuth valides | `https://app.elsatia.fr/api/social/oauth/meta/callback` ; pour Preview `https://elsatia-preview.vercel.app/api/social/oauth/meta/callback` |
+| Connexion OAuth client / web | activées ; **HTTPS imposé** ; **mode strict** des URI activé |
+| Configuration | type de jeton « Jeton d'accès utilisateur » ; actifs : Page ELSATIA (+ Instagram lié) ; permissions ci-dessous. Reporter l'identifiant dans `META_LOGIN_CONFIG_ID` (facultatif) |
+| Paramètres avancés | **« Exiger la clé secrète de l'app »** activé (le code envoie `appsecret_proof`) |
+
+Permissions (scopes) : `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_read_user_content`, `pages_manage_engagement`, `pages_manage_metadata`, `read_insights`, `business_management`, `instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`, `instagram_manage_insights` ; facultatives en V1 : `pages_messaging`, `instagram_manage_messages` (entreprise vérifiée). Accès standard suffisant pour les Pages ELSATIA elles-mêmes, sans App Review.
+
+### Webhooks
+
+| Champ | Valeur |
+|---|---|
+| URL de rappel | `https://app.elsatia.fr/api/social/webhooks/meta` |
+| Jeton de vérification | valeur de `META_WEBHOOK_VERIFY_TOKEN` (aléatoire, saisie aux deux endroits) |
+| Objet Page | champs `feed`, `messages` |
+| Objet Instagram | champs `comments`, `messages` |
+| Abonnement de la Page | bouton « Activer les webhooks » dans `/plateforme/social/comptes` (`POST /{page-id}/subscribed_apps`) |
+
+### Passage en mode Live
+
+- [ ] URL de confidentialité, conditions et **instructions de suppression** renseignées et publiques en Production ;
+- [ ] icône 1024 × 1024 (logo officiel requis), catégorie, e-mail de contact ;
+- [ ] vérification d'entreprise si la messagerie Instagram est voulue ;
+- [ ] basculer en **Live** (en mode Développement, les webhooks réels ne sont pas livrés).
+
+### Procédure de test (publication toujours simulée)
+
+1. `/plateforme/social/configuration` › « Tester l'application Meta » (paire identifiant / secret).
+2. Comptes › Connecter via Meta › choisir la Page ELSATIA ; l'Instagram lié est connecté avec elle.
+3. Vérifier le diagnostic lecture seule : identité, ID, permissions par ressource, expiration de l'accès aux données (~90 jours).
+4. « Activer les webhooks », puis commenter une publication existante depuis un compte personnel et vérifier sa réception dans Commentaires.
+5. Créer un brouillon, le faire valider (AAL2), « Publier » : résultat attendu « Facebook : simulé · Instagram : simulé ».
+
+## 6. LinkedIn : ce qu'il faut saisir dans le portail Developer
+
+### Créer l'application (linkedin.com/developers › Create app)
+
+| Champ | Valeur |
+|---|---|
+| App name | ELSATIA Social |
+| LinkedIn Page | Page Entreprise ELSATIA (recherche par nom ou URL) |
+| Privacy policy URL | `https://app.elsatia.fr/confidentialite` |
+| App logo | symbole officiel ELSATIA (≥ 100 × 100), dès réception du logo |
+| Legal agreement | accepter |
+
+Application **dédiée** : la Community Management API doit être le **seul produit** de l'application.
+
+### Rattacher la Page ELSATIA
+
+Onglet *Settings* › *Verify* : générer l'URL de vérification et la faire approuver par un **super administrateur** de la Page ELSATIA.
+
+### Demander la Community Management API
+
+Onglet *Products* › **Community Management API** › *Request access*. Formulaire :
+
+| Champ | Valeur |
+|---|---|
+| Raison sociale | Julien GREGUREC, entrepreneur individuel (nom commercial ELSATIA) |
+| Adresse enregistrée, téléphone, e-mail pro | coordonnées officielles d'ELSATIA (`support@elsatia.fr`) |
+| Site web | site ELSATIA public |
+| Cas d'usage | « Outil interne de l'éditeur ELSATIA pour gérer sa propre Page Entreprise : rédaction, validation humaine, publication, statistiques et réponses aux commentaires. Aucun accès à des Pages tierces, aucune revente de données. » |
+
+Palier **Development** d'abord ; palier **Standard** à demander dans les 12 mois, avec une vidéo de démonstration par cas d'usage.
+
+### OAuth (onglet *Auth*)
+
+| Champ | Valeur |
+|---|---|
+| Authorized redirect URLs | `https://app.elsatia.fr/api/social/oauth/linkedin/callback` ; Preview : `https://elsatia-preview.vercel.app/api/social/oauth/linkedin/callback` |
+| Client ID / Client Secret | à poser dans Vercel : `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` (secret) |
+| Scopes (visibles après approbation) | `w_organization_social`, `r_organization_social`, `rw_organization_admin` |
+
+Jetons : 60 jours ; sans jeton de renouvellement (réservé aux partenaires), reconnexion tous les 60 jours, alerte au journal 10 jours avant.
+
+### Webhook (si l'onglet *Webhooks* est proposé à l'application)
+
+| Champ | Valeur |
+|---|---|
+| Endpoint URL | `https://app.elsatia.fr/api/social/webhooks/linkedin` |
+| Validation | défi `challengeCode` et signature `X-LI-Signature` gérés par le code (HMAC avec le Client Secret) |
+| Événements | actions sociales de l'organisation (commentaires, réactions, mentions) |
+
+L'intégration du code ne dépend pas de cette approbation : LinkedIn se branchera sans changement de code.
+
+## 7. Suppression des données
+
+Page publique : `/suppression-donnees` (Gestion Pro, sans session), contenu dans `docs/juridique/suppression-donnees-comptes-connectes.md`. Elle décrit factuellement ce qu'ELSATIA Social conserve (jetons chiffrés, comptes connectés, commentaires et messages reçus, notifications techniques) et la procédure (e-mail à `SUPPORT_EMAIL`, réponse sous un mois). L'exécution d'une demande : `supabase/production/supprimer_donnees_tiers_elsatia_social.sql` (testé localement).
+
+Le site vitrine elsatia.fr est un dépôt distinct (`elsatia-site`) auquel cette session n'a pas eu accès : la page y sera reportée à partir du même texte. L'URL à déclarer chez Meta et LinkedIn peut être dès maintenant celle de Gestion Pro.

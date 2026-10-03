@@ -191,7 +191,7 @@ export async function soumettreAction(id: string): Promise<Resultat> {
 
 export async function validerAction(id: string, commentaire: string): Promise<Resultat> {
   return executer(async () => {
-    const ctx = await exigerSocial("valider");
+    await exigerSocial("valider");
     const p = await chargerPublication(adminSocial(), id);
     if (!p) throw new Error("Publication introuvable.");
     if (!transitionPossible(p.publication.statut, "valider")) throw new Error("Seule une publication « À valider » peut être validée.");
