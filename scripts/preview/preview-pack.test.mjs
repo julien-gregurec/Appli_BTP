@@ -1,9 +1,11 @@
 // Tests hors réseau du pack d'exécution Preview (scripts/preview/*).
 // Lancer : node --test scripts/preview/preview-pack.test.mjs   (npm run test:preview-pack)
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 
 import * as garde from "./lib/preview-guard.mjs";
@@ -25,6 +27,21 @@ const fauxStripe = (mode) => ["sk", mode, "x".repeat(24)].join("_");
 const silence = () => {};
 
 // ── Garde-fous ──────────────────────────────────────────────────────────────
+test("garde : point d'entrée reconnu via un chemin à lien symbolique (sinon no-op silencieux en 0)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "elsatia-entree-"));
+  const lien = join(dir, "depot");
+  symlinkSync(ROOT, lien);
+  const porte = join(ROOT, "scripts/preview/v9/code-deploy-gate.mjs");
+  const viaLien = join(lien, "scripts/preview/v9/code-deploy-gate.mjs");
+  assert.equal(garde.estPointEntree(pathToFileURL(porte).href, viaLien), true);
+  assert.equal(garde.estPointEntree(pathToFileURL(porte).href, join(ROOT, "scripts/preview/db-verify.mjs")), false);
+  assert.equal(garde.estPointEntree(pathToFileURL(porte).href, undefined), false);
+  // De bout en bout : la porte lancée par le chemin logique doit s'exécuter et rester FERMÉE.
+  const r = spawnSync(process.execPath, [viaLien, "--report", join(dir, "absent.json")], { encoding: "utf8" });
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /CODE_DEPLOY_ALLOWED=false/);
+});
+
 test("garde : références Supabase (API, DB directe, pooler)", () => {
   assert.equal(garde.refDepuisUrlApi(`https://${REF}.supabase.co`), REF);
   assert.equal(garde.refDepuisUrlDb(`postgresql://postgres:p@db.${REF}.supabase.co:5432/postgres`), REF);

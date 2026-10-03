@@ -4,7 +4,7 @@
 // GARANTIE : aucune fonction de ce module ne renvoie ni n'écrit une valeur d'environnement ;
 // seuls des noms, des états (« présente », « identique ») et des codes sont produits.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REF_PREVIEW_AUTORISEE } from "../../garde-scripts-production.mjs";
@@ -124,7 +124,18 @@ export function ligne(etat, code, sujet, message = "") {
   return `  ${icone} [${code}] ${sujet}${message ? ` — ${message}` : ""}`;
 }
 
-/** Vrai si ce module est le point d'entrée (pas un import de test). */
-export function estPointEntree(importMetaUrl) {
-  return Boolean(process.argv[1]) && fileURLToPath(importMetaUrl) === resolve(process.argv[1]);
+/** Chemin physique (liens symboliques et casse macOS résolus) ; chemin absolu brut si introuvable. */
+function cheminPhysique(chemin) {
+  try { return realpathSync.native(chemin); } catch { return resolve(chemin); }
+}
+
+/**
+ * Vrai si ce module est le point d'entrée (pas un import de test).
+ * Les DEUX chemins sont résolus physiquement : le chargeur ESM donne le chemin réel du module, alors
+ * que `process.argv[1]` garde le chemin logique (lien symbolique, `pwd` logique de v9-cutover.sh,
+ * casse différente sur APFS). Sans cette résolution, le script ne faisait RIEN et sortait en 0
+ * (rapport non écrit, db-verify vide, porte de code et garde de cible muettes : fail-open).
+ */
+export function estPointEntree(importMetaUrl, argv1 = process.argv[1]) {
+  return Boolean(argv1) && cheminPhysique(fileURLToPath(importMetaUrl)) === cheminPhysique(argv1);
 }

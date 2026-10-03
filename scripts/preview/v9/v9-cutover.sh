@@ -31,7 +31,7 @@
 # Compatible bash 3.2 (macOS) : ni tableaux associatifs, ni mapfile, ni ${var,,}.
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)"  # -P : chemin physique (cf. estPointEntree)
 V9="$REPO/scripts/preview/v9"
 REF_PREVIEW="pgvvpqyjziyapbbkydmc"
 REF_PRODUCTION="exhvuzegsefmoguxoiak"
@@ -65,7 +65,7 @@ etape() { echo; echo "── ÉTAPE $1 — $2"; }
 
 [ -n "$OUT" ] || refus "--out <dossier hors dépôt> obligatoire"
 mkdir -p "$OUT" || refus "dossier --out non créable"
-OUT="$(cd "$OUT" && pwd)"
+OUT="$(cd "$OUT" && pwd -P)"
 case "$OUT/" in "$REPO"/*) refus "--out doit être HORS du dépôt (exports et rapport ne doivent jamais être commités)" ;; esac
 [ -n "$OFF_LEDGER" ] && [ "$APPLY" = 1 ] && refus "--offline-ledger est une simulation : --apply-preview interdit"
 [ -n "$OFF_LEDGER" ] && [ "$HARNESS" = 1 ] && refus "--offline-ledger et --local-harness sont exclusifs"
@@ -79,6 +79,9 @@ MODE="dry-run"; [ "$APPLY" = 1 ] && MODE="apply"; [ "$VERIFY_ONLY" = 1 ] && MODE
 RAPPORT="$OUT/cutover-report.json"
 rm -f "$RAPPORT"
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" mode "\"$MODE\"" >/dev/null
+# Garde-fou : un script Node qui ne s'exécute pas (point d'entrée non reconnu) sort en 0 sans rien
+# écrire. Le rapport DOIT exister après la première écriture, sinon aucune étape n'est fiable.
+[ -s "$RAPPORT" ] || refus "rapport $RAPPORT non écrit : les scripts Node du pack ne s'exécutent pas (point d'entrée non reconnu) — aucune étape n'est fiable"
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" reprise "$([ "$RESUME" = 1 ] && echo true || echo false)" >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" harness "$([ "$HARNESS" = 1 ] && echo true || echo false)" >/dev/null
 SHA_HEAD="$(node "$V9/cutover-step.mjs" head)" || refus "SHA de HEAD illisible"
