@@ -1,0 +1,131 @@
+Timing is on.
+ cible 
+-------
+ t
+(1 row)
+
+Time: 79.692 ms
+ taches_total 
+--------------
+       108749
+(1 row)
+
+Time: 44.157 ms
+BEGIN
+Time: 7.894 ms
+SET
+Time: 0.118 ms
+ ?column? 
+----------
+ t
+(1 row)
+
+Time: 0.162 ms
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=544.320..544.323 rows=14 loops=1)
+   Sort Key: taches.created_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=4251 read=1423 written=55
+   ->  Seq Scan on taches (actual time=343.294..544.272 rows=14 loops=1)
+         Filter: ((chantier_id = (current_setting('x.ch'::text))::uuid) AND (SubPlan 1) AND (SubPlan 3))
+         Rows Removed by Filter: 108735
+         Buffers: shared hit=4248 read=1423 written=55
+         SubPlan 1
+           ->  Index Scan using chantiers_pkey on chantiers c (actual time=7.274..7.274 rows=1 loops=14)
+                 Index Cond: (id = taches.chantier_id)
+                 Filter: (peut_consulter_chantier(entreprise_id, id) AND peut_consulter_chantier(entreprise_id, id))
+                 Buffers: shared hit=2651 read=340
+         SubPlan 3
+           ->  Index Scan using chantiers_pkey on chantiers ch (actual time=5.032..5.032 rows=1 loops=14)
+                 Index Cond: (id = taches.chantier_id)
+                 Filter: (peut_consulter_chantier(entreprise_id, id) AND est_membre_actif(entreprise_id))
+                 Buffers: shared hit=797
+ Planning:
+   Buffers: shared hit=37 read=11 dirtied=5
+ Planning Time: 0.284 ms
+ Execution Time: 569.849 ms
+(22 rows)
+
+Time: 570.680 ms
+RESET
+Time: 2.253 ms
+CREATE INDEX
+Time: 147.190 ms
+ taille_index | taille_table 
+--------------+--------------
+ 1056 kB      | 15 MB
+(1 row)
+
+Time: 0.304 ms
+ANALYZE
+Time: 112.061 ms
+SET
+Time: 0.037 ms
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=63.108..63.111 rows=14 loops=1)
+   Sort Key: taches.created_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=2095 read=2
+   ->  Bitmap Heap Scan on taches (actual time=5.915..63.080 rows=14 loops=1)
+         Recheck Cond: (chantier_id = (current_setting('x.ch'::text))::uuid)
+         Filter: ((SubPlan 1) AND (SubPlan 3))
+         Heap Blocks: exact=12
+         Buffers: shared hit=2095 read=2
+         ->  Bitmap Index Scan on taches_chantier_created_idx (actual time=0.013..0.013 rows=14 loops=1)
+               Index Cond: (chantier_id = (current_setting('x.ch'::text))::uuid)
+               Buffers: shared read=2
+         SubPlan 1
+           ->  Index Scan using chantiers_pkey on chantiers c (actual time=2.835..2.835 rows=1 loops=14)
+                 Index Cond: (id = taches.chantier_id)
+                 Filter: (peut_consulter_chantier(entreprise_id, id) AND peut_consulter_chantier(entreprise_id, id))
+                 Buffers: shared hit=1286
+         SubPlan 3
+           ->  Index Scan using chantiers_pkey on chantiers ch (actual time=1.663..1.663 rows=1 loops=14)
+                 Index Cond: (id = taches.chantier_id)
+                 Filter: (peut_consulter_chantier(entreprise_id, id) AND est_membre_actif(entreprise_id))
+                 Buffers: shared hit=797
+ Planning:
+   Buffers: shared hit=63 read=5
+ Planning Time: 0.352 ms
+ Execution Time: 63.147 ms
+(26 rows)
+
+Time: 63.735 ms
+RESET
+Time: 0.032 ms
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
+ Insert on taches (actual time=30.838..30.838 rows=0 loops=1)
+   ->  Function Scan on generate_series g (actual time=0.215..9.050 rows=5000 loops=1)
+ Planning Time: 0.072 ms
+ Trigger for constraint taches_chantier_id_fkey: time=22.829 calls=5000
+ Trigger for constraint taches_responsable_id_fkey: time=3.059 calls=5000
+ Trigger for constraint taches_devis_id_fkey: time=3.049 calls=5000
+ Trigger for constraint taches_ligne_devis_id_fkey: time=2.921 calls=5000
+ Trigger incident_garde_ecriture: time=1.155 calls=1
+ Execution Time: 63.845 ms
+(9 rows)
+
+Time: 64.311 ms
+ROLLBACK
+Time: 1.460 ms
+BEGIN
+Time: 0.025 ms
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Insert on taches (actual time=29.410..29.411 rows=0 loops=1)
+   ->  Function Scan on generate_series g (actual time=0.231..12.162 rows=5000 loops=1)
+ Planning Time: 0.043 ms
+ Trigger for constraint taches_chantier_id_fkey: time=32.561 calls=5000
+ Trigger for constraint taches_responsable_id_fkey: time=3.874 calls=5000
+ Trigger for constraint taches_devis_id_fkey: time=3.712 calls=5000
+ Trigger for constraint taches_ligne_devis_id_fkey: time=3.832 calls=5000
+ Trigger incident_garde_ecriture: time=0.182 calls=1
+ Execution Time: 74.620 ms
+(9 rows)
+
+Time: 75.017 ms
+ROLLBACK
+Time: 0.495 ms
