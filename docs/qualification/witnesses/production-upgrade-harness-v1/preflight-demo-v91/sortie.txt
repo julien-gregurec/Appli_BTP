@@ -1,0 +1,9 @@
+✅ P1 branche courante « integration/elsatia-canonical-train-v9.1 » autorisée
+✅ P2 cible 24a0c2e993ec = HEAD, publiée sur origin
+✅ P3 391 migrations au SHA (attendu 391)
+✅ P4 210 migrations historiques identiques au manifeste 5777abbcb94f
+✅ P5 ledger 210 = source 210 + préfixe de 0 / 181 migration(s) du plan
+❌ P6 plan qualifié AVEC pont(s) absent(s) ou différent(s) de la cible : 20260921000298_pont_upgrade_backfill_lignes_avant.sql, 20260921000399_pont_upgrade_backfill_lignes_apres.sql — intégrer les ponts au train puis requalifier
+✅ P7 Production projet-production-SIMULE attestée par harnais (simulation) (2026-10-03T02:13:32Z), préconditions de données à 0
+✅ P8 sauvegarde pitr+dump simulation-locale (0.0 h), restauration testée sur upg_s5 (restauration locale S5)
+PREFLIGHT REFUSÉ (P6) — aucune action n'a été effectuée.

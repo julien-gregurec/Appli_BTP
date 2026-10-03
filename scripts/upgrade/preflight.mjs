@@ -23,7 +23,7 @@
  *   npm run production:v9x:preflight -- --target-sha <sha> --target-migration-count <n> \
  *     --ledger <export.txt> --production-attestation <prod.json> --backup-attestation <backup.json> \
  *     [--target-plan scripts/upgrade/manifests/target-<sha8>.json] [--source-manifest …] [--allow-branch <regex>] \
- *     [--expected-project-ref <ref>] [--max-backup-age-hours 24] [--now <ISO>]
+ *     [--expected-project-ref <ref>] [--max-backup-age-hours 24] [--now <ISO>] [--depot <checkout de release>]
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -130,8 +130,16 @@ export function evaluer(o, d) {
       const qualifiees = new Set(plan.migrations.map((m) => m.migration));
       const inattendues = enAttente.filter((f) => !qualifiees.has(f));
       const shaOk = plan.target_sha === sha;
-      verif("P6", shaOk && inattendues.length === 0,
+      // Un plan qualifié AVEC ponts d'upgrade n'autorise l'upgrade que si chaque pont est réellement dans la cible,
+      // à l'octet près (sinon la Production exécuterait un train différent de celui qualifié).
+      const pontsAbsents = (plan.ponts ?? []).filter((p) => {
+        const nom = typeof p === "string" ? p : p.fichier;
+        if (!fichiers.includes(nom)) return true;
+        return typeof p !== "string" && p.sha256 && sha256(d.git.contenu(sha, nom)) !== p.sha256;
+      }).map((p) => (typeof p === "string" ? p : p.fichier));
+      verif("P6", shaOk && inattendues.length === 0 && pontsAbsents.length === 0,
         !shaOk ? `plan qualifié pour ${String(plan.target_sha).slice(0, 12)}, pas pour ${sha.slice(0, 12)}`
+          : pontsAbsents.length ? `plan qualifié AVEC pont(s) absent(s) ou différent(s) de la cible : ${pontsAbsents.join(", ")} — intégrer les ponts au train puis requalifier`
           : inattendues.length ? `${inattendues.length} migration(s) en attente non qualifiée(s) : ${inattendues.slice(0, 5).join(", ")}`
             : `${enAttente.length} migration(s) en attente, toutes qualifiées (${plan.migrations.filter((m) => m.verrou === "MAINTENANCE_WINDOW_REQUIRED").length} en fenêtre de maintenance)`);
     }
@@ -187,12 +195,14 @@ export function main(argv = process.argv.slice(2), depot = DEPOT) {
   const targetSha = option(argv, "--target-sha");
   const g = gitDepot(depot);
   const resolu = targetSha ? g.resoudre(targetSha) : null;
-  const planP = option(argv, "--target-plan") ?? (resolu ? resolve(depot, `scripts/upgrade/manifests/target-${resolu.slice(0, 8)}.json`) : undefined);
+  // Manifestes : ceux du dépôt contrôlé s'il les porte, sinon ceux livrés avec ce preflight.
+  const manifeste = (nom) => [resolve(depot, "scripts/upgrade/manifests", nom), resolve(ICI, "manifests", nom)].find((x) => existsSync(x));
+  const planP = option(argv, "--target-plan") ?? (resolu ? manifeste(`target-${resolu.slice(0, 8)}.json`) : undefined);
   const o = {
     argv, targetSha, targetMigrationCount: option(argv, "--target-migration-count"),
     allowBranch: option(argv, "--allow-branch"), expectedProjectRef: option(argv, "--expected-project-ref"),
     maxBackupAgeHours: option(argv, "--max-backup-age-hours"), now: option(argv, "--now"),
-    sourceManifest: json(option(argv, "--source-manifest") ?? resolve(depot, "scripts/upgrade/manifests/source-prod-210-5777abb.json")),
+    sourceManifest: json(option(argv, "--source-manifest") ?? manifeste("source-prod-210-5777abb.json")),
     targetPlan: json(planP), ledger: ledgerTexte ? lireLedger(ledgerTexte) : undefined, ledgerTexte,
     productionAttestation: json(option(argv, "--production-attestation")), backupAttestation: json(option(argv, "--backup-attestation")),
   };
@@ -203,4 +213,9 @@ export function main(argv = process.argv.slice(2), depot = DEPOT) {
   return refus.length ? 1 : 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) process.exit(main());
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  // --depot : checkout de release à contrôler (lecture seule) ; défaut = ce dépôt.
+  const argv = process.argv.slice(2);
+  const i = argv.indexOf("--depot");
+  process.exit(main(argv, i >= 0 ? resolve(argv[i + 1]) : DEPOT));
+}

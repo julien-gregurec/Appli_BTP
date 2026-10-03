@@ -143,3 +143,21 @@ test("P7 précondition déclarée par le plan mais non mesurée", () => {
   const p = { ...plan, preconditions_bloquantes: ["lignes_factures_emises"] };
   assert.deepEqual(refus(evaluer(base({ targetPlan: p }), { git: fauxGit() })), ["P7"]);
 });
+test("P6 plan qualifié avec ponts absents de la cible → refus", () => {
+  const p = { ...plan, ponts: [{ fichier: "20260101000004_pont.sql", sha256: "0".repeat(64) }] };
+  assert.deepEqual(refus(evaluer(base({ targetPlan: p }), { git: fauxGit() })), ["P6"]);
+});
+test("P6 plan qualifié avec ponts présents et identiques → accepté", () => {
+  const pont = "20260101000004_pont.sql";
+  const g = fauxGit({ migrations: () => [...histo, ...nouvelles, pont] });
+  const p = { ...plan, ponts: [{ fichier: pont, sha256: sha256(contenu(pont)) }],
+              migrations: [...plan.migrations, { migration: pont, verrou: "SAFE", rollback: "REVERSIBLE" }] };
+  assert.deepEqual(refus(evaluer(base({ targetPlan: p, targetMigrationCount: "7" }), { git: g })), []);
+});
+test("P6 pont présent mais modifié → refus", () => {
+  const pont = "20260101000004_pont.sql";
+  const g = fauxGit({ migrations: () => [...histo, ...nouvelles, pont] });
+  const p = { ...plan, ponts: [{ fichier: pont, sha256: "f".repeat(64) }],
+              migrations: [...plan.migrations, { migration: pont, verrou: "SAFE", rollback: "REVERSIBLE" }] };
+  assert.deepEqual(refus(evaluer(base({ targetPlan: p, targetMigrationCount: "7" }), { git: g })), ["P6"]);
+});
