@@ -1,0 +1,164 @@
+{
+ "source": "fixture (format API Vercel /v9/projects/{id}/env)",
+ "envs": [
+  {
+   "key": "NEXT_PUBLIC_SUPABASE_URL",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "SUPABASE_SERVICE_ROLE_KEY",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "ELSATIA_APPLICATION_ENV",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "preview"
+  },
+  {
+   "key": "NEXT_PUBLIC_APP_URL",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "NEXT_PUBLIC_COLORS_URL",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "RATE_LIMIT_HMAC_KEY",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "STRIPE_SECRET_KEY",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "STRIPE_WEBHOOK_EXPECTED_MODE",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "test"
+  },
+  {
+   "key": "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
+   "target": [
+    "preview"
+   ],
+   "type": "encrypted"
+  },
+  {
+   "key": "STRIPE_AUTOMATIC_TAX_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "FEATURE_BOUTIQUE_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "FEATURE_AI_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "FEATURE_AI_DEVIS_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "FEATURE_RELANCES_AUTO_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "FEATURE_CRONS_ENABLED",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "ABONNEMENTS_PUBLICS_OUVERTS",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "ABONNEMENTS_LIVE_OUVERTURE_CONFIRMEE",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "LEGAL_TVA_REGIME_CONFIRME",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "false"
+  },
+  {
+   "key": "TOOLS_STORE_ENVIRONMENT",
+   "target": [
+    "preview"
+   ],
+   "type": "plain",
+   "value": "sandbox"
+  },
+  {
+   "key": "CRON_SECRET",
+   "target": [
+    "production"
+   ],
+   "type": "encrypted"
+  }
+ ]
+}
