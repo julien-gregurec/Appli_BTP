@@ -1,0 +1,7 @@
+factures=174200 ttc=346003765.25 paye=146106472.54
+paiements=81798 somme=146106472.54
+devis=176312 ttc=891410143.09
+pointages=51968 heures=348190.20
+documents_chantier=171990
+entreprises=6 abonnement=b29418f28f84df81ae5f3fb82a5da735
+utilisateurs_entreprises=44
