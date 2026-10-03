@@ -99,7 +99,8 @@ function verite(db: string): { totaux: Totaux; parChantier: Map<string, { heures
 type Rel<T> = T | T[] | null;
 const un = <T,>(valeur: Rel<T>): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
 
-/** Chemin HISTORIQUE (V7) de /rentabilite, rejoué à l'identique (mêmes requêtes, même addition). */
+/** Chemin HISTORIQUE (V7) de /rentabilite, rejoué à l'identique (mêmes requêtes, même addition),
+ *  avec la règle de CA corrigée par GP BUSINESS HARDENING V9.1 (B25) : émis net d'avoirs émis. */
 async function historiqueRentabilite(supabase: SupabaseClient) {
   const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ENTREPRISE).order("created_at", { ascending: false }),
@@ -118,7 +119,7 @@ async function historiqueRentabilite(supabase: SupabaseClient) {
   const mouvementsStock = (donneesMouvementsStock ?? []) as { chantier_id: string; quantite: number; article: Rel<{ prix_achat_ht: number }> }[];
   const notesFrais = (donneesNotesFrais ?? []) as { chantier_id: string; montant_ttc: number }[];
   const lignes = (chantiers ?? []).map((chantier) => {
-    const factureHt = (factures ?? []).filter((item) => item.chantier_id === chantier.id && !["annulee", "avoir_emis"].includes(item.statut)).reduce((s, item) => s + Number(item.montant_ht), 0);
+    const factureHt = (factures ?? []).filter((item) => item.chantier_id === chantier.id && !["brouillon", "annulee"].includes(item.statut)).reduce((s, item) => s + Number(item.montant_ht), 0);
     let heures = 0; let coutMainOeuvre = 0;
     for (const pointage of pointages.filter((item) => item.chantier_id === chantier.id)) {
       const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);

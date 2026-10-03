@@ -17,7 +17,7 @@ export type RentabiliteLigne = {
   chantierId: string;
   budgetHt: number;
   factureHt: number;
-  /** Part des avoirs (type « avoir ») incluse dans factureHt. */
+  /** Part des avoirs émis (type « avoir », montants négatifs) incluse dans factureHt. */
   factureHtAvoirs: number;
   heures: number;
   coutMainOeuvre: number;
@@ -167,14 +167,15 @@ export type RentabiliteChantier = {
 
 /**
  * Copilote : chantiers actifs, plus faibles marges d'abord.
- * Règle historique du copilote conservée : CA hors avoirs, marge = CA − main-d'œuvre
+ * CA = émis net d'avoirs émis (recette métier GP, B25 : le copilote ignorait les
+ * avoirs ; brouillons exclus en base, 20261003001406), marge = CA − main-d'œuvre
  * pointée − achats/charges − sous-traitance. Heures : pointages validés, règle
  * produit de /rentabilite (14f1112), que ce chemin n'appliquait pas.
  */
 export async function calculerRentabiliteChantiers(supabase: SupabaseClient, entrepriseId: string, options: { limite: number }): Promise<RentabiliteChantier[]> {
   const lignes = (await lireToutesRentabilitesChantiers(supabase, entrepriseId, "marge_asc"))
     .map((ligne) => {
-      const factureHt = ligne.factureHt - ligne.factureHtAvoirs;
+      const factureHt = ligne.factureHt;
       const marge = factureHt - ligne.coutMainOeuvre - ligne.coutAchats - ligne.coutSousTraitance;
       return {
         chantierId: ligne.chantierId,

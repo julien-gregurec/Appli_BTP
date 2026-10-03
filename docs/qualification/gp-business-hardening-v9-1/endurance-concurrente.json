@@ -1,0 +1,26 @@
+{
+ "cycles": 12,
+ "duree_s": 3.1,
+ "compte": {
+  "refacturations_acceptees": 12,
+  "refacturations_refusees": 24,
+  "paiements_doublons_acceptes": 12,
+  "paiements_doublons_refuses": 12,
+  "pointages_concurrents_acceptes": 12,
+  "pointages_concurrents_refuses": 12,
+  "plafond_refus": 12,
+  "erreurs_techniques": 0
+ },
+ "invariants": {
+  "devis_factures_au_dela": "0",
+  "devis_factures_plusieurs_fois": "0",
+  "facture_differente_du_devis": "0",
+  "paye_superieur_ttc": "0",
+  "paye_different_somme_paiements": "0",
+  "paiements_doublons_30s": "0",
+  "statut_incoherent": "0",
+  "journees_plus_24h": "0",
+  "doublons_pointage_oublie": "0"
+ },
+ "ecarts": 0
+}

@@ -30,7 +30,11 @@ select id, 'Ligne initiale', 1, 10, 20, 0 from public.factures where id::text li
 -- Émission (envoyee), paiement complet (payee) et annulation (annulee).
 update public.factures set statut = 'envoyee' where id in ('fb000000-0000-0000-0000-000000000002', 'fb000000-0000-0000-0000-000000000003', 'fb000000-0000-0000-0000-000000000004');
 insert into public.paiements (facture_id, montant) values ('fb000000-0000-0000-0000-000000000003', 12);
+-- GP BUSINESS HARDENING V9.1 (B24, 20261003001403) : une facture émise ne s'annule plus ;
+-- ce décor reproduit une facture annulée historique (antérieure au correctif).
+alter table public.factures disable trigger facture_emise_non_annulable;
 update public.factures set statut = 'annulee' where id = 'fb000000-0000-0000-0000-000000000004';
+alter table public.factures enable trigger facture_emise_non_annulable;
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 1. Droits : rien n'a été rouvert.

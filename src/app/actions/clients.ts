@@ -16,6 +16,10 @@ export async function creerClientAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  // Recette métier GP (B02) : un client doit avoir au moins un nom ou une société.
+  if (!champ(formData, "nom") && !champ(formData, "societe")) {
+    redirect(`/clients/nouveau?error=${encodeURIComponent("Renseignez au moins un nom ou une société.")}`);
+  }
   const legal = lireIdentiteLegale(formData);
   if (!legal.ok) {
     redirect(`/clients/nouveau?error=${encodeURIComponent(legal.erreur)}`);
@@ -106,6 +110,9 @@ export async function modifierClientAction(clientId: string, formData: FormData)
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  if (!champ(formData, "nom") && !champ(formData, "societe")) {
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent("Renseignez au moins un nom ou une société.")}`);
+  }
   const legal = lireIdentiteLegale(formData);
   if (!legal.ok) {
     redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(legal.erreur)}`);

@@ -25,6 +25,7 @@ export default async function ImprimerPartagePage({ params }: { params: Promise<
       numero={donnees.numero}
       dateEmission={donnees.dateEmission}
       dateSecondaire={donnees.dateSecondaire}
+        reference={donnees.reference ?? null}
       entreprise={donnees.entreprise}
       client={donnees.client}
       lignes={donnees.lignes}

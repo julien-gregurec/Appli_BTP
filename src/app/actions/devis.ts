@@ -8,7 +8,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import type { SurchargeDestinataire } from "@/lib/document-resend-override";
 import type { LigneDevis } from "@/lib/devis";
-import { TRANSITIONS_DEVIS } from "@/lib/devis";
+import { TRANSITIONS_DEVIS, erreurSaisieDevis } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
@@ -47,6 +47,8 @@ export async function creerDevisAction(payload: DevisPayload) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const lignes = nettoieLignes(payload.lignes);
+  const invalide = erreurSaisieDevis(payload.remise_globale, lignes);
+  if (invalide) return { error: invalide };
 
   const { data: devisId, error } = await supabase.rpc("creer_devis_brouillon", {
     p_entreprise_id: ctx.entrepriseId,
@@ -88,6 +90,8 @@ export async function modifierDevisAction(devisId: string, payload: DevisPayload
   }
 
   const lignes = nettoieLignes(payload.lignes);
+  const invalide = erreurSaisieDevis(payload.remise_globale, lignes);
+  if (invalide) return { error: invalide };
   const { error } = await supabase.rpc("modifier_devis_brouillon", {
     p_devis_id: devisId,
     p_devis: {

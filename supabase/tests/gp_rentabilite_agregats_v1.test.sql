@@ -13,6 +13,9 @@
 -- autre entreprise, membre désactivé, entreprise suspendue, sans identité,
 -- anon ; chantier non consultable ; pagination sans perte ni doublon ;
 -- paramètres invalides.
+-- GP BUSINESS HARDENING V9.1 (B25, 20261003001406) : vérité de référence du CA mise à jour —
+-- factures émises (brouillons et annulées exclus), factures créditées (avoir_emis) comprises,
+-- avoirs émis déduits ; l'ancienne règle retirait la facture créditée ET déduisait son avoir.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(60);
@@ -102,7 +105,7 @@ from generate_series(0, 99) g;
 create temp table verite as
 select c.id as chantier_id,
   coalesce((select sum(montant_ht) from public.devis d where d.chantier_id = c.id and d.statut = 'accepte'), 0) as budget_ht,
-  coalesce((select sum(montant_ht) from public.factures f where f.chantier_id = c.id and f.statut not in ('annulee', 'avoir_emis')), 0) as facture_ht,
+  coalesce((select sum(montant_ht) from public.factures f where f.chantier_id = c.id and f.statut not in ('brouillon', 'annulee')), 0) as facture_ht,
   coalesce((select sum(p.heures_normales + p.heures_supplementaires) from public.pointages p where p.chantier_id = c.id and p.verification_statut = 'valide'), 0) as heures,
   coalesce((select sum((p.heures_normales + p.heures_supplementaires) * coalesce(co.cout_horaire, 0)) from public.pointages p left join public.employes_cout_horaire co on co.employe_id = p.employe_id where p.chantier_id = c.id and p.verification_statut = 'valide'), 0) as cout_main_oeuvre,
   coalesce((select sum(montant_ht) from public.depenses_fournisseurs d where d.chantier_id = c.id and d.statut <> 'annulee' and d.categorie <> 'sous_traitance'), 0) as cout_achats,
@@ -122,8 +125,8 @@ returns table (chantier_id uuid, budget_ht numeric, facture_ht numeric, facture_
 language sql stable as $$
   select c.id,
     coalesce((select sum(d.montant_ht) from public.devis d where d.entreprise_id = e and d.chantier_id = c.id and d.statut = 'accepte'), 0),
-    coalesce((select sum(f.montant_ht) from public.factures f where f.entreprise_id = e and f.chantier_id = c.id and f.statut not in ('annulee', 'avoir_emis')), 0),
-    coalesce((select sum(f.montant_ht) from public.factures f where f.entreprise_id = e and f.chantier_id = c.id and f.statut not in ('annulee', 'avoir_emis') and f.type = 'avoir'), 0),
+    coalesce((select sum(f.montant_ht) from public.factures f where f.entreprise_id = e and f.chantier_id = c.id and f.statut not in ('brouillon', 'annulee')), 0),
+    coalesce((select sum(f.montant_ht) from public.factures f where f.entreprise_id = e and f.chantier_id = c.id and f.statut not in ('brouillon', 'annulee') and f.type = 'avoir'), 0),
     coalesce((select sum(p.heures_normales + p.heures_supplementaires) from public.pointages p where p.entreprise_id = e and p.chantier_id = c.id and p.verification_statut = 'valide'), 0),
     coalesce((select sum((p.heures_normales + p.heures_supplementaires) * coalesce(co.cout_horaire, 0)) from public.pointages p left join public.employes_cout_horaire co on co.employe_id = p.employe_id and co.entreprise_id = e where p.entreprise_id = e and p.chantier_id = c.id and p.verification_statut = 'valide'), 0),
     coalesce((select bool_or(coalesce(co.cout_horaire, 0) = 0) from public.pointages p left join public.employes_cout_horaire co on co.employe_id = p.employe_id and co.entreprise_id = e where p.entreprise_id = e and p.chantier_id = c.id and p.verification_statut = 'valide'), false),

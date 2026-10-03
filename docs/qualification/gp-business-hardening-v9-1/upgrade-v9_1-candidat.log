@@ -1,0 +1,42 @@
+== 1. base V9.1 : ? migrations enregistrées ==
+== 2. décor V9.1 ==
+              set_config              
+--------------------------------------
+ 10000000-0000-0000-0000-000000000001
+(1 row)
+
+     enregistrer_paiement_facture     
+--------------------------------------
+ 92f2a03f-b727-4196-a1e6-b23b6b56a8b2
+(1 row)
+
+        creer_facture_avancee         
+--------------------------------------
+ 06bf981f-c7c5-4a71-bb3c-05059dc24c09
+(1 row)
+
+   factures/paiements/pointages/devis/chantiers/ΣTTC/Σpayé = 6/1/4/5/5/7041.30/1000 ; cache « Total facturé » = 6201.30
+== 3. migrations du candidat postérieures à 20261002001302 ==
+   OK 20261003001401_gp_facturation_remise_globale_reportee_v1.sql
+   OK 20261003001402_gp_paiement_double_envoi_v1.sql
+psql:/home/user/Appli_BTP/supabase/migrations/20261003001403_gp_facture_emise_non_annulable_v1.sql:22: NOTICE:  trigger "facture_emise_non_annulable" for relation "public.factures" does not exist, skipping
+   OK 20261003001403_gp_facture_emise_non_annulable_v1.sql
+   OK 20261003001404_gp_pointage_oublie_doublon_plafond_v1.sql
+   OK 20261003001405_gp_pointages_totaux_hors_rejetes_v1.sql
+   OK 20261003001406_gp_chiffre_affaires_hors_brouillons_v1.sql
+   OK 20261003001407_gp_pointages_cout_horaire_confidentiel_v1.sql
+   OK 20261003001408_gp_saisie_garde_fous_base_v1.sql
+   8 migration(s) appliquée(s)
+== 4. contrôles ==
+   ✅ données conservées (comptes et sommes)
+   ✅ cache « Total facturé » recalculé hors brouillons et annulées
+   ✅ contraintes NOT VALID : historique invalide conservé
+   ✅ contraintes posées NOT VALID (5)
+   ✅ facture annulée historique conservée (aucune réécriture)
+   ✅ authenticated ne lit plus pointages.cout_horaire_applique
+   ✅ authenticated lit toujours pointages.heures_normales
+== 5. schéma + ACL : base upgradée = candidat frais ==
+   ✅ schéma + ACL identiques (pg_dump -s)
+== 6. témoin pgTAP sur la base upgradée ==
+gp_business_hardening_v9_1 plan=43 ok=43 not_ok=0 erreurs=0 PROPRE
+== RÉSULTAT : 0 écart(s) ==

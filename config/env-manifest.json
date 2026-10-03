@@ -6520,6 +6520,72 @@
       "example_required": false
     },
     {
+      "name": "SONDE_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL du PostgREST local des sondes API de GP BUSINESS HARDENING V9.1 (tests/e2e/gp-business-hardening-pile-locale/sondes-postgrest.mjs, défaut http://127.0.0.1:3001 ; toute URL non locale est refusée). Banc local uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "SONDE_SECRET",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Secret JWT HS256 généré pour le PostgREST jetable des sondes GP BUSINESS HARDENING V9.1 (tests/e2e/gp-business-hardening-pile-locale). Valeur aléatoire du banc local, jamais un secret d'environnement déployé.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "SONDE_BASE",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Nom de la base PostgreSQL locale des sondes GP BUSINESS HARDENING V9.1 (lecture du décor en superutilisateur local). Banc local uniquement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "PASSERELLE_HOTE",
       "applications": [
         "e2e"

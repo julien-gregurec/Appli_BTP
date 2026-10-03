@@ -30,6 +30,17 @@ export async function creerChantierAction(formData: FormData) {
   if (!clientId) {
     redirect(`/chantiers/nouveau?error=${encodeURIComponent("Client obligatoire")}`);
   }
+  // Garde-fous de saisie (recette métier GP B07, B31) ; la base les impose aussi
+  // (20261003001408) : ici, un message clair plutôt qu'une erreur générique.
+  const debutPrevu = champ(formData, "date_debut_prevue");
+  const finPrevue = champ(formData, "date_fin_prevue");
+  const budget = champ(formData, "budget_previsionnel");
+  if (budget !== null && !(Number(budget.replace(",", ".")) >= 0)) {
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent("Le budget prévisionnel doit être un montant positif.")}`);
+  }
+  if (debutPrevu && finPrevue && finPrevue < debutPrevu) {
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent("La date de fin prévue précède la date de début.")}`);
+  }
 
   const latitudeBrute = champ(formData, "latitude");
   const longitudeBrute = champ(formData, "longitude");

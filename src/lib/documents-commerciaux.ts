@@ -25,6 +25,8 @@ export type DonneesDocumentImprimable = {
   // Uniquement vrai pour une facture de type "avoir" (jamais pour un devis) — permet à l'email
   // (documents-envoi.ts) de distinguer le wording sans dupliquer la lecture de facture.type.
   estAvoir: boolean;
+  // Mention sous le numéro : pour un avoir, la facture qu'il rectifie.
+  reference?: string | null;
   signatures: SignatureImprimable[];
   photos: Array<{ id: string; nom: string; legende?: string | null }>;
   // Métadonnées hors DocumentImprimable, utiles aux appelants (email, nom de fichier PDF, statut).
@@ -129,14 +131,14 @@ export async function chargerDonneesFactureImprimable(
   const { data: facture } = await supabase
     .from("factures")
     .select(
-      "id,numero,statut,type,date_emission,date_echeance,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,entreprise_snapshot,client_snapshot,client_snapshot_at,client:clients!factures_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
+      "id,numero,statut,type,facture_origine_id,date_emission,date_echeance,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,entreprise_snapshot,client_snapshot,client_snapshot_at,client:clients!factures_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
     )
     .eq("id", params.id)
     .eq("entreprise_id", params.entrepriseId)
     .maybeSingle();
   if (!facture) return null;
 
-  const [{ data: lignes }, { data: entrepriseCourante }, { data: signatures }] = await Promise.all([
+  const [{ data: lignes }, { data: entrepriseCourante }, { data: signatures }, { data: factureOrigine }] = await Promise.all([
     supabase.from("lignes_factures").select("*").eq("facture_id", params.id).order("ordre"),
     supabase.from("entreprises").select("*").eq("id", params.entrepriseId).single(),
     supabase
@@ -146,6 +148,10 @@ export async function chargerDonneesFactureImprimable(
       .eq("type_document", "facture")
       .eq("document_id", params.id)
       .order("signed_at"),
+    // Un avoir doit citer la facture qu'il rectifie (recette métier GP, B21).
+    facture.type === "avoir" && facture.facture_origine_id
+      ? supabase.from("factures").select("numero").eq("id", facture.facture_origine_id).eq("entreprise_id", params.entrepriseId).maybeSingle()
+      : Promise.resolve({ data: null as { numero: string | null } | null }),
   ]);
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
@@ -186,6 +192,7 @@ export async function chargerDonneesFactureImprimable(
     notesClient: facture.notes_client,
     estFacture: true,
     estAvoir: facture.type === "avoir",
+    reference: factureOrigine?.numero ? `Avoir sur facture n° ${factureOrigine.numero}` : null,
     signatures: signatures ?? [],
     photos: [],
     statut: facture.statut,

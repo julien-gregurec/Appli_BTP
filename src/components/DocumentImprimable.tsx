@@ -54,6 +54,13 @@ export type SignatureImprimable = {
   document_sha256: string;
 };
 
+/** AAAA-MM-JJ (éventuellement suivi d'une heure) → JJ/MM/AAAA ; toute autre valeur est rendue telle quelle. */
+export function dateDocumentFr(valeur: string | null | undefined): string {
+  if (!valeur) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(valeur);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : valeur;
+}
+
 // Document A4 imprimable partagé devis / facture. Styles inline pour un rendu fiable à l'impression.
 export function DocumentImprimable({
   typeDoc,
@@ -70,6 +77,7 @@ export function DocumentImprimable({
   estFacture,
   signatures = [],
   photos = [],
+  reference = null,
   urlPhoto,
   urlSignature,
 }: {
@@ -87,6 +95,8 @@ export function DocumentImprimable({
   estFacture: boolean;
   signatures?: SignatureImprimable[];
   photos?: Array<{ id: string; nom: string; legende?: string | null }>;
+  /** Mention sous le numéro, par exemple la facture rectifiée par un avoir. */
+  reference?: string | null;
   // Chemin de lecture de la photo : par défaut la route authentifiée
   // (session ELSATIA). La page publique par jeton (/document/[token],
   // /imprimer/partage/[token]) n'a pas de session — GP-EXTERNAL-PILOT-
@@ -100,6 +110,8 @@ export function DocumentImprimable({
   const construireUrlPhoto = urlPhoto ?? ((photoId: string) => `/api/devis/pieces-jointes/${photoId}`);
   const construireUrlSignature =
     urlSignature ?? ((signature: SignatureImprimable) => `/api/employes/${signature.employe_id}/signature?document=${signature.id}`);
+  // Dates de la base au format ISO (AAAA-MM-JJ) : affichage français sans passer par Date (aucun décalage de fuseau).
+  const dateFr=dateDocumentFr;
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
   const couleur=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_documents??"")?entreprise.couleur_documents!:"#0d1b2a";
@@ -150,12 +162,13 @@ export function DocumentImprimable({
         <div style={{ textAlign: positionLogo==="droite"?"left":"right", display:positionLogo==="centre"?"none":"block" }}>
           <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: moderne?"#fff":couleur }}>{typeDoc}</div>
           <div style={{ fontFamily: "monospace", fontSize: "15px" }}>{numero}</div>
-          <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateEmission}</div>
-          {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateSecondaire.valeur}</div>}
+          <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateFr(dateEmission)}</div>
+          {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateFr(dateSecondaire.valeur)}</div>}
+          {reference && <div style={{ color: "#555" }}>{reference}</div>}
         </div>
       </div>
 
-      {positionLogo==="centre"&&<div style={{textAlign:"center",marginBottom:"8px"}}><strong style={{fontSize:"22px",textTransform:"uppercase"}}>{typeDoc}</strong><div style={{fontFamily:"monospace"}}>{numero} · Émis le {dateEmission}</div></div>}
+      {positionLogo==="centre"&&<div style={{textAlign:"center",marginBottom:"8px"}}><strong style={{fontSize:"22px",textTransform:"uppercase"}}>{typeDoc}</strong><div style={{fontFamily:"monospace"}}>{numero} · Émis le {dateFr(dateEmission)}</div></div>}
       <hr style={{ border: "none", borderTop: epuree ? `1px solid ${couleur}` : elegante?`1px solid ${accent}`:`3px solid ${accent}`, margin: compacte ? "8px 0 12px" : "12px 0 20px" }} />
 
       {/* Client */}

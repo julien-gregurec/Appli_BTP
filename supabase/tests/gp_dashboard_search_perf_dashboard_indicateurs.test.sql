@@ -30,11 +30,13 @@ select is(
   '1. devis_acceptes_total == SUM(montant_ttc) WHERE statut=accepte (recalcul manuel)'
 );
 
--- 2. Le total facturé (hors annulée) correspond au recalcul manuel.
+-- 2. Le total facturé (hors annulée et hors brouillon) correspond au recalcul manuel.
+-- GP BUSINESS HARDENING V9.1 (B25, 20261003001406) : les brouillons ne sont plus
+-- comptés dans « Total facturé » ; recalcul canonique mis à jour en conséquence.
 select is(
   ((public.dashboard_indicateurs('a0000000-0000-0000-0000-000000000001', current_date))->>'factures_total')::numeric,
-  (select coalesce(sum(montant_ttc), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut <> 'annulee'),
-  '2. factures_total == SUM(montant_ttc) WHERE statut<>annulee (recalcul manuel)'
+  (select coalesce(sum(montant_ttc), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and statut not in ('annulee', 'brouillon')),
+  '2. factures_total == SUM(montant_ttc) WHERE statut hors annulee/brouillon (recalcul manuel)'
 );
 
 -- 3. Insertion d'un nouveau devis accepté : le cache suit immédiatement
@@ -118,7 +120,7 @@ values ('ae000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-0000000
 
 select is(
   (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
-  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut not in ('annulee', 'brouillon')), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   '10. Cache tenant A cohérent juste après création de la facture brouillon (avant mutation)'
 );
 
@@ -133,18 +135,22 @@ where id = 'ae000000-0000-0000-0000-000000000001';
 
 select is(
   (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
-  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut not in ('annulee', 'brouillon')), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   '11. ANCIEN tenant (A) : cache débité, cohérent avec le recalcul canonique après le changement d''entreprise'
 );
 select is(
   (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'b0000000-0000-0000-0000-000000000001'),
-  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'b0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut not in ('annulee', 'brouillon')), 0) from public.factures where entreprise_id = 'b0000000-0000-0000-0000-000000000001'),
   '12. NOUVEAU tenant (B) : cache crédité, cohérent avec le recalcul canonique après le changement d''entreprise'
 );
+-- GP BUSINESS HARDENING V9.1 (B25) : seul un brouillon peut changer d'entreprise
+-- (verrouiller_facture_emise) et un brouillon est désormais hors « Total facturé » :
+-- le déplacement ne doit créditer AUCUN montant au nouveau tenant (ni en débiter
+-- à l'ancien, vérifié par 11), au lieu de 1 200 € avant B25.
 select is(
   (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'b0000000-0000-0000-0000-000000000001') - (select v from _qual_cache_b_avant),
-  1200::numeric,
-  '13. NOUVEAU tenant (B) : le montant complet de la facture déplacée (1200) s''ajoute, pas un delta net partiel'
+  0::numeric,
+  '13. NOUVEAU tenant (B) : un brouillon déplacé ne crédite aucun montant (brouillons hors total, B25)'
 );
 
 select * from finish();
