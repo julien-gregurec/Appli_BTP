@@ -241,6 +241,10 @@ Reproduit et caractérisé (`scripts/perf/soak/tests/cron_push_red.test.sql`, pg
 * **Message empoisonné** : une notification dont la préparation échoue reste en attente et occupe une place
   à chaque passage ; 200 d'entre elles bloquent toutes les autres (rouge Vitest).
 * Observation : sans clés VAPID, chaque notification est **marquée envoyée sans push** (consommée).
+* **Performance de la RPC** : 79 264 notifications en attente (toutes remises en attente dans une
+  transaction annulée) → `push_notifications_en_attente_service(…, 200)` en **3,5 ms** ; avec le tri du
+  correctif, `Index Scan` sur `notifications_a_pousser_idx` + *Incremental Sort*, **0,3 ms**. Le défaut F
+  n'est pas un problème de performance de la sélection, mais de capacité/fenêtre du passage quotidien.
 
 **Correctif trivial et sûr appliqué sur branche isolée** `fix/elsatia-soak-files-service-ordre-v1`
 (`8fba2be3`) : migration `20261002001901_push_file_attente_ordre_explicite_v1.sql`
