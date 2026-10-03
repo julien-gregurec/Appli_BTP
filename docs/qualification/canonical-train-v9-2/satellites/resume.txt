@@ -1,0 +1,8 @@
+== builds GP / Colors / Réserves (ELSATIA_APPLICATION_ENV=local au build) ==
+== mode local ==
+   playwright local rc=0 :  6 skipped  10 passed (25.5s) 
+== mode preview ==
+   playwright preview rc=0 :  12 skipped  4 passed (6.2s) 
+== mode production ==
+   playwright production rc=0 :  14 skipped  2 passed (4.1s) 
+exit=0
