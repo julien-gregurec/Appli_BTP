@@ -1,5 +1,10 @@
 {
   "regions": ["fra1"],
+  "git": {
+    "deploymentEnabled": {
+      "integration/elsatia-v9.2-preview-ready-v1": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/abonnements",
