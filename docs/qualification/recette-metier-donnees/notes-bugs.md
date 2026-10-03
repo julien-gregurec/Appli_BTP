@@ -34,3 +34,9 @@
 - B28 P1 confidentialité NON CORRIGÉ: salarié lit par API cout_horaire/taux_horaire de 4 collègues (policy employes = membre actif, toutes colonnes). UI ne l'affiche pas. Correctif proposé: même modèle que articles_stock (revoke colonne + RPC avec contrôle voir_cout_interne_employe)
 - Permissions: 221 contrôles (132 écrans conformité config, 37 attentes métier, 6 données écran, 34 sondes API, 2 multi-tenant/anon) → 220 PASS
 - suppression d'un paiement d'une facture soldée possible (UI et API) — observation, pas d'audit visible
+- B29 P2 double soumission systémique (212 formulaires sans état d'envoi): 2 clients créés sur 2 clics réseau lent. CORRIGÉ GardeDoubleSoumission (layout app)
+- B30 P2 échéance facture antérieure à l'émission acceptée CORRIGÉ; date impossible 2026-02-30 refusée (message générique)
+- B31 P3 budget prévisionnel négatif accepté CORRIGÉ
+- B32 P3 hors ligne: aucun message explicite au pointage (page /offline existe) NON CORRIGÉ
+- B33 P3 devis accepté non facturé supprimable via API (cascade lignes autorisée) NON CORRIGÉ
+- Suppressions liées (client, chantier, employé, fournisseur, facture émise, devis facturé) toutes refusées

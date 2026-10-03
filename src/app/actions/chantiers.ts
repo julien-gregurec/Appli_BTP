@@ -31,6 +31,10 @@ export async function creerChantierAction(formData: FormData) {
   }
   const debutPrevu = champ(formData, "date_debut_prevue");
   const finPrevue = champ(formData, "date_fin_prevue");
+  const budget = champ(formData, "budget_previsionnel");
+  if (budget !== null && !(Number(budget.replace(",", ".")) >= 0)) {
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent("Le budget prévisionnel doit être un montant positif.")}`);
+  }
   if (debutPrevu && finPrevue && finPrevue < debutPrevu) {
     redirect(`/chantiers/nouveau?error=${encodeURIComponent("La date de fin prévue précède la date de début.")}`);
   }

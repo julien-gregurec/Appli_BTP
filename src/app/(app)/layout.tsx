@@ -8,6 +8,7 @@ import { MobileBack } from "@/components/MobileBack";
 import { AideButton } from "@/components/AideButton";
 import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
+import { GardeDoubleSoumission } from "@/components/GardeDoubleSoumission";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="app-shell flex min-h-full flex-1">
       <AppPresenceTracker actif={!isEmailLoginDisabled()} />
+      <GardeDoubleSoumission />
       <style>{`@media (max-width:767px){
         /* Le header mobile est fixe (h-16) : on décale le contenu dessous + zone sûre iOS,
            sinon le titre ET les liens « ← Retour » passent cachés sous la barre. */

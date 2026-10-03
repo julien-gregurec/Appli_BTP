@@ -160,6 +160,12 @@ export async function modifierEcheanceFactureAction(factureId: string, formData:
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const dateEcheance = String(formData.get("date_echeance") ?? "") || null;
+  if (dateEcheance) {
+    const { data: facture } = await supabase.from("factures").select("date_emission").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (facture?.date_emission && dateEcheance < facture.date_emission) {
+      redirect(`/factures/${factureId}?error=${encodeURIComponent("L’échéance ne peut pas précéder la date d’émission.")}`);
+    }
+  }
   const { error } = await supabase
     .from("factures")
     .update({ date_echeance: dateEcheance, updated_at: new Date().toISOString() })
