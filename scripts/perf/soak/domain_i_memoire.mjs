@@ -16,8 +16,9 @@ const PAGES = [
   ["planning_T22_500sal", "T22", "/planning"], ["pointage_gestion_T22", "T22", "/pointage/gestion?mois=2026-09"],
   ["employes_T22", "T22", "/employes"], ["devis_T14", "T14", "/devis"], ["factures_T14", "T14", "/factures"],
 ];
+const FILTRE = process.argv[3] ? process.argv[3].split(",") : null;
 const out = { depart: await apresGc(), pages: {} };
-for (const [nom, c, chemin] of PAGES) {
+for (const [nom, c, chemin] of PAGES.filter(([n]) => !FILTRE || FILTRE.includes(n))) {
   const r = (out.pages[nom] = { chemin, paliers: [] }); let fait = 0; const t0 = Date.now();
   for (const p of PALIERS) {
     const rs = await load(p - fait, 10, () => page(comptes[c].cookie, chemin));
