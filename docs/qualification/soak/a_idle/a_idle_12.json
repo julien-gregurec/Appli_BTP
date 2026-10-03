@@ -1,0 +1,122 @@
+{
+ "date": "2026-10-03T03:43:08.191Z",
+ "reps": 10,
+ "results": [
+  {
+   "tenant": 12,
+   "volume": 5000,
+   "verite": {
+    "factures_alertes": 2489,
+    "devis_alertes": 1247,
+    "factures_total": 5801606.66,
+    "factures_encaisse_total": 2766064.01,
+    "devis_acceptes_total": 4807039.52,
+    "chantiers": 500,
+    "notifs_non_lues": 2000
+   },
+   "flux": {
+    "dashboard_indicateurs": {
+     "n": 10,
+     "p50": 36.9,
+     "p95": 46.6,
+     "max": 46.6,
+     "errors": 0,
+     "avgBytes": 729865,
+     "exactitude": {
+      "factures_alertes": [
+       2489,
+       2489
+      ],
+      "devis_alertes": [
+       1247,
+       1247
+      ],
+      "factures_total": [
+       5801606.66,
+       5801606.66
+      ],
+      "factures_encaisse_total": [
+       2766064.01,
+       2766064.01
+      ],
+      "devis_acceptes_total": [
+       4807039.52,
+       4807039.52
+      ]
+     },
+     "exact": true
+    },
+    "gp_dashboard_chantiers": {
+     "n": 10,
+     "p50": 4.3,
+     "p95": 4.7,
+     "max": 4.7,
+     "errors": 0,
+     "avgBytes": 1843
+    },
+    "gp_options_chantiers": {
+     "n": 10,
+     "p50": 6.5,
+     "p95": 7.3,
+     "max": 7.3,
+     "errors": 0,
+     "avgBytes": 104781,
+     "lignes": [
+      500,
+      500
+     ]
+    },
+    "notifications_8": {
+     "n": 10,
+     "p50": 2,
+     "p95": 2.4,
+     "max": 2.4,
+     "errors": 0,
+     "avgBytes": 2
+    },
+    "devis_liste_paginee_p1": {
+     "n": 10,
+     "p50": 44.2,
+     "p95": 49.4,
+     "max": 49.4,
+     "errors": 0,
+     "avgBytes": 6778,
+     "total_api": 5000,
+     "exact_total": true
+    },
+    "devis_liste_paginee_derniere": {
+     "n": 10,
+     "p50": 53.9,
+     "p95": 92.8,
+     "max": 92.8,
+     "errors": 0,
+     "avgBytes": 6753
+    },
+    "devis_recherche_texte": {
+     "n": 10,
+     "p50": 48.3,
+     "p95": 50.3,
+     "max": 50.3,
+     "errors": 0,
+     "avgBytes": 6818
+    },
+    "factures_liste_paginee_p1": {
+     "n": 10,
+     "p50": 8.5,
+     "p95": 9.3,
+     "max": 9.3,
+     "errors": 0,
+     "avgBytes": 7442
+    },
+    "factures_impayees_p1": {
+     "n": 10,
+     "p50": 4.1,
+     "p95": 4.5,
+     "max": 4.5,
+     "errors": 0,
+     "avgBytes": 100
+    }
+   }
+  }
+ ]
+}

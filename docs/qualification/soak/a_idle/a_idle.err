@@ -1,0 +1,51 @@
+  11 dashboard_indicateurs p50=13.5 p95=23.4 max=23.4 err=0 octets=146845
+  11 gp_dashboard_chantiers p50=3.6 p95=4.2 max=4.2 err=0 octets=1025
+  11 gp_options_chantiers p50=3.8 p95=4.6 max=4.6 err=0 octets=20887
+  11 notifications_8 p50=1.9 p95=2.1 max=2.1 err=0 octets=2
+  11 devis_liste_paginee_p1 p50=39.2 p95=45.4 max=45.4 err=0 octets=6642
+  11 devis_liste_paginee_derniere p50=46.4 p95=67.6 max=67.6 err=0 octets=6660
+  11 devis_recherche_texte p50=38.8 p95=45.6 max=45.6 err=0 octets=6665
+  11 factures_liste_paginee_p1 p50=4.9 p95=5.4 max=5.4 err=0 octets=7271
+  11 factures_impayees_p1 p50=3.2 p95=3.6 max=3.6 err=0 octets=100
+tenant 11 (1000) ok
+  12 dashboard_indicateurs p50=36.9 p95=46.6 max=46.6 err=0 octets=729865
+  12 gp_dashboard_chantiers p50=4.3 p95=4.7 max=4.7 err=0 octets=1843
+  12 gp_options_chantiers p50=6.5 p95=7.3 max=7.3 err=0 octets=104781
+  12 notifications_8 p50=2 p95=2.4 max=2.4 err=0 octets=2
+  12 devis_liste_paginee_p1 p50=44.2 p95=49.4 max=49.4 err=0 octets=6778
+  12 devis_liste_paginee_derniere p50=53.9 p95=92.8 max=92.8 err=0 octets=6753
+  12 devis_recherche_texte p50=48.3 p95=50.3 max=50.3 err=0 octets=6818
+  12 factures_liste_paginee_p1 p50=8.5 p95=9.3 max=9.3 err=0 octets=7442
+  12 factures_impayees_p1 p50=4.1 p95=4.5 max=4.5 err=0 octets=100
+tenant 12 (5000) ok
+  13 dashboard_indicateurs p50=168.8 p95=178.3 max=178.3 err=0 octets=2874605
+  13 gp_dashboard_chantiers p50=6.3 p95=7.7 max=7.7 err=0 octets=1858
+  13 gp_options_chantiers p50=17.1 p95=23.6 max=23.6 err=0 octets=421467
+  13 notifications_8 p50=2.1 p95=2.6 max=2.6 err=0 octets=2
+  13 devis_liste_paginee_p1 p50=82.5 p95=103.1 max=103.1 err=0 octets=6815
+  13 devis_liste_paginee_derniere p50=83.6 p95=99 max=99 err=0 octets=6857
+  13 devis_recherche_texte p50=91.1 p95=150.1 max=150.1 err=0 octets=6726
+  13 factures_liste_paginee_p1 p50=26 p95=28.3 max=28.3 err=0 octets=7424
+  13 factures_impayees_p1 p50=7.3 p95=10.9 max=10.9 err=0 octets=100
+tenant 13 (20000) ok
+  14 dashboard_indicateurs p50=479.4 p95=518.8 max=518.8 err=0 octets=7312851
+  14 gp_dashboard_chantiers p50=9.4 p95=13 max=13 err=0 octets=1866
+  14 gp_options_chantiers p50=33.4 p95=40.1 max=40.1 err=0 octets=1056737
+  14 notifications_8 p50=1.8 p95=2.1 max=2.1 err=0 octets=2
+  14 devis_liste_paginee_p1 p50=150.2 p95=206.1 max=206.1 err=0 octets=6854
+  14 devis_liste_paginee_derniere p50=145.7 p95=164.9 max=164.9 err=0 octets=6864
+  14 devis_recherche_texte p50=202.2 p95=281.8 max=281.8 err=0 octets=6917
+  14 factures_liste_paginee_p1 p50=73.3 p95=80.5 max=80.5 err=0 octets=7492
+  14 factures_impayees_p1 p50=16.8 p95=20.6 max=20.6 err=0 octets=100
+tenant 14 (50000) ok
+  15 dashboard_indicateurs p50=916.8 p95=1055.3 max=1055.3 err=0 octets=14566255
+  15 gp_dashboard_chantiers p50=26.5 p95=27.6 max=27.6 err=0 octets=1867
+  15 gp_options_chantiers p50=68.6 p95=89.2 max=89.2 err=0 octets=2115769
+  15 notifications_8 p50=1.8 p95=11 max=11 err=0 octets=2
+  15 devis_liste_paginee_p1 p50=375.1 p95=412 max=412 err=0 octets=6919
+  15 devis_liste_paginee_derniere p50=352.8 p95=408 max=408 err=0 octets=6847
+  15 devis_recherche_texte p50=581.7 p95=649.3 max=649.3 err=0 octets=6868
+  15 factures_liste_paginee_p1 p50=286.3 p95=314.6 max=314.6 err=0 octets=7489
+  15 factures_impayees_p1 p50=170.6 p95=213 max=213 err=0 octets=100
+tenant 15 (100000) ok
+FIN_A3

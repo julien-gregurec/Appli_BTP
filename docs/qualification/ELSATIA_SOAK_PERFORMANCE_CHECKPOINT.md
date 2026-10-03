@@ -20,8 +20,8 @@ Base : `integration/elsatia-post-v9-hardening-v1` @ `877a4b9f284150e5d4f06fd6825
 
 - [x] 0. Sélection de la tête + branche isolée
 - [x] 1. PostgreSQL 16 + 391 migrations + fixture + PostgREST + pgTAP
-- [~] 2. Fixtures volumétriques (11, 12, 13 faits ; 14, 15, 16, 21, 22 en cours)
-- [ ] 3. Domaines
+- [x] 2. Fixtures volumétriques : 11, 12, 13, 14, 15 (100k), 21, 22 faits ; 16 (250k) abandonné après 7 101 s
+- [x] 3. Domaines A à L mesurés (voir rapport)
   - [x] F cron push : 9 rouges pgTAP + 4 rouges Vitest
   - [x] D concurrence facturation : `docs/qualification/soak/domain_d_concurrence.json` (7 PASS, 1 DEGRADATION, 0 deadlock) ; lost update SQL lignes (P2)
   - [x] G relances : 2 rouges (famine, pas d'ORDER BY), doublons/reprise PASS
@@ -29,7 +29,7 @@ Base : `integration/elsatia-post-v9-hardening-v1` @ `877a4b9f284150e5d4f06fd6825
   - [~] K multi-tenant : script prêt, à relancer hors charge
   - [ ] A dashboard (script prêt `domain_a_dashboard.mjs`) — après génération
   - [ ] B planning, C pointages, H PDF, I mémoire Next, J abus, L long run
-- [ ] 4. Rapport final
+- [x] 4. Rapport final : docs/qualification/ELSATIA_SOAK_PERFORMANCE_V1.md — ELSATIA_SOAK_PERFORMANCE_PARTIAL
 
 ## Constats provisoires
 - H PDF : file bornée (2 Chromium, file 10, 503+Retry-After), 0 orphelin même après abandon en plein rendu ; P2 : le PDF consomme le quota /imprimer (30/min) → 502 au lieu de 429, Chromium lancé pour rien. `docs/qualification/soak/domain_h_pdf.json`.

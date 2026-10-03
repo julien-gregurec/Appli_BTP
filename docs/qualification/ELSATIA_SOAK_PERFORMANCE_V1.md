@@ -25,7 +25,7 @@ La qualification est **partielle** pour quatre raisons, toutes documentées plus
 3. **Limites de capacité** au-delà de la cible PME 20–40 salariés : `/employes` (32 Mo HTML à 500 salariés,
    RSS serveur 2,7 Go), `/planning` (8 Mo), `/dashboard` CPU-bound au-delà de ~10 000 alertes ouvertes.
 4. **Volumétrie 250 000 non atteinte** pour devis/factures (génération interrompue après 7 101 s, § 2) ;
-   100 000 : voir § 2. Les mesures ont été prises sur un conteneur 4 vCPU **partagé** avec les
+   le palier **100 000** est atteint et mesuré (exactitude PASS, dashboard 917 ms côté API). Les mesures ont été prises sur un conteneur 4 vCPU **partagé** avec les
    générateurs : les latences sont pessimistes (signalé à chaque fois qu'un chiffre en dépend).
 
 ---
@@ -65,13 +65,13 @@ par palier, + fixture capacité historique `scripts/perf/generate_fixture.sql` (
 | T12 | 5 000 | 5 000 | 5 000 | 5 000 | 5 000 | 500 | 20 | — | — | 57 s |
 | T13 | 20 000 | 20 000 | 20 000 | 20 000 | 20 000 | 2 000 | 20 | — | — | 422 s |
 | T14 | 50 000 | 50 000 | 50 000 | 50 000 | 50 000 | 5 000 | 20 | — | — | 2 865 s |
-| T15 | 100 000 (cible) | | | | | | | | | voir § 2.1 |
+| T15 | **100 000** | 100 000 | 100 000 | 100 000 | 100 000 | 10 000 | 20 | — | — | 13 070 s |
 | T16 | 250 000 (cible) | | | | | | | | | **abandonné** après 7 101 s |
 | T21 | 1 000 | 1 000 | | | | 100 | 100 | 87 724 (5 ans) | 9 000 | 65 s |
 | T22 | 1 000 | 1 000 | | | | 100 | **500** | 159 321 (1 an) | 45 000 | 72 s |
 | A (fixture) | 5 012 | 3 000 | 1 200 | ~800 | — | 150 | 40 | 46 650 | — | — |
 
-Totaux base `soak` : > 250 000 pointages, 108 749 tâches, > 80 000 devis et factures.
+Totaux base `soak` : 298 939 pointages, 233 739 tâches, 183 312 devis (434 874 lignes), 181 603 factures, 179 264 notifications, 178 990 documents.
 
 ### 2.1 Pourquoi 250 000 n'a pas été atteint
 
@@ -97,16 +97,18 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
 
 | Flux | Volume | P50 | P95 | Max | Erreurs | Mémoire | DB plan | Verdict |
 |---|---|---:|---:|---:|---|---|---|---|
-| RPC `dashboard_indicateurs` | 1k | 21 | 26 | 26 | 0 | 147 Ko | agrégats + cache | PASS |
-| RPC `dashboard_indicateurs` | 5k | 50 | 59 | 59 | 0 | 730 Ko | idem | PASS |
-| RPC `dashboard_indicateurs` | 20k | 163 | 187 | 187 | 0 | 2,9 Mo | jsonb_agg de 14 635 alertes | DEGRADATION |
-| RPC `dashboard_indicateurs` | 50k | 1 659 | 1 827 | 1 827 | 0 | 7,3 Mo | jsonb_agg de 36 988 alertes (machine chargée) | DEGRADATION |
-| Exactitude dashboard (alertes, totaux, cache) | 5k / 20k | — | — | — | **0 écart** | — | — | PASS |
+| RPC `dashboard_indicateurs` (machine au repos) | 1k | 13,5 | 23 | 23 | 0 | 147 Ko | agrégats + cache | PASS |
+| RPC `dashboard_indicateurs` | 5k | 37 | 47 | 47 | 0 | 730 Ko | idem | PASS |
+| RPC `dashboard_indicateurs` | 20k | 169 | 178 | 178 | 0 | 2,9 Mo | jsonb_agg de 14 635 alertes | PASS |
+| RPC `dashboard_indicateurs` | 50k | 479 | 519 | 519 | 0 | 7,3 Mo | jsonb_agg de 36 988 alertes | DEGRADATION |
+| RPC `dashboard_indicateurs` | **100k** | 917 | 1 055 | 1 055 | 0 | 14,6 Mo | jsonb_agg (linéaire ≈ 9 ms / 1 000 documents) | DEGRADATION |
+| Exactitude dashboard (alertes, totaux, cache, total paginé, options chantiers) | 5k / 20k / 50k / **100k** | — | — | — | **0 écart** | — | — | PASS |
 | Page `/dashboard` 10 VU | A (5k) | 2 205 | 2 555 | 2 623 | 0 | 1 065 Mo après GC, stable sur 1 000 req | — | PASS |
 | Page `/dashboard` 10 VU | T14 50k | 16 137 | 18 371 | 30 737 | 0 (2 × 307) | 1 058 Mo après GC ; ELU 1 ; délai boucle p99 10,8 s | CPU Node (`construireAlertes` sur 37 k éléments) | DEGRADATION |
-| RPC `devis_liste_paginee` p1 | 5k → 50k | 48 → 185 | 58 → 657 | | 0 | 7 Ko | `count(*) over ()` sur tout le filtre | PASS |
-| RPC `devis_liste_paginee` recherche | 50k | 868 | 976 | 976 | 0 | 7 Ko | ILIKE ×5 colonnes + fenêtre | DEGRADATION |
-| RPC `factures_liste_paginee` p1 | 50k | 329 | 349 | 349 | 0 | 7 Ko | idem | PASS |
+| RPC `devis_liste_paginee` p1 (au repos) | 1k / 20k / 50k / 100k | 39 / 83 / 150 / 375 | 45 / 103 / 206 / 412 | | 0 | 7 Ko | `count(*) over ()` sur tout le filtre | PASS |
+| RPC `devis_liste_paginee` recherche texte | 1k / 50k / 100k | 39 / 202 / 582 | 46 / 282 / 649 | | 0 | 7 Ko | ILIKE ×5 colonnes + fenêtre | PASS / PASS / DEGRADATION |
+| RPC `factures_liste_paginee` p1 | 1k / 50k / 100k | 5 / 73 / 286 | 5 / 81 / 315 | | 0 | 7 Ko | idem | PASS |
+| RPC `gp_options_chantiers` (sélecteurs) | 100k (10 000 chantiers) | 69 | 89 | | 0 | 2,1 Mo, 10 000/10 000 | jsonb | PASS |
 | PostgREST direct `factures` sans limite | 20k | 22 238 | 26 627 | | 0 | tronqué 1 000 (`max_rows`) | RLS ×2 par ligne + `count=exact` | FAIL (chemin non utilisé par les pages) |
 | Planning semaine (RPC) | 40 / 100 / 500 sal. | 86 / 415 / 4 311 | 136 / 956 / 4 438 | | 0 | 43 Ko / 348 Ko / 1,7 Mo | 2 × `peut_consulter_*` par salarié | PASS / PASS / DEGRADATION |
 | Planning 20 lecteurs simultanés | 500 sal. | 10 020 | 22 133 | 24 270 | **85 / 200** (504 pool) | | idem | FAIL |
@@ -131,7 +133,7 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
 
 ### A — Dashboard
 
-* **Exactitude** : à 5k et 20k, `factures_alertes`, `devis_alertes`, `factures_total`,
+* **Exactitude** : à 5k, 20k, 50k et 100k (série au repos, `docs/qualification/soak/a_idle/`), `factures_alertes`, `devis_alertes`, `factures_total`,
   `factures_encaisse_total` et `devis_acceptes_total` renvoyés par l'API sont **identiques** à la vérité
   SQL superuser (`docs/qualification/soak/domain_a_tenant12.json`, `…13.json`). `devis_liste_paginee`
   renvoie le total exact (5 000, 20 000). `gp_options_chantiers` renvoie 2 000/2 000 chantiers (jsonb, pas
@@ -139,6 +141,7 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
 * **Aucune troncature à 1 000** sur les chemins du tableau de bord : toutes les sources passent par des RPC
   `jsonb`. La lecture PostgREST directe sans limite est bien tronquée à 1 000 (`max_rows`) — chemin non
   utilisé par les pages (`domain_a_dashboard_serie1.log`).
+* **Série au repos 1k → 100k** : `dashboard_indicateurs` 13,5 → 37 → 169 → 479 → 917 ms (×68 pour ×100 de volume : linéaire, pas de multiplication anormale) ; listes paginées 39 → 375 ms (×10). Baseline 1k : toutes les RPC du tableau de bord < 50 ms.
 * **Croissance** : la charge utile de `dashboard_indicateurs` est linéaire dans le nombre d'alertes
   ouvertes (≈ 200 octets/alerte : 147 Ko → 7,3 Mo). Le centre d'alertes (`construireAlertes`,
   `repartirAlertes`) traite **toutes** les alertes en Node à chaque rendu avant de n'en envoyer que 30 :
