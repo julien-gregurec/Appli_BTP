@@ -88,12 +88,22 @@ export function Sidebar({
               href="/plateforme"
               onClick={() => setOuvert(false)}
               className={`block rounded-md px-3 py-2 text-sm ${
-                pathname === "/plateforme" || pathname.startsWith("/plateforme/")
+                pathname === "/plateforme" || (pathname.startsWith("/plateforme/") && !pathname.startsWith("/plateforme/social"))
                   ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
                   : "text-[#c9a24a] hover:bg-white/10"
               }`}
             >
               ★ Plateforme
+            </Link>
+            <p className="mt-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/45">Communication</p>
+            <Link
+              href="/plateforme/social"
+              onClick={() => setOuvert(false)}
+              className={`block rounded-md px-3 py-2 text-sm ${
+                pathname.startsWith("/plateforme/social") ? "bg-[#c9a24a] font-medium text-[#0d1b2a]" : "text-white/80 hover:bg-white/10"
+              }`}
+            >
+              Réseaux sociaux
             </Link>
           </>
         )}

@@ -90,6 +90,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             <Link href="/plateforme/tarification" className="rounded-md border px-3 py-2 text-sm font-medium">Tarification</Link>
             <Link href="/plateforme/roles-demo" className="rounded-md border px-3 py-2 text-sm font-medium">Rôles de démonstration</Link>
             <Link href="/plateforme/support" className="rounded-md border px-3 py-2 text-sm font-medium">Support</Link>
+            <Link href="/plateforme/social" className="rounded-md border px-3 py-2 text-sm font-medium">ELSATIA Social</Link>
             <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
           </div>
         </div>

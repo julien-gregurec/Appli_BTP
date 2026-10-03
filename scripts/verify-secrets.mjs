@@ -13,6 +13,7 @@ const signatures = [
   { nom: "secret webhook Stripe", motif: /\bwhsec_[A-Za-z0-9]{20,}\b/ },
   { nom: "clé OpenAI", motif: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/ },
   { nom: "jeton GitHub", motif: /\bgh[opusr]_[A-Za-z0-9]{30,}\b/ },
+  { nom: "jeton Meta (Graph API)", motif: /\bEAA[A-Za-z0-9]{80,}\b/ },
   { nom: "JWT Supabase", motif: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/ },
 ];
 

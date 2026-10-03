@@ -1,5 +1,18 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE — 3 octobre 2026, ELSATIA Social (MIGRATION 184 À APPLIQUER)
+
+- Nouveau module interne **ELSATIA Social** dans l’espace plateforme : `/plateforme/social` (menu Communication › Réseaux sociaux). Il gère la Page Facebook, l’Instagram professionnel et la Page LinkedIn ELSATIA. Documentation complète : `docs/ELSATIA_SOCIAL.md`.
+- Workflow imposé : brouillon → aperçu → validation humaine (Administrateur ou Validateur, contrôle aussi par trigger en base) → publication. Une empreinte SHA-256 fige le contenu validé ; toute modification renvoie en brouillon.
+- **Mode simulation par défaut** : rien n’est envoyé tant que `SOCIAL_DRY_RUN` ne vaut pas exactement `false`. Ne pas le passer à `false` sans l’accord explicite de Julien.
+- Connecteurs `MetaConnector` (Graph API v26.0) et `LinkedInConnector` (version 202609) derrière l’interface `SocialProvider`. Fonctions absentes des API (messagerie LinkedIn, programmation Instagram/LinkedIn) déclarées indisponibles, jamais simulées.
+- Jetons chiffrés AES-256-GCM (`SOCIAL_TOKEN_ENCRYPTION_KEY`, rotation via `_PREVIOUS`) dans `social_identifiants`, sans policy RLS. OAuth côté serveur avec état signé et nonce en cookie httpOnly. Webhooks signés (Meta `X-Hub-Signature-256`, LinkedIn `X-LI-Signature`), idempotence, reprise et file des échecs.
+- Migration `20261003000184_elsatia_social.sql` **non appliquée** ; testée sur PostgreSQL 16 local (garde-fous et RLS vérifiés).
+- Contrôles : 134 tests (dont 30 nouveaux), TypeScript, ESLint (0 erreur) et build Next verts.
+- Actions externes restantes : application Meta, application LinkedIn (Community Management API), variables Vercel, migration 184, logo officiel ELSATIA dans `public/elsatia/`, planificateur toutes les 5 minutes sur `/api/social/cron`.
+
+---
+
 ## REPRISE AUTORITATIVE — 18 juillet 2026, coût client et appareils déplacés dans Abonnement
 
 - L’avertissement de dépassement d’appareils a été retiré du tableau de bord : aucune information de facturation SaaS n’encombre désormais l’accueil opérationnel.

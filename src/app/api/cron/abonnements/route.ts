@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { executerTachesSociales } from "@/lib/social/taches";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
@@ -82,5 +83,8 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  // Rattrapage quotidien ELSATIA Social (même raison : limite de crons du plan Hobby).
+  // La programmation à l'heure près exige l'appel fréquent de /api/social/cron.
+  const elsatiaSocial = await executerTachesSociales(admin, { synchroniser: true }).catch((erreur) => ({ erreur: erreur instanceof Error ? erreur.message : "Erreur" }));
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, elsatiaSocial });
 }
