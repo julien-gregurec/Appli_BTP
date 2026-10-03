@@ -25,6 +25,8 @@
     "preflight:env": "node scripts/check-env-manifest.mjs --preflight",
     "preflight:preview": "node scripts/preflight-preview.mjs",
     "test:preflight-preview": "node --test scripts/preflight-preview.test.mjs",
+    "production:v9x:preflight": "node scripts/upgrade/preflight.mjs",
+    "test:production-v9x-preflight": "node --test scripts/upgrade/preflight.test.mjs",
     "smoke:email:preview": "node scripts/smoke-email-preview.mjs",
     "test:smoke-email": "node --test scripts/smoke-email-preview.test.mjs",
     "preview:env-inventory": "node scripts/preview/env-inventory.mjs",

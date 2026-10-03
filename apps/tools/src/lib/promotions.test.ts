@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FREE_ACCESS, resolveAccess } from "./access";
-import { getPromotion, getPromotionForAccess, promotions } from "./promotions";
+import { buildPromotions, getPromotion, getPromotionForAccess, promotions } from "./promotions";
+import { elsatiaAppUrls } from "./site";
 
 describe("promotions ELSATIA", () => {
   it("possède des ids uniques et des configurations complètes", () => {
@@ -21,5 +22,13 @@ describe("promotions ELSATIA", () => {
   it("désactive centralement les promotions pour la capability Pro dédiée", () => {
     expect(getPromotionForAccess("gestion-pro-quantitatifs", FREE_ACCESS)).toBeDefined();
     expect(getPromotionForAccess("gestion-pro-quantitatifs", resolveAccess([{ tier: "pro", source: "web" }]))).toBeUndefined();
+  });
+
+  /* A-08 : sans URL sûre pour l'environnement, la promotion est désactivée (jamais un lien Production depuis une Preview). */
+  it("désactive une promotion dont l'application n'a pas d'URL dans l'environnement", () => {
+    const preview = buildPromotions(elsatiaAppUrls({ env: "preview", colors: "https://colors-git-main.vercel.app" }));
+    expect(preview.find((p) => p.id === "gestion-pro-quantitatifs")?.active).toBe(false);
+    expect(preview.find((p) => p.id === "colors-peinture")).toMatchObject({ active: true, url: "https://colors-git-main.vercel.app" });
+    for (const promotion of preview) expect(promotion.url ?? "").not.toMatch(/elsatia\.fr/);
   });
 });

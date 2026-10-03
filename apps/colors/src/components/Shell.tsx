@@ -34,7 +34,7 @@ export function Shell({
         <div className="sidebar-brand"><Brand /></div>
         <DesktopNavigation />
         <div className="sidebar-footer">
-          <Link href={compteUrl} className="account-link">Compte et abonnements <span>↗</span></Link>
+          {compteUrl && <Link href={compteUrl} className="account-link">Compte et abonnements <span>↗</span></Link>}
           <div className="profile-card">
             <span className="avatar">{(contexte.prenom ?? contexte.email ?? "E").slice(0, 1).toUpperCase()}</span>
             <span><strong>{contexte.prenom ?? "Compte ELSATIA"}</strong><small>{role ?? contexte.entrepriseNom}</small></span>
@@ -49,9 +49,15 @@ export function Shell({
           <ApplicationSwitcher contexte={contexte} />
           <div className="topbar-actions">
             <span className="secure-pill"><i/> Accès sécurisé</span>
-            <Link href={compteUrl} className="account-avatar" aria-label="Ouvrir le compte ELSATIA">
-              {(contexte.prenom ?? contexte.email ?? "E").slice(0, 1).toUpperCase()}
-            </Link>
+            {compteUrl ? (
+              <Link href={compteUrl} className="account-avatar" aria-label="Ouvrir le compte ELSATIA">
+                {(contexte.prenom ?? contexte.email ?? "E").slice(0, 1).toUpperCase()}
+              </Link>
+            ) : (
+              <span className="account-avatar" aria-hidden="true">
+                {(contexte.prenom ?? contexte.email ?? "E").slice(0, 1).toUpperCase()}
+              </span>
+            )}
           </div>
         </header>
         <BandeauAssistanceElsatia bandeau={bandeauAssistance} />

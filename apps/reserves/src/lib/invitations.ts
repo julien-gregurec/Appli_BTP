@@ -30,7 +30,7 @@ export const DUREE_INVITATION_JOURS = 30;
  *
  * L'origine est validée par le registre commun (`@elsatia/email`) : en Production,
  * `https://reserves.elsatia.fr` exactement ; en Preview, HTTPS et jamais un hôte de
- * Production. Le repli `http://localhost:3020` n'existe plus qu'en local et en test :
+ * Production. Le repli `http://localhost:3040` n'existe plus qu'en local et en test :
  * ailleurs, une origine absente ou invalide LÈVE plutôt que d'envoyer un lien mort ou
  * pointant vers une autre application.
  */
@@ -38,7 +38,7 @@ export function urlApplicationReserves(): string {
   const origine = origineApplication("reserves");
   if (origine.ok) return origine.origine;
   const env = resoudreEnvironnementEmail();
-  if ((env === "local" || env === "test") && origine.motif === "origine_absente") return "http://localhost:3020";
+  if ((env === "local" || env === "test") && origine.motif === "origine_absente") return "http://localhost:3040";
   throw new Error(`Origine publique de Réserves inutilisable (${origine.motif}) : aucun lien n'est émis.`);
 }
 

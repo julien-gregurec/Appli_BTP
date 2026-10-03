@@ -1,0 +1,6 @@
+# Reproduction UPG-P0-1 : Production 210 synthétique (vol 500) → V9.1 24a0c2e9, SANS pont (dry-run)
+dry-run : échec 20260921000300_correctif_perf_rls_lignes_devis_factures.sql
+NOTICE:  constraint "lignes_devis_devis_id_entreprise_id_fkey" of relation "lignes_devis" does not exist, skipping
+NOTICE:  trigger "fixer_entreprise_ligne_devis" for relation "public.lignes_devis" does not exist, skipping
+ERROR:  Les lignes d'une facture émise ne peuvent plus être modifiées
+CONTEXT:  PL/pgSQL function trg_lignes_factures_brouillon_only() line 10 at RAISE

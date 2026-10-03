@@ -663,8 +663,8 @@
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY"
       ],
-      "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (Gestion Pro, Colors, Studio, Tools) et ANON legacy (Réserves seulement — Tools a migré, 094bd43e).",
-      "next_step": "Lot code Réserves : lecture canonique + repli sur l'alias, puis retrait de l'alias."
+      "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (convention, lue par toutes les applications) et ANON hérité (Réserves seulement, en repli transitoire depuis A-07).",
+      "next_step": "Fait (A-07) : Réserves lit le nom canonique avec repli sur l'alias. Reste : renommer la variable dans les projets Vercel Réserves, puis retirer le repli et l'alias."
     },
     {
       "id": "F-RESERVES-EXAMPLE-KEY",
@@ -674,7 +674,7 @@
         "NEXT_PUBLIC_SUPABASE_ANON_KEY"
       ],
       "text": "Le gabarit de Réserves déclarait PUBLISHABLE alors que le code lit ANON : configurée selon l'exemple, l'application n'authentifiait personne.",
-      "next_step": "Corrigé : le gabarit déclare l'alias lu par le code. Test de non-régression : EXAMPLE-FOREIGN / EXAMPLE-MISSING."
+      "next_step": "Corrigé, puis dépassé par A-07 : le gabarit déclare désormais le nom canonique, que le code lit en priorité. Tests : check-env-manifest.test.mjs (Réserves réel)."
     },
     {
       "id": "F-STRIPE-EXPECTED-MODE-TEMPLATES",
@@ -869,7 +869,8 @@
         "gestion_pro",
         "colors",
         "studio",
-        "tools"
+        "tools",
+        "reserves"
       ],
       "required": true,
       "environments": [
@@ -882,7 +883,7 @@
       "build_time": true,
       "runtime": true,
       "category": "supabase_public",
-      "description": "CONVENTION CIBLE de la clé publique Supabase (clé publishable sb_publishable_…). Publique par conception, protégée par la RLS ; jamais une clé de service. Les clés JWT legacy sont désactivées côté projet.",
+      "description": "CONVENTION de la clé publique Supabase (clé publishable sb_publishable_…), lue par toutes les applications — Réserves comprise depuis A-07 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2, apps/reserves/src/lib/supabase/cles.ts). Publique par conception, protégée par la RLS ; jamais une clé de service. Les clés JWT legacy sont désactivées côté projet.",
       "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
@@ -898,7 +899,7 @@
       "applications": [
         "reserves"
       ],
-      "required": true,
+      "required": false,
       "environments": [
         "local",
         "preview",
@@ -909,13 +910,13 @@
       "build_time": true,
       "runtime": true,
       "category": "supabase_public",
-      "description": "ALIAS LEGACY de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, encore lu par le code de Réserves. Le NOM est legacy, la VALEUR doit déjà être une clé publishable (sb_publishable_…). Tools ne le lit plus depuis 094bd43e (apps/tools/src/lib/auth/client.ts ne lit que la clé canonique) : retiré de Tools par ELSATIA_PREVIEW_EXECUTION_PREP_V3.",
+      "description": "ALIAS HÉRITÉ de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Réserves lit désormais le nom canonique et n'accepte celui-ci qu'en REPLI TRANSITOIRE (apps/reserves/src/lib/supabase/cles.ts, A-07) : un projet encore configuré sous l'ancien nom continue de fonctionner, avec un avertissement du preflight (PF-ALIAS-IN-USE) et de la garde de build ; deux valeurs différentes sous les deux noms bloquent (PF-ALIAS-CONFLICT). La VALEUR doit être une clé publishable (sb_publishable_…). Tools ne le lit plus depuis 094bd43e.",
       "fail_mode": "closed",
       "deprecated": true,
       "replacement": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "dr_critical": false,
-      "example_required": true,
-      "migration": "Lot code séparé : lire la clé canonique avec repli sur l'alias pendant la transition, puis retirer l'alias. Le gabarit de Réserves déclare l'alias TANT QUE le code le lit (test de non-régression).",
+      "example_required": false,
+      "migration": "Fait (A-07) : lecture canonique + repli sur l'alias ; gabarits migrés vers le nom canonique. Reste : renommer la variable dans les projets Vercel Réserves (Preview, Production), puis retirer le repli du code et cette entrée.",
       "value_pattern": "^sb_publishable_[A-Za-z0-9_-]+$",
       "finding_ids": [
         "F-SUPABASE-PUBLIC-KEY-NAME"
@@ -1049,8 +1050,8 @@
       "build_time": true,
       "runtime": true,
       "category": "env_indicator",
-      "description": "Indicateur d'environnement PUBLIC de Tools (local | preview | production | native-dev | native-production). Valeur par défaut quand absent ou inconnu : « production ». Second indicateur, distinct d'ELSATIA_APPLICATION_ENV qui n'est pas publique.",
-      "fail_mode": "default",
+      "description": "Indicateur d'environnement PUBLIC de Tools (local | preview | production | native-dev | native-production). Absent : « production » (build traité comme publié). Valeur inconnue : build REFUSÉ par apps/tools/scripts/verify-public-env.mjs et aucun lien inter-applications à l'exécution (fail closed, TOOLS_ENV — ELSATIA_SATELLITES_PREVIEW_READINESS_V2). Sur Vercel, doit correspondre à VERCEL_ENV : une Preview doit déclarer « preview ». Second indicateur, distinct d'ELSATIA_APPLICATION_ENV qui n'est pas publique.",
+      "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
@@ -1249,6 +1250,56 @@
       "example_required": true,
       "required_when": "dès que l'abonnement Tools est ouvert",
       "url_class": "api_endpoint"
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine de Gestion Pro pour les liens Tools → Gestion Pro (A-08, apps/tools/src/lib/site.ts::elsatiaAppUrls). Local : défaut http://localhost:3000 ; Preview : origine Preview OBLIGATOIRE pour afficher le lien, un hôte *.elsatia.fr est refusé au build ; Production : défaut origine canonique, une valeur hors *.elsatia.fr est refusée. Absente en Preview : lien masqué, jamais de repli vers la Production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "cross_app_link",
+      "required_when": "pour afficher les liens inter-applications d'une Preview Tools"
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_COLORS_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine de Colors pour les liens Tools → Colors (A-08, apps/tools/src/lib/site.ts::elsatiaAppUrls). Local : défaut http://localhost:3010 ; Preview : origine Preview OBLIGATOIRE pour afficher le lien, un hôte *.elsatia.fr est refusé au build ; Production : défaut origine canonique, une valeur hors *.elsatia.fr est refusée. Absente en Preview : lien masqué, jamais de repli vers la Production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "cross_app_link",
+      "required_when": "pour afficher les liens inter-applications d'une Preview Tools"
     },
     {
       "name": "TOOLS_APP_URL",

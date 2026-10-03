@@ -1,4 +1,8 @@
-import type { ApplicationElsatiaAutorisee } from "@elsatia/application-access";
+import {
+  environnementNavigationServeur,
+  urlApplicationPourEnvironnement,
+  type ApplicationElsatiaAutorisee,
+} from "@elsatia/application-access";
 
 export type EnvironnementApplications = "local" | "preview" | "production";
 
@@ -32,26 +36,34 @@ export const LIBELLES_ROLES_APPLICATIONS: Record<string, string> = {
   administrateur_plateforme_global: "Administration ELSATIA",
 };
 
+/**
+ * Environnement de navigation (A-08, `@elsatia/application-access`) : valeur inconnue, ou
+ * déploiement Vercel non déclaré → `null`, donc aucun lien inter-applications. Absente sur un
+ * poste de développement → `local`.
+ */
 export function environnementApplications(
   valeur = process.env.ELSATIA_APPLICATION_ENV,
-): EnvironnementApplications {
-  if (valeur === "preview" || valeur === "production") return valeur;
-  return "local";
+  vercelEnv = process.env.VERCEL_ENV,
+): EnvironnementApplications | null {
+  return environnementNavigationServeur({ ELSATIA_APPLICATION_ENV: valeur, VERCEL_ENV: vercelEnv });
 }
 
+/**
+ * URL d'une application du catalogue pour l'environnement courant, validée : jamais une URL
+ * de Production en Preview, jamais une URL hors Production en Production, jamais de repli
+ * d'un environnement sur un autre. `null` = lien non proposé.
+ */
 export function urlApplication(
   application: Pick<ApplicationElsatiaAutorisee, "urlLocale" | "urlPreview" | "urlProduction">,
-  environnement = environnementApplications(),
+  environnement: EnvironnementApplications | null = environnementApplications(),
 ): string | null {
-  if (environnement === "production") return application.urlProduction;
-  if (environnement === "preview") return application.urlPreview;
-  return application.urlLocale;
+  return urlApplicationPourEnvironnement(application, environnement);
 }
 
 export function construireSelecteurApplications(
   applications: ApplicationElsatiaAutorisee[],
   applicationCourante = "gestion_pro",
-  environnement = environnementApplications(),
+  environnement: EnvironnementApplications | null = environnementApplications(),
 ): DestinationApplication[] {
   return applications.map((application) => ({
     code: application.applicationCode,
@@ -76,3 +88,21 @@ export function accesDansSaFenetre(
 
 // valeurDateHeureLocale (rendu datetime-local dans le fuseau du SERVEUR) retirée en post-V9
 // (V9-01) : voir src/lib/date-heure-locale.ts et src/components/ChampDateHeure.tsx.
+
+/**
+ * A-11 : normalisation et validation d'une `url_preview`, à l'identique de la RPC
+ * `plateforme_definir_url_preview_application` (migration 20261003000102), qui reste
+ * l'autorité. Sert à refuser tôt, avec un message clair, sans solliciter la base.
+ * Vide → effacement (`url: null`). Sinon : origine stricte `https://<projet>.vercel.app`.
+ */
+const ORIGINE_PREVIEW_VERCEL = /^https:\/\/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$/;
+
+export function normaliserUrlPreview(brute: string): { ok: true; url: string | null } | { ok: false; motif: string } {
+  const valeur = brute.trim().toLowerCase();
+  if (!valeur) return { ok: true, url: null };
+  const url = valeur.replace(/\/$/, "");
+  if (!ORIGINE_PREVIEW_VERCEL.test(url)) {
+    return { ok: false, motif: "URL Preview refusée : origine https://<projet>.vercel.app attendue, sans chemin, requête, port ni identifiants" };
+  }
+  return { ok: true, url };
+}

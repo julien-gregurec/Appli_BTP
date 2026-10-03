@@ -219,26 +219,62 @@ test("gabarit : un drapeau doit porter la valeur attendue pour son environnement
   assert.ok(has(repo(withExamples(manifest), { ...files, ".env.example": "", ".env.local.example": "" }), "EXAMPLE-FLAG-VALUE"));
 });
 
-test("Réserves : le gabarit doit déclarer ce que le code lit (non-régression ANON / PUBLISHABLE)", () => {
+test("Réserves : le gabarit doit déclarer ce que le code lit (A-07 : PUBLISHABLE canonique, ANON alias)", () => {
   const manifest = manifestWith([
-    v("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", { applications: ["gestion_pro"], accepted_aliases: ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] }),
-    v("NEXT_PUBLIC_SUPABASE_ANON_KEY", { applications: ["reserves"], required: true, example_required: true, deprecated: true, replacement: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", migration: "plus tard" }),
+    v("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", { applications: ["gestion_pro", "reserves"], required: true, example_required: true, accepted_aliases: ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] }),
+    v("NEXT_PUBLIC_SUPABASE_ANON_KEY", { applications: ["reserves"], required: false, example_required: false, deprecated: true, replacement: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", migration: "retrait après bascule" }),
   ]);
-  const code = { "apps/reserves/src/lib/supabase/server.ts": "createServerClient(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)" };
-  // Gabarit incohérent (l'ancien état) : déclare PUBLISHABLE alors que le code lit ANON.
-  const bad = repo(withExamples(manifest), { ...code, "apps/reserves/.env.example": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=publishable-key\n" });
-  assert.ok(has(bad, "EXAMPLE-FOREIGN", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"), "PUBLISHABLE n'appartient pas à Réserves");
-  assert.ok(has(bad, "EXAMPLE-MISSING", "NEXT_PUBLIC_SUPABASE_ANON_KEY"), "le nom lu par le code doit figurer au gabarit");
-  // Gabarit corrigé : aucune erreur.
-  const good = repo(withExamples(manifest), { ...code, "apps/reserves/.env.example": "NEXT_PUBLIC_SUPABASE_ANON_KEY=publishable-key\n" });
+  const code = { "apps/reserves/src/lib/supabase/cles.ts": "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY" };
+  // Gabarit resté sur l'ancien nom : le nom canonique manque.
+  const bad = repo(withExamples(manifest), { ...code, "apps/reserves/.env.example": "NEXT_PUBLIC_SUPABASE_ANON_KEY=publishable-key\n" });
+  assert.ok(has(bad, "EXAMPLE-MISSING", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"), "le nom canonique doit figurer au gabarit");
+  // Gabarit migré : aucune erreur ; la lecture transitoire de l'alias reste signalée (avertissement).
+  const good = repo(withExamples(manifest), { ...code, "apps/reserves/.env.example": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=publishable-key\n" });
   assert.deepEqual(errorsOf(good), []);
+  assert.ok(good.some((f) => f.code === "ENV-DEPRECATED-USED" && f.subject === "NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 });
 
-test("Réserves réel : le gabarit déclare le nom que lit le code de Réserves", () => {
+test("Réserves réel : le gabarit déclare le nom canonique que lit le code de Réserves (A-07)", () => {
   const example = parseEnvFile(readFileSync(`${ROOT}/apps/reserves/.env.example`, "utf8"));
-  const reads = readFileSync(`${ROOT}/apps/reserves/src/lib/supabase/server.ts`, "utf8");
+  const reads = readFileSync(`${ROOT}/apps/reserves/src/lib/supabase/cles.ts`, "utf8");
   const nameRead = /process\.env\.(NEXT_PUBLIC_SUPABASE_[A-Z_]*KEY)/.exec(reads)[1];
+  assert.equal(nameRead, "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "le nom canonique est lu en premier");
   assert.ok(nameRead in example, `le gabarit de Réserves doit déclarer ${nameRead}, lu par le code`);
+  assert.equal("NEXT_PUBLIC_SUPABASE_ANON_KEY" in example, false, "le gabarit ne propage plus l'ancien nom");
+});
+
+test("preflight A-08 : en Preview, aucune URL de navigation ne vise la Production ELSATIA (*.elsatia.fr)", () => {
+  const manifest = manifestWith([
+    v("NEXT_PUBLIC_ELSATIA_ACCOUNT_URL", { applications: ["colors"], category: "url", url_class: "cross_app_link" }),
+    v("NEXT_PUBLIC_TOOLS_BILLING_API_URL", { applications: ["colors"], category: "url", url_class: "api_endpoint" }),
+    v("ELSATIA_IDENTITY_ISSUER", { applications: ["colors"], category: "url", url_class: "api_endpoint" }),
+    v("POWENS_API_BASE_URL", { applications: ["colors"], category: "url", url_class: "provider_base" }),
+  ]);
+  const run = (env, target = "preview") => runPreflight(manifest, env, { target, apps: ["colors"] }).findings;
+  assert.ok(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://app.elsatia.fr/abonnement" }), "PF-URL-PRODUCTION-IN-PREVIEW", "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL"));
+  assert.ok(has(run({ NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://APP.ELSATIA.FR" }), "PF-URL-PRODUCTION-IN-PREVIEW", "NEXT_PUBLIC_TOOLS_BILLING_API_URL"));
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://gp-git-main.vercel.app/abonnement" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://elsatia.fr.evil.example/x" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false, "suffixe trompeur : pas un hôte ELSATIA");
+  // Identifiant serveur (émetteur) et fournisseur tiers : hors règle de navigation.
+  assert.equal(has(run({ ELSATIA_IDENTITY_ISSUER: "https://app.elsatia.fr/identity", POWENS_API_BASE_URL: "https://x.elsatia.fr" }), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+  // En Production, l'hôte canonique est la norme.
+  assert.equal(has(run({ NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://app.elsatia.fr/abonnement" }, "production"), "PF-URL-PRODUCTION-IN-PREVIEW"), false);
+});
+
+test("preflight A-07 : l'alias hérité satisfait seul une variable requise (avertissement), deux valeurs divergentes bloquent", () => {
+  const manifest = manifestWith([
+    v("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", { applications: ["reserves"], required: true, category: "supabase_public", accepted_aliases: ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] }),
+    v("NEXT_PUBLIC_SUPABASE_ANON_KEY", { applications: ["reserves"], category: "supabase_public", deprecated: true, replacement: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", migration: "retrait" }),
+  ]);
+  const key = "sb_publishable_" + "z".repeat(20);
+  const run = (env) => runPreflight(manifest, env, { target: "local", apps: ["reserves"] }).findings;
+  const seul = run({ NEXT_PUBLIC_SUPABASE_ANON_KEY: key });
+  assert.equal(has(seul, "PF-REQUIRED-MISSING", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"), false, "un environnement existant n'est pas cassé");
+  assert.ok(seul.some((f) => f.code === "PF-ALIAS-IN-USE" && f.level === "warning"));
+  assert.ok(has(run({}), "PF-REQUIRED-MISSING", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"));
+  assert.ok(has(run({ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key, NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_" + "y".repeat(20) }), "PF-ALIAS-CONFLICT", "NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+  assert.deepEqual(errorsOf(run({ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key })), []);
+  for (const f of seul) assert.equal(f.message.includes(key), false);
 });
 
 // ── D. Public / secret ──────────────────────────────────────────────────────
@@ -630,6 +666,18 @@ test("CLI --auto : Preview complète et cohérente = GO, sans afficher de valeur
   const r = runAuto(dir, "reserves", {
     VERCEL_ENV: "preview", ELSATIA_APPLICATION_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: key, NEXT_PUBLIC_RESERVES_URL: "https://reserves-preview.example.com",
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /GO : aucune erreur/);
+  assert.equal(r.out.includes(key), false);
+});
+
+test("CLI --auto : Preview Réserves au nom canonique (A-07) = GO", () => {
+  const dir = rootWithEnforcement("report", { preview: "enforce" });
+  const key = "sb_publishable_" + "p".repeat(20);
+  const r = runAuto(dir, "reserves", {
+    VERCEL_ENV: "preview", ELSATIA_APPLICATION_ENV: "preview", NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: key, NEXT_PUBLIC_RESERVES_URL: "https://reserves-preview.example.com",
   });
   assert.equal(r.status, 0, r.out);
   assert.match(r.out, /GO : aucune erreur/);

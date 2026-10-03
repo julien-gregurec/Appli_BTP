@@ -93,7 +93,7 @@ describe("URL d'invitation — hors local, jamais de repli silencieux", () => {
     vi.stubEnv("ELSATIA_APPLICATION_ENV", "preview");
     vi.stubEnv("NEXT_PUBLIC_RESERVES_URL", "https://reserves.elsatia.fr");
     expect(() => urlApplicationReserves()).toThrow(/hote_production_hors_production/);
-    vi.stubEnv("NEXT_PUBLIC_RESERVES_URL", "http://localhost:3020");
+    vi.stubEnv("NEXT_PUBLIC_RESERVES_URL", "http://localhost:3040");
     expect(() => urlApplicationReserves()).toThrow();
     vi.unstubAllEnvs();
   });
@@ -102,7 +102,7 @@ describe("URL d'invitation — hors local, jamais de repli silencieux", () => {
     vi.stubEnv("ELSATIA_APPLICATION_ENV", "local");
     vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("NEXT_PUBLIC_RESERVES_URL", "");
-    expect(urlApplicationReserves()).toBe("http://localhost:3020");
+    expect(urlApplicationReserves()).toBe("http://localhost:3040");
     vi.unstubAllEnvs();
   });
 });

@@ -4,13 +4,13 @@
  * Ce que ces tests fixent n'est pas un formatage mais un mode de défaillance. Next fige les
  * `NEXT_PUBLIC_*` dans le bundle au moment du build : un `next build` Production lancé sans elles
  * **réussit**, et chaque invitation envoyée par e-mail par `urlInvitation()` (`invitations.ts`)
- * contient alors un lien vers `http://localhost:3020` — mort pour son destinataire, sans qu'aucune
+ * contient alors un lien vers `http://localhost:3040` — mort pour son destinataire, sans qu'aucune
  * étape du déploiement n'ait échoué.
  *
  * Quatre propriétés sont vérifiées, dans cet ordre d'importance :
  *
  * 1. un build publié auquel manque une variable requise échoue ;
- * 2. une URL non https (dont `http://localhost:3020`, le repli réel du code) est refusée sur un
+ * 2. une URL non https (dont `http://localhost:3040`, le repli réel du code) est refusée sur un
  *    build publié, et seulement là ;
  * 3. un build local n'échoue pas pour autant ;
  * 4. aucun message produit ne contient jamais une valeur d'environnement.
@@ -35,7 +35,7 @@ import {
 const COMPLET = {
   ELSATIA_APPLICATION_ENV: "production",
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_valeur-de-test",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_valeur-de-test",
   NEXT_PUBLIC_RESERVES_URL: "https://reserves.elsatia.fr",
 } as const;
 
@@ -60,7 +60,7 @@ describe("contrat des variables publiques", () => {
   it("porte exactement les variables sans lesquelles Réserves est amputé", () => {
     expect(REQUISES.map((entree) => entree.name)).toEqual([
       "NEXT_PUBLIC_SUPABASE_URL",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_RESERVES_URL",
       "ELSATIA_APPLICATION_ENV",
     ]);
@@ -147,12 +147,12 @@ describe("build publié", () => {
 
   /*
    * Le scénario réel de ce correctif : le repli du code (`urlApplicationReserves()`) est
-   * précisément `http://localhost:3020`. Sur un build publié, cette valeur doit être refusée
+   * précisément `http://localhost:3040`. Sur un build publié, cette valeur doit être refusée
    * exactement comme n'importe quelle autre URL http en clair — même si elle est syntaxiquement
    * valide — et acceptée sur un build local, là où elle est correcte.
    */
-  it("refuse http://localhost:3020 sur un build publié, et l'accepte en local", () => {
-    const clair = { ...COMPLET, NEXT_PUBLIC_RESERVES_URL: "http://localhost:3020" };
+  it("refuse http://localhost:3040 sur un build publié, et l'accepte en local", () => {
+    const clair = { ...COMPLET, NEXT_PUBLIC_RESERVES_URL: "http://localhost:3040" };
     expect(evaluerEnvPublic(clair).failures[0]).toMatchObject({
       name: "NEXT_PUBLIC_RESERVES_URL",
       reason: RAISONS.pasHttps,
@@ -269,5 +269,52 @@ describe("cohérence avec le code réel", () => {
     const options = { exigerHttps: true, mode: "production" } as const;
     expect(inspecterVariable(entree, "https://reserves.elsatia.fr", options)).toBeNull();
     expect(inspecterVariable(entree, "javascript:alert(1)", options)).toBe(RAISONS.pasUneUrl);
+  });
+});
+
+/*
+ * A-07 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2) : nom canonique, alias hérité accepté en
+ * transition sans casser un environnement existant, jamais deux valeurs divergentes.
+ */
+describe("clé publique : nom canonique et alias hérité (A-07)", () => {
+  const sansCle = () => {
+    const env: Record<string, string | undefined> = { ...COMPLET };
+    delete env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    return env;
+  };
+
+  it("déclare l'alias hérité sur l'entrée canonique", () => {
+    const entree = CONTRAT_ENV_PUBLIC.find((e) => e.name === "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    expect(entree).toMatchObject({ alias: "NEXT_PUBLIC_SUPABASE_ANON_KEY", level: "required" });
+  });
+
+  it("un environnement existant (alias seul) continue de construire, avec un avis", () => {
+    const resultat = evaluerEnvPublic({ ...sansCle(), NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_heritee" });
+    expect(resultat.ok).toBe(true);
+    expect(resultat.warnings).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", reason: RAISONS.aliasHerite }));
+  });
+
+  it("aucune des deux : build publié refusé en nommant la variable canonique", () => {
+    expect(echecs(sansCle())).toEqual(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"]);
+  });
+
+  it("deux valeurs divergentes : refus, quel que soit le mode", () => {
+    for (const mode of ["local", "preview", "production"]) {
+      const resultat = evaluerEnvPublic({ ...COMPLET, ELSATIA_APPLICATION_ENV: mode, NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_autre" });
+      expect(resultat.ok).toBe(false);
+      expect(resultat.failures).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", reason: RAISONS.aliasDivergent }));
+    }
+  });
+
+  it("deux valeurs identiques : accepté, l'alias est signalé comme retirable", () => {
+    const resultat = evaluerEnvPublic({ ...COMPLET, NEXT_PUBLIC_SUPABASE_ANON_KEY: COMPLET.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY });
+    expect(resultat.ok).toBe(true);
+    expect(resultat.warnings.map((c) => c.reason)).toContain(RAISONS.aliasHerite);
+  });
+
+  it("une clé de service sous l'alias reste bloquée", () => {
+    const resultat = evaluerEnvPublic({ ...sansCle(), NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_x" });
+    expect(resultat.ok).toBe(false);
+    expect(resultat.failures.map((c) => c.reason)).toContain(RAISONS.formeSecrete);
   });
 });

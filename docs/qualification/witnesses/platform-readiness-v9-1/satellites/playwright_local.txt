@@ -1,0 +1,12 @@
+  ✓   1 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:99:7 › LOCAL — navigation réelle entre applications › lanceur GP (Karim) : Colors, Tools, Réserves en local, jamais Drone ni la Production (2.8s)
+  ✓   2 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:109:7 › LOCAL — navigation réelle entre applications › GP → Colors → GP : session propre à chaque application, liens locaux, cookies hôte seul (3.7s)
+  ✓   3 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:126:7 › LOCAL — navigation réelle entre applications › GP → Réserves → GP : Réserves propose le retour vers l'univers ELSATIA (A-09) (3.1s)
+  ✓   4 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:141:7 › LOCAL — navigation réelle entre applications › Tools → GP / Colors : liens locaux (promotions, création de compte) (1.1s)
+  ✓   5 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:153:7 › LOCAL — navigation réelle entre applications › même entreprise, sans habilitation (Belaid) : lanceur vide, Colors et Réserves refusent (2.6s)
+  ✓   6 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:167:7 › LOCAL — navigation réelle entre applications › droit expiré et droit suspendu : Colors refuse à la connexion, URL directe refusée (1.6s)
+  ✓   7 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:175:7 › LOCAL — navigation réelle entre applications › Drone (A-05) : absent du lanceur d'un administrateur plateforme, présent au catalogue (1.4s)
+  ✓   8 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:187:7 › LOCAL — navigation réelle entre applications › url_preview (A-11) : le propriétaire la définit, les URL dangereuses sont refusées (2.2s)
+  ✓   9 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:203:7 › LOCAL — navigation réelle entre applications › next= et en-tête Host : aucune redirection hors de l'application (172ms)
+  ✓  10 [desktop-chromium] › tests/e2e/satellites-preview-readiness.spec.ts:222:7 › LOCAL — navigation réelle entre applications › logout : retour à /login ; déconnexion globale (toutes les applications du compte) (4.5s)
+  6 skipped
+  10 passed (24.6s)

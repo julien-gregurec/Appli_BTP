@@ -75,4 +75,4 @@ node "$RACINE/scripts/e2e/amorcer-recette-v4.mjs"
 echo
 echo "Décor prêt. Lancer ensuite :"
 echo "  npm --prefix apps/reserves run build && npm --prefix apps/reserves run start"
-echo "  E2E_RESERVES_URL=http://127.0.0.1:3020 npx playwright test reserves-v3 reserves-v4"
+echo "  E2E_RESERVES_URL=http://127.0.0.1:3040 npx playwright test reserves-v3 reserves-v4"

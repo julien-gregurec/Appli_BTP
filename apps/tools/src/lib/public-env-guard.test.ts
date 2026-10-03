@@ -178,9 +178,12 @@ describe("builds non publiés", () => {
     const result = evaluatePublicEnv({ NEXT_PUBLIC_TOOLS_ENV: "preview" });
     expect(result.level).toBe("advisory");
     expect(result.ok).toBe(true);
-    expect(result.warnings.map((finding) => finding.name)).toEqual(
-      PUBLIC_ENV_CONTRACT.map((entry) => entry.name),
-    );
+    /* + les deux liens d'application, masqués tant qu'ils ne sont pas déclarés (A-08). */
+    expect(result.warnings.map((finding) => finding.name)).toEqual([
+      ...PUBLIC_ENV_CONTRACT.map((entry) => entry.name),
+      "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL",
+      "NEXT_PUBLIC_TOOLS_COLORS_URL",
+    ]);
   });
 
   /* Une valeur présente mais absurde est une faute de saisie, quel que soit le mode. */
@@ -288,5 +291,89 @@ describe("cohérence avec la CSP", () => {
       expect(inspectVariable(entry, "https://abcdefgh.supabase.co/rest/v1?x=1", { requireHttps: true })).toBeNull();
       expect(inspectVariable(entry, "javascript:alert(1)", { requireHttps: true })).toBe(REASONS.notUrl);
     }
+  });
+});
+
+/*
+ * TOOLS_ENV + A-08 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2) : valeur inconnue refusée dans tous
+ * les modes (fail closed), cohérence avec la plateforme Vercel, et aucune URL de Production dans
+ * un build Preview.
+ */
+const PREVIEW = {
+  NEXT_PUBLIC_TOOLS_ENV: "preview",
+  NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_valeur-de-test",
+  NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://gp-git-main.vercel.app",
+  NEXT_PUBLIC_TOOLS_URL: "https://tools-git-main.vercel.app",
+  NEXT_PUBLIC_TOOLS_GESTION_PRO_URL: "https://gp-git-main.vercel.app",
+  NEXT_PUBLIC_TOOLS_COLORS_URL: "https://colors-git-main.vercel.app",
+};
+const LOCAL = {
+  NEXT_PUBLIC_TOOLS_ENV: "local",
+  NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_valeur-de-test",
+};
+
+describe("NEXT_PUBLIC_TOOLS_ENV : trois modes, fail closed", () => {
+  it("les trois builds de référence passent : local, preview, production", () => {
+    expect(evaluatePublicEnv(LOCAL)).toMatchObject({ mode: "local", ok: true });
+    expect(evaluatePublicEnv(PREVIEW)).toMatchObject({ mode: "preview", ok: true });
+    expect(evaluatePublicEnv(COMPLETE)).toMatchObject({ mode: "production", ok: true });
+  });
+
+  it.each(["prod", "Preview", "staging", "recette", "development"])("refuse la valeur inconnue « %s » dans tous les cas", (value) => {
+    const result = evaluatePublicEnv({ ...COMPLETE, NEXT_PUBLIC_TOOLS_ENV: value });
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_TOOLS_ENV", reason: REASONS.unknownMode }));
+  });
+
+  it("refuse un build Vercel Preview qui ne se déclare pas preview", () => {
+    for (const declared of [undefined, "production", "local"]) {
+      const env: Record<string, string | undefined> = { ...PREVIEW, VERCEL_ENV: "preview", NEXT_PUBLIC_TOOLS_ENV: declared };
+      const result = evaluatePublicEnv(env);
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_TOOLS_ENV", reason: REASONS.platformMismatch }));
+    }
+    expect(evaluatePublicEnv({ ...PREVIEW, VERCEL_ENV: "preview" }).ok).toBe(true);
+  });
+
+  it("refuse un build Vercel Production déclaré preview ou local", () => {
+    for (const declared of ["preview", "local"]) {
+      const result = evaluatePublicEnv({ ...COMPLETE, VERCEL_ENV: "production", NEXT_PUBLIC_TOOLS_ENV: declared });
+      expect(result.failures).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_TOOLS_ENV", reason: REASONS.platformMismatch }));
+    }
+    expect(evaluatePublicEnv({ ...COMPLETE, VERCEL_ENV: "production" }).ok).toBe(true);
+  });
+});
+
+describe("A-08 : aucune bascule Preview → Production au build", () => {
+  it.each([
+    "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL",
+    "NEXT_PUBLIC_TOOLS_COLORS_URL",
+    "NEXT_PUBLIC_TOOLS_BILLING_API_URL",
+    "NEXT_PUBLIC_TOOLS_URL",
+  ])("Preview : %s sur un hôte *.elsatia.fr est refusée", (name) => {
+    const result = evaluatePublicEnv({ ...PREVIEW, [name]: "https://app.elsatia.fr" });
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContainEqual(expect.objectContaining({ name, reason: REASONS.productionHostInPreview }));
+  });
+
+  it("Preview : liens d'application absents = avis (liens masqués), pas un blocage", () => {
+    const env: Record<string, string | undefined> = { ...PREVIEW };
+    delete env.NEXT_PUBLIC_TOOLS_GESTION_PRO_URL;
+    delete env.NEXT_PUBLIC_TOOLS_COLORS_URL;
+    const result = evaluatePublicEnv(env);
+    expect(result.ok).toBe(true);
+    expect(result.warnings.map((w) => w.name)).toEqual(expect.arrayContaining(["NEXT_PUBLIC_TOOLS_GESTION_PRO_URL", "NEXT_PUBLIC_TOOLS_COLORS_URL"]));
+  });
+
+  it("Production : un lien d'application hors hôte canonique est refusé", () => {
+    const result = evaluatePublicEnv({ ...COMPLETE, NEXT_PUBLIC_TOOLS_GESTION_PRO_URL: "https://gp-git-main.vercel.app" });
+    expect(result.failures).toContainEqual(expect.objectContaining({ name: "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL", reason: REASONS.notProductionHost }));
+  });
+
+  it("n'imprime toujours aucune valeur", () => {
+    const report = formatReport(evaluatePublicEnv({ ...PREVIEW, NEXT_PUBLIC_TOOLS_GESTION_PRO_URL: "https://app.elsatia.fr/valeur-reconnaissable", NEXT_PUBLIC_TOOLS_ENV: "preview" }));
+    expect(report).not.toContain("valeur-reconnaissable");
   });
 });

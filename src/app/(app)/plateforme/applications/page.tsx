@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { chargerCatalogueApplications, chargerHistoriqueApplications, estAdministrateurPlateformeMultiApp } from "@/lib/multi-app-server";
+import { chargerCatalogueApplications, chargerHistoriqueApplications, estAdministrateurPlateformeMultiApp, estProprietairePlateforme } from "@/lib/multi-app-server";
 import { environnementApplications } from "@/lib/multi-app";
+import { definirUrlPreviewApplicationAction } from "@/app/actions/multi-app";
 
 const STATUTS_PRODUIT: Record<string, string> = {
   disponible: "Disponible",
@@ -15,10 +16,11 @@ export default async function ApplicationsPlateformePage({
   searchParams: Promise<{ error?: string; succes?: string }>;
 }) {
   if (!(await estAdministrateurPlateformeMultiApp())) notFound();
-  const [applications, historique, messages] = await Promise.all([
+  const [applications, historique, messages, proprietaire] = await Promise.all([
     chargerCatalogueApplications(),
     chargerHistoriqueApplications(),
     searchParams,
+    estProprietairePlateforme(),
   ]);
   const environnement = environnementApplications();
 
@@ -43,7 +45,7 @@ export default async function ApplicationsPlateformePage({
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="catalogue-applications" className="font-semibold">Catalogue des applications</h2>
-              <p className="text-xs text-neutral-500">URL affichée pour l’environnement <strong>{environnement}</strong>.</p>
+              <p className="text-xs text-neutral-500">URL affichée pour l’environnement <strong>{environnement ?? "non déclaré (aucun lien servi)"}</strong>.</p>
             </div>
             <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">{applications.length} application(s)</span>
           </div>
@@ -75,9 +77,28 @@ export default async function ApplicationsPlateformePage({
                     <div><dt className="text-[10px] uppercase text-neutral-500">Ordre</dt><dd className="mt-1 font-medium">{application.ordre}</dd></div>
                   </dl>
                   <div className="mt-4 rounded-md bg-neutral-50 p-3 text-xs dark:bg-neutral-900">
-                    <span className="block text-[10px] uppercase text-neutral-500">URL {environnement}</span>
+                    <span className="block text-[10px] uppercase text-neutral-500">URL {environnement ?? "—"}</span>
                     {url ? <a href={url} className="mt-1 block truncate font-mono text-blue-700 underline dark:text-blue-300">{url}</a> : <span className="mt-1 block text-amber-700">Non configurée</span>}
                   </div>
+                  {/* A-11 : URL Preview administrable par le seul propriétaire plateforme (RPC
+                      plateforme_definir_url_preview_application : AAL2, origine Vercel stricte,
+                      jamais une URL de Production, journalisée). */}
+                  {proprietaire && (
+                    <form action={definirUrlPreviewApplicationAction.bind(null, application.code)} className="mt-3 flex flex-wrap items-end gap-2 text-xs" aria-label={`URL Preview de ${application.nom}`}>
+                      <label className="min-w-0 flex-1">
+                        <span className="block text-[10px] uppercase text-neutral-500">URL Preview (propriétaire)</span>
+                        <input
+                          name="url_preview"
+                          type="url"
+                          inputMode="url"
+                          defaultValue={application.url_preview ?? ""}
+                          placeholder="https://<projet>.vercel.app"
+                          className="mt-1 w-full rounded-md border px-2 py-1 font-mono"
+                        />
+                      </label>
+                      <button type="submit" className="rounded-md border px-3 py-1 font-medium">Enregistrer</button>
+                    </form>
+                  )}
                 </article>
               );
             })}

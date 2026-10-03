@@ -1,0 +1,36 @@
+### ledger avant, --phase 0
+✅ P1 branche courante « release/elsatia-platform-readiness-v9-1-preflight-demo » autorisée
+✅ P2 cible 2cd5ca6eea19 = HEAD, publiée sur origin
+✅ P3 396 migrations au SHA (attendu 396)
+✅ P4 210 migrations historiques identiques au manifeste 5777abbcb94f
+✅ P5 ledger 210 = source 210 + préfixe de 0 / 186 migration(s) du plan
+✅ P6 186 migration(s) en attente, toutes qualifiées (1 en fenêtre de maintenance)
+✅ P9 phase 0 autorisée : appliquer UNIQUEMENT 20261003000201_pont_upgrade_prod_phase0_lignes_entreprise_v1.sql (déjà au ledger : 0/1)
+✅ P7 Production projet-production-SIMULE attestée par harnais (simulation) (2026-10-03T11:23:14Z), préconditions de données à 0
+✅ P8 sauvegarde pitr+dump bk-simule-1 (0.0 h), restauration testée sur restauration_locale_isolee
+PREFLIGHT OK — upgrade autorisé pour ce SHA (aucune action n'a été effectuée).
+
+### ledger avant, --phase principale
+✅ P1 branche courante « release/elsatia-platform-readiness-v9-1-preflight-demo » autorisée
+✅ P2 cible 2cd5ca6eea19 = HEAD, publiée sur origin
+✅ P3 396 migrations au SHA (attendu 396)
+✅ P4 210 migrations historiques identiques au manifeste 5777abbcb94f
+✅ P5 ledger 210 = source 210 + préfixe de 0 / 186 migration(s) du plan
+✅ P6 186 migration(s) en attente, toutes qualifiées (1 en fenêtre de maintenance)
+❌ P9 phase principale refusée : pont(s) de phase 0 absent(s) du ledger Production (20261003000201) — exécuter d'abord la phase 0
+❌ P7 précondition bloquant_lignes_factures_emises_non_preparees = 1040
+✅ P8 sauvegarde pitr+dump bk-simule-1 (0.0 h), restauration testée sur restauration_locale_isolee
+PREFLIGHT REFUSÉ (P9, P7) — aucune action n'a été effectuée.
+
+### ledger apres_phase0, --phase principale
+✅ P1 branche courante « release/elsatia-platform-readiness-v9-1-preflight-demo » autorisée
+✅ P2 cible 2cd5ca6eea19 = HEAD, publiée sur origin
+✅ P3 396 migrations au SHA (attendu 396)
+✅ P4 210 migrations historiques identiques au manifeste 5777abbcb94f
+✅ P5 ledger 211 = source 210 + préfixe de 1 / 186 migration(s) du plan
+✅ P6 185 migration(s) en attente, toutes qualifiées (1 en fenêtre de maintenance)
+✅ P9 phase 0 au ledger (1 pont(s)) : phase principale autorisée
+✅ P7 Production projet-production-SIMULE attestée par harnais (simulation) (2026-10-03T11:23:14Z), préconditions de données à 0
+✅ P8 sauvegarde pitr+dump bk-simule-1 (0.0 h), restauration testée sur restauration_locale_isolee
+PREFLIGHT OK — upgrade autorisé pour ce SHA (aucune action n'a été effectuée).
+

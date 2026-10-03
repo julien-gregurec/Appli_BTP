@@ -57,7 +57,7 @@ export async function executer({ env, refAttendue = REF_PREVIEW_AUTORISEE, ecrir
   const base = String(env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
   exigerRefPreview(refDepuisUrlApi(base), refAttendue);
   const service = env.SUPABASE_SERVICE_ROLE_KEY;
-  const publique = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const publique = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // alias hérité Réserves (A-07), repli transitoire
   if (!estDefinie(service)) throw new Refus("SUPABASE_SERVICE_ROLE_KEY absente");
   if (!estDefinie(publique)) throw new Refus("clé publique Supabase absente");
   const svc = { apikey: service, Authorization: `Bearer ${service}` };

@@ -1,0 +1,97 @@
+ELSATIA production → V9.x : cible 846853ae52af77820d8fc576e9372559edc50012 (396 migrations) ; source h210_vol100000 (profil ACL supabase) ; travail h210_vol100000_v9x ; fresh fresh_846853ae_sb ; preuves /tmp/upg/vol/run_100000
+
+== 1. Snapshot avant ==
+h210_vol100000: 153 tables, 602422 lignes, 396 FK, 23 jeux critiques -> /tmp/upg/vol/run_100000/avant
+h210_vol100000: inventaire sécurité/catalogue 15 familles, 6337 lignes -> /tmp/upg/vol/run_100000/securite_avant
+  ✅ empreintes, inventaire sécurité et sonde RLS de la source (jamais modifiée)
+
+== 2. Ledger avant ==
+  ledger : 210 versions, max 20260824000231
+
+== 3. Classification des migrations ==
+  déjà appliquées 210 ; en attente 186 (dont 13 hors ordre → --include-all) ; inattendues au ledger 0
+  ponts d'upgrade du train : 2 ; phase 0 (appliquée en premier) : 20261003000201_pont_upgrade_prod_phase0_lignes_entreprise_v1.sql
+
+== 4. Dry-run (copie jetable, chaque migration annulée après mesure) ==
+  ✅ dry-run : 186 migrations rejouées sur copie jetable (18 s), base de travail intacte
+
+== 5. Application (une transaction par migration, ledger inclus) ==
+  186 migration(s) appliquée(s) en 28 s ; ledger 396 versions
+  ✅ ledger après = les 396 fichiers de la cible
+
+== 6. Snapshot après ==
+h210_vol100000_v9x: 283 tables, 602769 lignes, 710 FK, 23 jeux critiques -> /tmp/upg/vol/run_100000/apres
+h210_vol100000_v9x: inventaire sécurité/catalogue 15 familles, 12508 lignes -> /tmp/upg/vol/run_100000/securite_apres
+
+== 7. Comparaison schéma : upgradé vs fresh cible ==
+  ✅ fresh cible fresh_846853ae_sb construite (396 migrations)
+  ordre de colonnes différent (toléré) : public.entreprises — premières colonnes déplacées : remise_motif_interne, remise_cree_par, remise_duree_mois
+  schéma identique au fresh (36451 lignes normalisées ; 1 table(s) à ordre de colonnes différent)
+  ✅ schéma upgradé = fresh cible (aux seules positions de colonnes près, listées)
+
+== 8. Contrôles métier (pgTAP, transactions annulées) ==
+  ✅ legacy_offers : 24/24
+  ✅ security_isolation : 21/21
+
+== 9-15. Sécurité et catalogue : upgradé = fresh cible (fermé) ; inventaire avant → après ==
+  Fermeture upgradé = fresh cible : ✅ (15 familles, 12401 lignes)
+  Avant → après : acl_colonnes 21→305 (-0/+284) ; acl_fonctions 834→2919 (-285/+2370) ; acl_schemas 12→15 (-0/+3) ; acl_tables 2689→3438 (-752/+1501) ; constraints 1039→2180 (-1/+1142) ; default_acl 19→5 (-14/+0) ; functions 278→973 (-58/+753) ; indexes 468→893 (-0/+425) ; policies 559→760 (-47/+248) ; rls 153→283 (-0/+130) ; storage 62→93 (-0/+31) ; triggers 91→530 (-2/+441) ; views 0→3 (-0/+3)
+  Signaux bloquants : 0 ; à justifier : 1
+     ⚠  privilège table ajouté à authenticated : public.lignes_inventaire|authenticated|SELECT|false
+     ℹ  table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.acceptations_documents_legaux
+     ℹ  table nouvelle sans RLS, aucun privilège anon/authenticated (non exposée) : platform.documents_legaux_versions
+  RLS flags : 0 table(s) existante(s) modifiée(s) ; 120 table(s) nouvelle(s), toutes RLS : True
+  Policies : 473 avant, 658 après ; supprimées 2, modifiées 31, ajoutées 187
+  Sonde RLS réelle : 0 utilisateurs, 0 cellules, 0 écart(s)
+  Accès : 19 appartenances historiques évaluées ; pertes 6 (déclarées 6) ; réductions de visibilité 0 ; hausses 0 ; bloquants 0
+     déclaré : admin-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : chef-equipe-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : comptable-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : conducteur-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : dirigeant-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+     déclaré : ouvrier-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).
+
+== 16. Contrôles de données : zéro perte ==
+  Zéro perte : 153 tables / 602422 lignes d'avant comparées ; 7 table(s) différente(s) ; 12 écart(s) déclaré(s) ; P0 = 0
+     déclaré  : public.employes.taux_horaire déplacée vers public.employes_taux_facture.taux_horaire.employe_id : toutes les valeurs retrouvées
+     déclaré  : public.employes.cout_horaire déplacée vers public.employes_cout_horaire.cout_horaire.employe_id : toutes les valeurs retrouvées
+     déclaré  : public.employes : -0 ~68 +0 [] — 20260818000205 / 20260922000328 : coûts et taux horaires sortis de employes (données RH sensibles) vers des tables à accès restreint ; valeurs vérifiées une à une.
+     déclaré  : public.entreprises : -0 ~6 +0 [abonnement_essai_debut∅→(6), abonnement_essai_fin(1), abonnement_essai_fin∅→(5)] — 20260816000204 (C6-B, hors ordre) : fenêtre d'essai de 30 jours renseignée pour les entreprises antérieures à 231 (debut = création) ; UPG-P2-1 : une fin d'essai Stripe > création + 30 j est TRONQUÉE à création + 30 (changement rétroactif, sans effet sur un contrat payant).
+     déclaré  : public.factures : -0 ~1082 +0 [entreprise_snapshot∅→(1082)] — Idem devis : 20260921000300 (recalcul, montants identiques, updated_at rafraîchi) ; 20260908000272 / 20260926000501 : snapshot émetteur des factures émises renseigné s'il était NULL, marqué identite_incertaine (jamais écrasé).
+     déclaré  : public.historique_tarification : -0 ~0 +5 [] — 20260901000254 : journal de réconciliation du catalogue (ajouts seulement).
+     déclaré  : public.plans_abonnement : -0 ~5 +8 [actif(5), valide_au∅→(5)] — 20260815000200 / 20260816000201 (TARIFS-V2) / 20260901000254 / 20260928000802 : versions de catalogue désactivées (actif=false, valide_au) et nouvelles versions ajoutées ; prix, codes et ids des versions existantes INCHANGÉS ; aucun contrat remappé (checks/legacy_offers.test.sql).
+     déclaré  : public.plateforme_admins : -0 ~0 +1 [] — 20260825000233 : ajout du compte administrateur plateforme julien@elsatia.fr (rôle total) — décision propriétaire, jamais appliquée en Production 210 ; à confirmer au cutover (UPG-SEC-1).
+     déclaré  : storage.buckets : -0 ~0 +7 [] — Buckets privés des nouvelles applications (Colors, Réserves, Studio, Relevé, communications) ; aucun bucket existant modifié.
+     déclaré  : critique historiques : +5 / -0 — journal de réconciliation tarifaire
+     déclaré  : critique plans_historiques : +8 / -0 — nouvelles versions de catalogue ; toute version d'avant conservée à l'identique
+     déclaré  : critique support : +1 / -0 — administrateur plateforme ajouté par 20260825000233
+     VERDICT : ZERO_PERTE
+
+== 17. Performance sanity ==
+     ✓ moyenne      liste_devis              4018.13 ms →   7386.55 ms
+     ✓ moyenne      liste_factures           3834.74 ms →   7364.08 ms
+     ✓ moyenne      lignes_un_devis          4691.23 ms →   7760.81 ms
+     ✓ moyenne      lignes_une_facture       4320.88 ms →   7674.93 ms
+     ✓ moyenne      pointages_mois           2873.70 ms →   4722.30 ms
+     ⚠ moyenne      planning_semaine           59.38 ms →   1138.08 ms
+     ✓ moyenne      clients_recherche        3976.79 ms →   7248.13 ms
+     ✓ moyenne      journal_recent          38644.10 ms →  71915.74 ms
+     ✓ moyenne      documents_chantier       3396.24 ms →   4765.76 ms
+     ✓ volumetrique liste_devis              5381.31 ms →  10270.44 ms
+     ✓ volumetrique liste_factures           5303.98 ms →  10423.14 ms
+     ✓ volumetrique lignes_un_devis          5729.27 ms →  10397.38 ms
+     ✓ volumetrique lignes_une_facture       5511.76 ms →  10018.06 ms
+     ✓ volumetrique pointages_mois           1480.47 ms →   2475.58 ms
+     ⚠ volumetrique planning_semaine           66.51 ms →    600.62 ms
+     ✓ volumetrique clients_recherche          89.23 ms →    187.23 ms
+     ✓ volumetrique journal_recent          52973.80 ms → 100559.91 ms
+     ✓ volumetrique documents_chantier       8325.20 ms →  14305.10 ms
+  Performance sanity : 18 mesures, 0 régression(s) bloquante(s)
+  Classification : 186 migrations
+    verrous  : SAFE=87, CAUTION=98, MAINTENANCE_WINDOW_REQUIRED=1
+    rollback : REVERSIBLE=55, FORWARD_ONLY=78, RESTORE_REQUIRED=53
+    plus lentes : 20261003000201_pont_upgrade_pr 1629.9 ms, 20260921000300_correctif_perf_ 619.0 ms, 20260908000272_client_document 589.0 ms
+    fenêtre de maintenance : 20261003000201_pont_upgrade_prod_phase0_lignes_entreprise_v1.sql
+  plan qualifié écrit : /tmp/upg/vol/run_100000/target-846853ae.json (186 migrations, préconditions bloquantes ['bloquant_essai_hors_fenetre', 'bloquant_essai_perpetuel', 'bloquant_essai_tronque_expire'])
+
+VERDICT HARNAIS : ✅ UPGRADE QUALIFIÉ (h210_vol100000 → 846853ae52af77820d8fc576e9372559edc50012, 396 migrations). Preuves : /tmp/upg/vol/run_100000

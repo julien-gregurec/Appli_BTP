@@ -6,7 +6,8 @@
  * existant ne voit : la COHÉRENCE ENTRE APPLICATIONS d'une même Preview.
  *   1. manifeste : runPreflight(target=preview) pour chaque fichier fourni ;
  *   2. même projet Supabase partout (SSO), jamais la Production, = la Preview attendue ;
- *   3. même clé publique partout (Réserves lit encore NEXT_PUBLIC_SUPABASE_ANON_KEY) ;
+ *   3. même clé publique partout (Réserves : nom canonique depuis A-07, alias hérité
+ *      NEXT_PUBLIC_SUPABASE_ANON_KEY accepté en repli avec avertissement) ;
  *      même clé de service GP / Colors / Réserves ; même clé Storage Studio / worker ;
  *   4. URL croisées : Colors ↔ GP, Tools ↔ GP (API de facturation, retour Checkout, CORS) ;
  *   5. aucune valeur publique (NEXT_PUBLIC_*) égale à une valeur secrète d'un autre fichier ;
@@ -41,7 +42,9 @@ export const FICHIERS = [
   { fichier: "worker.env", app: "studio_worker", court: "worker" },
 ];
 
-const CLE_PUBLIQUE = { gp: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", colors: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", tools: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", studio: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", reserves: "NEXT_PUBLIC_SUPABASE_ANON_KEY" };
+const CLE_PUBLIQUE = { gp: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", colors: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", tools: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", studio: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", reserves: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" };
+/** Alias hérité encore accepté par le code de Réserves (apps/reserves/src/lib/supabase/cles.ts, A-07). */
+const ALIAS_CLE_PUBLIQUE_RESERVES = "NEXT_PUBLIC_SUPABASE_ANON_KEY";
 
 /**
  * Contrôles croisés. `envs` = { gp: {...}, colors: {...}, … } (apps présentes seulement).
@@ -77,7 +80,17 @@ export function controlesCroises(envs, { refAttendue = REF_PREVIEW_AUTORISEE, ma
   else if (refs.size === 1) push("ok", "X-SUPABASE-SSO", "NEXT_PUBLIC_SUPABASE_URL", `un seul projet sur ${apps.filter((a) => estDefinie(envs[a].NEXT_PUBLIC_SUPABASE_URL)).length} app(s)`);
 
   // 3. Clés partagées.
-  memeValeur("X-PUBLIC-KEY", "clé Supabase publique", Object.entries(CLE_PUBLIQUE).map(([a, n]) => [a, n]));
+  const reserves = envs.reserves;
+  const canoniqueReserves = reserves && estDefinie(reserves[CLE_PUBLIQUE.reserves]);
+  if (reserves && estDefinie(reserves[ALIAS_CLE_PUBLIQUE_RESERVES])) {
+    if (canoniqueReserves && reserves[ALIAS_CLE_PUBLIQUE_RESERVES].trim() !== reserves[CLE_PUBLIQUE.reserves].trim()) {
+      push("error", "X-PUBLIC-KEY-ALIAS", ALIAS_CLE_PUBLIQUE_RESERVES, "Réserves : valeur différente de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    } else if (!canoniqueReserves) {
+      push("warning", "X-PUBLIC-KEY-ALIAS", ALIAS_CLE_PUBLIQUE_RESERVES, "Réserves : alias hérité utilisé — renommer en NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    }
+  }
+  const nomCle = (a) => (a === "reserves" && !canoniqueReserves ? ALIAS_CLE_PUBLIQUE_RESERVES : CLE_PUBLIQUE[a]);
+  memeValeur("X-PUBLIC-KEY", "clé Supabase publique", Object.keys(CLE_PUBLIQUE).map((a) => [a, nomCle(a)]));
   memeValeur("X-SERVICE-KEY", "SUPABASE_SERVICE_ROLE_KEY", ["gp", "colors", "reserves"].map((a) => [a, "SUPABASE_SERVICE_ROLE_KEY"]));
   memeValeur("X-STUDIO-STORAGE-KEY", "STUDIO_STORAGE_SERVICE_KEY", ["studio", "worker"].map((a) => [a, "STUDIO_STORAGE_SERVICE_KEY"]));
 
@@ -93,6 +106,9 @@ export function controlesCroises(envs, { refAttendue = REF_PREVIEW_AUTORISEE, ma
   memeOrigine("X-URL-ACCOUNT", "portail de compte Colors → GP", ["colors", "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
   memeOrigine("X-URL-TOOLS-BILLING", "API de facturation Tools → GP", ["tools", "NEXT_PUBLIC_TOOLS_BILLING_API_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
   memeOrigine("X-URL-TOOLS-RETURN", "retour Checkout Tools", ["gp", "TOOLS_APP_URL"], ["tools", "NEXT_PUBLIC_TOOLS_URL"]);
+  // A-08 : liens de navigation Tools → GP / Colors = origines Preview des applications visées.
+  memeOrigine("X-URL-TOOLS-NAV-GP", "lien Tools → Gestion Pro", ["tools", "NEXT_PUBLIC_TOOLS_GESTION_PRO_URL"], ["gp", "NEXT_PUBLIC_APP_URL"]);
+  memeOrigine("X-URL-TOOLS-NAV-COLORS", "lien Tools → Colors", ["tools", "NEXT_PUBLIC_TOOLS_COLORS_URL"], ["colors", "NEXT_PUBLIC_COLORS_URL"]);
   if (envs.gp && envs.tools && estDefinie(envs.gp.TOOLS_ALLOWED_ORIGINS) && estDefinie(envs.tools.NEXT_PUBLIC_TOOLS_URL)) {
     const liste = envs.gp.TOOLS_ALLOWED_ORIGINS.split(",").map((s) => origine(s)).filter(Boolean);
     const tools = origine(envs.tools.NEXT_PUBLIC_TOOLS_URL);

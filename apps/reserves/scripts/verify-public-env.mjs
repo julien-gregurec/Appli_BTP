@@ -6,12 +6,12 @@
  * REUSSIT — il fige `undefined`, donc les replis du code — et livre un Réserves cohérent mais
  * amputé en silence :
  *
- *  - `src/lib/invitations.ts` (`urlApplicationReserves`) replie sur `http://localhost:3020` :
+ *  - `src/lib/invitations.ts` (`urlApplicationReserves`) replie sur `http://localhost:3040` :
  *    chaque invitation envoyée par e-mail contient un lien mort pour son destinataire, sans
  *    qu'aucune étape du déploiement n'échoue ;
  *  - `src/app/layout.tsx` (`metadataBase`) replie sur la même origine locale ;
- *  - `src/proxy.ts` et `src/lib/supabase/server.ts` n'ont, eux, aucun repli sur
- *    `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` (`!` non nul) : leur absence casse
+ *  - `src/lib/supabase/cles.ts` (lu par `src/proxy.ts` et `src/lib/supabase/server.ts`) n'a
+ *    aucun repli sur `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` : leur absence casse
  *    l'authentification à l'exécution plutôt qu'au build, un mode de défaillance différent mais
  *    tout aussi silencieux tant que personne ne s'est connecté.
  *
@@ -44,18 +44,18 @@ export const MODES_CONSULTATIFS = ["preview"];
  * - `NEXT_PUBLIC_SUPABASE_URL`        lue par `src/proxy.ts`, `src/lib/supabase/server.ts` et
  *                                     `src/lib/supabase/admin.ts` (client Supabase, origine
  *                                     `connect-src` de la CSP construite par `src/proxy.ts`).
- * - `NEXT_PUBLIC_SUPABASE_ANON_KEY`   lue par `src/proxy.ts` et `src/lib/supabase/server.ts`.
- *                                     C'est le nom LEGACY, celui réellement lu par ce code
- *                                     (contrairement à Gestion Pro/Colors/Studio, qui lisent
- *                                     `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) — documenté comme
- *                                     tel dans `apps/reserves/.env.example` et dans
- *                                     `config/env-manifest.json` (F-SUPABASE-PUBLIC-KEY-NAME).
- *                                     La VALEUR attendue est une clé publishable, jamais une clé
- *                                     de service : seul le NOM de variable diverge du reste de
- *                                     l'écosystème, pas sa nature.
+ * - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` lue par `src/lib/supabase/cles.ts` (proxy, client
+ *                                     serveur, santé, mode sûr). Nom canonique de l'écosystème
+ *                                     depuis A-07 (ELSATIA_SATELLITES_PREVIEW_READINESS_V2).
+ *                                     Alias hérité `NEXT_PUBLIC_SUPABASE_ANON_KEY` encore accepté
+ *                                     en repli (transition, F-SUPABASE-PUBLIC-KEY-NAME) : seul il
+ *                                     satisfait le contrat avec un AVIS ; présent avec une valeur
+ *                                     différente du nom canonique, il BLOQUE (deux clés pour un même
+ *                                     client, dont une ignorée en silence). La VALEUR attendue est
+ *                                     toujours une clé publishable, jamais une clé de service.
  * - `NEXT_PUBLIC_RESERVES_URL`        lue par `src/lib/invitations.ts` (`urlApplicationReserves`)
  *                                     et par `src/app/layout.tsx` (`metadataBase`). Son repli
- *                                     `http://localhost:3020` est correct en local et faux partout
+ *                                     `http://localhost:3040` est correct en local et faux partout
  *                                     ailleurs — chaque lien d'invitation envoyé par e-mail en
  *                                     hériterait, sans qu'aucun destinataire ne puisse deviner
  *                                     pourquoi le lien ne mène nulle part. C'est le repli que
@@ -78,10 +78,11 @@ export const CONTRAT_ENV_PUBLIC = [
     role: "client Supabase (session, requêtes) et origine connect-src de la CSP",
   },
   {
-    name: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     kind: "cle",
     level: "required",
-    role: "clé publique du client Supabase (nom legacy propre à Réserves)",
+    alias: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    role: "clé publique du client Supabase (nom canonique ; alias hérité NEXT_PUBLIC_SUPABASE_ANON_KEY accepté en transition)",
   },
   {
     name: "NEXT_PUBLIC_RESERVES_URL",
@@ -106,6 +107,8 @@ export const RAISONS = {
   modeInconnu: "valeur inconnue (attendu : local, preview ou production)",
   modeIncoherent: "déclare un environnement non Production sur un build Production",
   formeSecrete: "a la forme d'une clé de service ou privée (jamais publiable)",
+  aliasHerite: "nom hérité accepté en transition : renommer en NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  aliasDivergent: "valeur différente de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (deux clés pour un même client)",
 };
 
 /**
@@ -207,9 +210,24 @@ export function evaluerEnvPublic(env = process.env, contrat = CONTRAT_ENV_PUBLIC
   const warnings = [];
 
   for (const entree of contrat) {
-    const raison = inspecterVariable(entree, env[entree.name], { exigerHttps, mode });
+    let valeur = env[entree.name];
+    let nom = entree.name;
+    if (entree.alias) {
+      const canonique = typeof valeur === "string" ? valeur.trim() : "";
+      const heritee = typeof env[entree.alias] === "string" ? env[entree.alias].trim() : "";
+      if (heritee && canonique && heritee !== canonique) {
+        failures.push({ name: entree.alias, reason: RAISONS.aliasDivergent, role: entree.role });
+      } else if (heritee) {
+        warnings.push({ name: entree.alias, reason: RAISONS.aliasHerite, role: entree.role });
+        if (!canonique) {
+          valeur = env[entree.alias];
+          nom = entree.alias;
+        }
+      }
+    }
+    const raison = inspecterVariable(entree, valeur, { exigerHttps, mode });
     if (!raison) continue;
-    const constat = { name: entree.name, reason: raison, role: entree.role };
+    const constat = { name: nom, reason: raison, role: entree.role };
     if ((niveau === "bloquant" && entree.level === "required") || raison === RAISONS.formeSecrete) {
       failures.push(constat);
       continue;
@@ -236,7 +254,7 @@ export function formaterRapport({ mode, niveau, failures, warnings }) {
     lignes.push("Build interrompu avant `next build`.");
     if (failures.some((constat) => constat.reason !== RAISONS.formeSecrete)) {
       lignes.push("Un build publié sans ces variables réussirait silencieusement et livrerait des");
-      lignes.push("invitations pointant vers http://localhost:3020. Pour un build local ou de");
+      lignes.push("invitations pointant vers http://localhost:3040. Pour un build local ou de");
       lignes.push("recette, déclarer ELSATIA_APPLICATION_ENV=local.");
     }
     if (failures.some((constat) => constat.reason === RAISONS.formeSecrete)) {
