@@ -90,7 +90,7 @@ const inv = {
   devis_factures_au_dela: sql(`select count(*) from (select d.id from devis d join factures f on f.devis_origine_id = d.id and f.statut <> 'annulee' and f.type <> 'avoir' where d.entreprise_id = '${E}' group by d.id, d.montant_ht having sum(f.montant_ht) > d.montant_ht + 0.01) x`),
   devis_factures_plusieurs_fois: sql(`select count(*) from (select devis_origine_id from factures where entreprise_id = '${E}' and type = 'simple' and statut <> 'annulee' and devis_origine_id is not null group by 1 having count(*) > 1) x`),
   facture_differente_du_devis: sql(`select count(*) from factures f join devis d on d.id = f.devis_origine_id where f.entreprise_id = '${E}' and f.type = 'simple' and (f.montant_ht, f.montant_tva, f.montant_ttc) <> (d.montant_ht, d.montant_tva, d.montant_ttc)`),
-  paye_superieur_ttc: sql(`select count(*) from factures where entreprise_id = '${E}' and montant_paye > montant_ttc + 0.005`),
+  paye_superieur_ttc: sql(`select count(*) from factures where entreprise_id = '${E}' and montant_paye > greatest(montant_ttc, 0) + 0.005`),
   paye_different_somme_paiements: sql(`select count(*) from factures f where entreprise_id = '${E}' and montant_paye <> coalesce((select round(sum(montant), 2) from paiements p where p.facture_id = f.id), 0)`),
   paiements_doublons_30s: sql(`select count(*) from (select facture_id, montant, date, mode, reference from paiements p join factures f on f.id = p.facture_id where f.entreprise_id = '${E}' group by 1,2,3,4,5 having count(*) > 1) x`),
   statut_incoherent: sql(`select count(*) from factures where entreprise_id = '${E}' and ((statut = 'payee' and montant_paye < montant_ttc) or (statut = 'payee_partiel' and (montant_paye <= 0 or montant_paye >= montant_ttc)))`),

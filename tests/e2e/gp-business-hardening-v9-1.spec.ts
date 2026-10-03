@@ -353,3 +353,14 @@ test("S12 matrice écran × rôle (6 rôles) et attentes de confidentialité", a
     expect.soft(corps, ecran).not.toContain("41,50");
   }
 });
+
+test("S13 avoir : l'impression cite la facture rectifiée (B21)", async ({ page }) => {
+  const numero = psql(`select numero from factures where id = '${etat.factureId}';`);
+  const avoir = psql(`select set_config('request.jwt.claims', '{"sub":"6a000000-0000-4000-8000-000000000001","role":"authenticated"}', false);
+    select public.creer_facture_avancee('${ENTREPRISE()}', '${etat.devisId}', 'avoir', 10, false, '${etat.factureId}');`).split("\n").pop()!;
+  await connecter(page, "gerant@gpb.invalid");
+  await page.goto(`/imprimer/factures/${avoir}`);
+  await expect(page.locator("body")).toContainText(`Avoir sur facture n° ${numero}`);
+  await page.goto(`/imprimer/factures/${etat.factureId}`);
+  await expect(page.locator("body")).not.toContainText("Avoir sur facture n°");
+});

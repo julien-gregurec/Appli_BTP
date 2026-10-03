@@ -81,6 +81,7 @@ await sonde("C04 lignes facture émise", "refus", "gerant", "PATCH", `/lignes_fa
 await sonde("C05 montant devis accepté", "refus", "gerant", "PATCH", `/devis?id=eq.${ID.d1}`, { montant_ttc: 1 });
 await sonde("C06 prix ligne devis accepté", "refus", "gerant", "PATCH", `/lignes_devis?devis_id=eq.${ID.d1}`, { prix_unitaire_ht: 1 });
 await sonde("C07 suppression lignes devis accepté", "refus", "gerant", "DELETE", `/lignes_devis?devis_id=eq.${ID.d1}`);
+await sonde("C07b suppression d'un devis accepté non facturé (B33)", "refus", "gerant", "DELETE", `/devis?id=eq.${ID.d2}`);
 await sonde("C08 annulation directe facture émise (B24)", "refus", "gerant", "PATCH", fac(ID.f1), { statut: "annulee" });
 const paiement = { p_entreprise_id: A, p_facture_id: ID.f1, p_montant: 1000, p_date: new Date().toISOString().slice(0, 10), p_mode: "virement", p_reference: null };
 await sonde("C09 paiement partiel 1 000 €", "ok", "gerant", "POST", "/rpc/enregistrer_paiement_facture", paiement);
