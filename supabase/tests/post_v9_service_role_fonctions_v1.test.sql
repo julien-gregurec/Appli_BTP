@@ -19,6 +19,14 @@ select no_plan();
 
 -- ── Données propres au lot (propriétaire, avant tout changement de rôle) ──────────────
 update public.clients set email = 'client-a@invalid.local' where id = 'a3000000-0000-0000-0000-000000000001';
+-- Depuis 20261003000201 (PERFORMANCE HARDENING V9.1, P1-B), la sélection ne rend que les
+-- documents potentiellement éligibles : facture témoin échue (celle de la fixture n'a pas
+-- d'échéance et n'a jamais été relançable par le moteur).
+insert into public.factures(id, entreprise_id, numero, client_id, chantier_id, statut, date_echeance,
+                            montant_ht, montant_tva, montant_ttc) values
+  ('aa000000-0000-0000-0000-0000000000e1', 'a0000000-0000-0000-0000-000000000001', 'TEST_A_FAC_PV9',
+   'a3000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'envoyee',
+   current_date - 10, 100, 20, 120);
 update public.employes set compte_application_statut = 'actif'
  where id in ('a2000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000002');
 update public.employes set compte_application_statut = 'pause' where id = 'a2000000-0000-0000-0000-000000000003';
@@ -139,9 +147,9 @@ select ok('a9000000-0000-0000-0000-000000000001'::uuid not in
 select is((select count(*)::int from public.relances_auto_candidats_service('b0000000-0000-0000-0000-000000000001', 'devis', 200)
            where id = 'a9000000-0000-0000-0000-0000000000e1'), 0,
   'Relances : multi-tenant — aucun candidat d''une autre entreprise');
-select ok('aa000000-0000-0000-0000-000000000001'::uuid in
+select ok('aa000000-0000-0000-0000-0000000000e1'::uuid in
           (select id from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'facture', 200)),
-  'Relances : facture envoyée candidate');
+  'Relances : facture envoyée échue candidate');
 select is((select count(*)::int from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'devis', 0)), 0,
   'Relances : plafond respecté (0)');
 select throws_ok($$select * from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'chantier', 200)$$,
