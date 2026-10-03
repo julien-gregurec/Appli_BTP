@@ -1,0 +1,62 @@
+[
+ {
+  "essai": 1,
+  "ms": 472,
+  "chemin": "/login",
+  "erreur": "Adresse email ou mot de passe incorrect."
+ },
+ {
+  "essai": 2,
+  "ms": 274,
+  "chemin": "/login",
+  "erreur": "Adresse email ou mot de passe incorrect."
+ },
+ {
+  "essai": 3,
+  "ms": 260,
+  "chemin": "/login",
+  "erreur": "Adresse email ou mot de passe incorrect."
+ },
+ {
+  "essai": 4,
+  "ms": 285,
+  "chemin": "/login",
+  "erreur": "Adresse email ou mot de passe incorrect."
+ },
+ {
+  "essai": 5,
+  "ms": 259,
+  "chemin": "/login",
+  "erreur": "Adresse email ou mot de passe incorrect."
+ },
+ {
+  "essai": 6,
+  "ms": 189,
+  "chemin": "/login",
+  "erreur": "Trop de tentatives de connexion. Réessayez dans quelques minutes."
+ },
+ {
+  "essai": 7,
+  "ms": 130,
+  "chemin": "/login",
+  "erreur": "Trop de tentatives de connexion. Réessayez dans quelques minutes."
+ },
+ {
+  "essai": 8,
+  "ms": 332,
+  "chemin": "/login",
+  "erreur": "Trop de tentatives de connexion. Réessayez dans quelques minutes."
+ },
+ {
+  "essai": "bon_mot_de_passe_apres_blocage",
+  "ms": 181,
+  "chemin": "/login",
+  "erreur": "Trop de tentatives de connexion. Réessayez dans quelques minutes."
+ },
+ {
+  "essai": "autre_compte_meme_ip",
+  "ms": 965,
+  "chemin": "/dashboard",
+  "erreur": null
+ }
+]

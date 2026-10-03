@@ -1,0 +1,10 @@
+# Base : soak — 20 sessions parallèles
+ok   - T1 aucune erreur (aucun 500) sur 20 livraisons concurrentes (0)
+ok   - T1 fenêtre finale dans la contrainte, jamais prolongée (true)
+ok   - T1 toutes les livraisons journalisées une fois (20)
+#    décisions : applique:2 perime:18 
+ok   - T2 une seule subscription rattachée (1)
+ok   - T2 l'autre subscription est refusée (42501) à chaque livraison (10)
+ok   - T2 aucune autre erreur (0)
+ok   - T2 fenêtre finale dans la contrainte, jamais prolongée (true)
+# PASS=7 FAIL=0
