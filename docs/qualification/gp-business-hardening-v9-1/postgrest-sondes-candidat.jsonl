@@ -1,0 +1,42 @@
+{"id":"C01 TTC facture émise","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Cette facture a déjà été émise et ne peut plus être modifiée.","verdict":"CONFORME"}
+{"id":"C01b TTC facture émise (comptable)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Cette facture a déjà été émise et ne peut plus être modifiée.","verdict":"CONFORME"}
+{"id":"C02 renumérotation facture émise","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Cette facture a déjà été émise et ne peut plus être modifiée.","verdict":"CONFORME"}
+{"id":"C03 suppression facture émise","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Cette facture a déjà été émise et ne peut plus être supprimée.","verdict":"CONFORME"}
+{"id":"C04 lignes facture émise","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Les lignes d'une facture émise ne peuvent plus être modifiées","verdict":"CONFORME"}
+{"id":"C05 montant devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté et ne peut plus être modifié.","verdict":"CONFORME"}
+{"id":"C06 prix ligne devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté : ses lignes ne peuvent plus être modifiées.","verdict":"CONFORME"}
+{"id":"C07 suppression lignes devis accepté","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est accepté : ses lignes ne peuvent plus être modifiées.","verdict":"CONFORME"}
+{"id":"C08 annulation directe facture émise (B24)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Une facture émise ne peut pas être annulée : émettez un avoir","verdict":"CONFORME"}
+{"id":"C09 paiement partiel 1 000 €","attendu":"ok","http":200,"code":null,"obtenu":"ok","verdict":"CONFORME"}
+{"id":"C10 même paiement renvoyé (double clic, B17)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce paiement vient d'être enregistré (double envoi ignoré)","verdict":"CONFORME"}
+{"id":"C11 insertion directe paiement","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table paiements","verdict":"CONFORME"}
+{"id":"C12 paiement > reste dû","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Le paiement dépasse le reste dû (4648.96)","verdict":"CONFORME"}
+{"id":"C13 refacturation devis déjà facturé (B34)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Ce devis est déjà facturé, au moins en partie (déjà 4856.67 €) : utilisez une facture de solde/finale ou une situation plutôt qu'une n","verdict":"CONFORME"}
+{"id":"C14 facture depuis devis remisé","attendu":"ok","http":200,"code":null,"obtenu":"ok","verdict":"CONFORME"}
+{"id":"C15 TTC facture = TTC devis remisé (B16)","attendu":"11058.00","http":200,"code":null,"obtenu":"11058.00","verdict":"CONFORME"}
+{"id":"C16 suppression d'un paiement (droit V9.1 conservé)","attendu":"ok","http":200,"code":null,"obtenu":"1 ligne(s)","verdict":"CONFORME"}
+{"id":"C17 statut et montant payé recalculés après suppression","attendu":"0.00|envoyee","http":200,"code":null,"obtenu":"0.00|envoyee","verdict":"CONFORME"}
+{"id":"C18 avoir 10 % sur la facture émise","attendu":"ok","http":200,"code":null,"obtenu":"ok","verdict":"CONFORME"}
+{"id":"C19 paiement après avoir (au-delà du reste réellement dû)","attendu":"refus","http":400,"code":"P0001","obtenu":"P0001 Un paiement ne peut pas être ajouté à cette facture","verdict":"CONFORME"}
+{"id":"C20 écriture cross-tenant (gérant B → facture A)","attendu":"refus","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"D01 chef : coût horaire figé des collègues (B28)","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table pointages","verdict":"CONFORME"}
+{"id":"D02 chef : pointages (heures, statut) toujours lisibles","attendu":"ok","http":200,"code":null,"obtenu":"2 ligne(s)","verdict":"CONFORME"}
+{"id":"D03 salarié : coût horaire employeur (B28)","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table pointages","verdict":"CONFORME"}
+{"id":"D04 salarié : coûts horaires des collègues","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"D05 salarié : taux de facturation","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"D06 salarié : champs RH sensibles d'un collègue (email)","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table employes","verdict":"CONFORME"}
+{"id":"D07 salarié : annuaire (nom) conservé","attendu":"ok","http":200,"code":null,"obtenu":"4 ligne(s)","verdict":"CONFORME"}
+{"id":"D08 salarié : bulletins / profils de paie","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"D09 salarié : coordonnées bancaires","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"D10 gérant : coûts appliqués par RPC (accès légitime)","attendu":"ok","http":200,"code":null,"obtenu":"2 ligne(s)","verdict":"CONFORME"}
+{"id":"D11 comptable (acces_rentabilite) : coûts appliqués par RPC","attendu":"ok","http":200,"code":null,"obtenu":"2 ligne(s)","verdict":"CONFORME"}
+{"id":"D12 gérant : coûts horaires (table dédiée) conservés","attendu":"ok","http":200,"code":null,"obtenu":"2 ligne(s)","verdict":"CONFORME"}
+{"id":"D13 chef : RPC des coûts appliqués","attendu":"refus","http":403,"code":"42501","obtenu":"42501 POINTAGES_COUTS_REFUSES","verdict":"CONFORME"}
+{"id":"D14 gérant B : RPC des coûts de A","attendu":"refus","http":403,"code":"42501","obtenu":"42501 POINTAGES_COUTS_REFUSES","verdict":"CONFORME"}
+{"id":"I01 anon : factures","attendu":"refus","http":401,"code":"42501","obtenu":"42501 permission denied for table factures","verdict":"CONFORME"}
+{"id":"I02 anon : pointages","attendu":"refus","http":401,"code":"42501","obtenu":"42501 permission denied for table pointages","verdict":"CONFORME"}
+{"id":"I03 anon : RPC coûts appliqués","attendu":"refus","http":401,"code":"42501","obtenu":"42501 permission denied for function pointages_couts_appliques","verdict":"CONFORME"}
+{"id":"I04 anon : RPC paiement","attendu":"refus","http":401,"code":"42501","obtenu":"42501 permission denied for function enregistrer_paiement_facture","verdict":"CONFORME"}
+{"id":"I05 service_role : flux de service (paramètres relances)","attendu":"ok","http":200,"code":null,"obtenu":"0 ligne(s)","verdict":"CONFORME"}
+{"id":"I06 service_role : aucune lecture directe des factures (ACL V9.1)","attendu":"refus","http":403,"code":"42501","obtenu":"42501 permission denied for table factures","verdict":"CONFORME"}
+{"total":41,"conformes":41,"ecarts":0}

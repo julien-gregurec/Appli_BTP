@@ -1,0 +1,54 @@
+1..43
+10000000-0000-0000-0000-000000000001
+admin-a@invalid.local
+ok 1 - B04 : le gérant crée un chantier (non-régression V9.1)
+ok 2 - B16 : HT de la facture = HT du devis remisé (remise globale reportée)
+ok 3 - B16 : TVA de la facture = TVA du devis remisé
+ok 4 - B16 : TTC de la facture = TTC du devis remisé (5 648,96 €)
+ok 5 - B16 : calcul indépendant du devis (remises ligne + globale 3 %, 3 taux de TVA)
+ok 6 - B34 : refacturation du même devis refusée (non-régression V9.1)
+ok 7 - B17 : premier paiement partiel de 1 000 € accepté
+ok 8 - B17 : le même paiement renvoyé aussitôt (double clic) est refusé
+ok 9 - B17 : un second paiement distinct (autre mode, autre référence) reste accepté
+ok 10 - B17 : montant payé = 2 000 € (pas de doublon)
+ok 11 - B24 : une facture émise ne passe pas directement à « annulée » (avoir obligatoire)
+ok 12 - B24 : un brouillon (non numéroté) reste annulable
+ok 13 - B19 : acompte 30 % = 30 % du HT remisé du devis
+ok 14 - B19 : acompte 30 % = 30 % du TTC remisé du devis
+ok 15 - B19 : avoir 10 % = −10 % du HT remisé du devis
+ok 16 - Situation : somme des lignes = montant de la période (remise globale non regonflée)
+ok 17 - Situation : HT de la facture de situation = montant de la période
+10000000-0000-0000-0000-000000000001
+ok 18 - B25 : CA de rentabilité = émis net d'avoirs émis (1 000 + 2 000 − 200), brouillons exclus
+ok 19 - B25 : part des avoirs = avoirs émis seulement (avoir brouillon exclu)
+ok 20 - B25 : les alertes « à encaisser » ignorent brouillons et avoirs
+ok 21 - B25 : « Total facturé » du tableau de bord = factures émises (brouillons exclus)
+ok 22 - B12 : première déclaration de pointage oublié acceptée
+ok 23 - B12 : seconde déclaration le même jour sur le même chantier refusée
+ok 24 - B35 : une déclaration sur un autre chantier reste possible (16 h cumulées)
+ok 25 - B35 : le cumul journalier tous chantiers ne dépasse pas 24 h
+ok 26 - B35 : 16 h enregistrées pour la journée (refus sans écriture partielle)
+10000000-0000-0000-0000-000000000001
+ok 27 - B12 : après rejet, une nouvelle déclaration sur le même chantier est possible
+ok 28 - B37 : « Total par employé » exclut le pointage rejeté (7 h, pas 19 h)
+ok 29 - B37 : le nombre de pointages comptés exclut le rejeté
+10000000-0000-0000-0000-000000000003
+ok 30 - B28 : le chef d'équipe (valider_pointages, sans voir_cout_interne_employe) ne lit plus le coût horaire de ses collègues
+ok 31 - B28 : le chef d'équipe garde la lecture des pointages eux-mêmes (heures, statut)
+ok 32 - B28 : la RPC des coûts appliqués est refusée au chef d'équipe
+10000000-0000-0000-0000-000000000002
+ok 33 - B28 : le salarié ne lit pas le coût horaire employeur par l'API
+ok 34 - B28 : le salarié ne lit aucun coût horaire de collègue (non-régression V9.1)
+ok 35 - B28 : le salarié ne lit aucun taux de facturation (non-régression V9.1)
+10000000-0000-0000-0000-000000000005
+ok 36 - B28 : le comptable (acces_rentabilite) conserve l'accès aux coûts appliqués par la RPC
+10000000-0000-0000-0000-000000000001
+ok 37 - B28 : le gérant conserve l'accès aux coûts appliqués par la RPC
+20000000-0000-0000-0000-000000000001
+ok 38 - B28 : aucun coût d'une autre entreprise par la RPC
+10000000-0000-0000-0000-000000000001
+ok 39 - B28 : RPC fermée à anon
+ok 40 - B31 : budget prévisionnel négatif refusé par la base
+ok 41 - B07 : fin prévue antérieure au début refusée par la base
+ok 42 - B05 : remise de ligne > 100 % refusée par la base
+ok 43 - B05 : remise globale > 100 % refusée par la base

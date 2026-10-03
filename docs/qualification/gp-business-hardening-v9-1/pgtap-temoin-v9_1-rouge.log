@@ -1,0 +1,117 @@
+1..43
+10000000-0000-0000-0000-000000000001
+admin-a@invalid.local
+ok 1 - B04 : le gérant crée un chantier (non-régression V9.1)
+not ok 2 - B16 : HT de la facture = HT du devis remisé (remise globale reportée)
+# Failed test 2: "B16 : HT de la facture = HT du devis remisé (remise globale reportée)"
+#         have: 5006.87
+#         want: 4856.67
+not ok 3 - B16 : TVA de la facture = TVA du devis remisé
+# Failed test 3: "B16 : TVA de la facture = TVA du devis remisé"
+#         have: 816.80
+#         want: 792.29
+not ok 4 - B16 : TTC de la facture = TTC du devis remisé (5 648,96 €)
+# Failed test 4: "B16 : TTC de la facture = TTC du devis remisé (5 648,96 €)"
+#         have: 5823.67
+#         want: 5648.96
+ok 5 - B16 : calcul indépendant du devis (remises ligne + globale 3 %, 3 taux de TVA)
+ok 6 - B34 : refacturation du même devis refusée (non-régression V9.1)
+ok 7 - B17 : premier paiement partiel de 1 000 € accepté
+not ok 8 - B17 : le même paiement renvoyé aussitôt (double clic) est refusé
+# Failed test 8: "B17 : le même paiement renvoyé aussitôt (double clic) est refusé"
+#     no exception thrown
+ok 9 - B17 : un second paiement distinct (autre mode, autre référence) reste accepté
+not ok 10 - B17 : montant payé = 2 000 € (pas de doublon)
+# Failed test 10: "B17 : montant payé = 2 000 € (pas de doublon)"
+#         have: 3000.00
+#         want: 2000.00
+not ok 11 - B24 : une facture émise ne passe pas directement à « annulée » (avoir obligatoire)
+# Failed test 11: "B24 : une facture émise ne passe pas directement à « annulée » (avoir obligatoire)"
+#     no exception thrown
+ok 12 - B24 : un brouillon (non numéroté) reste annulable
+not ok 13 - B19 : acompte 30 % = 30 % du HT remisé du devis
+# Failed test 13: "B19 : acompte 30 % = 30 % du HT remisé du devis"
+#         have: 3150.00
+#         want: 3055.50
+not ok 14 - B19 : acompte 30 % = 30 % du TTC remisé du devis
+# Failed test 14: "B19 : acompte 30 % = 30 % du TTC remisé du devis"
+#         have: 3750.00
+#         want: 3637.50
+not ok 15 - B19 : avoir 10 % = −10 % du HT remisé du devis
+# Failed test 15: "B19 : avoir 10 % = −10 % du HT remisé du devis"
+#         have: -1050.00
+#         want: -1018.50
+not ok 16 - Situation : somme des lignes = montant de la période (remise globale non regonflée)
+# Failed test 16: "Situation : somme des lignes = montant de la période (remise globale non regonflée)"
+not ok 17 - Situation : HT de la facture de situation = montant de la période
+# Failed test 17: "Situation : HT de la facture de situation = montant de la période"
+10000000-0000-0000-0000-000000000001
+not ok 18 - B25 : CA de rentabilité = émis net d'avoirs émis (1 000 + 2 000 − 200), brouillons exclus
+# Failed test 18: "B25 : CA de rentabilité = émis net d'avoirs émis (1 000 + 2 000 − 200), brouillons exclus"
+#         have: 1250
+#         want: 2800
+not ok 19 - B25 : part des avoirs = avoirs émis seulement (avoir brouillon exclu)
+# Failed test 19: "B25 : part des avoirs = avoirs émis seulement (avoir brouillon exclu)"
+#         have: -250
+#         want: -200
+not ok 20 - B25 : les alertes « à encaisser » ignorent brouillons et avoirs
+# Failed test 20: "B25 : les alertes « à encaisser » ignorent brouillons et avoirs"
+not ok 21 - B25 : « Total facturé » du tableau de bord = factures émises (brouillons exclus)
+# Failed test 21: "B25 : « Total facturé » du tableau de bord = factures émises (brouillons exclus)"
+#         have: 14020.00
+#         want: 7230.00
+ok 22 - B12 : première déclaration de pointage oublié acceptée
+not ok 23 - B12 : seconde déclaration le même jour sur le même chantier refusée
+# Failed test 23: "B12 : seconde déclaration le même jour sur le même chantier refusée"
+#     no exception thrown
+ok 24 - B35 : une déclaration sur un autre chantier reste possible (16 h cumulées)
+not ok 25 - B35 : le cumul journalier tous chantiers ne dépasse pas 24 h
+# Failed test 25: "B35 : le cumul journalier tous chantiers ne dépasse pas 24 h"
+#     no exception thrown
+not ok 26 - B35 : 16 h enregistrées pour la journée (refus sans écriture partielle)
+# Failed test 26: "B35 : 16 h enregistrées pour la journée (refus sans écriture partielle)"
+#         have: 29.00
+#         want: 16.00
+10000000-0000-0000-0000-000000000001
+ok 27 - B12 : après rejet, une nouvelle déclaration sur le même chantier est possible
+not ok 28 - B37 : « Total par employé » exclut le pointage rejeté (7 h, pas 19 h)
+# Failed test 28: "B37 : « Total par employé » exclut le pointage rejeté (7 h, pas 19 h)"
+#         have: 19.00
+#         want: 7.00
+not ok 29 - B37 : le nombre de pointages comptés exclut le rejeté
+# Failed test 29: "B37 : le nombre de pointages comptés exclut le rejeté"
+#         have: 2
+#         want: 1
+10000000-0000-0000-0000-000000000003
+not ok 30 - B28 : le chef d'équipe (valider_pointages, sans voir_cout_interne_employe) ne lit plus le coût horaire de ses collègues
+# Failed test 30: "B28 : le chef d'équipe (valider_pointages, sans voir_cout_interne_employe) ne lit plus le coût horaire de ses collègues"
+#       caught: no exception
+#       wanted: 42501
+ok 31 - B28 : le chef d'équipe garde la lecture des pointages eux-mêmes (heures, statut)
+not ok 32 - B28 : la RPC des coûts appliqués est refusée au chef d'équipe
+# Failed test 32: "B28 : la RPC des coûts appliqués est refusée au chef d'équipe"
+#       caught: 42883: function public.pointages_couts_appliques(unknown, date, date) does not exist
+#       wanted: 42501
+10000000-0000-0000-0000-000000000002
+not ok 33 - B28 : le salarié ne lit pas le coût horaire employeur par l'API
+# Failed test 33: "B28 : le salarié ne lit pas le coût horaire employeur par l'API"
+#       caught: no exception
+#       wanted: 42501
+ok 34 - B28 : le salarié ne lit aucun coût horaire de collègue (non-régression V9.1)
+ok 35 - B28 : le salarié ne lit aucun taux de facturation (non-régression V9.1)
+10000000-0000-0000-0000-000000000005
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:195: ERROR:  function public.pointages_couts_appliques(unknown, date, date) does not exist
+LINE 1: select is((select count(*)::int from public.pointages_couts_...
+                                             ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:196: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:199: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:200: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:202: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:203: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:205: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:209: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:211: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:213: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:215: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/home/user/Appli_BTP/supabase/tests/gp_business_hardening_v9_1.test.sql:217: ERROR:  current transaction is aborted, commands ignored until end of transaction block
