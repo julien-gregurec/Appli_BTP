@@ -1,0 +1,125 @@
+{
+ "date": "2026-10-03T00:20:18.028Z",
+ "reps": 10,
+ "results": [
+  {
+   "tenant": 11,
+   "volume": 1000,
+   "verite": {
+    "factures_alertes": 503,
+    "devis_alertes": 247,
+    "factures_total": 1193966.75,
+    "factures_encaisse_total": 535179.01,
+    "devis_acceptes_total": 977543.9,
+    "chantiers": 100,
+    "notifs_non_lues": 400
+   },
+   "flux": {
+    "dashboard_indicateurs": {
+     "n": 10,
+     "p50": 21.1,
+     "p95": 26.2,
+     "max": 26.2,
+     "errors": 0,
+     "avgBytes": 146845,
+     "exactitude": {
+      "factures_alertes": [
+       503,
+       503
+      ],
+      "devis_alertes": [
+       247,
+       247
+      ],
+      "factures_total": [
+       1193966.75,
+       1193966.75
+      ],
+      "factures_encaisse_total": [
+       535179.01,
+       535179.01
+      ],
+      "devis_acceptes_total": [
+       977543.9,
+       977543.9
+      ]
+     },
+     "exact": true
+    },
+    "gp_dashboard_chantiers": {
+     "n": 10,
+     "p50": 3.8,
+     "p95": 5.2,
+     "max": 5.2,
+     "errors": 0,
+     "avgBytes": 1025
+    },
+    "gp_options_chantiers": {
+     "n": 10,
+     "p50": 4.3,
+     "p95": 6.3,
+     "max": 6.3,
+     "errors": 0,
+     "avgBytes": 20887,
+     "lignes": [
+      100,
+      100
+     ]
+    },
+    "notifications_8": {
+     "n": 10,
+     "p50": 2,
+     "p95": 3.3,
+     "max": 3.3,
+     "errors": 0,
+     "avgBytes": 2
+    },
+    "devis_liste_page1": {
+     "n": 10,
+     "p50": 1.2,
+     "p95": 1.2,
+     "max": 1.2,
+     "errors": 0,
+     "avgBytes": 629
+    },
+    "devis_liste_offset_profond": {
+     "n": 10,
+     "p50": 958.4,
+     "p95": 2043.1,
+     "max": 2043.1,
+     "errors": 0,
+     "avgBytes": 3578
+    },
+    "factures_sans_limite": {
+     "n": 10,
+     "p50": 2218.6,
+     "p95": 3517.5,
+     "max": 3517.5,
+     "errors": 0,
+     "avgBytes": 48998,
+     "lignes": [
+      1000,
+      1000
+     ],
+     "troncature_max_rows": false
+    },
+    "taches_a_faire": {
+     "n": 10,
+     "p50": 8855.2,
+     "p95": 10074,
+     "max": 10074,
+     "errors": 0,
+     "avgBytes": 8236
+    },
+    "documents_page": {
+     "n": 10,
+     "p50": 1296.6,
+     "p95": 2514.3,
+     "max": 2514.3,
+     "errors": 0,
+     "avgBytes": 3443
+    }
+   }
+  }
+ ]
+}

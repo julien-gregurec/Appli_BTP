@@ -1,0 +1,159 @@
+{
+ "date": "2026-10-03T00:46:35.285Z",
+ "reps": 10,
+ "results": [
+  {
+   "tenant": 13,
+   "volume": 20000,
+   "verite": {
+    "factures_alertes": 9813,
+    "devis_alertes": 4822,
+    "factures_total": 23504937.05,
+    "factures_encaisse_total": 11341672.23,
+    "devis_acceptes_total": 20200092.14,
+    "chantiers": 2000,
+    "notifs_non_lues": 8000
+   },
+   "flux": {
+    "dashboard_indicateurs": {
+     "n": 10,
+     "p50": 163.3,
+     "p95": 186.5,
+     "max": 186.5,
+     "errors": 0,
+     "avgBytes": 2874605,
+     "exactitude": {
+      "factures_alertes": [
+       9813,
+       9813
+      ],
+      "devis_alertes": [
+       4822,
+       4822
+      ],
+      "factures_total": [
+       23504937.05,
+       23504937.05
+      ],
+      "factures_encaisse_total": [
+       11341672.23,
+       11341672.23
+      ],
+      "devis_acceptes_total": [
+       20200092.14,
+       20200092.14
+      ]
+     },
+     "exact": true
+    },
+    "gp_dashboard_chantiers": {
+     "n": 10,
+     "p50": 6.4,
+     "p95": 7.1,
+     "max": 7.1,
+     "errors": 0,
+     "avgBytes": 1858
+    },
+    "gp_options_chantiers": {
+     "n": 10,
+     "p50": 16.7,
+     "p95": 19.8,
+     "max": 19.8,
+     "errors": 0,
+     "avgBytes": 421467,
+     "lignes": [
+      2000,
+      2000
+     ]
+    },
+    "notifications_8": {
+     "n": 10,
+     "p50": 2,
+     "p95": 3.6,
+     "max": 3.6,
+     "errors": 0,
+     "avgBytes": 2
+    },
+    "devis_liste_paginee_p1": {
+     "n": 10,
+     "p50": 78.6,
+     "p95": 88,
+     "max": 88,
+     "errors": 0,
+     "avgBytes": 6815,
+     "total_api": 20000,
+     "exact_total": true
+    },
+    "devis_liste_paginee_derniere": {
+     "n": 10,
+     "p50": 82.6,
+     "p95": 90.1,
+     "max": 90.1,
+     "errors": 0,
+     "avgBytes": 6857
+    },
+    "devis_recherche_texte": {
+     "n": 10,
+     "p50": 115.7,
+     "p95": 123.9,
+     "max": 123.9,
+     "errors": 0,
+     "avgBytes": 6726
+    },
+    "factures_liste_paginee_p1": {
+     "n": 10,
+     "p50": 27.4,
+     "p95": 29,
+     "max": 29,
+     "errors": 0,
+     "avgBytes": 7424
+    },
+    "factures_impayees_p1": {
+     "n": 10,
+     "p50": 9.9,
+     "p95": 11.6,
+     "max": 11.6,
+     "errors": 0,
+     "avgBytes": 100
+    },
+    "devis_direct_offset_profond": {
+     "n": 10,
+     "p50": 953,
+     "p95": 1737.7,
+     "max": 1737.7,
+     "errors": 0,
+     "avgBytes": 3610
+    },
+    "factures_sans_limite": {
+     "n": 10,
+     "p50": 22238,
+     "p95": 26626.7,
+     "max": 26626.7,
+     "errors": 0,
+     "avgBytes": 48998,
+     "lignes": [
+      1000,
+      20000
+     ],
+     "troncature_max_rows": true
+    },
+    "taches_a_faire": {
+     "n": 10,
+     "p50": 25326.4,
+     "p95": 43975.9,
+     "max": 43975.9,
+     "errors": 0,
+     "avgBytes": 8283
+    },
+    "documents_page": {
+     "n": 10,
+     "p50": 65152.4,
+     "p95": 69139.9,
+     "max": 69139.9,
+     "errors": 0,
+     "avgBytes": 3389
+    }
+   }
+  }
+ ]
+}
