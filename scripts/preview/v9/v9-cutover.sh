@@ -195,7 +195,7 @@ fi
 # ── 9-10 : dry-run CLI et égalité avec le plan ─────────────────────────────────────────────────
 etape "9-10" "supabase db push --dry-run : exactement les PENDING_MIGRATIONS du plan, dans l'ordre"
 if [ -n "$OFF_LEDGER" ]; then
-  if [ -n "$OFF_DRY" ]; then cp "$OFF_DRY" "$OUT/dry-run.txt"; else echo "  · dry-run CLI non exécuté (hors ligne, --offline-dry-run absent)"; fi
+  if [ -n "$OFF_DRY" ]; then cp "$OFF_DRY" "$OUT/dry-run.txt" || stop "sortie de dry-run hors ligne introuvable : $OFF_DRY"; else echo "  · dry-run CLI non exécuté (hors ligne, --offline-dry-run absent)"; fi
 else
   $SUPABASE_BIN db push --linked --dry-run </dev/null > "$OUT/dry-run.txt" 2>&1 || { cat "$OUT/dry-run.txt"; stop "db push --dry-run en échec"; }
 fi
