@@ -25,9 +25,14 @@ echo "== builds GP / Colors / Réserves (ELSATIA_APPLICATION_ENV=local au build)
 
 for MODE in "${MODES[@]}"; do
   echo "== mode $MODE =="
-  arreter_apps; arreter_pile
-  bash "$DEPOT/tests/e2e/satellites-pile-locale/preparer-base.sh" sat_e2e "$MODELE" > "$OUT/${MODE}_base.log" 2>&1 || { echo "base KO"; tail -n 20 "$OUT/${MODE}_base.log"; exit 1; }
-  bash "$DEPOT/tests/e2e/finance-pile-locale/demarrer-pile.sh" sat_e2e "$OUT/pile" > "$OUT/${MODE}_pile.log" 2>&1 || { echo "pile KO"; exit 1; }
+  arreter_apps
+  # Une seule base pour les trois modes (comme la recette d'origine) : l'url_preview de Colors est
+  # définie par l'écran propriétaire en mode local (A-11) puis lue par les modes Preview / Production.
+  if [ -z "${PILE_PRETE:-}" ]; then
+    bash "$DEPOT/tests/e2e/satellites-pile-locale/preparer-base.sh" sat_e2e "$MODELE" > "$OUT/base.log" 2>&1 || { echo "base KO"; tail -n 20 "$OUT/base.log"; exit 1; }
+    bash "$DEPOT/tests/e2e/finance-pile-locale/demarrer-pile.sh" sat_e2e "$OUT/pile" > "$OUT/pile.log" 2>&1 || { echo "pile KO"; exit 1; }
+    PILE_PRETE=1
+  fi
   case $MODE in
     local) T=(NEXT_PUBLIC_SUPABASE_URL=$LOCAL_SB NEXT_PUBLIC_TOOLS_URL=http://localhost:3020 NEXT_PUBLIC_TOOLS_ENV=local NEXT_PUBLIC_TOOLS_BILLING_API_URL=http://localhost:3000 NEXT_PUBLIC_TOOLS_GESTION_PRO_URL=http://localhost:3000 NEXT_PUBLIC_TOOLS_COLORS_URL=http://localhost:3010);;
     preview) T=(NEXT_PUBLIC_SUPABASE_URL=https://preview-simulee.supabase.co NEXT_PUBLIC_TOOLS_URL=https://elsatia-tools-git-preview.vercel.app NEXT_PUBLIC_TOOLS_ENV=preview NEXT_PUBLIC_TOOLS_BILLING_API_URL=https://elsatia-gp-git-preview.vercel.app NEXT_PUBLIC_TOOLS_GESTION_PRO_URL=https://elsatia-gp-git-preview.vercel.app NEXT_PUBLIC_TOOLS_COLORS_URL=https://elsatia-colors-git-preview.vercel.app);;
