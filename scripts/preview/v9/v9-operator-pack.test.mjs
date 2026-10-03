@@ -5,7 +5,7 @@
 // local (supabase/migrations) et de versions identifiées (socle V8 = 813 ORIGINALE, V9.1).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -30,6 +30,7 @@ import { executer as gateCli } from "./code-deploy-gate.mjs";
 import { executer as guardCli } from "./guard-preview-target.mjs";
 import { executer as envCli } from "./env-scope-check.mjs";
 import { executer as ibanCli } from "./iban-k1-check.mjs";
+import { estPointEntree } from "../lib/preview-guard.mjs";
 import { dryRuns, fixtures, ledgersDerives } from "./fixtures/generate-fixtures.mjs";
 
 const FIX = resolve(import.meta.dirname, "fixtures");
@@ -595,4 +596,43 @@ test("reprise (cas A) : préfixe exact partiel accepté (pre et reprise), plan =
   const c = capture();
   assert.equal(checkLedgerCli([resolve(FIX, "ledger-partiel.json"), "--expect", "reprise"], { local, log: c.log }), 0);
   assert.match(c.texte(), new RegExp(`^PENDING_MIGRATIONS=${cible.nb - a.courant.nb} `, "m"));
+});
+
+// ── Point d'entrée : dépôt atteint par un lien symbolique (bug du pack V9.2 post-cutover) ──
+// Node canonicalise `import.meta.url` du point d'entrée mais pas `process.argv[1]` : sans
+// canonicalisation des deux côtés, chaque script du pack sortait en 0 SANS RIEN FAIRE (HEAD vide,
+// cutover-report.json et ledger-apres.json jamais écrits, db-verify.txt vide, porte muette).
+test("point d'entrée : scripts du pack exécutés via un chemin à lien symbolique → ils s'exécutent réellement", () => {
+  const dir = mkdtempSync(join(tmpdir(), "v9-lien-"));
+  const lien = join(dir, "depot");
+  symlinkSync(ROOT, lien, "dir");
+  const v9 = join(lien, "scripts/preview/v9");
+  assert.equal(estPointEntree(new URL(`file://${resolve(import.meta.dirname, "cutover-step.mjs")}`).href, join(v9, "cutover-step.mjs")), true);
+  assert.equal(estPointEntree(new URL(`file://${resolve(import.meta.dirname, "cutover-step.mjs")}`).href, join(v9, "code-deploy-gate.mjs")), false);
+  assert.equal(estPointEntree(import.meta.url, ""), false);
+  const node = (script, args = []) => spawnSync(process.execPath, [join(v9, script), ...args], { encoding: "utf8" });
+  const head = node("cutover-step.mjs", ["head"]);
+  assert.equal(head.status, 0);
+  assert.match(head.stdout.trim(), /^[0-9a-f]{40}$/, "HEAD vide via lien symbolique");
+  const rapport = join(dir, "cutover-report.json");
+  assert.equal(node("cutover-step.mjs", ["report-set", rapport, "mode", '"verify"']).status, 0);
+  assert.equal(JSON.parse(readFileSync(rapport, "utf8")).mode, "verify", "cutover-report.json non écrit via lien symbolique");
+  const porte = node("code-deploy-gate.mjs", ["--report", rapport]);
+  assert.equal(porte.status, 1, "porte muette (sortie 0) via lien symbolique");
+  assert.match(porte.stdout, /^CODE_DEPLOY_ALLOWED=false$/m);
+  const ledger = node("check-ledger-v9.mjs", [join(dir, "absent.json"), "--expect", "post"]);
+  assert.notEqual(ledger.status, 0, "contrôle du ledger muet via lien symbolique");
+});
+
+test("cutover : un succès exige des preuves écrites (rapport, SHA de HEAD, ledger, DB verify, porte explicite)", () => {
+  const src = readFileSync(resolve(import.meta.dirname, "v9-cutover.sh"), "utf8");
+  assert.match(src, /\[ -s "\$RAPPORT" \] \|\| refus "pack Node inopérant/);
+  assert.match(src, /case "\$SHA_HEAD" in \*\[!0-9a-f\]\*\|""\) refus/);
+  assert.match(src, /ledger-tag "\$REF_PREVIEW" "\$1\.brut" "\$1" && \[ -s "\$1" \]/);
+  assert.match(src, /grep -q '\^PREVIEW_LEDGER_V9_COMPLETE' "\$OUT\/ledger-apres\.txt" \|\| c=1/);
+  assert.match(src, /grep -q '\^GO : base Preview conforme' "\$OUT\/db-verify\.txt"/);
+  assert.match(src, /grep -q '\^V9_CHECKS_GO' "\$OUT\/v9-checks-verdict\.txt" \|\| vc=1/);
+  assert.match(src, /grep -q '\^CODE_DEPLOY_ALLOWED=true\$' "\$OUT\/code-deploy-gate\.txt" \|\| g=1/);
+  // Le libellé GO de db-verify reste celui que le script de cutover attend.
+  assert.match(readFileSync(resolve(ROOT, "scripts/preview/db-verify.mjs"), "utf8"), /"\\nGO : base Preview conforme\."/);
 });

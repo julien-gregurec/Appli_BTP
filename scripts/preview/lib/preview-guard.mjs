@@ -4,7 +4,7 @@
 // GARANTIE : aucune fonction de ce module ne renvoie ni n'écrit une valeur d'environnement ;
 // seuls des noms, des états (« présente », « identique ») et des codes sont produits.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REF_PREVIEW_AUTORISEE } from "../../garde-scripts-production.mjs";
@@ -124,7 +124,18 @@ export function ligne(etat, code, sujet, message = "") {
   return `  ${icone} [${code}] ${sujet}${message ? ` — ${message}` : ""}`;
 }
 
-/** Vrai si ce module est le point d'entrée (pas un import de test). */
-export function estPointEntree(importMetaUrl) {
-  return Boolean(process.argv[1]) && fileURLToPath(importMetaUrl) === resolve(process.argv[1]);
+/** Chemin canonique (liens symboliques, casse et normalisation Unicode résolus par le système). */
+function cheminReel(chemin) {
+  try { return realpathSync.native(chemin); } catch { return resolve(chemin); }
+}
+
+/**
+ * Vrai si ce module est le point d'entrée (pas un import de test).
+ * Node résout les liens symboliques du point d'entrée dans `import.meta.url`, pas dans
+ * `process.argv[1]` : sans canonicalisation des DEUX côtés, un dépôt atteint par un lien
+ * symbolique (ou par une casse / une forme Unicode différente sur macOS) rendait chaque script
+ * muet avec le code 0 — y compris la porte CODE_DEPLOY_ALLOWED.
+ */
+export function estPointEntree(importMetaUrl, argv1 = process.argv[1]) {
+  return Boolean(argv1) && cheminReel(fileURLToPath(importMetaUrl)) === cheminReel(resolve(argv1));
 }

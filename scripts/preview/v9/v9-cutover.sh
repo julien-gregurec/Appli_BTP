@@ -81,7 +81,11 @@ rm -f "$RAPPORT"
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" mode "\"$MODE\"" >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" reprise "$([ "$RESUME" = 1 ] && echo true || echo false)" >/dev/null
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" harness "$([ "$HARNESS" = 1 ] && echo true || echo false)" >/dev/null
+# Auto-contrôle du pack : un script Node muet (sortie 0 sans rien faire) ne doit jamais passer pour un succès.
+[ -s "$RAPPORT" ] || refus "pack Node inopérant : $RAPPORT non écrit (lancer depuis le chemin réel du dépôt : cd \"\$(pwd -P)\")"
 SHA_HEAD="$(node "$V9/cutover-step.mjs" head)" || refus "SHA de HEAD illisible"
+case "$SHA_HEAD" in *[!0-9a-f]*|"") refus "SHA de HEAD illisible ou vide (« $SHA_HEAD »)" ;; esac
+[ ${#SHA_HEAD} = 40 ] || refus "SHA de HEAD illisible (« $SHA_HEAD »)"
 node "$V9/cutover-step.mjs" report-set "$RAPPORT" sha_deploye "\"$SHA_HEAD\"" >/dev/null
 echo "ELSATIA V9 — cutover Preview → train local (HEAD $SHA_HEAD) — mode $MODE$([ "$HARNESS" = 1 ] && echo ' (BANC LOCAL)') — sorties : $OUT"
 
@@ -129,30 +133,36 @@ node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.cible '{"ok":true}' >/d
 lire_ledger() { # $1 = fichier de sortie
   if [ -n "$OFF_LEDGER" ]; then cp "$OFF_LEDGER" "$1"; return; fi
   psql_ro -f "$REPO/docs/runbooks/sql/ELSATIA_V9_LEDGER_EXPORT.sql" > "$1.brut" || return 1
-  node "$V9/cutover-step.mjs" ledger-tag "$REF_PREVIEW" "$1.brut" "$1" && rm -f "$1.brut"
+  node "$V9/cutover-step.mjs" ledger-tag "$REF_PREVIEW" "$1.brut" "$1" && [ -s "$1" ] && rm -f "$1.brut"
 }
 
 verifier_apres() {
   etape 12 "relecture du ledger"
   lire_ledger "$OUT/ledger-apres.json" || stop "export du ledger après cutover impossible"
   etape 13 "ledger = train complet (CURRENT_LEDGER = TARGET_LEDGER), 813 originale"
-  node "$V9/check-ledger-v9.mjs" "$OUT/ledger-apres.json" --expect post --require-813-proof
-  local c=$?
+  node "$V9/check-ledger-v9.mjs" "$OUT/ledger-apres.json" --expect post --require-813-proof | tee "$OUT/ledger-apres.txt"
+  local c=${PIPESTATUS[0]}
+  grep -q '^PREVIEW_LEDGER_V9_COMPLETE' "$OUT/ledger-apres.txt" || c=1
   node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.ledger_apres "{\"verdict\":\"$( [ $c = 0 ] && echo PREVIEW_LEDGER_V9_COMPLETE || echo PREVIEW_LEDGER_DIVERGENCE)\"}" >/dev/null
   [ $c = 0 ] || stop "ledger après cutover ≠ train complet : runbook ELSATIA_V9_PREVIEW_ROLLBACK.md, cas A"
 
   etape 14 "DB verify (contrôles du train) + contrôles V9 post-cutover"
   ELSATIA_PREVIEW_DB_URL="$DB_VERIFY_URL" node "$REPO/scripts/preview/db-verify.mjs" ${DB_VERIFY_ARGS[@]+"${DB_VERIFY_ARGS[@]}"} | tee "$OUT/db-verify.txt"
   local dv=${PIPESTATUS[0]}
+  grep -q '^GO : base Preview conforme' "$OUT/db-verify.txt" || { [ "$dv" = 0 ] && dv=1; }
   node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.db_verify "{\"code\":$dv}" >/dev/null
   psql_ro -F '|' -f "$REPO/docs/runbooks/sql/ELSATIA_V9_POST_CUTOVER_CHECKS.sql" > "$OUT/v9-checks.txt" 2>"$OUT/v9-checks.err" || true
-  node "$V9/cutover-step.mjs" v9-checks "$OUT/v9-checks.txt"
-  local vc=$?
+  node "$V9/cutover-step.mjs" v9-checks "$OUT/v9-checks.txt" | tee "$OUT/v9-checks-verdict.txt"
+  local vc=${PIPESTATUS[0]}
+  grep -q '^V9_CHECKS_GO' "$OUT/v9-checks-verdict.txt" || vc=1
   node "$V9/cutover-step.mjs" report-set "$RAPPORT" etapes.controles_v9 "{\"ok\":$([ $vc = 0 ] && echo true || echo false)}" >/dev/null
 
   etape 15 "rapport et porte « code après base »"
-  node "$V9/code-deploy-gate.mjs" --report "$RAPPORT" --ledger "$OUT/ledger-apres.json"
-  local g=$?
+  node "$V9/code-deploy-gate.mjs" --report "$RAPPORT" --ledger "$OUT/ledger-apres.json" | tee "$OUT/code-deploy-gate.txt"
+  local g=${PIPESTATUS[0]}
+  # La porte n'est ouverte que si elle l'ÉCRIT : une sortie 0 muette est un refus.
+  grep -q '^CODE_DEPLOY_ALLOWED=true$' "$OUT/code-deploy-gate.txt" || g=1
+  [ -s "$RAPPORT" ] && [ -s "$OUT/ledger-apres.json" ] || g=1
   node "$V9/cutover-step.mjs" report-set "$RAPPORT" verdict "\"$([ $g = 0 ] && echo DB_V9_CONFIRMED || echo NO_GO)\"" >/dev/null
   echo "Rapport : $RAPPORT"
   [ $g = 0 ] || exit 1
