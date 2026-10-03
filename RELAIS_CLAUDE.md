@@ -1,5 +1,13 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE — 3 octobre 2026 (pré-production), ELSATIA Social : ligne d’intégration à décider
+
+- `main` n’est **pas** la ligne canonique : le train `integration/elsatia-canonical-train-v9.2` compte 408 migrations (dernière `20261003001504`), contre 178 sur `main` et 179 sur cette branche. La migration Social `20261003000184` devra être réhorodatée après le train, puis adaptée au modèle `utilisateur_id` / `actif` et à l’AAL2. Détails : `docs/ELSATIA_SOCIAL_PREPRODUCTION.md`.
+- Ledgers Preview et Production **inconnus** : aucun accès distant depuis la session. Rien n’a été appliqué ni déployé.
+- La fusion du train dans cette branche a été refusée par le garde-fou de session : décision à prendre par Julien.
+
+---
+
 ## REPRISE — 3 octobre 2026 (suite), ELSATIA Social qualifié en local, identité ELSATIA
 
 - **Identité** : le nouveau logo ELSATIA bleu / cyan / blanc est la référence de tout l’écosystème. L’or est retiré d’ELSATIA Social. Source unique : `src/lib/elsatia/marque.ts` et `--elsatia-*` dans `globals.css`. Valeurs **provisoires** jusqu’au fichier du logo. Fichiers attendus et déclinaisons : `docs/ELSATIA_IDENTITE.md` ; générateur `npm run elsatia:logo`. Le shell Gestion Pro reste à l’identité Liria en attendant le logo.
