@@ -58,7 +58,7 @@ insert into public.utilisateurs (id, prenom, nom) values
   ('6a000000-0000-4000-8000-000000000005', 'Claire', 'Comptable'),
   ('6a000000-0000-4000-8000-000000000006', 'Louis', 'Limité'),
   ('6b000000-0000-4000-8000-000000000001', 'Aline', 'Autre')
-on conflict (id) do nothing;
+on conflict (id) do update set prenom = excluded.prenom, nom = excluded.nom;
 
 select set_config('request.jwt.claims', '{"sub":"6a000000-0000-4000-8000-000000000001","role":"authenticated"}', false);
 select public.creer_entreprise_bootstrap('GPB Alsace Test BTP');
@@ -102,5 +102,8 @@ on conflict do nothing;
 update public.utilisateurs_entreprises ue set pointage_personnel_actif = true
   from public.entreprises e where e.id = ue.entreprise_id and e.nom = 'GPB Alsace Test BTP'
    and ue.utilisateur_id = '6a000000-0000-4000-8000-000000000001';
+update public.utilisateurs u set entreprise_active_id = ue.entreprise_id
+  from public.utilisateurs_entreprises ue
+ where ue.utilisateur_id = u.id and u.entreprise_active_id is null;
 SQL
 echo "== OK : base $BASE prête =="

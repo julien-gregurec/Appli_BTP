@@ -215,3 +215,141 @@ test("S7 impression : dates au format français (B06)", async ({ page }) => {
   await page.goto(`/imprimer/devis/${etat.devisId}`);
   expect(await page.locator("body").innerText()).not.toMatch(/Émis le \d{4}-\d{2}-\d{2}/);
 });
+
+const ilYA = (jours: number) => new Date(Date.now() - jours * 86_400_000).toISOString().slice(0, 10);
+
+async function declarerOubli(page: Page, date: string, arrivee: string, depart: string, pause: string) {
+  await page.goto("/pointage");
+  await page.getByText("J’ai oublié de pointer mon arrivée ou mon départ").click();
+  const formulaire = page.locator("form").filter({ has: page.locator("input[name=heure_arrivee]") });
+  await formulaire.locator("input[name=date]").fill(date);
+  await formulaire.getByPlaceholder("Écrire le nom du chantier…").fill("Rénovation");
+  await page.getByRole("option", { name: /Rénovation Recette/ }).first().click();
+  await formulaire.locator("input[name=heure_arrivee]").fill(arrivee);
+  await formulaire.locator("input[name=heure_depart]").fill(depart);
+  await formulaire.locator("input[name=pause_minutes]").fill(pause);
+  await formulaire.locator("input[name=commentaire]").fill("Oubli de pointage (recette)");
+  await formulaire.getByRole("button", { name: "Transmettre pour vérification" }).click();
+}
+
+test("S8 pointage oublié : déclaration, puis doublon même jour même chantier refusé (B12)", async ({ page, context }) => {
+  // Affectation de l'équipe par le gérant (fiche chantier) : salarié puis chef.
+  await connecter(page, "gerant@gpb.invalid");
+  for (const [nom, role] of [["Samir Salarié", "ouvrier"], ["Charles Chef", "chef_chantier"]] as const) {
+    await page.goto(`/chantiers/${etat.chantierId}`);
+    await page.locator("select[name=employe_id]").selectOption({ label: nom });
+    const roles = await page.locator("select[name=role_chantier] option").evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).value));
+    await page.locator("select[name=role_chantier]").selectOption(roles.includes(role) ? role : roles[0]);
+    await page.getByRole("button", { name: "Affecter" }).click();
+    await expect.poll(() => psql(`select count(*) from equipes_chantiers ec join employes e on e.id = ec.employe_id where ec.chantier_id = '${etat.chantierId}' and e.prenom || ' ' || e.nom = '${nom}';`)).toBe("1");
+  }
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 48.0794, longitude: 7.3585, accuracy: 15 });
+  await connecter(page, "salarie@gpb.invalid");
+  await declarerOubli(page, ilYA(1), "07:30", "16:30", "60");
+  await expect(page.getByText("Pointage enregistré.")).toBeVisible();
+  const salarie = psql("select id from employes where nom = 'Salarié';");
+  expect(psql(`select heures_normales + heures_supplementaires || '|' || verification_statut from pointages where employe_id = '${salarie}' and date = '${ilYA(1)}';`)).toBe("8.00|a_verifier");
+
+  await declarerOubli(page, ilYA(1), "17:00", "20:00", "0");
+  // Refus en base ; l'écran affiche le message générique (V9.1 n'expose jamais le message SQL brut).
+  await expect(page.getByText("Impossible d’enregistrer ce pointage oublié.")).toBeVisible();
+  expect(psql(`select count(*) from pointages where employe_id = '${salarie}' and date = '${ilYA(1)}';`)).toBe("1");
+
+  await declarerOubli(page, ilYA(2), "07:00", "12:00", "0");
+  await expect(page.getByText("Pointage enregistré.")).toBeVisible();
+});
+
+test("S9 chef : rejet et validation ; totaux d'heures hors rejetés (B37) côté chef et salarié", async ({ page }) => {
+  const mois = ilYA(1).slice(0, 7);
+  const salarie = psql("select id from employes where nom = 'Salarié';");
+  const idRejete = psql(`select id from pointages where employe_id = '${salarie}' and date = '${ilYA(2)}';`);
+  const idValide = psql(`select id from pointages where employe_id = '${salarie}' and date = '${ilYA(1)}';`);
+  await connecter(page, "chef@gpb.invalid");
+  await page.goto(`/pointage/gestion?mois=${mois}`);
+  await page.getByText(/Anciennes saisies d’heures/).click();
+  const carte = (id: string) => page.locator("article").filter({ has: page.locator(`input[value="${id}"]`) });
+  await carte(idRejete).getByPlaceholder("Motif").fill("Doublon de déclaration");
+  await carte(idRejete).getByRole("button", { name: "Rejeter" }).click();
+  await expect.poll(() => psql(`select verification_statut from pointages where id = '${idRejete}';`)).toBe("rejete");
+  await page.goto(`/pointage/gestion?mois=${mois}`);
+  await page.getByText(/Anciennes saisies d’heures/).click();
+  await carte(idValide).getByRole("button", { name: "Valider" }).click();
+  await expect.poll(() => psql(`select verification_statut from pointages where id = '${idValide}';`)).toBe("valide");
+
+  await page.goto(`/pointage/gestion?mois=${mois}`);
+  expect(espaces(await page.locator("main").innerText())).toMatch(/Samir Salarié\s*8 h/);
+
+  await connecter(page, "salarie@gpb.invalid");
+  await page.goto(`/pointage?mois=${mois}`);
+  const texte = espaces(await page.locator("main").innerText());
+  expect(texte).toMatch(/Mon total travaillé\s*8 h/);
+});
+
+test("S10 rentabilité : CA émis hors brouillon (B25), main-d'œuvre validée = heures × coût, UI = RPC", async ({ page }) => {
+  // Brouillon non émis sur le même chantier : ne doit pas entrer dans le CA.
+  psql(`insert into factures (entreprise_id, client_id, chantier_id, type, statut, montant_ht, montant_tva, montant_ttc)
+        select entreprise_id, client_id, id, 'simple', 'brouillon', 1000, 200, 1200 from chantiers where id = '${etat.chantierId}';`);
+  await connecter(page, "gerant@gpb.invalid");
+  await page.goto("/rentabilite");
+  const texte = espaces(await page.locator("main").innerText());
+  const verite = psql(`select set_config('request.jwt.claims', '{"sub":"6a000000-0000-4000-8000-000000000001","role":"authenticated"}', false);
+    select facture_ht || '|' || cout_main_oeuvre || '|' || heures from rentabilite_chantier('${ENTREPRISE()}', '${etat.chantierId}');`).split("\n").pop()!;
+  const [ca, mo, heures] = verite.split("|").map(Number);
+  expect(ca).toBe(4856.67);
+  expect(heures).toBe(8);
+  expect(mo).toBe(212);
+  expect(texte).toContain(espaces(euros(ca)));
+  expect(texte).toMatch(new RegExp(`Main-d’œuvre\\s*${espaces(euros(mo)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+});
+
+test("S11 clôture : chantier terminé, factures toujours consultables", async ({ page }) => {
+  await connecter(page, "gerant@gpb.invalid");
+  await page.goto(`/chantiers/${etat.chantierId}`);
+  const statut = page.locator("main select").filter({ has: page.locator('option[value="termine"]') }).first();
+  await statut.selectOption("termine");
+  await expect.poll(() => psql(`select statut from chantiers where id = '${etat.chantierId}';`), { timeout: 15_000 }).toBe("termine");
+  await page.goto(`/factures/${etat.factureId}`);
+  await expect(page.locator("main")).toContainText(psql(`select numero from factures where id = '${etat.factureId}';`));
+});
+
+const ECRANS = ["/dashboard", "/clients", "/chantiers", "/devis", "/factures", "/planning", "/pointage", "/pointage/gestion",
+  "/employes", "/depenses", "/rentabilite", "/tresorerie", "/exports", "/parametres", "/parametres/acces", "/plateforme"];
+const ROLES = { gerant: "gerant@gpb.invalid", conducteur: "conducteur@gpb.invalid", chef: "chef@gpb.invalid",
+  salarie: "salarie@gpb.invalid", comptable: "comptable@gpb.invalid", limite: "limite@gpb.invalid" } as const;
+// Attentes métier explicites (le reste de la matrice est relevé et archivé, la configuration
+// des postes prédéfinis restant la référence produit).
+const ATTENDU: Partial<Record<keyof typeof ROLES, Record<string, boolean>>> = {
+  gerant: { "/factures": true, "/rentabilite": true, "/parametres": true, "/plateforme": false },
+  salarie: { "/pointage": true, "/factures": false, "/devis": false, "/rentabilite": false, "/employes": false, "/parametres": false, "/exports": false, "/tresorerie": false },
+  comptable: { "/factures": true, "/parametres/acces": false },
+  limite: { "/clients": true, "/chantiers": true, "/devis": false, "/factures": false, "/rentabilite": false },
+  chef: { "/pointage/gestion": true, "/factures": false, "/rentabilite": false },
+};
+
+test("S12 matrice écran × rôle (6 rôles) et attentes de confidentialité", async ({ page }) => {
+  const matrice: Record<string, Record<string, boolean>> = {};
+  for (const [role, email] of Object.entries(ROLES)) {
+    await connecter(page, email);
+    matrice[role] = {};
+    for (const ecran of ECRANS) {
+      const reponse = await page.goto(ecran);
+      const chemin = new URL(page.url()).pathname;
+      const corps = (await page.locator("body").innerText()).toLowerCase();
+      const refuse = chemin !== ecran || (reponse?.status() ?? 200) >= 400 || /accès refusé|n’avez pas accès|n'avez pas accès|non autorisé/.test(corps);
+      matrice[role][ecran] = !refuse;
+    }
+  }
+  console.log("MATRICE", JSON.stringify(matrice));
+  for (const [role, attentes] of Object.entries(ATTENDU)) {
+    for (const [ecran, ok] of Object.entries(attentes!)) expect.soft(matrice[role][ecran], `${role} ${ecran}`).toBe(ok);
+  }
+  // Le salarié ne voit aucun coût horaire à l'écran.
+  await connecter(page, "salarie@gpb.invalid");
+  for (const ecran of ["/dashboard", "/pointage", "/planning", "/chantiers", `/chantiers/${etat.chantierId}`]) {
+    await page.goto(ecran);
+    const corps = espaces(await page.locator("body").innerText());
+    expect.soft(corps, ecran).not.toContain("26,50");
+    expect.soft(corps, ecran).not.toContain("41,50");
+  }
+});
