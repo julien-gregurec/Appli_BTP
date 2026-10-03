@@ -1,0 +1,11 @@
+{
+  "_doc": "GABARIT — attestation de sauvegarde lue par le preflight (P8). La restauration doit avoir été TESTÉE sur une base isolée (jamais Production / Preview).",
+  "project_ref": "<ref du projet Production sauvegardé>",
+  "kind": "pitr+dump",
+  "backup_id": "<identifiant PITR / nom du dump chiffré>",
+  "dump_sha256": "<sha256 du dump>",
+  "taken_at": "<horodatage ISO UTC, ≤ 24 h avant le preflight>",
+  "restore_tested": true,
+  "restore_tested_at": "<horodatage ISO UTC>",
+  "restore_target": "<base de restauration isolée, ex. elsatia_restore_probe_local>"
+}

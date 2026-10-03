@@ -1,0 +1,16 @@
+{
+  "_doc": "GABARIT — à remplir par l'opérateur habilité à partir d'exports LECTURE SEULE (scripts/upgrade/sql/production_readonly_probe.sql). Aucune valeur ici n'est réelle. Lu par npm run production:v9x:preflight (P7).",
+  "project_ref": "<ref du projet Production attendu>",
+  "read_only": true,
+  "exported_by": "<nom de l'opérateur>",
+  "exported_at": "<horodatage ISO UTC de l'export>",
+  "ledger_sha256": "<sha256 du fichier ledger fourni via --ledger>",
+  "data_preconditions": {
+    "bloquant_essai_hors_fenetre": "<résultat de la sonde §2>",
+    "bloquant_essai_perpetuel": "<résultat de la sonde §2 bis>",
+    "lignes_factures_emises": "<résultat de la sonde §3 — bloquant si la cible n'intègre pas le pont 298/399>",
+    "info_essai_tronque": "<§2>",
+    "info_essai_renseigne": "<§2>",
+    "info_essai_expire_coupe_en_base": "<§2 bis>"
+  }
+}

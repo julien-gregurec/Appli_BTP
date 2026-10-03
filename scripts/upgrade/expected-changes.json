@@ -1,0 +1,87 @@
+{
+  "_doc": "Changements de DONNÉES déclarés de l'upgrade Production 210 → V9.x. Tout écart absent d'ici = P0. colonnes_renseignables : NULL → valeur seulement ; colonnes_modifiables : écrasement admis ; colonnes_deplacees : colonne supprimée dont CHAQUE valeur non nulle doit être retrouvée dans <schéma>.<table>.<colonne>.<clé = PK d'origine>. Rapport : docs/qualification/ELSATIA_PRODUCTION_UPGRADE_HARNESS_V1.md §5.",
+  "tables": {
+    "public.employes": {
+      "colonnes_deplacees": {
+        "cout_horaire": "public.employes_cout_horaire.cout_horaire.employe_id",
+        "taux_horaire": "public.employes_taux_facture.taux_horaire.employe_id"
+      },
+      "justification": "20260818000205 / 20260922000328 : coûts et taux horaires sortis de employes (données RH sensibles) vers des tables à accès restreint ; valeurs vérifiées une à une."
+    },
+    "public.entreprises": {
+      "colonnes_renseignables": [
+        "abonnement_essai_debut",
+        "abonnement_essai_fin"
+      ],
+      "colonnes_modifiables": [
+        "abonnement_essai_fin"
+      ],
+      "justification": "20260816000204 (C6-B, hors ordre) : fenêtre d'essai de 30 jours renseignée pour les entreprises antérieures à 231 (debut = création) ; UPG-P2-1 : une fin d'essai Stripe > création + 30 j est TRONQUÉE à création + 30 (changement rétroactif, sans effet sur un contrat payant)."
+    },
+    "public.devis": {
+      "colonnes_modifiables": [
+        "updated_at"
+      ],
+      "colonnes_renseignables": [
+        "entreprise_snapshot",
+        "client_snapshot",
+        "client_snapshot_at"
+      ],
+      "justification": "20260921000300 : le backfill de lignes_devis.entreprise_id déclenche trg_recalc_devis (montants recalculés IDENTIQUES, updated_at = instant de l'upgrade : UPG-P3-1) ; 20260908000272 / 20260922000308 : snapshots NULL renseignés, marqués provenance=backfill_identite_actuelle + identite_incertaine."
+    },
+    "public.factures": {
+      "colonnes_modifiables": [
+        "updated_at"
+      ],
+      "colonnes_renseignables": [
+        "entreprise_snapshot",
+        "client_snapshot",
+        "client_snapshot_at"
+      ],
+      "justification": "Idem devis : 20260921000300 (recalcul, montants identiques, updated_at rafraîchi) ; 20260908000272 / 20260926000501 : snapshot émetteur des factures émises renseigné s'il était NULL, marqué identite_incertaine (jamais écrasé)."
+    },
+    "public.plans_abonnement": {
+      "colonnes_modifiables": [
+        "actif",
+        "valide_au"
+      ],
+      "ajout_autorise": true,
+      "justification": "20260815000200 / 20260816000201 (TARIFS-V2) / 20260901000254 / 20260928000802 : versions de catalogue désactivées (actif=false, valide_au) et nouvelles versions ajoutées ; prix, codes et ids des versions existantes INCHANGÉS ; aucun contrat remappé (checks/legacy_offers.test.sql)."
+    },
+    "public.historique_tarification": {
+      "ajout_autorise": true,
+      "justification": "20260901000254 : journal de réconciliation du catalogue (ajouts seulement)."
+    },
+    "public.plateforme_admins": {
+      "ajout_autorise": true,
+      "justification": "20260825000233 : ajout du compte administrateur plateforme julien@elsatia.fr (rôle total) — décision propriétaire, jamais appliquée en Production 210 ; à confirmer au cutover (UPG-SEC-1)."
+    },
+    "storage.buckets": {
+      "ajout_autorise": true,
+      "justification": "Buckets privés des nouvelles applications (Colors, Réserves, Studio, Relevé, communications) ; aucun bucket existant modifié."
+    }
+  },
+  "critiques": {
+    "plans_historiques": {
+      "mode": "ajouts_seulement",
+      "justification": "nouvelles versions de catalogue ; toute version d'avant conservée à l'identique"
+    },
+    "historiques": {
+      "mode": "ajouts_seulement",
+      "justification": "journal de réconciliation tarifaire"
+    },
+    "support": {
+      "mode": "ajouts_seulement",
+      "justification": "administrateur plateforme ajouté par 20260825000233"
+    }
+  },
+  "acces": {
+    "_doc": "Pertes d'accès / réductions de visibilité admises, avec motif. Toute autre = bloquant (access_check.py).",
+    "perte_acces_declaree": {
+      "Entreprise Isolation A": "essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c)."
+    },
+    "reduction_visibilite_declaree": {
+      "affectations": "PL-05 (20260923000327 / 000346) : la lecture du planning d'autrui exige gerer_planning / voir_pointages_equipe / voir_heures_chantiers ; un membre sans ces permissions ne voit plus que ses propres affectations."
+    }
+  }
+}

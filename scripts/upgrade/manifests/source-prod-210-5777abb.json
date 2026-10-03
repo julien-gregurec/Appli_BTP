@@ -1,0 +1,846 @@
+{
+ "migrations": {
+  "20260710000001": {
+   "fichier": "20260710000001_comptes_entreprises.sql",
+   "sha256": "2abfa97258751fcc3bc168debdc6454a9b2132ed98ce8e15ac9944de03c11ac4"
+  },
+  "20260710000002": {
+   "fichier": "20260710000002_trigger_profil_utilisateur.sql",
+   "sha256": "97a30cf6a82ddcb93ecf705435276dccea54f2e3fbfded3ca7d3bc707fbd1250"
+  },
+  "20260710000003": {
+   "fichier": "20260710000003_bootstrap_entreprise.sql",
+   "sha256": "2e85e1be50e4934475f935ec6d32551f96ff14af2f54f312c0d10476f11b19a1"
+  },
+  "20260710000004": {
+   "fichier": "20260710000004_clients_chantiers.sql",
+   "sha256": "9d59d7b285c85d2326e5261f016e67f8c1f700649625097bd9cee9ec026792aa"
+  },
+  "20260710000005": {
+   "fichier": "20260710000005_devis.sql",
+   "sha256": "c418c4dfef6d6650487c38665fa288b0bbb9d9a9e0c29b0fbb4d3dff19a7ff1e"
+  },
+  "20260710000006": {
+   "fichier": "20260710000006_factures.sql",
+   "sha256": "3284474693b8c793f34971d0aeffdf494baded9e0726c98efeede137c67c1b7b"
+  },
+  "20260710000007": {
+   "fichier": "20260710000007_consolidation_financiere.sql",
+   "sha256": "43893d58cbb0930cb1cc9adae28bb26a0d7b33b5e8f11c21cb27049d287eecc9"
+  },
+  "20260710000008": {
+   "fichier": "20260710000008_mode_sans_connexion.sql",
+   "sha256": "07dfc98414c87a64b10a411d634a79c32298783394925d9ec9f2a0fbfeaba803"
+  },
+  "20260710000009": {
+   "fichier": "20260710000009_planning.sql",
+   "sha256": "1345f00e8812291a866650d7333506832d8a093585565d24938693868b370e8d"
+  },
+  "20260710000010": {
+   "fichier": "20260710000010_employes.sql",
+   "sha256": "3da0ee88aaf379f9e3ed2e78c351a03fda8d5c27236fa5cce9a8c319a8b1a4d7"
+  },
+  "20260710000011": {
+   "fichier": "20260710000011_affectations.sql",
+   "sha256": "f457f568c0a22e8b205722e717dad7eaf3ada49076e5c77fa96985bc61ff9d43"
+  },
+  "20260710000012": {
+   "fichier": "20260710000012_prestations_catalogue.sql",
+   "sha256": "f7cd7166ad6a51da9d2ce22d1aa9cde430ebf85cd3966afcfbbbe9e76a853dda"
+  },
+  "20260710000013": {
+   "fichier": "20260710000013_modification_devis_atomique.sql",
+   "sha256": "834dea27f6472ff06e5a18b2d74984c814df3f2ee17a20b138983cf22289f1fb"
+  },
+  "20260710000014": {
+   "fichier": "20260710000014_duplication_devis.sql",
+   "sha256": "096a3fc1df1d651b201693c3ea779551dca11c3130cc764f2da3761443091325"
+  },
+  "20260710000015": {
+   "fichier": "20260710000015_creation_devis_atomique.sql",
+   "sha256": "79a5142a75721315466fa982f2dd3722b221d69c1daeadb28895fa6ed5b08bea"
+  },
+  "20260710000016": {
+   "fichier": "20260710000016_delai_paiement_client.sql",
+   "sha256": "ccae6053f556aa4653c258078745a656acda2e98fa49ee307a09b4b74cb5ad63"
+  },
+  "20260710000017": {
+   "fichier": "20260710000017_modification_facture_atomique.sql",
+   "sha256": "dd27e949f4464611fbf47a90d1e9c9731c3304315fff995bfcab8a3d1379c070"
+  },
+  "20260710000018": {
+   "fichier": "20260710000018_pointages.sql",
+   "sha256": "e21d74a784b4ed6dac84eabee2f8fead25758146a7c3ca6bb277d2687f4d630d"
+  },
+  "20260710000019": {
+   "fichier": "20260710000019_stock.sql",
+   "sha256": "78d90e09503db12219f9b4b7be4c9563c6448db08c75a4360c42082b8f875302"
+  },
+  "20260710000020": {
+   "fichier": "20260710000020_synchro_statuts.sql",
+   "sha256": "2c85753a3f6c24c6bd6edf462aebb70528134e63d444c08e34c4edc1be38429a"
+  },
+  "20260710000021": {
+   "fichier": "20260710000021_commandes_fournisseurs.sql",
+   "sha256": "15830c78204238d15fd6b09d748bb3e1c423e42216d2d9283cc0fe8d4cb54d32"
+  },
+  "20260710000022": {
+   "fichier": "20260710000022_documents_chantier.sql",
+   "sha256": "61b5ad4f24816983d1000949b3e05585dd9e19f639432602816a0642df6cd0e9"
+  },
+  "20260710000023": {
+   "fichier": "20260710000023_flotte.sql",
+   "sha256": "bcaee44cafe02c456d3b7e5db53cd926b8bb02debfd4d7d57171fb306bac5732"
+  },
+  "20260710000024": {
+   "fichier": "20260710000024_outillage.sql",
+   "sha256": "762d5baa882d4bf0fff08db0fffa49e1ea97436b0d79a7f92d4405b649f9b2de"
+  },
+  "20260710000025": {
+   "fichier": "20260710000025_depot_inventaires.sql",
+   "sha256": "a2fbdf1c49b492e06d7c4f2111cfdc3f1d0e142e44d035d60fb92a66fc71e7cb"
+  },
+  "20260710000026": {
+   "fichier": "20260710000026_depenses_fournisseurs.sql",
+   "sha256": "86e6d4696682aef77948cb04ff686babc630da3d3eb2528e421777b45f2e281a"
+  },
+  "20260710000027": {
+   "fichier": "20260710000027_charges_recurrentes.sql",
+   "sha256": "924021a8c6a1f2b48d6c6f9f9b2d1bbfd1de0cc192bd28a3a0abb89a25a8f36d"
+  },
+  "20260710000029": {
+   "fichier": "20260710000029_planning_hebdomadaire.sql",
+   "sha256": "734e721e9bf3bb1c0db02ba3a30a217059b85a4b63a86950ba66b30d994ecaf3"
+  },
+  "20260710000030": {
+   "fichier": "20260710000030_acces_modules.sql",
+   "sha256": "c436d7c3cbb252da1e65901d56c24e1b2d7878864d8cdbd948e623595b67f78a"
+  },
+  "20260710000031": {
+   "fichier": "20260710000031_membres_postes.sql",
+   "sha256": "f213f8c809b6fc1bae91579696a8bbc60b63dcc9d6ea054eaa144f780bd8721a"
+  },
+  "20260710000032": {
+   "fichier": "20260710000032_logo_entreprise.sql",
+   "sha256": "d44abe78e0265f6a509ebaa75bd23cc923232b229136c29c17563e2d706772ec"
+  },
+  "20260710000033": {
+   "fichier": "20260710000033_pointage_preuves.sql",
+   "sha256": "33a36e429c19b8a3bc6cf9cea274e820d9a0cf58f2b96c922658e30c62eefafd"
+  },
+  "20260710000034": {
+   "fichier": "20260710000034_stock_import_nuanciers.sql",
+   "sha256": "b51072857fad550c4f1e2fce93a7bd32bdaa8f64aefa09f2fcc1f4d0dfd13b65"
+  },
+  "20260710000035": {
+   "fichier": "20260710000035_code_entreprise.sql",
+   "sha256": "d2a932e9173b74facc91a52c46d866648a3ef8292168272764e8243dbd62f1d6"
+  },
+  "20260710000036": {
+   "fichier": "20260710000036_plateforme_abonnements.sql",
+   "sha256": "efab38a2ab4c049e710dfb55b3992bfb7bb514c85cfef281bd5801427af1495e"
+  },
+  "20260710000037": {
+   "fichier": "20260710000037_depenses_actifs_documents.sql",
+   "sha256": "89b497e12bee73cf48bd2b4cc36799c65df8cc8a1274aa202571ddd40dea161c"
+  },
+  "20260712000038": {
+   "fichier": "20260712000038_sessions_pointage.sql",
+   "sha256": "5b61525111601e40d3db575083a1e35ef72e78ece983e5ee3cd75c615945e6b0"
+  },
+  "20260712000039": {
+   "fichier": "20260712000039_historique_vehicules.sql",
+   "sha256": "c35b1b074f814ce382066056bcc2a26e1ed19ef93ebf39cb8a53cd3692e5b1e4"
+  },
+  "20260712000040": {
+   "fichier": "20260712000040_permissions_lecture_gestion.sql",
+   "sha256": "9abd313ccfd93a87aa62a98f12b742fef81fb9a66aa69578376519a43b55cdb8"
+  },
+  "20260712000041": {
+   "fichier": "20260712000041_pointage_gps_sans_photo.sql",
+   "sha256": "37eed2d07065ebd31a45ac4f443e873c5759708396ef50b89cba27832882d1fe"
+  },
+  "20260713000042": {
+   "fichier": "20260713000042_carte_btp_employes.sql",
+   "sha256": "037c1d4ace7c1f2120709c06bf9e0cbaeaa05ec3d918d9f5a3ddb06beb5ab166"
+  },
+  "20260713000043": {
+   "fichier": "20260713000043_permissions_rls_gestion.sql",
+   "sha256": "e115c4202c80cba2b5a308d751e2d4fe94d5cb223e5c9f0cb99b5b3dfb5f8288"
+  },
+  "20260713000044": {
+   "fichier": "20260713000044_inscription_employes.sql",
+   "sha256": "faf0ddca3ccd0014d732d5b56477a031bb57b812673ba33b4c4a6e1837faa88c"
+  },
+  "20260713000045": {
+   "fichier": "20260713000045_pointage_personnel.sql",
+   "sha256": "47f5270102ec3714d8d7cff06b74827142642719b6ab1151e804f8fcc6f3ee28"
+  },
+  "20260713000046": {
+   "fichier": "20260713000046_roles_terrain_par_defaut.sql",
+   "sha256": "090290b449f9ac62d7aaf770b9b75dd6ea56e5a53d653d0e0f76da70149f82f2"
+  },
+  "20260713000047": {
+   "fichier": "20260713000047_habilitations_employe.sql",
+   "sha256": "da0553dadd5f5ce8433b0adccf38d364df44a0af8112d4849281a441a91a4384"
+  },
+  "20260713000048": {
+   "fichier": "20260713000048_notes_frais.sql",
+   "sha256": "9fc522dd599c21c9190f003fc0871f1631ba182bfc1f5fad0061a25d1a192b4a"
+  },
+  "20260713000049": {
+   "fichier": "20260713000049_correctif_numero_inscription_employe.sql",
+   "sha256": "6cf034fdbb8aa3b8a675f72ac31618d194476b65b7f6e5e6da69511a0255af74"
+  },
+  "20260713000050": {
+   "fichier": "20260713000050_notes_frais_personnelles.sql",
+   "sha256": "c8db284f2c182d2138c7556b0f309c33581b8d0b874c8200a2c59ddf4ee28d6f"
+  },
+  "20260713000051": {
+   "fichier": "20260713000051_auteur_commandes.sql",
+   "sha256": "d1a36e5d91086d5cf0fe2126bac918ea368d5d79c14855bdcf74dee33562602c"
+  },
+  "20260713000052": {
+   "fichier": "20260713000052_dashboard_terrain_securise.sql",
+   "sha256": "eeddcf87236ac2d6cb6b5f2e7324d717d11ddc4b831773c873efe8321f5edca8"
+  },
+  "20260713000053": {
+   "fichier": "20260713000053_notes_frais_chantier_confidentialite.sql",
+   "sha256": "353b393c0125b45c2dc253f887a4e1f02fe7dbccc74140323807fe70823aa078"
+  },
+  "20260713000054": {
+   "fichier": "20260713000054_droits_socle_et_anciennete.sql",
+   "sha256": "09d67ba46ef06893953f05560a02665395703b9f9bf95979b9294f9606e6d3e6"
+  },
+  "20260713000055": {
+   "fichier": "20260713000055_activites_hors_chantier.sql",
+   "sha256": "9d604b427148b9192e70294b48f4c683fe4040a0aaf6c0cc50e73b13e564bfee"
+  },
+  "20260713000056": {
+   "fichier": "20260713000056_suivi_acces_collaborateurs.sql",
+   "sha256": "636e7db6bc3f201415691dc6d4b65b457c9f97d93cdb4e4946d357472ed5da11"
+  },
+  "20260713000057": {
+   "fichier": "20260713000057_archivage_notes_frais_socle.sql",
+   "sha256": "3392a5d417848b70a2503b95b262ec2d2f48ad0f35d9230a8203c4c13012f627"
+  },
+  "20260713000058": {
+   "fichier": "20260713000058_archivage_notes_frais_audit_exports.sql",
+   "sha256": "1d9787569265a3e352bac59fa38ea26cb9f1c6e99f001342feea1ce4492c86c6"
+  },
+  "20260713000059": {
+   "fichier": "20260713000059_archivage_notes_frais_permissions_workflow.sql",
+   "sha256": "f4f1b429c169233193e435f159a6605cfb539a53508be2ee0741a93b1a8569a1"
+  },
+  "20260713000060": {
+   "fichier": "20260713000060_archivage_notes_frais_integrite_stockage.sql",
+   "sha256": "870108feb774c4548c15854d548a95f9c6e0eb2ded0c248250a814d71ca00d7c"
+  },
+  "20260713000061": {
+   "fichier": "20260713000061_archivage_notes_frais_exports_securises.sql",
+   "sha256": "cc1b9684979a37a894ae794ecf61e1db8fed1e4e50cd1eb1d797283e59b301ee"
+  },
+  "20260713000062": {
+   "fichier": "20260713000062_demandes_conges.sql",
+   "sha256": "cbb35e213a7ad59ec2b0353d878c6d46395921fde349ce05f4d7b9058806f5af"
+  },
+  "20260713000063": {
+   "fichier": "20260713000063_comptes_facturation_plateforme.sql",
+   "sha256": "5638eebd7f95416bddd9ddcd1f02f971d93f39064919c7f6e37fcd072ad509ae"
+  },
+  "20260713000064": {
+   "fichier": "20260713000064_personnalisation_documents.sql",
+   "sha256": "4bcac1145bcda9e4232775db352bd923c36b4088e15d40c5d068a80737c0b5f2"
+  },
+  "20260713000065": {
+   "fichier": "20260713000065_pointage_planning_heures_chantier.sql",
+   "sha256": "6e8992b5662da3da4d7eea5f92bc5f3446e9419cd2f0cef70aec20aa0a92ab1e"
+  },
+  "20260713000066": {
+   "fichier": "20260713000066_devis_chantier_sans_prix.sql",
+   "sha256": "0c4940639b3d5af9fbb2b703d85384ca73a084524354b8ae711797b7a704d92b"
+  },
+  "20260713000067": {
+   "fichier": "20260713000067_reparation_outillage_travaux_vehicules.sql",
+   "sha256": "4724da731b9a1984b6872b4a26e750bcf27949fa93e3d60891cbda7b81d8c9ff"
+  },
+  "20260713000068": {
+   "fichier": "20260713000068_codes_qr_borne_stock_securisee.sql",
+   "sha256": "a314d2ef4b97f7285a6861d91d15818529d5d3a8bf2634001d14ec42b619f03d"
+  },
+  "20260713000069": {
+   "fichier": "20260713000069_socle_droits_personnels_complet.sql",
+   "sha256": "c22b8d963350ad2f96adb97dd37ddd3582db13aac48ae4f88c0c059d039b8805"
+  },
+  "20260713000070": {
+   "fichier": "20260713000070_pointage_strictement_nom_propre.sql",
+   "sha256": "d45343323f2262c9bffd72c62c60ccfda92bc391003d1cbcc7dcc9b2746acc22"
+  },
+  "20260713000071": {
+   "fichier": "20260713000071_releves_facturation_comptes.sql",
+   "sha256": "18683d1d4e5f507bf336416de957b857a27311a323b9caa634062d2bb20b45c4"
+  },
+  "20260714000072": {
+   "fichier": "20260714000072_plateforme_equipe.sql",
+   "sha256": "00708ce3ba57815ddd0b7f5e5e33f1cb8aebbe78df1ea4656c20b1de44ae1b6c"
+  },
+  "20260714000073": {
+   "fichier": "20260714000073_besoins_et_support.sql",
+   "sha256": "735a8f7331920bc63c9c82c1769cb0d13c7fc145fb1127975b45c5af537871c2"
+  },
+  "20260714000074": {
+   "fichier": "20260714000074_acces_stock_personnel.sql",
+   "sha256": "5fe5c9732e7f81c3f5360ada940293acee97798ecb71f0a6fd3e89217aa40602"
+  },
+  "20260714000075": {
+   "fichier": "20260714000075_acces_plateforme_impayes.sql",
+   "sha256": "0bd8b320da06f2a2c2a009466b4477db8631c66e520b69082d37ba72aefcb671"
+  },
+  "20260714000076": {
+   "fichier": "20260714000076_identifiants_et_compte_depot.sql",
+   "sha256": "9d0e4059174898e6a0162d79731e25bbd2b7e7f1374488d88e502c57736507e3"
+  },
+  "20260714000077": {
+   "fichier": "20260714000077_equipes_chantiers.sql",
+   "sha256": "b4af68b0a36c86d5244fa40664071a862dd4964e104c6b63dc4a7f4faa553216"
+  },
+  "20260714000078": {
+   "fichier": "20260714000078_fermeture_acces_anonyme_production.sql",
+   "sha256": "1213acd565884797815573b396847156f9d13e24a0c923ddc6d6677ca784ae78"
+  },
+  "20260714000079": {
+   "fichier": "20260714000079_correction_encodage_compte_depot.sql",
+   "sha256": "b6703e01e37d2adcd3c48adc44ea386781a4f85bf07688a8e6f6de8ce807a6aa"
+  },
+  "20260715000080": {
+   "fichier": "20260715000080_suite_metier_complete.sql",
+   "sha256": "7cde8d719b68b433fb2ac57e248c95a4b0a23db26054501a8751b44c4925174c"
+  },
+  "20260715000081": {
+   "fichier": "20260715000081_securite_terrain_alertes_personnalisation.sql",
+   "sha256": "0bd46757682245bb2540f2a4232c0184d05d83ad2134211af253a946bed4d7fc"
+  },
+  "20260715000082": {
+   "fichier": "20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql",
+   "sha256": "da570d205673ae05463dcd43cf5c3b78878c6c77cda0d327b5ab1cad29c44c70"
+  },
+  "20260715000083": {
+   "fichier": "20260715000083_modeles_documents_et_personnalisation.sql",
+   "sha256": "eba4b1cc038170671531398a0c47c129ba195acc82640611db2f2e75dcf9b5fe"
+  },
+  "20260715000084": {
+   "fichier": "20260715000084_classement_factures_fournisseurs.sql",
+   "sha256": "54086312532a277a43773a9700f3038cf07ebcebccdbc0cedb27133a751f788f"
+  },
+  "20260716000085": {
+   "fichier": "20260716000085_admin_pointage_photos_appareils.sql",
+   "sha256": "43b5b8c1b3bf677d54796fb696342c84d27b81971eed0dc29beec259dfa20518"
+  },
+  "20260716000086": {
+   "fichier": "20260716000086_correctif_mode_compte_depot_admin.sql",
+   "sha256": "61556756e694061847b8ea957032de673440ad47a5035e034e3273bab23ba32a"
+  },
+  "20260716000089": {
+   "fichier": "20260716000089_paiements_bancaires_paie.sql",
+   "sha256": "fe9834e4b80c20cc9576a3c081d8633ce553e04ec4447cccccca75a493ae8496"
+  },
+  "20260717000090": {
+   "fichier": "20260717000090_facturation_depassement_appareils.sql",
+   "sha256": "627deb2905e909c8de8c60606547ee2706837d21dfde70532162ac5b5a6f93f8"
+  },
+  "20260717000091": {
+   "fichier": "20260717000091_tva_factures_fournisseurs.sql",
+   "sha256": "0b92a45de35b61fe0b01edefc53cdc4d119cb54bb683cf6159af8834986c0530"
+  },
+  "20260717000092": {
+   "fichier": "20260717000092_tva_charges_recurrentes.sql",
+   "sha256": "2775a49142c068177017e6d924751ee607afdda3329387e5bf29f5fe7c8e322e"
+  },
+  "20260717000093": {
+   "fichier": "20260717000093_valorisation_inventaires.sql",
+   "sha256": "4732fb37ae577d01a1b20be956fcb31cc1d28e142bd439aeace992e1f6c64de4"
+  },
+  "20260717000094": {
+   "fichier": "20260717000094_selection_articles_inventaire.sql",
+   "sha256": "fb56bbc41bcf3dad653a0edd2d2d39046e39d93fdc8417367fd1a3161d96b94b"
+  },
+  "20260717000095": {
+   "fichier": "20260717000095_rib_fiches_delais_fournisseurs.sql",
+   "sha256": "95a437f7cbfd22b73cad75ef020123abc8401cc5b850ea6aa000d6f675b50a01"
+  },
+  "20260717000096": {
+   "fichier": "20260717000096_collaboration_appels_offres_doe.sql",
+   "sha256": "82a14466d7b3b1e73335aa2e689a3d5b07c85d16adc76599e61e04afb250b750"
+  },
+  "20260717000097": {
+   "fichier": "20260717000097_scanner_universel_destinations_stock.sql",
+   "sha256": "840b4b8f13c5da670ed80306e230b97d44f5510d5276b03ca73c346e94b5e644"
+  },
+  "20260717000098": {
+   "fichier": "20260717000098_reception_sortie_lot.sql",
+   "sha256": "60d942ee908c0045ed2166ba09c3701c5f64d0e1f826592b91f3d6119cee1dd7"
+  },
+  "20260717000099": {
+   "fichier": "20260717000099_signature_employe.sql",
+   "sha256": "5839aa8899aa386d49b6397273ac7398a3dd91c0ebfc8c408a3f6cc5de2f87ca"
+  },
+  "20260718000100": {
+   "fichier": "20260718000100_abonnement_stripe_billing.sql",
+   "sha256": "9d02b0565525009f743b5028ee01d8097f15d39388982bab58f32baaf16c9559"
+  },
+  "20260718000101": {
+   "fichier": "20260718000101_facturation_stockage.sql",
+   "sha256": "9248c277c1a5cc9187c068371c753701e23da22f16f967260304acbae1448833"
+  },
+  "20260718000102": {
+   "fichier": "20260718000102_signatures_documents_metier.sql",
+   "sha256": "38606268187ec677c8c73d7ea9127e70931985490947ae728a0fc1ab905dd564"
+  },
+  "20260718000103": {
+   "fichier": "20260718000103_sorties_lot_destinations.sql",
+   "sha256": "a5d9a00a9bd441202c21814b6c76b3b36a31f0618dc9920fc457c3b163c00f45"
+  },
+  "20260718000104": {
+   "fichier": "20260718000104_roles_predefinis.sql",
+   "sha256": "28d62e05bad84fd90239711bcf68f7aeee8e2246956d441cf2b9f10d9907a7d3"
+  },
+  "20260718000105": {
+   "fichier": "20260718000105_prefixe_identifiants_depot.sql",
+   "sha256": "b150eb721d207cb754c10e42bb2149abd0cc30a0397981658cbfabf2872ca0a9"
+  },
+  "20260718000106": {
+   "fichier": "20260718000106_correctif_rls_messagerie_ouvrier.sql",
+   "sha256": "f8040396685a2e8ac59c45d08c85d4788eb5872e60f373836940d4724a605c38"
+  },
+  "20260718000107": {
+   "fichier": "20260718000107_lieux_notes_frais.sql",
+   "sha256": "9d10720bb1aaeb73c1b7bae34ab3a3da135f4b6a7faef9e8de49dc57f0ad9d3b"
+  },
+  "20260718000108": {
+   "fichier": "20260718000108_droits_pointages_chantiers_prix_stock.sql",
+   "sha256": "b14b3c51ee0349c4350552741f3e80af889954e0e5409542653fa4f6d0d2a3e2"
+  },
+  "20260718000109": {
+   "fichier": "20260718000109_pointage_optionnel_par_poste.sql",
+   "sha256": "ff1cfdf1537194f35889ef41e68da02f0ab4d8ecf2b525cef85ebfb0e01c78ee"
+  },
+  "20260718000110": {
+   "fichier": "20260718000110_pointage_individuel_comptes.sql",
+   "sha256": "bb7a09dfa53d365334a646f7a4f20ae1b996833ad3306afa6f4b833f0cef65c9"
+  },
+  "20260718000111": {
+   "fichier": "20260718000111_sous_traitants.sql",
+   "sha256": "55f9f421649015df7e5b549a4ae599addaec9fa54f03bd02acaaedeb6dcf79cb"
+  },
+  "20260718000112": {
+   "fichier": "20260718000112_reception_lot_securisee_compte_depot.sql",
+   "sha256": "e18fdec3f203f3fb1237ea8b5e27c92291b69e644b8c1ddfacf3659adfb2d922"
+  },
+  "20260718000113": {
+   "fichier": "20260718000113_lecture_modules_selon_permissions.sql",
+   "sha256": "b2a7b1b6b4083f5922460bd15f34fb65f352834339e45224937d99cc7aad1265"
+  },
+  "20260719000114": {
+   "fichier": "20260719000114_rgpd_export_suppression.sql",
+   "sha256": "e18c7f56daff7cd08d0663b1d676452883a6c08a34cbec148116c6476eb0e631"
+  },
+  "20260719000115": {
+   "fichier": "20260719000115_roles_plateforme_appliques.sql",
+   "sha256": "25baf0dfb7f3e94fb3764a25cd7e5ea0cd6d7fca1aca1e75bfaffd28d64e7525"
+  },
+  "20260719000116": {
+   "fichier": "20260719000116_index_entreprise_id.sql",
+   "sha256": "40ed5d9037c9250e2e470ffba2d492c8360aa22dee24ef66e5ac45e521d848a6"
+  },
+  "20260719000117": {
+   "fichier": "20260719000117_contexte_acces_proxy.sql",
+   "sha256": "d9b609aa4f4dd85d659cfbd340516aa01a156be01bdf196af66a894b232fecfc"
+  },
+  "20260719000118": {
+   "fichier": "20260719000118_pagination_listes_devis.sql",
+   "sha256": "3626e90a5268cee4be44d14df6c42bbfe68c05e020aec35e246e9775ba0b76ee"
+  },
+  "20260719000119": {
+   "fichier": "20260719000119_pagination_listes_factures.sql",
+   "sha256": "cdd091b244a6c8bf9ebd2d4e80cac932f57bacb020af6c66676da3f9e81e5d9b"
+  },
+  "20260719000120": {
+   "fichier": "20260719000120_pagination_liste_chantiers.sql",
+   "sha256": "50d931279d5407510233f3df414e59b5b05c1cb1f830a89494f0a8291f81f7bd"
+  },
+  "20260719000121": {
+   "fichier": "20260719000121_pagination_liste_clients.sql",
+   "sha256": "1d48f7664ef4780c4a6a0f46988fba993f6efefaf5b78a1914593a4526c45193"
+  },
+  "20260719000122": {
+   "fichier": "20260719000122_reparation_mojibake_conges.sql",
+   "sha256": "b8c02af11045a57a637fe2dfefeb9b251e6127864729224d572b7f73894de168"
+  },
+  "20260721000123": {
+   "fichier": "20260721000123_comptes_rendus_chantier.sql",
+   "sha256": "ff3eede50fa8c09c995fa6ec8c190ee60b029b781d4955453d753e6765800e18"
+  },
+  "20260721000124": {
+   "fichier": "20260721000124_reparation_mojibake_notifications.sql",
+   "sha256": "9ef99598c436f417e48ba33597dfe77f0be73b6ad730d0b04491f5b4da4800d4"
+  },
+  "20260722000125": {
+   "fichier": "20260722000125_journal_ia.sql",
+   "sha256": "f470b8ffbd24de62c6ae796d1ecaf7dbd8d336c9e96a46aafeaa6db35d016ba8"
+  },
+  "20260722000126": {
+   "fichier": "20260722000126_renommage_fk_conversations_internes.sql",
+   "sha256": "46081c886a7150dc5033b1749e7e008404708830fcc39fb1b32bc42d43eb1712"
+  },
+  "20260722000127": {
+   "fichier": "20260722000127_separer_droits_taux_cout_employe.sql",
+   "sha256": "cda2073c522cd5e283cf899121cd2f4a99200bfd8879165c0dcacca4af8f9fc2"
+  },
+  "20260722000128": {
+   "fichier": "20260722000128_droit_acces_ia.sql",
+   "sha256": "9c2b505630287dc7f3c5ff804bae2095b565cfa1330120965f92ca291ee437d1"
+  },
+  "20260723000129": {
+   "fichier": "20260723000129_reparation_mojibake_chr.sql",
+   "sha256": "c26098b0ac0e31b472398ad96e78670623f038e16db6e7cc9f7fc7c9363f53eb"
+  },
+  "20260723000130": {
+   "fichier": "20260723000130_pointage_gps_optionnel.sql",
+   "sha256": "ee05f954f4ba16a35cbc60356e3760d7fef81b5f022b3614fa7aac5deeab4f13"
+  },
+  "20260723000131": {
+   "fichier": "20260723000131_notifications_push.sql",
+   "sha256": "6a7689d28dc74be6f1247f2d44a651041ccf34a626ff2b2f586e44bedf552347"
+  },
+  "20260723000132": {
+   "fichier": "20260723000132_remises_plateforme.sql",
+   "sha256": "2aaeaf8feb2fd2e41879d306567c99600052a200b42ebd8f915270920d1c45d3"
+  },
+  "20260723000134": {
+   "fichier": "20260723000134_option_ia_facturation.sql",
+   "sha256": "c887170cfd8334e44360d6f04cbd1a45eb563c67f5d1739d299b55492caec680"
+  },
+  "20260723000135": {
+   "fichier": "20260723000135_notifications_planning.sql",
+   "sha256": "012ad4917144be040402c125b5d82aaa6e87d24c88759e5d539dc0968545b43e"
+  },
+  "20260723000136": {
+   "fichier": "20260723000136_option_ia_paliers.sql",
+   "sha256": "fb8baeb8c107f58d121e7664e0b4180897af14521a54d5bb249220c015c15ad3"
+  },
+  "20260723000137": {
+   "fichier": "20260723000137_suivi_zone_chantier.sql",
+   "sha256": "80b47731e65a2a280fc20b3a9fb4cd032c8eff1fd5d51ec2d253782018aa6ed4"
+  },
+  "20260723000138": {
+   "fichier": "20260723000138_securite_suivi_zone.sql",
+   "sha256": "eea2ec197019ebf2ce46c1084ff312b3d02b3b4a9d726513f9424b25fe506c6d"
+  },
+  "20260723000139": {
+   "fichier": "20260723000139_grands_deplacements.sql",
+   "sha256": "27fc161496e26dfdc237a1b4ac56710cf1abacf52a4256a3d8edaf9830b75026"
+  },
+  "20260723000140": {
+   "fichier": "20260723000140_nettoyage_mojibake_global.sql",
+   "sha256": "03af4797d2691e2416b57ca1b45101d59681640d1e3c75c5a4c00aac27514e6b"
+  },
+  "20260723000141": {
+   "fichier": "20260723000141_preparation_paie.sql",
+   "sha256": "73f9667722dbfcbe9bf684b694289d58b23e51c40c5d1a70b0620278772f18bd"
+  },
+  "20260723000142": {
+   "fichier": "20260723000142_tarification_abonnements.sql",
+   "sha256": "f29ca80866d8ce7bfdb575718aba6386e104940c3da500efeb84765655920b35"
+  },
+  "20260723000143": {
+   "fichier": "20260723000143_retablir_gestion_documents_chantier.sql",
+   "sha256": "9da8280dd9e503197c955583990935790e850d8a5840ddadc18981d58ed6f244"
+  },
+  "20260724000144": {
+   "fichier": "20260724000144_boutique_catalogue.sql",
+   "sha256": "48e955da029b0e2e3b4415a920fc4a56dbe33278f0c307161ed11e55b8923745"
+  },
+  "20260724000145": {
+   "fichier": "20260724000145_boutique_commandes.sql",
+   "sha256": "7714e861c1954f3873671dded9aaabbd537f4c4359837ee623b8daf86b33753c"
+  },
+  "20260724000146": {
+   "fichier": "20260724000146_fermeture_acces_anonyme_boutique.sql",
+   "sha256": "bb4b720aacd29a4fb737c3fa753cbb3e1e00cc08aec8969fc4478db0edcbb717"
+  },
+  "20260724000147": {
+   "fichier": "20260724000147_paie_rentabilite_et_cron.sql",
+   "sha256": "803249622162148b98ba83b2bebc9c478580189f848785caf7556a5e08455561"
+  },
+  "20260724000148": {
+   "fichier": "20260724000148_correction_controle_periode_paie_service.sql",
+   "sha256": "24f5a87c658b1b9fdbc5b6d6b3c90ad883b40edc820c1aa698c9fab980ab8204"
+  },
+  "20260724000149": {
+   "fichier": "20260724000149_correction_min_uuid_controle_paie.sql",
+   "sha256": "cf1384762774ebec1482d02d84699ddf9ee7228f4d16205f6cf9b16b4e075392"
+  },
+  "20260724000150": {
+   "fichier": "20260724000150_frais_route_automatiques.sql",
+   "sha256": "3f18b356b7ce90d8073c9788466e202ad92cde43f01c67436d3805a161039141"
+  },
+  "20260724000151": {
+   "fichier": "20260724000151_diagnostic_temporaire.sql",
+   "sha256": "dae2c903e9435fd0d814d715c75a75abc412ae71a36616fac6775025c065b141"
+  },
+  "20260724000152": {
+   "fichier": "20260724000152_suppression_diagnostic_temporaire.sql",
+   "sha256": "0b5e2ca24e970bfab7aa11c7b48a634ec247d8b9ad6397a648d5988e5a60d967"
+  },
+  "20260724000153": {
+   "fichier": "20260724000153_diagnostic_temporaire2.sql",
+   "sha256": "013eb86d009bdc95c72c6bcc125f753f4f042d7b222001d830868015b8f67b03"
+  },
+  "20260724000154": {
+   "fichier": "20260724000154_reparation_execution_pointage_gps_optionnel.sql",
+   "sha256": "5e3cb6e972f2fe4bf5bc357caa6419d49b80769dba27f7dc856d00a1a951bbca"
+  },
+  "20260724000155": {
+   "fichier": "20260724000155_suppression_diagnostic_temporaire2.sql",
+   "sha256": "39244f96eb0d12558b6115d02512afb6f5af8501c5815ce7d3567ab1333d06c2"
+  },
+  "20260724000156": {
+   "fichier": "20260724000156_fermeture_acces_anonyme_collaboration_appels_offres_doe.sql",
+   "sha256": "14604bebd6fb02378770ff1820d07307b3ae0041f8fc0146e50f547f6340491d"
+  },
+  "20260724000157": {
+   "fichier": "20260724000157_fermeture_acces_anonyme_rpc_diverses.sql",
+   "sha256": "c8a2d9fc4cf9626b0f5a74ff3e385ac3eb77856294ccffc53cc3188b223ae405"
+  },
+  "20260724000158": {
+   "fichier": "20260724000158_plateforme_reinitialisation_mot_de_passe.sql",
+   "sha256": "5abad4b73ff8e7e17dbe3113916c7e891b283653d2b6684a97878968af2bfbc1"
+  },
+  "20260724000159": {
+   "fichier": "20260724000159_diagnostic_temporaire3.sql",
+   "sha256": "09f2fcec714da46df122b7ffb2576e8fbaed41e040791c78a3c88b8d0570855b"
+  },
+  "20260724000160": {
+   "fichier": "20260724000160_suppression_diagnostic_temporaire3.sql",
+   "sha256": "1243399962f50faf04b6f61151e81c202696ddc4165bae81a71e6d4cda4ece59"
+  },
+  "20260724000161": {
+   "fichier": "20260724000161_suppression_policies_prototype_storage_dormantes.sql",
+   "sha256": "9da2bf5097a99ba7f2c90de682bda04debf75daf4e83410df4329bf152d92aa7"
+  },
+  "20260724000162": {
+   "fichier": "20260724000162_alertes_pointage_manquant_et_a_valider.sql",
+   "sha256": "96552b7961e599b60b20ef32cae184b614f5cf03e89a9634b0e8a74963ace2ab"
+  },
+  "20260724000164": {
+   "fichier": "20260724000164_diagnostic_temporaire4_v2.sql",
+   "sha256": "6a3dd26548a51b73bc7eddf67be662a0bbb19c33432fcdbdd273ad740034dc35"
+  },
+  "20260724000165": {
+   "fichier": "20260724000165_suppression_diagnostic_temporaire4.sql",
+   "sha256": "28a7851aeae711e872e9e2704272bcfc55875f92b81fce97a3f6f9ca3d7e61a4"
+  },
+  "20260724000166": {
+   "fichier": "20260724000166_correction_absences_paie_jours_ouvres.sql",
+   "sha256": "49697b1937b44154d1f3629827715406be8bebce9bcc7ee065fd66aad5d3d9d2"
+  },
+  "20260724000167": {
+   "fichier": "20260724000167_diagnostic_temporaire5.sql",
+   "sha256": "0be1b423f1e990e7376513e557c5af81a2187d5008b4ea424a1f1e95aea22cbf"
+  },
+  "20260724000168": {
+   "fichier": "20260724000168_suppression_diagnostic_temporaire5.sql",
+   "sha256": "2885ba571c56da2e40cb1e37575a3e3938d22b3b31bf38fc682b5cec0cb8fef3"
+  },
+  "20260724000169": {
+   "fichier": "20260724000169_correction_heures_attendues_affectation.sql",
+   "sha256": "d69491fa308f1b58be3d0723eca188e95b9d29a820b22733f617167a128190c5"
+  },
+  "20260724000170": {
+   "fichier": "20260724000170_diagnostic_temporaire6.sql",
+   "sha256": "6f2095bcbc8ef71c6b9436ff614e3d7b12e66e52ab73aa85e1f5000d3f82ff67"
+  },
+  "20260724000171": {
+   "fichier": "20260724000171_suppression_diagnostic_temporaire6.sql",
+   "sha256": "c8eac130bb8cca643e56b64bf301740ddebd26d770a895043ac05a7d95043592"
+  },
+  "20260724000172": {
+   "fichier": "20260724000172_garde_fou_surfacturation_devis.sql",
+   "sha256": "0a76834fbf8ef9929f35a59e607d82c165e7e774465d1547589ea184c1f14728"
+  },
+  "20260724000173": {
+   "fichier": "20260724000173_diagnostic_temporaire7.sql",
+   "sha256": "09eaefec15b6dc2624b495c3dd9d0e4d9175d7006e51852a1745a6cfb461a41c"
+  },
+  "20260724000174": {
+   "fichier": "20260724000174_suppression_diagnostic_temporaire7.sql",
+   "sha256": "f3c10f97f79af7a9ebc0d74e2a2e7caca37db3d1988df329873e9aa3ee4f1e98"
+  },
+  "20260724000175": {
+   "fichier": "20260724000175_liaison_boutique_tresorerie.sql",
+   "sha256": "fe8497120eba5909490f9fb69982494faf13924b9650029408e623afec536262"
+  },
+  "20260724000176": {
+   "fichier": "20260724000176_correction_reglement_boutique_tresorerie.sql",
+   "sha256": "ce3a2b215465e06ac1b09659d732350338aa7da8ad8a19e721437c9bbbec5967"
+  },
+  "20260724000177": {
+   "fichier": "20260724000177_lien_avoir_facture_origine.sql",
+   "sha256": "d59982f4974e12201a795dd88bc48af736a462bf8a97aed15e78ff48287b07f9"
+  },
+  "20260724000178": {
+   "fichier": "20260724000178_diagnostic_temporaire8.sql",
+   "sha256": "08a8cc4be97b1f1ed99081cbd1ce30c8fba67daf5193ac4e0be377988ffb9933"
+  },
+  "20260724000179": {
+   "fichier": "20260724000179_suppression_diagnostic_temporaire8.sql",
+   "sha256": "0e26bcfc8ca6a77fbf492ae5210674b606453d78718e2fda48c28b2af4c44f4d"
+  },
+  "20260728000180": {
+   "fichier": "20260728000180_feature_flags_v3.sql",
+   "sha256": "5d90cd5aa2a4627693c2cf17c34e894a84cbd17fb0875a097f52642aec59ae55"
+  },
+  "20260728000181": {
+   "fichier": "20260728000181_medias_messagerie_chantiers.sql",
+   "sha256": "0947f0cee4b3da08e9599faaf6e3e196fbec2d298b66b42b40cdc6050391cdff"
+  },
+  "20260728000182": {
+   "fichier": "20260728000182_alertes_operationnelles_ignorees.sql",
+   "sha256": "1bb2caa32aef43c29b1c42da431b2e136076b63e00a0250c6648cedbb3792f75"
+  },
+  "20260729000183": {
+   "fichier": "20260729000183_medias_devis.sql",
+   "sha256": "d99bbbb9304355e205f435944fd4e570bc9735f06d31476c4a94fc1f2ad11e0d"
+  },
+  "20260729000184": {
+   "fichier": "20260729000184_medias_devis_finalisation.sql",
+   "sha256": "2bd4c820a1456cb0c6615dc3c16456193a9cae7a108a5ffa671da56fdaf8f31f"
+  },
+  "20260729000185": {
+   "fichier": "20260729000185_isolation_multitenant_grants_et_definer.sql",
+   "sha256": "a7b0f7674edc37a797bc27b57fec7f6af982aae0029567e84248b4ee074c64ad"
+  },
+  "20260729000186": {
+   "fichier": "20260729000186_restaurer_privileges_clients_chantiers.sql",
+   "sha256": "61cbe4f844756e064a60cfd1378eb31378f946d917371219c93edafa38eef9a1"
+  },
+  "20260729000187": {
+   "fichier": "20260729000187_restaurer_execution_fonctions_rls.sql",
+   "sha256": "9d96268e8284d3ba4154944231fc9485716c0abb2f14cf00e5ff2f873477fac9"
+  },
+  "20260729000188": {
+   "fichier": "20260729000188_isoler_politiques_storage_paie.sql",
+   "sha256": "0a3469d772309dcbc02d0ad9fae3cbb2949c21015d4b398f3a54b54894923023"
+  },
+  "20260729000189": {
+   "fichier": "20260729000189_restaurer_privileges_modules_metier.sql",
+   "sha256": "b1b1e2a9c454d915464abb80f37aefb676fa0ad24330fb72e86d8fde98ef5609"
+  },
+  "20260729000190": {
+   "fichier": "20260729000190_isoler_journal_ia_plateforme.sql",
+   "sha256": "284e096470821c90367bbdb5385dcd836a8cb25b59b309851932bbc41f977db4"
+  },
+  "20260731000192": {
+   "fichier": "20260731000192_restaurer_privileges_comptes_entreprises.sql",
+   "sha256": "fbfc6974808292b978ef748531ac85629e3933b111751c1328d2ec948eb5bfc3"
+  },
+  "20260731000193": {
+   "fichier": "20260731000193_rate_limiting_applicatif.sql",
+   "sha256": "23766566b74e771f6b4896d04516c59d3f4259b6ccb569350f38b4d28f0e498c"
+  },
+  "20260801000194": {
+   "fichier": "20260801000194_renommer_identite_elsatia_boutique.sql",
+   "sha256": "2849d3904fb1f232ce741faf92623e25cb91ad21513c4f8d5de22e8af6023214"
+  },
+  "20260802000195": {
+   "fichier": "20260802000195_migration_prefixe_qr_lgp_vers_els.sql",
+   "sha256": "4d2fe282ddf46601d12679a692ad2da2ecda73018c145e53bca3e158fb35020e"
+  },
+  "20260806000196": {
+   "fichier": "20260806000196_correctif_rls_ecriture_chantiers.sql",
+   "sha256": "462a26a91f564e92ab1028f3869a25fb264a515ed72061b3830359916dd135aa"
+  },
+  "20260806000197": {
+   "fichier": "20260806000197_correctif_isolation_factures.sql",
+   "sha256": "7d69439b450843c5b7ded0ce7a44419ce4b51132f4ee2574b209b5a8c1d406be"
+  },
+  "20260806000198": {
+   "fichier": "20260806000198_correctif_isolation_devis_client.sql",
+   "sha256": "7870ebc7b6c28748cb717abd5cf7e69ea1ba6384ab7a354ad582a3aaa0f9d145"
+  },
+  "20260806000199": {
+   "fichier": "20260806000199_correctif_isolation_relances_impayes.sql",
+   "sha256": "b347d3e9a28eafaa8c3996c6c5a7a9c44e20a7c2024f36e5d6d67aca096a6070"
+  },
+  "20260812000200": {
+   "fichier": "20260812000200_documents_commerciaux_p9.sql",
+   "sha256": "3ea00a44700e11c149da7d8dfcc5da50ab58f2a428d8f2a11c55ef065ec4cda6"
+  },
+  "20260819000216": {
+   "fichier": "20260819000216_terrain_mobile_v1b_permission_documents_chantier.sql",
+   "sha256": "19b7638546abb0434c07d888828df1ce4eb41f6764af8a5c305fc68dfa8d1113"
+  },
+  "20260819000217": {
+   "fichier": "20260819000217_terrain_mobile_v1b_fix_digest_search_path.sql",
+   "sha256": "190e78db51db3ad5589065810fee287665c0b39a6603cab9955bf42e45b44a1d"
+  },
+  "20260819000218": {
+   "fichier": "20260819000218_terrain_mobile_v1c_retirer_branches_anon_pointage.sql",
+   "sha256": "bbfbc24f39f8887174d4bddc98867475c3762c20708c5cefcfa14657a813024a"
+  },
+  "20260820000219": {
+   "fichier": "20260820000219_terrain_mobile_v1d2_correction_valider_preuve_pointage.sql",
+   "sha256": "4b8e6bf06a473d54799079b28ccb80bafdb25b479e6813a2cb2ef7e7baf93507"
+  },
+  "20260821000220": {
+   "fichier": "20260821000220_alertes_delegation_v1.sql",
+   "sha256": "2255f19fbd68dac69f3123a5da5b5adab089ee4dfa841c0c847c8b0855a4afb1"
+  },
+  "20260822000221": {
+   "fichier": "20260822000221_nettoyage_motif_anon_vestigial.sql",
+   "sha256": "ba67762edbf57d8d42dee1440fc7529528e6c01bbddd10b5b96eccf927c6de11"
+  },
+  "20260822000222": {
+   "fichier": "20260822000222_verrouiller_facture_emise.sql",
+   "sha256": "984af8c3cd646a94312737330d2461970ceae8c1e6196c3d0f734be42de78341"
+  },
+  "20260823000223": {
+   "fichier": "20260823000223_remises_clients_v1.sql",
+   "sha256": "fd7bf179b16b4507f0d979e81b0bc2695f42b2a5fe9242ef534edcfd78a191c5"
+  },
+  "20260824000224": {
+   "fichier": "20260824000224_pieces_jointes_v1_rls_lecture_sensible.sql",
+   "sha256": "e4373b6aa44dcdfdc1aee2ce3b2de4a63dd683704b0513276dae13df2b46c6d1"
+  },
+  "20260824000225": {
+   "fichier": "20260824000225_pieces_jointes_v1_suppression_devis.sql",
+   "sha256": "220b5ca44352c297b43e51aa4802e33a365fb971b2877c482530dc7d03066815"
+  },
+  "20260824000226": {
+   "fichier": "20260824000226_pieces_jointes_v1_photos_comptes_rendus.sql",
+   "sha256": "1fda840cddb676e8f1d09c0df17d07db0e303682ff5285e3d84618f6fde1d6b0"
+  },
+  "20260824000227": {
+   "fichier": "20260824000227_workflow_devis_v1_chantier_depuis_devis.sql",
+   "sha256": "ff460615173ddc5f56180a333f3016d2170bd49ad71574cdf2dfa3c3aea72168"
+  },
+  "20260824000228": {
+   "fichier": "20260824000228_workflow_devis_v1_lier_devis_chantier_reciproque.sql",
+   "sha256": "929a88dc40fd246422df05bebff009d3fa6794d70b366179536c97d12f3866d5"
+  },
+  "20260824000229": {
+   "fichier": "20260824000229_workflow_devis_v1_revert_lien_reciproque.sql",
+   "sha256": "363ded4560828814ff71432688c375a48c15dc80ce94fd9d3ea2ee1dd4edad4e"
+  },
+  "20260824000230": {
+   "fichier": "20260824000230_relances_auto_v1.sql",
+   "sha256": "f1bdd214ce4cfe2a09000b3c7094a7838901067f46b0648c5224874d6ba98ee8"
+  },
+  "20260824000231": {
+   "fichier": "20260824000231_roadmap_cleanup_v1_reconciliation_drift_production.sql",
+   "sha256": "c381e09fd52a70e580527976c5765350fdb07e633fa0dd8ecddfee0c575c3e2f"
+  }
+ },
+ "nombre": 210,
+ "ref": "5777abbcb94fb899ed14a3e7e5213be8f3abb0e7"
+}
