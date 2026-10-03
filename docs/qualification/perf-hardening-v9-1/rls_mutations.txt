@@ -1,0 +1,3 @@
+rls_ensembles_entreprises_equivalence_v1 plan=50 ok=40 not_ok=10 erreurs=0 NON_PROPRE
+rls_ensembles_entreprises_equivalence_v1 plan=50 ok=49 not_ok=1 erreurs=0 NON_PROPRE
+rls_ensembles_entreprises_equivalence_v1 plan=50 ok=35 not_ok=15 erreurs=0 NON_PROPRE

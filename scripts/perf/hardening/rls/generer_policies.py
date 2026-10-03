@@ -1,22 +1,22 @@
 import json, re, sys
-d = json.load(open('/var/tmp/perf/rls/pol.json'))
-M = "(SELECT public.entreprises_membre_actif())"
-def S(k): return f"(SELECT public.entreprises_avec_permission({k}))"
-def U(ks): return "(SELECT public.entreprises_avec_une_permission(ARRAY[" + ", ".join(f"'{k}'" for k in ks) + "]))"
+d = json.load(open(sys.argv[1] if len(sys.argv) > 1 else '/var/tmp/perf/rls/pol.json'))
+M = "(ARRAY(SELECT public.entreprises_membre_actif()))"
+def S(k): return f"(ARRAY(SELECT public.entreprises_avec_permission({k})))"
+def U(ks): return "(ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY[" + ", ".join(f"'{k}'" for k in ks) + "])))"
 ARG = r"([a-z_]+\.)?[a-z_]+"
 def rw(e):
     if e is None: return None
     o = e
     e = re.sub(r"\bpeut_consulter_chantier\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} IN {M}) AND (({m.group(1)} IN {U(['acces_chantiers','gerer_chantiers'])}) OR peut_consulter_chantier({m.group(1)}, {m.group(3)})))", e)
+        lambda m: f"(({m.group(1)} = ANY {M}) AND (({m.group(1)} = ANY {U(['acces_chantiers','gerer_chantiers'])}) OR peut_consulter_chantier({m.group(1)}, {m.group(3)})))", e)
     e = re.sub(r"\bpeut_consulter_pointage_employe\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} IN {U(['voir_pointages_equipe','gerer_pointage','valider_pointages'])}) OR peut_consulter_pointage_employe({m.group(1)}, {m.group(3)}))", e)
+        lambda m: f"(({m.group(1)} = ANY {U(['voir_pointages_equipe','gerer_pointage','valider_pointages'])}) OR peut_consulter_pointage_employe({m.group(1)}, {m.group(3)}))", e)
     e = re.sub(r"\bpeut_consulter_affectation_employe\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} IN {U(['gerer_planning','voir_pointages_equipe','voir_heures_chantiers'])}) OR peut_consulter_affectation_employe({m.group(1)}, {m.group(3)}))", e)
+        lambda m: f"(({m.group(1)} = ANY {U(['gerer_planning','voir_pointages_equipe','voir_heures_chantiers'])}) OR peut_consulter_affectation_employe({m.group(1)}, {m.group(3)}))", e)
     e = re.sub(r"\bpeut_voir_document_chantier\(id\)",
-        f"((entreprise_id IN {M}) AND ((entreprise_id IN {S(chr(39)+'gerer_chantiers'+chr(39)+'::text')}) OR peut_voir_document_chantier(id)))", e)
-    e = re.sub(r"\best_membre_actif\((%s)\)" % ARG, lambda m: f"({m.group(1)} IN {M})", e)
-    e = re.sub(r"\ba_permission\((%s), ('[a-z_]+'::text)\)" % ARG, lambda m: f"({m.group(1)} IN {S(m.group(3))})", e)
+        f"((entreprise_id = ANY {M}) AND ((entreprise_id = ANY {S(chr(39)+'gerer_chantiers'+chr(39)+'::text')}) OR peut_voir_document_chantier(id)))", e)
+    e = re.sub(r"\best_membre_actif\((%s)\)" % ARG, lambda m: f"({m.group(1)} = ANY {M})", e)
+    e = re.sub(r"\ba_permission\((%s), ('[a-z_]+'::text)\)" % ARG, lambda m: f"({m.group(1)} = ANY {S(m.group(3))})", e)
     e = re.sub(r"(?<![.\w])auth\.uid\(\)", "( SELECT auth.uid() AS uid)", e)
     return e
 def q(s): return "$q$" + s + "$q$" if s is not None else "NULL"

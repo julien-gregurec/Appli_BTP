@@ -6,8 +6,10 @@
 -- DEFINER, donc jamais inlinées — POUR CHAQUE LIGNE examinée (≈ 1 ms/ligne), y compris
 -- les lignes d'un AUTRE tenant qu'une lecture croisée vide doit seulement rejeter.
 --
--- Principe : calculer UNE fois par requête l'ensemble des entreprises autorisées et
--- tester l'appartenance de la ligne (sous-requête non corrélée : InitPlan / SubPlan haché).
+-- Principe : calculer UNE fois par requête l'ensemble des entreprises autorisées
+-- (InitPlan : entreprise_id = ANY (ARRAY(SELECT …))) ; la condition devient une condition
+-- d'index sur entreprise_id : seules les lignes des entreprises autorisées sont lues,
+-- quel que soit le nombre de tenants dans la table.
 --
 -- Équivalence EXACTE, par construction (aucune règle d'accès n'est réécrite) :
 --   entreprises_membre_actif()          = { e ∈ C | est_membre_actif(e) }
@@ -20,8 +22,8 @@
 -- plateforme_acces_entreprises exigée) : filtrer C par la fonction d'origine rend donc
 -- exactement l'ensemble où elle est vraie. Toute évolution future de est_membre_actif /
 -- a_permission (suspension, entitlement, révocation de session, support) est héritée
--- automatiquement. entreprise_id NULL : faux avant (aucune ligne ne correspond), NULL
--- (rejet) après.
+-- automatiquement. entreprise_id NULL : faux avant, NULL (rejet) après. Les fonctions ne
+-- rendent jamais NULL (colonnes NOT NULL).
 --
 -- Fonctions par ligne à second argument (peut_consulter_chantier, …) : elles restent
 -- l'autorité, précédées d'un chemin rapide dont la vérité IMPLIQUE la leur
@@ -234,255 +236,255 @@ end
 $garde$;
 
 ALTER POLICY "membres affectations" ON public.affectations
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_affectation_select" ON public.affectations
-  USING (((entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['gerer_planning', 'voir_pointages_equipe', 'voir_heures_chantiers']))) OR peut_consulter_affectation_employe(entreprise_id, employe_id)));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['gerer_planning', 'voir_pointages_equipe', 'voir_heures_chantiers'])))) OR peut_consulter_affectation_employe(entreprise_id, employe_id)));
 
 ALTER POLICY "role_gestion_delete" ON public.affectations
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_planning'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_planning'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.affectations
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_planning'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_planning'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.affectations
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_planning'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_planning'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_planning'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_planning'::text)))));
 
 ALTER POLICY "chantiers_lecture_selon_droits" ON public.chantiers
-  USING (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND ((entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers']))) OR peut_consulter_chantier(entreprise_id, id))));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers'])))) OR peut_consulter_chantier(entreprise_id, id))));
 
 ALTER POLICY "lecture_chantiers_selon_permission" ON public.chantiers
-  USING (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND ((entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers']))) OR peut_consulter_chantier(entreprise_id, id))));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers'])))) OR peut_consulter_chantier(entreprise_id, id))));
 
 ALTER POLICY "membres modifient les chantiers" ON public.chantiers
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (EXISTS ( SELECT 1
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (EXISTS ( SELECT 1
    FROM clients c
   WHERE ((c.id = chantiers.client_id) AND (c.entreprise_id = chantiers.entreprise_id))))));
 
 ALTER POLICY "membres suppriment les chantiers" ON public.chantiers
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "membres écrivent les chantiers" ON public.chantiers
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (EXISTS ( SELECT 1
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (EXISTS ( SELECT 1
    FROM clients c
   WHERE ((c.id = chantiers.client_id) AND (c.entreprise_id = chantiers.entreprise_id))))));
 
 ALTER POLICY "role_gestion_delete" ON public.chantiers
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.chantiers
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.chantiers
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
 
 ALTER POLICY "lecture_clients_selon_permission" ON public.clients
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('acces_clients'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_clients'::text)))));
 
 ALTER POLICY "membres accèdent aux clients" ON public.clients
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.clients
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_clients'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_clients'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.clients
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_clients'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_clients'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.clients
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_clients'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_clients'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_clients'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_clients'::text)))));
 
 ALTER POLICY "lecture_devis_selon_permission" ON public.devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('acces_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_devis'::text)))));
 
 ALTER POLICY "membres devis" ON public.devis
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.devis
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "documents_chantier_ajout" ON public.documents_chantier
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))));
 
 ALTER POLICY "documents_chantier_ajout_terrain" ON public.documents_chantier
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (entreprise_id IN (SELECT public.entreprises_avec_permission('ajouter_documents_chantier'::text)))));
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('ajouter_documents_chantier'::text))))));
 
 ALTER POLICY "documents_chantier_lecture" ON public.documents_chantier
-  USING (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))) OR peut_voir_document_chantier(id))));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))) OR peut_voir_document_chantier(id))));
 
 ALTER POLICY "documents_chantier_modification" ON public.documents_chantier
-  USING (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))))
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))));
 
 ALTER POLICY "documents_chantier_suppression" ON public.documents_chantier
-  USING (((entreprise_id IN (SELECT public.entreprises_membre_actif())) AND (entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))));
 
 ALTER POLICY "role_gestion_delete" ON public.documents_chantier
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.documents_chantier
-  WITH CHECK (((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))) OR (entreprise_id IN (SELECT public.entreprises_avec_permission('ajouter_documents_chantier'::text)))));
+  WITH CHECK (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))) OR (entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('ajouter_documents_chantier'::text))))));
 
 ALTER POLICY "role_gestion_update" ON public.documents_chantier
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))));
 
 ALTER POLICY "lecture_factures_selon_permission" ON public.factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('acces_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_factures'::text)))));
 
 ALTER POLICY "membres factures" ON public.factures
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.factures
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "lecture_lignes_devis_selon_permission" ON public.lignes_devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('acces_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_devis'::text)))));
 
 ALTER POLICY "membres lignes_devis" ON public.lignes_devis
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.lignes_devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.lignes_devis
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.lignes_devis
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_devis'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_devis'::text)))));
 
 ALTER POLICY "lecture_lignes_factures_selon_permission" ON public.lignes_factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('acces_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_factures'::text)))));
 
 ALTER POLICY "membres lignes_factures" ON public.lignes_factures
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.lignes_factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "role_gestion_insert" ON public.lignes_factures
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.lignes_factures
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text)))));
 
 ALTER POLICY "notifications_marquer_lue" ON public.notifications_utilisateurs
   USING ((utilisateur_id = ( SELECT auth.uid() AS uid)))
   WITH CHECK ((utilisateur_id = ( SELECT auth.uid() AS uid)));
 
 ALTER POLICY "notifications_personnelles" ON public.notifications_utilisateurs
-  USING (((utilisateur_id = ( SELECT auth.uid() AS uid)) AND (entreprise_id IN (SELECT public.entreprises_membre_actif()))));
+  USING (((utilisateur_id = ( SELECT auth.uid() AS uid)) AND (entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif())))));
 
 ALTER POLICY "lecture_paiements_selon_permission" ON public.paiements
   USING ((EXISTS ( SELECT 1
    FROM factures f
-  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id IN (SELECT public.entreprises_avec_permission('acces_factures'::text)))))));
+  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('acces_factures'::text))))))));
 
 ALTER POLICY "membres paiements" ON public.paiements
   USING ((EXISTS ( SELECT 1
    FROM factures f
-  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id IN (SELECT public.entreprises_membre_actif()))))))
+  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif())))))))
   WITH CHECK ((EXISTS ( SELECT 1
    FROM factures f
-  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id IN (SELECT public.entreprises_membre_actif()))))));
+  WHERE ((f.id = paiements.facture_id) AND (f.entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif())))))));
 
 ALTER POLICY "role_gestion_delete" ON public.paiements
   USING ((EXISTS ( SELECT 1
    FROM factures p
-  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text)))))));
+  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text))))))));
 
 ALTER POLICY "role_gestion_insert" ON public.paiements
   WITH CHECK ((EXISTS ( SELECT 1
    FROM factures p
-  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text)))))));
+  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text))))))));
 
 ALTER POLICY "role_gestion_update" ON public.paiements
   USING ((EXISTS ( SELECT 1
    FROM factures p
-  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text)))))))
+  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text))))))))
   WITH CHECK ((EXISTS ( SELECT 1
    FROM factures p
-  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_factures'::text)))))));
+  WHERE ((p.id = paiements.facture_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_factures'::text))))))));
 
 ALTER POLICY "membres pointages" ON public.pointages
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "role_gestion_delete" ON public.pointages
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_pointage'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_pointage'::text)))));
 
 ALTER POLICY "role_gestion_update" ON public.pointages
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_pointage'::text))))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_pointage'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_pointage'::text)))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_pointage'::text)))));
 
 ALTER POLICY "role_pointage_select" ON public.pointages
-  USING (((entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['voir_pointages_equipe', 'gerer_pointage', 'valider_pointages']))) OR peut_consulter_pointage_employe(entreprise_id, employe_id)));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['voir_pointages_equipe', 'gerer_pointage', 'valider_pointages'])))) OR peut_consulter_pointage_employe(entreprise_id, employe_id)));
 
 ALTER POLICY "role_gestion_delete" ON public.sessions_pointage
-  USING ((entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_pointage'::text))));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_pointage'::text)))));
 
 ALTER POLICY "role_pointage_select" ON public.sessions_pointage
-  USING (((entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['voir_pointages_equipe', 'gerer_pointage', 'valider_pointages']))) OR peut_consulter_pointage_employe(entreprise_id, employe_id)));
+  USING (((entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['voir_pointages_equipe', 'gerer_pointage', 'valider_pointages'])))) OR peut_consulter_pointage_employe(entreprise_id, employe_id)));
 
 ALTER POLICY "sessions_pointage_membres" ON public.sessions_pointage
-  USING ((entreprise_id IN (SELECT public.entreprises_membre_actif())))
-  WITH CHECK ((entreprise_id IN (SELECT public.entreprises_membre_actif())));
+  USING ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))))
+  WITH CHECK ((entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))));
 
 ALTER POLICY "lecture_taches_selon_permission" ON public.taches
   USING ((EXISTS ( SELECT 1
    FROM chantiers c
-  WHERE ((c.id = taches.chantier_id) AND ((c.entreprise_id IN (SELECT public.entreprises_membre_actif())) AND ((c.entreprise_id IN (SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers']))) OR peut_consulter_chantier(c.entreprise_id, c.id)))))));
+  WHERE ((c.id = taches.chantier_id) AND ((c.entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif()))) AND ((c.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_une_permission(ARRAY['acces_chantiers', 'gerer_chantiers'])))) OR peut_consulter_chantier(c.entreprise_id, c.id)))))));
 
 ALTER POLICY "membres accèdent aux tâches" ON public.taches
   USING ((EXISTS ( SELECT 1
    FROM chantiers ch
-  WHERE ((ch.id = taches.chantier_id) AND (ch.entreprise_id IN (SELECT public.entreprises_membre_actif()))))))
+  WHERE ((ch.id = taches.chantier_id) AND (ch.entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif())))))))
   WITH CHECK ((EXISTS ( SELECT 1
    FROM chantiers ch
-  WHERE ((ch.id = taches.chantier_id) AND (ch.entreprise_id IN (SELECT public.entreprises_membre_actif()))))));
+  WHERE ((ch.id = taches.chantier_id) AND (ch.entreprise_id = ANY (ARRAY(SELECT public.entreprises_membre_actif())))))));
 
 ALTER POLICY "role_gestion_delete" ON public.taches
   USING ((EXISTS ( SELECT 1
    FROM chantiers p
-  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))));
+  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))))));
 
 ALTER POLICY "role_gestion_insert" ON public.taches
   WITH CHECK ((EXISTS ( SELECT 1
    FROM chantiers p
-  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))));
+  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))))));
 
 ALTER POLICY "role_gestion_update" ON public.taches
   USING ((EXISTS ( SELECT 1
    FROM chantiers p
-  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))))
+  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))))))
   WITH CHECK ((EXISTS ( SELECT 1
    FROM chantiers p
-  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id IN (SELECT public.entreprises_avec_permission('gerer_chantiers'::text)))))));
+  WHERE ((p.id = taches.chantier_id) AND (p.entreprise_id = ANY (ARRAY(SELECT public.entreprises_avec_permission('gerer_chantiers'::text))))))));
 
 notify pgrst, 'reload schema';
 
