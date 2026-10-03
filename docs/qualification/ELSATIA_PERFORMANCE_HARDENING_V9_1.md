@@ -4,13 +4,13 @@ PUSH_LOSS_AFTER=0 (contrat 50→10 000, charge 10 000 × 4 workers, endurance 30
 REMINDER_STARVATION_BEFORE=1800/2000 factures dues jamais relancées (90 %, cron réel, 10 000 factures, 5 tenants, 3 passages)
 REMINDER_STARVATION_AFTER=0/2000 (toutes atteintes en 2 passages)
 
-RLS_OWN_TENANT_BEFORE=@@RLS_OWN_BEFORE@@
-RLS_OWN_TENANT_AFTER=@@RLS_OWN_AFTER@@
+RLS_OWN_TENANT_BEFORE=1 000 devis propres 1 074 ms (1k) … 2 344 ms (100k) ; liste/comptage sans filtre 61 s (1k) … > 120 s timeout (100k)
+RLS_OWN_TENANT_AFTER=1 000 devis propres 6,6–7,0 ms (1k … 100k) ; liste/comptage sans filtre 6,7–172 ms (100k : 110–172 ms)
 
-RLS_CROSS_TENANT_BEFORE=@@RLS_CROSS_BEFORE@@
-RLS_CROSS_TENANT_AFTER=@@RLS_CROSS_AFTER@@
+RLS_CROSS_TENANT_BEFORE=lecture croisée vide (devis) 826 ms (1k), 3,8 s (5k), 15,4 s (20k), 37,3 s (50k), 77,4 s (100k)
+RLS_CROSS_TENANT_AFTER=5,9–7,0 ms constant (1k … 100k), 0 ligne lue ; 0 fuite (54/54 contre-épreuves, 6 mutations détectées, ~955 000 requêtes contrôlées)
 
-VERDICT=@@VERDICT@@
+VERDICT=PERFORMANCE_HARDENING_V9_1_LOCALLY_QUALIFIED
 
 # ELSATIA — PERFORMANCE HARDENING V9.1 (remédiation des P1 du soak)
 
@@ -25,13 +25,20 @@ VERDICT=@@VERDICT@@
 
 ## 0. Verdict
 
-@@VERDICT_TEXTE@@
+**`PERFORMANCE_HARDENING_V9_1_LOCALLY_QUALIFIED`**
+
+Les trois P1 du soak sont reproduits sur V9.1 (rouge), corrigés par 4 migrations ajoutées après les 391 de V9.1
+(aucune modifiée) et le code applicatif strictement nécessaire, puis prouvés en vert, en charge (≥ 10 000 push,
+≥ 10 000 factures, tenants 1k → 100k, 30 min d'endurance, 3 000 + 3 000 requêtes multi-tenant entrelacées) et en
+sécurité (équivalence ligne à ligne des 65 policies dans 18 contextes, mutations détectées, 0 fuite sur ≈ 955 000
+requêtes contrôlées). Chaque correctif a un retour arrière **testé** (schéma identique à V9.1). Qualification
+**locale uniquement** : aucun déploiement, aucune Preview, aucune Production. Limites assumées au § 9.
 
 | P1 | RED_BEFORE (V9.1) | GREEN_AFTER | LOAD | RLS_SECURITY | ROLLBACK |
 |---|---|---|---|---|---|
 | **A — push** | contrat 12/19 rouges ; 9 800 / 10 000 perdues ; 4 workers : 4 844 perdues, 5 145 doubles push | contrat 19/19 ; pgTAP CI 19/19 ; Vitest 13 | 10 000 × 4 workers : 0 perte, 0 doublon ; 30 min : 35 690 notifications, 0 perte, 0 doublon | aucune policy touchée ; fonctions `service_role` seul | script testé (schéma = V9.1) |
 | **B — relances** | contrat 10/16 rouges ; cron réel : 1 800 / 2 000 dues jamais relancées | contrat 16/16 ; propriété moteur réel : 0 éligible écarté ; pgTAP CI 8/8 | cron réel 10 000 factures : 2 000 / 2 000 atteintes, 0 doublon, 0 dépassement | sélection SECURITY INVOKER (RLS de la session) | script testé (schéma = V9.1) |
-| **C — RLS** | @@C_RED@@ | équivalence 54/54 (17+1 contextes), 6 mutations détectées | @@C_LOAD@@ | 0 écart ligne à ligne, 0 fuite en charge | script testé (policies = V9.1 à l'octet) |
+| **C — RLS** | 1 000 lignes propres 1,0–2,3 s ; lecture croisée vide 0,8 s (1k) → 77 s (100k) ; liste / comptage sans filtre 61 s → > 120 s ; 20 lecteurs : 90 % d'échecs | équivalence 54/54 (18 contextes), 6 mutations détectées | 3 000 + 3 000 requêtes multi-tenant (dont 100k), endurance 30 min 949 546 requêtes : 0 erreur, 0 fuite ; lecture croisée 5,9 ms constante | 0 écart ligne à ligne, 0 fuite en charge | script testé (policies = V9.1 à l'octet) |
 
 Non-régression : **pgTAP 176 suites existantes identiques avant / après** (167 propres ; les 9 non propres le sont
 déjà sur V9.1 : 7 suites Studio — projet Supabase dédié —, `platform_stripe_state_attestation_r72`,
@@ -138,8 +145,11 @@ donc modifier les colonnes push de **ses** notifications (n'affecte que lui) ; c
 
 ### ROLLBACK
 
+Script testé : `scripts/perf/hardening/rollback/rollback_20261003000101.sql`.
+
 1. Revenir au code applicatif précédent (route, `push.ts`) **avant** de toucher la base.
-2. ```sql
+2. Contenu :
+   ```sql
    begin;
    drop function if exists public.push_reserver_lot_service(integer, integer, integer, integer, integer);
    drop function if exists public.push_reserver_notification_service(uuid, integer, integer);
@@ -209,7 +219,12 @@ simulé) — 5 tenants × 2 000 factures = **10 000** : 60 % au maximum de relan
 Cron réel, 10 000 factures, 5 tenants (`relances_charge_apres.json`) : passage 1 = **1 000** relances (200 par tenant),
 passage 2 = 1 000, passage 3 = 0 → **2 000 / 2 000 dues atteintes**, 0 relance au-delà du maximum, 0 doublon le même
 jour ; 15,7 s puis 12,1 s par passage (dominés par l'envoi simulé et les RPC par candidat).
-Sélection SQL sur le tenant de 100 000 factures : @@RELANCES_SELECTION_100K@@.
+Coût de la sélection SQL (une fois par entreprise et par type, au passage quotidien) :
+
+| Tenant | Factures ouvertes | V9.1 (LIMIT sans filtre) | Après (filtre + tri) |
+|---|---:|---:|---:|
+| 50 000 factures | 18 869 | 5–7 ms | 90–100 ms (devis : 81 ms) |
+| 100 000 factures | 37 492 | 5–11 ms | 234–243 ms (devis : 126 ms) |
 
 Capacité (documentée, inchangée) : 200 candidats par type, par entreprise et par passage quotidien. Au-delà de
 200 documents **réellement dus** le même jour, le reste part aux passages suivants, les plus dus d'abord.
@@ -221,6 +236,8 @@ l'appelant) ; EXECUTE refusé à anon. pgTAP : une session de B n'obtient **aucu
 obtient la même sélection que le cron. Le chemin de service reste `service_role` seul.
 
 ### ROLLBACK
+
+Script testé : `scripts/perf/hardening/rollback/rollback_20261003000201.sql` :
 
 ```sql
 begin;
@@ -239,7 +256,9 @@ Revenir **avant** au code applicatif précédent (la simulation appelle `relance
 Les policies des tables métier appellent `est_membre_actif(entreprise_id)` et `a_permission(entreprise_id, '…')`
 — `SECURITY DEFINER`, jamais inlinées — **pour chaque ligne examinée**, y compris les lignes qu'une lecture croisée
 doit seulement rejeter, et y compris toutes les lignes **des autres tenants** pour une requête sans filtre
-`entreprise_id` (la RLS est le seul filtre). Mesures V9.1 (rôle `authenticated`, `EXPLAIN ANALYZE`) au § 3.4.
+`entreprise_id` (la RLS est le seul filtre). Mesures V9.1 (rôle `authenticated`, `EXPLAIN ANALYZE`, 1k → 100k) dans le
+tableau GREEN_AFTER ci-dessous (colonne « Avant ») : lecture croisée **vide** de 0,8 s (1k) à **77 s** (100k),
+1 000 lignes propres 1,0–2,3 s, comptage / liste sans filtre 61 s puis > 120 s, 20 lecteurs PostgREST : 90 % d'échecs.
 
 Inventaire : **157 tables** ont au moins une policy appelant `est_membre_actif` / `a_permission` / `peut_*`.
 Tables retenues (chemins chauds mesurés : listes, comptages, lectures PostgREST directes, pages chantier, planning,
@@ -272,17 +291,21 @@ fonction d'origine rend donc **exactement** l'ensemble où elle est vraie : sess
 expiré, terminé, rôle), suspension, essai expiré, suspension globale, statut du membre, permissions du poste — tout
 reste évalué par les fonctions V9.1, et toute évolution future de ces fonctions est héritée automatiquement.
 
-Fonctions à second argument (`peut_consulter_chantier(e, c)`, `peut_voir_document_chantier(id)`,
-`peut_consulter_pointage_employe(e, s)`, `peut_consulter_affectation_employe(e, s)`) : elles **restent l'autorité**,
-précédées d'un chemin rapide `F` dont la vérité implique la leur (`F ⇒ P`, donc `P ≡ F ∨ P`) et, quand `P ⇒ membre`,
-d'une garde d'appartenance (`P ≡ M ∧ (F ∨ P)`) qui rejette **sans appel de fonction** toute ligne d'un autre tenant :
+Fonctions par ligne à second argument (`peut_consulter_chantier(e, c)`, `peut_voir_document_chantier(id)`,
+`peut_consulter_pointage_employe(e, s)`, `peut_consulter_affectation_employe(e, s)`) : même principe. Chacune est
+décomposée en un **chemin rapide F** (permissions d'entreprise, ensemble ci-dessus) et un **petit ensemble de couples
+candidats tirés des seules lignes de l'utilisateur** (ses fiches salarié, ses équipes, ses affectations), **filtré par
+la fonction d'origine** — exact, et plus aucun appel ligne à ligne :
 
-| Fonction | Chemin rapide F | Garde M |
+| Fonction d'origine P | Réécriture équivalente | Pourquoi exact |
 |---|---|---|
-| `peut_consulter_chantier` | `acces_chantiers` ou `gerer_chantiers` | oui |
-| `peut_voir_document_chantier` | `gerer_chantiers` | oui |
-| `peut_consulter_pointage_employe` | `voir_pointages_equipe`, `gerer_pointage` ou `valider_pointages` | non (la policy permissive `membres` l'impose déjà) |
-| `peut_consulter_affectation_employe` | `gerer_planning`, `voir_pointages_equipe` ou `voir_heures_chantiers` | idem |
+| `peut_consulter_chantier(e, c)` | `M(e) ∧ (e a acces_chantiers ∨ gerer_chantiers ∨ (e, c) ∈ chantiers_assignes_consultables())` | P ⇒ M ; sa 3e branche exige une ligne `equipes_chantiers` ou `affectations` (e, c, fiche de l'utilisateur) : (e, c) est candidat, et le candidat n'est retenu que si P(e, c) |
+| `peut_consulter_pointage_employe(e, s)` | `e a voir_pointages_equipe ∨ gerer_pointage ∨ valider_pointages ∨ (e, s) ∈ employes_du_compte_pointage_consultables()` | la branche personnelle exige une fiche salarié s de l'utilisateur dans e : candidate, retenue si P(e, s) |
+| `peut_consulter_affectation_employe(e, s)` | idem avec gerer_planning ∨ voir_pointages_equipe ∨ voir_heures_chantiers | idem |
+| `peut_voir_document_chantier(d)` | `M(e) ∧ (e a gerer_chantiers ∨ (d.chantier_id ∈ chantiers_equipes_du_compte() ∧ P(d)))` | la branche équipe exige une ligne `equipes_chantiers` sur ce chantier : repli d'origine **limité** aux documents des chantiers de ses équipes |
+
+Une version intermédiaire (chemin rapide puis repli ligne à ligne sur la fonction d'origine) laissait un salarié sans
+droit d'équipe à **31 s** pour un mois de pointages de son entreprise ; la version finale : **20 ms**.
 
 `auth.uid()` → `(select auth.uid())` (même valeur, évaluée une fois). Noms, commandes, rôles et caractère
 permissif / restrictif des policies **inchangés** (`ALTER POLICY` ne touche que les expressions).
@@ -298,53 +321,242 @@ Garde-fous de la migration :
   migration sur une base déjà migrée est refusé) ;
 * SQL généré et relisible (`scripts/perf/hardening/rls/generer_policies.py` à partir du catalogue V9.1
   `policies_v91.json`), retour arrière généré en même temps (`rollback_20261003000301.sql`) ;
-* fonctions : mêmes droits que `est_membre_actif` / `a_permission` (EXECUTE `authenticated` ; ni PUBLIC, ni anon).
+* **7 fonctions** `SECURITY DEFINER`, `search_path` figé, `STABLE` : mêmes droits que `est_membre_actif` /
+  `a_permission` (EXECUTE `authenticated` ; ni PUBLIC, ni anon). Elles ne rendent que des identifiants d'entreprises
+  / de fiches / de chantiers **de l'utilisateur courant** ;
+* verrous des 13 tables pris d'un coup avec `lock_timeout` (voir « Déploiement »).
+
+### GREEN_AFTER — performance (`EXPLAIN ANALYZE`, rôle `authenticated`, 1k → 100k)
+
+Correction fonctionnelle : suite d'équivalence 54/54 (voir RLS_SECURITY). Performance :
+
+Bases : V9.1 + `generate_fixture.sql` + 5 tenants volumétriques `volume_tenant.sql` (k = 11…15 : 1 000, 5 000,
+20 000, 50 000, 100 000 devis **et** factures, autant de documents et tâches ; ~181 000 devis au total). Le tenant de
+100 000 a été produit par `scripts/perf/hardening/volume_tenant_rapide.sql` : la génération standard a dépassé 3 h
+(maintenance des totaux par trigger superlinéaire en volume : 107 Go lus pour les seules lignes de factures) ; la
+variante insère les lignes sans les triggers de recalcul et fixe les totaux en une instruction — données
+équivalentes pour la RLS. Mesures : `scripts/perf/hardening/rls/bench_explain.sh` (chauffe + médiane de 3 sous 5 s ;
+`statement_timeout` 120 s), CSV bruts `perf-hardening-v9-1/rls_explain_avant.csv` / `rls_explain_apres.csv`.
+Utilisateur = admin du tenant mesuré ; lecture croisée = admin du tenant 1k lisant le tenant mesuré.
+Scénarios : `own_read_1000` = `?entreprise_id=eq.<propre>&limit=1000` ; `own_list_rls_only_50` = liste triée sans
+filtre (la RLS seule borne le résultat) ; `own_count` = `count(*)` sans filtre ; `own_page_milieu_50` = page de 50 à
+l'offset N/2 ; `cross_tenant_empty` = `?entreprise_id=eq.<autre>&limit=1000` (attendu : 0 ligne).
+
+Conditions : les mesures « avant » 1k–50k ont été prises pendant la génération des volumes (CPU partagé) et sur une
+base sans le tenant 100k ; les mesures « après » l'ont été sur la base complète (plus de lignes) : l'écart réel est
+plutôt sous-estimé.
+
+| Table | Scénario | Tenant | Avant (ms) | Après (ms) | Gain |
+|---|---|---|---:|---:|---:|
+| chantiers | own_count | 1k | 3 941 | 6.5 | ×606 |
+| chantiers | own_count | 5k | 4 364 | 6.4 | ×682 |
+| chantiers | own_count | 20k | 5 966 | 6.5 | ×918 |
+| chantiers | own_count | 50k | 12 397 | 7.2 | ×1 722 |
+| chantiers | own_count | 100k | 19 497 | 13.6 | ×1 434 |
+| clients | cross_tenant_empty | 1k | 41.7 | 6.1 | ×7 |
+| clients | cross_tenant_empty | 5k | 203 | 6.4 | ×32 |
+| clients | cross_tenant_empty | 20k | 755 | 8.8 | ×86 |
+| clients | cross_tenant_empty | 50k | 1 885 | 6.1 | ×309 |
+| clients | cross_tenant_empty | 100k | 3 799 | 5.9 | ×644 |
+| clients | own_count | 1k | 3 247 | 6.3 | ×515 |
+| clients | own_count | 5k | 3 142 | 7.6 | ×413 |
+| clients | own_count | 20k | 3 352 | 6.5 | ×516 |
+| clients | own_count | 50k | 3 865 | 6.8 | ×568 |
+| clients | own_count | 100k | 8 304 | 6.9 | ×1 204 |
+| devis | cross_tenant_empty | 1k | 826 | 7.0 | ×118 |
+| devis | cross_tenant_empty | 5k | 3 794 | 6.5 | ×584 |
+| devis | cross_tenant_empty | 20k | 15 434 | 5.9 | ×2 616 |
+| devis | cross_tenant_empty | 50k | 37 310 | 5.9 | ×6 324 |
+| devis | cross_tenant_empty | 100k | 77 422 | 5.9 | ×13 122 |
+| devis | own_count | 1k | 61 568 | 10.4 | ×5 920 |
+| devis | own_count | 5k | 61 926 | 9.4 | ×6 588 |
+| devis | own_count | 20k | 66 021 | 16.3 | ×4 050 |
+| devis | own_count | 50k | 75 335 | 26.1 | ×2 886 |
+| devis | own_count | 100k | > 120 000 (timeout) | 110 | > ×1 091 |
+| devis | own_list_rls_only_50 | 1k | 61 709 | 10.5 | ×5 877 |
+| devis | own_list_rls_only_50 | 5k | 62 162 | 9.5 | ×6 543 |
+| devis | own_list_rls_only_50 | 20k | 66 638 | 21.8 | ×3 057 |
+| devis | own_list_rls_only_50 | 50k | 75 287 | 37.2 | ×2 024 |
+| devis | own_list_rls_only_50 | 100k | > 120 000 (timeout) | 124 | > ×970 |
+| devis | own_page_milieu_50 | 1k | 1 117 | 7.4 | ×151 |
+| devis | own_page_milieu_50 | 5k | 5 724 | 10.3 | ×556 |
+| devis | own_page_milieu_50 | 20k | 23 104 | 23.8 | ×971 |
+| devis | own_page_milieu_50 | 50k | 56 760 | 52.8 | ×1 075 |
+| devis | own_page_milieu_50 | 100k | 112 222 | 164 | ×685 |
+| devis | own_read_1000 | 1k | 1 074 | 6.6 | ×163 |
+| devis | own_read_1000 | 5k | 1 076 | 6.9 | ×156 |
+| devis | own_read_1000 | 20k | 1 187 | 7.0 | ×170 |
+| devis | own_read_1000 | 50k | 1 096 | 6.8 | ×161 |
+| devis | own_read_1000 | 100k | 2 344 | 6.8 | ×345 |
+| documents_chantier | cross_tenant_empty | 1k | 522 | 4.8 | ×109 |
+| documents_chantier | cross_tenant_empty | 5k | 2 572 | 5.0 | ×514 |
+| documents_chantier | cross_tenant_empty | 20k | 10 586 | 4.3 | ×2 462 |
+| documents_chantier | cross_tenant_empty | 50k | 28 298 | 4.1 | ×6 902 |
+| documents_chantier | cross_tenant_empty | 100k | 55 116 | 4.2 | ×13 123 |
+| documents_chantier | own_count | 1k | 41 972 | 7.5 | ×5 596 |
+| documents_chantier | own_count | 5k | 46 564 | 8.4 | ×5 543 |
+| documents_chantier | own_count | 20k | 58 523 | 14.0 | ×4 180 |
+| documents_chantier | own_count | 50k | 91 227 | 20.3 | ×4 494 |
+| documents_chantier | own_count | 100k | > 120 000 (timeout) | 34.6 | > ×3 468 |
+| factures | cross_tenant_empty | 1k | 752 | 6.9 | ×109 |
+| factures | cross_tenant_empty | 5k | 3 789 | 6.0 | ×631 |
+| factures | cross_tenant_empty | 20k | 15 050 | 6.2 | ×2 427 |
+| factures | cross_tenant_empty | 50k | 38 270 | 8.8 | ×4 349 |
+| factures | cross_tenant_empty | 100k | 78 170 | 6.0 | ×13 028 |
+| factures | own_count | 1k | 62 049 | 8.0 | ×7 756 |
+| factures | own_count | 5k | 60 536 | 9.2 | ×6 580 |
+| factures | own_count | 20k | 64 304 | 20.6 | ×3 122 |
+| factures | own_count | 50k | 74 566 | 26.6 | ×2 803 |
+| factures | own_count | 100k | > 120 000 (timeout) | 144 | > ×835 |
+| factures | own_list_rls_only_50 | 1k | 58 800 | 6.8 | ×8 647 |
+| factures | own_list_rls_only_50 | 5k | 59 391 | 9.6 | ×6 187 |
+| factures | own_list_rls_only_50 | 20k | 64 334 | 20.1 | ×3 201 |
+| factures | own_list_rls_only_50 | 50k | 73 646 | 46.5 | ×1 584 |
+| factures | own_list_rls_only_50 | 100k | > 120 000 (timeout) | 172 | > ×697 |
+| factures | own_page_milieu_50 | 1k | 1 137 | 6.7 | ×170 |
+| factures | own_page_milieu_50 | 5k | 5 466 | 10.5 | ×521 |
+| factures | own_page_milieu_50 | 20k | 22 826 | 23.1 | ×988 |
+| factures | own_page_milieu_50 | 50k | 56 913 | 51.2 | ×1 112 |
+| factures | own_page_milieu_50 | 100k | 114 412 | 177 | ×646 |
+| factures | own_read_1000 | 1k | 1 025 | 6.5 | ×158 |
+| factures | own_read_1000 | 5k | 1 002 | 8.3 | ×121 |
+| factures | own_read_1000 | 20k | 1 098 | 6.6 | ×166 |
+| factures | own_read_1000 | 50k | 1 056 | 6.9 | ×153 |
+| factures | own_read_1000 | 100k | 1 082 | 7.8 | ×139 |
+| notifications_utilisateurs | own_count | 1k | 68.2 | 4.4 | ×16 |
+| notifications_utilisateurs | own_count | 5k | 268 | 4.7 | ×57 |
+| notifications_utilisateurs | own_count | 20k | 1 100 | 5.5 | ×200 |
+| notifications_utilisateurs | own_count | 50k | 2 787 | 7.5 | ×372 |
+| notifications_utilisateurs | own_count | 100k | 5 953 | 12.4 | ×480 |
+| taches | own_count | 1k | 8 265 | 349 | ×24 |
+| taches | own_count | 5k | 9 747 | 332 | ×29 |
+| taches | own_count | 20k | 14 835 | 343 | ×43 |
+| taches | own_count | 50k | 58 250 | 335 | ×174 |
+| taches | own_count | 100k | 56 321 | 376 | ×150 |
+| taches | taches_d_un_chantier | 1k | 228 | 12.4 | ×18 |
+| taches | taches_d_un_chantier | 5k | 255 | 12.6 | ×20 |
+| taches | taches_d_un_chantier | 20k | 217 | 12.2 | ×18 |
+| taches | taches_d_un_chantier | 50k | 976 | 11.7 | ×83 |
+| taches | taches_d_un_chantier | 100k | 246 | 12.1 | ×20 |
+
+Lecture :
+* **Avant**, le coût suit le nombre de lignes **examinées**, de **tous** les tenants pour une requête sans filtre :
+  1 000 devis propres ≈ 1,1–2,3 s ; lecture croisée **vide** 0,8 s (1k) → **77 s (100k)** ; liste / comptage sans
+  filtre 61 s dès 1k (la table entière est parcourue) puis > 120 s ; 20 lecteurs PostgREST → files 504.
+* **Après**, l'ensemble autorisé est calculé une fois (InitPlan ≈ 5–6 ms, plancher de toutes les requêtes) puis sert
+  de condition d'index : lecture croisée **constante ≈ 6 ms et 0 ligne lue** quel que soit le volume ; 1 000 lignes
+  propres ≈ 7 ms ; comptage / liste / page au milieu proportionnels aux seules lignes **du tenant** (110–177 ms à 100k).
+* Résidu `taches` (`own_count` ≈ 0,3–0,4 s) : la table n'a pas d'`entreprise_id` ; un comptage sans filtre parcourt
+  les tâches de tous les tenants (≈ 3 µs/ligne au lieu de ≈ 0,5 ms). L'application lit les tâches par `chantier_id`
+  (index, § 4) : 12 ms. Dénormaliser `entreprise_id` sur `taches` relève d'un lot ultérieur.
+
+#### Pointages / planning (rôles restreints)
+
+`scripts/perf/hardening/rls/bench_pointages.sh` — tenant A de la fixture (~52 000 pointages), CSV
+`perf-hardening-v9-1/bench_pointages_*.csv` :
+
+| Scénario | Profil | Avant (ms) | Après (ms) |
+|---|---|---:|---:|
+| `count(*)` pointages | gestionnaire | > 120 000 (timeout) | 15,7 |
+| mois filtré (500 lignes) | gestionnaire | 7 383 | 4,5 |
+| liste sans filtre (50) | gestionnaire | > 120 000 | 49,1 |
+| `count(*)` pointages | **salarié** (sans droit d'équipe : branche « ses propres pointages ») | > 120 000 | 42,3 |
+| mois filtré (37 lignes visibles) | salarié | 15 860 | 19,8 |
+| liste sans filtre (50) | salarié | > 120 000 | 42,1 |
+| mois filtré | lecture croisée (autre tenant) | 12 733 | 2,4 |
+| liste sans filtre | lecture croisée | > 120 000 | 12,1 |
+
+Le profil salarié est celui qui justifie les ensembles candidats exacts (FIX) : avec un simple chemin rapide + repli,
+il restait à 31 s (mesuré sur une version intermédiaire) car `peut_consulter_pointage_employe` était appelée pour
+chaque pointage de ses collègues.
+
+### LOAD — charge PostgREST réelle (JWT signés, RLS, contrôle de fuite sur chaque ligne)
+
+`scripts/perf/hardening/rls/charge_postgrest.mjs`, PostgREST v12.2.3 (`db-pool = 10`, `max-rows = 1000`),
+JSON bruts dans `perf-hardening-v9-1/`.
+
+| Banc | Avant (V9.1) | Après |
+|---|---|---|
+| Lecteurs concurrents, tenant 50k — 1 / 5 / 10 / 20 VU (débit ; p50 / p95) | 0,8 / 1,6 / 1,2 / 1,9 req/s ; p50 1,2 s → 10 s ; **52 / 58 requêtes en échec** à 20 VU (délai 60 s) | 139 / 275 / 346 / 180 req/s ; p50 6 / 11 / 16 / 95 ms ; p95 ≤ 250 ms ; **0 erreur** |
+| Lecteurs concurrents, tenant 100k — 1 / 5 / 10 / 20 VU | — (pas mesurable utilement) | 127 / 289 / 319 / 131 req/s ; p50 7 / 11 / 16 / 148 ms ; 0 erreur (20 VU : pool de 10 + 4 vCPU partagés avec le banc V9.1) |
+| Multi-tenant entrelacé (listes, filtres, pages, comptages, lectures croisées) | 300 requêtes, 10 clients, 4 tenants : 898 s, 0,3 req/s, p50 20 s, **147 / 300 en échec** (55 × 504, 92 délais), 0 fuite | **3 000** requêtes, 4 tenants : 402 req/s, p50 20 ms, p95 58 ms ; **3 000** requêtes, 5 tenants dont 100k : 221 req/s, p95 193 ms — **0 erreur, 0 fuite, 0 lecture croisée non vide** |
+| Endurance 30 min, 10 clients, 4 tenants | — | **949 546** requêtes, 527 req/s, p50 15 ms / p95 46 ms **stables minute par minute** (30 fenêtres : p95 45–49 ms), 0 erreur, **0 fuite** |
+
+Observation (V9.1) : une requête abandonnée par le client continue côté serveur (aucun `statement_timeout` versionné) ;
+pendant le banc « avant », des requêtes PostgREST tournaient encore plusieurs minutes après l'abandon et dégradaient
+toute la base — c'est l'amplification P1-2 du soak.
+
+#### Déploiement (application sous trafic)
+
+Appliquer la migration table par table **sous trafic** a provoqué en banc un **interblocage** (lecture PostgREST en
+cours ↔ `ALTER POLICY`) : transaction annulée en entier, aucun effet, mais migration en échec. Version finale : les
+13 verrous `ACCESS EXCLUSIVE` sont pris d'un coup, dans un ordre fixe, avec `lock_timeout = 10 s` ; appliquée sous
+charge PostgREST : 0,14 s. Sous la RLS V9.1, des lectures de plusieurs secondes peuvent faire expirer ce délai : la
+migration échoue alors proprement et se rejoue (constaté en banc tant que des requêtes lentes V9.1 étaient en cours).
+Recommandation : appliquer en heure creuse, rejouer en cas de `lock timeout`. Durées mesurées sur la base complète :
+`…0101` 0,26 s, `…0201` 0,07 s, `…0301` 0,12 s, `…0401` 0,22 s.
+
 
 ### RLS_SECURITY — contre-épreuves
 
-`supabase/tests/rls_ensembles_entreprises_equivalence_v1.test.sql` (généré, **50/50**) — 17 contextes : admin A,
-ouvrier A (`voir_chantiers_assignes`), chef d'équipe A, conducteur A, comptable A, admin B, ouvrier B,
-**multi-entreprise** (ouvrier dans A + comptable dans B), **support** actif sur A + accès terminé sur C, **support
-expiré** sur B, **plateforme** (rôle total) sans accès, membre d'entreprise **suspendue**, d'entreprise en **essai
-expiré**, en **suspension globale**, en **suspension seulement prévue**, membre **en pause**, **session révoquée**,
-**anonyme** ; entreprise C **sans aucun membre** ; données dans les 13 tables pour A, B, C, D, E, F, G.
+`supabase/tests/rls_ensembles_entreprises_equivalence_v1.test.sql` (généré par
+`scripts/perf/hardening/rls/generer_test_equivalence.py`, **54/54**) — **18 contextes** : admin A, ouvrier A
+(`voir_chantiers_assignes`), chef d'équipe A, conducteur A, comptable A, admin B, ouvrier B, **multi-entreprise**
+(ouvrier dans A + comptable dans B), **support** actif sur A + accès terminé sur C, **support expiré** sur B,
+**plateforme** (rôle total) sans accès, membre d'entreprise **suspendue**, d'entreprise en **essai expiré**
+(entitlement d'abonnement), en **suspension globale**, en **suspension seulement prévue**, membre **en pause**,
+**ancien salarié** (fiche « sortie », encore membre, avec équipe et affectation du jour), **session révoquée**,
+**anonyme** ; entreprise C **sans aucun membre** ; données dans les 13 tables pour A…G, affectation du jour sur un
+chantier non assigné, équipe échue, document réservé à l'encadrement. (Les 13 tables ne dépendent d'aucune
+fonction d'entitlement par application ; l'entitlement d'abonnement passe par `est_membre_actif`, couvert.)
 
+* **E0** — plus aucune des 65 policies n'appelle `est_membre_actif` / `a_permission` ligne à ligne.
 * **E1** — pour chaque contexte, chacune des 65 policies : prédicat `USING` et `WITH CHECK` V9.1 (embarqué) contre le
-  prédicat installé, **ligne à ligne** sur toutes les lignes des 13 tables : **0 écart** (17/17).
+  prédicat installé, **ligne à ligne** sur toutes les lignes des 13 tables : **0 écart** (18/18).
 * **E2** — lignes **réellement visibles** sous RLS (rôle `authenticated` / `anon`) dans les 13 tables, empreinte md5
-  des ids, **avant** (policies V9.1 restaurées dans la transaction) et **après** : **identiques** (17/17). Couvre les
+  des ids, **avant** (policies V9.1 restaurées dans la transaction) et **après** : **identiques** (18/18). Couvre les
   sous-requêtes de policies elles-mêmes soumises à la RLS (taches → chantiers, paiements → factures).
-* **E3** — témoins non vacuitaires : admin A voit ses données, multi-entreprise voit les factures de B et aucune de A,
-  l'ouvrier ne voit que son chantier assigné (chemin lent conservé), aucune ligne pour suspendue / essai expiré /
-  suspension globale / session révoquée / membre en pause / plateforme sans accès / support expiré / anonyme,
-  suspension future encore accessible, support = exactement A.
+* **E3** — témoins non vacuitaires : admin A voit ses données ; multi-entreprise voit les factures de B et aucune de A,
+  aucun client ; l'ouvrier ne voit que son chantier assigné ; l'affectation du jour ouvre le chantier ; le document
+  d'encadrement est réservé au chef d'équipe ; l'ancien salarié ne voit ni chantier, ni pointage, ni affectation ;
+  aucune ligne pour suspendue / essai expiré / suspension globale / session révoquée / membre en pause / plateforme
+  sans accès / support expiré / anonyme ; suspension future encore accessible ; support = exactement A.
 * **E4** — écritures inter-tenant : B ne crée pas de devis dans A (42501), ne modifie aucun client de A, ne supprime
   aucune facture de A ; crée bien dans B.
-* **Mutations** (la suite doit échouer) : policy restrictive affaiblie (permission retirée) → **10 échecs** ; chemin
-  rapide avec la mauvaise permission (`acces_planning`) → **1 échec** (E1 chef d'équipe) ; fonction d'ensemble sans
-  accès support ni contrôle de suspension → **15 échecs** (`perf-hardening-v9-1/rls_mutations.txt`).
-* Charge multi-tenant PostgREST (§ 3.5) : contrôle de **chaque** ligne de **chaque** réponse.
+* **Mutations** (la suite doit échouer — `perf-hardening-v9-1/rls_mutations.txt`) :
+
+  | Mutant | Échecs |
+  |---|---:|
+  | policy restrictive `devis` affaiblie (permission retirée) | 10 |
+  | chemin rapide `chantiers` avec la mauvaise permission (`acces_planning`) | 1 |
+  | `entreprises_membre_actif` sans support ni contrôle de suspension | 17 |
+  | `chantiers_assignes_consultables` sans filtre par la fonction d'origine | 6 |
+  | `employes_du_compte_pointage_consultables` sans filtre | 1 |
+  | documents : repli d'origine supprimé | 3 |
+
+* Charge PostgREST : contrôle de **chaque** ligne de **chaque** réponse (≈ 955 000 requêtes) : **0 fuite**.
 
 ### ROLLBACK
 
-`scripts/perf/hardening/rls/rollback_20261003000301.sql` : rétablit les 65 expressions V9.1 exactes puis supprime les
-3 fonctions. Aucune donnée touchée ; aucun changement applicatif associé.
-
-@@RLS_MESURES@@
+`scripts/perf/hardening/rollback/rollback_20261003000301.sql` (généré) : mêmes verrous groupés, rétablit les 65
+expressions V9.1 exactes puis supprime les 7 fonctions. **Testé** : après retour arrière des 4 migrations, le
+catalogue (6 088 objets : fonctions et leurs droits, policies, index, colonnes) est **identique** à V9.1. Aucune
+donnée touchée ; aucun changement applicatif associé.
 
 ## 4. Index `taches(chantier_id, created_at)`
 
-Migration `20261003000401_taches_chantier_created_idx_v1.sql` — **reproduit et confirmé sur V9.1** (base volumétrique,
-106 241 tâches, chantier de 18 tâches, `scripts/perf/hardening/index/taches_chantier.sh`, transactions annulées,
-`perf-hardening-v9-1/index_taches_chantier_k14.txt`) :
+Migration `20261003000401_taches_chantier_created_idx_v1.sql` — **reproduit et confirmé sur V9.1** (bases volumétriques,
+106 241 et 231 231 tâches, chantier de 18 tâches, `scripts/perf/hardening/index/taches_chantier.sh`, transactions annulées,
+`perf-hardening-v9-1/index_taches_chantier_k14.txt`, `…_k15.txt`) :
 
 | Mesure | Sans index | Avec index |
 |---|---:|---:|
-| Requête de la page chantier, sans RLS (effet de l'index seul) | 24,4 ms — `Seq Scan` | **0,1 ms** — `Bitmap Heap Scan` |
-| Même requête sous RLS V9.1 (rôle authenticated) | 394 ms — `Seq Scan` | 192 ms — `Index Scan` (le reste = RLS ligne à ligne V9.1) |
-| Même requête, RLS P1-C + index (base « après ») | — | **@@TACHES_CHANTIER_APRES@@** |
-| 5 000 insertions de tâches (médiane de 3) | 74 ms | 70 ms (bruit : coût d'écriture non mesurable) |
-| Taille | — | **1 032 kB** (table 17 Mo) |
+| Requête de la page chantier, sans RLS (effet de l'index seul) — 106 241 tâches | 24,4 ms — `Seq Scan` | **0,1 ms** — `Bitmap Heap Scan` |
+| idem — 231 231 tâches (base avec le tenant 100k) | 13,4 ms | **0,1 ms** |
+| Même requête sous RLS V9.1 (rôle authenticated), 106k / 231k | 394 / 260 ms — `Seq Scan` | 192 / 92 ms (le reste = RLS ligne à ligne V9.1) |
+| Même requête, RLS P1-C + index (base « après »), 1k → 100k | 228–976 ms (V9.1) | **11,9–16,7 ms** |
+| 5 000 insertions de tâches (médiane de 3), 106k / 231k | 74 / 74 ms | 70 / 74 ms (coût d'écriture non mesurable) |
+| Taille | — | **1 032 kB** (table 17 Mo) ; **2 280 kB** (table 31 Mo) |
 
 Le soak mesurait 570 → 63 ms sous charge ; l'ordre de grandeur est confirmé (le seq scan parcourt les tâches de
 **tous** les tenants). Index aussi utile à la clé étrangère `taches.chantier_id` (suppression d'un chantier) et à
@@ -357,9 +569,9 @@ bloquées. Retour arrière : `drop index if exists public.taches_chantier_create
 |---|---|---|
 | Push ≥ 10 000 | 10 000 notifications, 4 workers parallèles, 1 % poisons | **0 perte, 0 doublon**, 100 % des poisons sortis explicitement |
 | Relances ≥ 10 000 | cron réel, 10 000 factures, 5 tenants | **2 000 / 2 000** dues atteintes, 0 dépassement, 0 doublon |
-| RLS 100 000 lignes | tenant de 100 000 devis / factures (+ 1k, 5k, 20k, 50k) | § 3.4 |
-| Long run ≥ 30 min | push : 30 min producteur + webhook + 3 crons ; PostgREST : 30 min, 10 clients, 4 tenants | @@LONG_RUN@@ |
-| Multi-tenant ≥ 1 500 requêtes entrelacées | 3 000 requêtes, 10 clients, 4 tenants, listes / filtres / pages / comptages / lectures croisées | **0 fuite**, 0 lecture croisée non vide, 0 erreur ; @@MULTI_RPS@@ |
+| RLS 100 000 lignes | tenant de 100 000 devis / factures (+ 1k, 5k, 20k, 50k) | § 3 GREEN_AFTER : lecture croisée 77 s → 5,9 ms ; 1 000 lignes propres 2,3 s → 6,8 ms ; comptage > 120 s → 110 ms |
+| Long run ≥ 30 min | push : 30 min producteur + webhook + 3 crons ; PostgREST : 30 min, 10 clients, 4 tenants | push : 35 690 notifications, 0 perte, 0 doublon ; PostgREST : 949 546 requêtes, p95 stable 45–49 ms, 0 erreur, 0 fuite |
+| Multi-tenant ≥ 1 500 requêtes entrelacées | 3 000 requêtes, 10 clients, 4 tenants, listes / filtres / pages / comptages / lectures croisées | **0 fuite**, 0 lecture croisée non vide, 0 erreur ; 402 req/s (4 tenants), 221 req/s (5 tenants dont 100k) |
 | Aucune fuite | contrôle de chaque ligne de chaque réponse (charge, endurance) + suite d'équivalence 54/54 | **0** |
 
 ## 6. P2 documentés (non traités — autres lots)
@@ -411,3 +623,25 @@ HARDENING_PG_DB=<base> npx vitest run src/lib/relances-preselection.pg.test.ts
 CHARGE_URL=<proxy supabase local> CHARGE_DB=<base> npx vitest run --config scripts/perf/hardening/relances/vitest.config.ts
 ```
 
+## 9. Limites, risques résiduels et suites
+
+* **RLS — périmètre** : 13 tables / 65 policies sur 157 tables concernées. Les autres gardent l'évaluation ligne à
+  ligne (correcte, plus lente) ; même générateur + même suite d'équivalence pour une phase 2 table par table.
+* **RLS — `taches`** : pas d'`entreprise_id` → comptage sans filtre ≈ 0,3–0,4 s (toutes les tâches de tous les
+  tenants parcourues, à ≈ 3 µs/ligne). Dénormalisation à décider dans un lot de schéma.
+* **RLS — documents** : repli `peut_voir_document_chantier` conservé pour les seuls documents des chantiers des
+  équipes de l'utilisateur (non mesurable au volume testé, borné par ce périmètre).
+* **Déploiement de `…0301`** : verrou `ACCESS EXCLUSIVE` des 13 tables le temps de la transaction (≈ 0,1 s) ; sous la
+  RLS V9.1, une lecture lente en cours peut faire expirer `lock_timeout` (10 s) → échec propre, à rejouer ; appliquer
+  en heure creuse.
+* **Push** : un appareil servi puis un marquage en échec (base indisponible à cet instant précis) ⇒ notification
+  retentée à l'expiration du bail (double push possible dans ce seul cas). Sans VAPID : comportement V9.1 conservé
+  (P2-14). Débit de la route : ~45 s de budget par passage quotidien (≈ 20 000+ notifications au débit mesuré) ; le
+  surplus reste en file, rien n'expire avant 7 jours.
+* **Relances** : plafond de 200 documents dus par type, par entreprise et par passage quotidien (inchangé, documenté) ;
+  la sélection coûte ≈ 0,2 s pour 37 000 factures ouvertes.
+* **Mesures** : conteneur 4 vCPU partagé (génération, pgTAP, bancs) ; PostgreSQL 16 (production : 17) ; PostgREST
+  `db-pool = 10` ; pas de `statement_timeout` local (Supabase hébergé en applique un par rôle) ; tenant 100k produit
+  par la variante rapide du générateur.
+* **Observation hors lot** : `authenticated` a un `UPDATE` de table sur `notifications_utilisateurs` (ses lignes) : il
+  peut modifier les colonnes push de ses propres notifications. À restreindre par grant de colonne (lot ACL).

@@ -1,0 +1,43 @@
+{
+  "mode": "lecteurs",
+  "k": "15",
+  "secondes": 20,
+  "paliers": [
+    {
+      "vu": 1,
+      "requetes": 2542,
+      "debit_rps": 127.1,
+      "p50": 7,
+      "p95": 10,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "vu": 5,
+      "requetes": 5772,
+      "debit_rps": 288.6,
+      "p50": 11,
+      "p95": 33,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "vu": 10,
+      "requetes": 6376,
+      "debit_rps": 318.8,
+      "p50": 16,
+      "p95": 214,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "vu": 20,
+      "requetes": 2625,
+      "debit_rps": 131.3,
+      "p50": 148,
+      "p95": 301,
+      "erreurs": 0,
+      "fuites": 0
+    }
+  ]
+}

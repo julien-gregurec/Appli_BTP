@@ -1,0 +1,8 @@
+taches: 231231 lignes ; chantier mesuré : f8ed6c0e-6b04-4960-8d22-8dcd3061ca43 (18 tâches)
+superutilisateur sans index : 13.4 Sort
+RLS authenticated sans index : 260.1 Seq Scan
+5000 insertions sans index (ms) : 73.573
+superutilisateur avec index : 0.1 Bitmap Heap Scan
+RLS authenticated avec index : 92.0 Bitmap Heap Scan
+5000 insertions avec index (ms) : 74.359
+taille index : 2280 kB ; table : 31 MB
