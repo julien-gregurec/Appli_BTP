@@ -18,7 +18,9 @@ VOLUMETRIC_MAX=100 000 lignes par table critique (602 632 lignes au total)
 
 **`PRODUCTION_UPGRADE_HARNESS_PARTIALLY_QUALIFIED`**
 
-Le harnais est complet, paramétrable et qualifié **localement** de bout en bout. Le verdict n'est pas
+Le harnais est complet, paramétrable et qualifié **localement** de bout en bout. Avec le pont v2 et la régularisation
+UPG-P1-1, l'upgrade 210 → `877a4b9f` **et** 210 → tête V9.1 `24a0c2e9` est vert à tous les contrôles (zéro perte,
+sécurité fermée, anciennes offres, accès, interruptions, restauration), jusqu'à 100 000 lignes par table critique. Le verdict n'est pas
 « LOCALLY_QUALIFIED » pour une raison de fond, pas d'outillage : **l'upgrade de la Production réelle n'est
 PAS possible avec le train tel quel**. Le harnais l'a démontré et a produit les correctifs à arbitrer :
 
@@ -27,7 +29,7 @@ PAS possible avec le train tel quel**. Le harnais l'a démontré et a produit le
 | **UPG-P0-1** `20260921000300` échoue dès qu'une facture émise a des lignes | **P0 — bloquant** | upgrade arrêté au rang ~110 (transaction annulée, sans dégât) | ponts proposés `scripts/upgrade/bridges/` (v1 minimal, **v2 recommandé**) |
 | **UPG-P0-2** `20260816000204` pose une contrainte « essai ≤ 30 j » | P0 conditionnel | upgrade arrêté si une entreprise post-231 a un `trial_end` Stripe hors fenêtre | précondition `bloquant_essai_hors_fenetre` (sonde + preflight) |
 | **UPG-P1-1** « essai perpétuel » (statut `essai`, dates NULL, cas documenté de l'entreprise réelle ELSATIA) | **P1** | tous ses membres perdent l'accès à l'instant de l'upgrade | précondition `bloquant_essai_perpetuel` + SQL de régularisation **proposé** |
-| **UPG-LOCK-1** `300` : cascade de recalcul quadratique sous ACCESS EXCLUSIVE | P1 opérationnel | 7,4 s (5 000) → 64,6 s (20 000) → **1 266 s = 21 min** (100 000) de blocage devis/factures | fenêtre de maintenance ; pont v2 : ⟨MS_100K_V2⟩ |
+| **UPG-LOCK-1** `300` : cascade de recalcul quadratique sous ACCESS EXCLUSIVE | P1 opérationnel | 7,4 s (5 000) → 64,6 s (20 000) → **1 266 s = 21 min** (100 000) de blocage devis/factures | pont v2 : **3,6 s** (÷350), upgrade complet 1 287 s → **23 s** ; sinon fenêtre de maintenance ≥ 25 min |
 | UPG-P2-1 | P2 | fin d'essai Stripe > 30 j tronquée rétroactivement par 204 | déclarée, sondée (`info_essai_tronque`) |
 | UPG-P3-1 | P3 | `devis/factures.updated_at` réécrits à l'instant de l'upgrade (montants identiques) | déclarée ; supprimée par le pont v2 |
 | UPG-PERF-1 | P2 | lectures sous RLS ≈ ×2 (gardes enrichies) ; planning d'autrui ×10–×20 | mesuré, non bloquant (< 2 s) |
@@ -211,7 +213,28 @@ existantes touchées) : **SAFE 83 · CAUTION 99 · MAINTENANCE_WINDOW_REQUIRED 1
 factures / lignes). Les CAUTION prennent un verrou fort **bref** sur des tables 210 (création de triggers,
 contraintes, backfills < 0,5 s) : en Production, appliquer avec `lock_timeout` et trafic coupé.
 
-Pont v2 (`bridges/v2/`) au palier 100 000 : ⟨PONT_V2⟩.
+**Pont v2** (`bridges/v2/`, run sur la tête V9.1 `24a0c2e9`, même source 100 000) :
+
+| Mesure (100 000) | Sans pont v2 (pont v1) | Avec pont v2 |
+|---|---|---|
+| Dry-run (183 migrations) | 1 279 s | **19 s** |
+| Application (183 migrations) | 1 287 s | **23 s** |
+| `20260921000300` | 1 266 s, ACCESS EXCLUSIVE sur `devis`, `factures`, `lignes_devis`, `lignes_factures` ; 404 500 lignes touchées (cascade) | **3,6 s**, ACCESS EXCLUSIVE sur les deux tables de lignes seulement ; 201 440 lignes (le seul backfill) |
+| `devis` / `factures` `updated_at` | réécrits (UPG-P3-1) | **inchangés** |
+
+`300` reste classée MAINTENANCE_WINDOW_REQUIRED par la règle (DML > 10 000 lignes sous verrou exclusif), mais
+pour 3,6 s : la fenêtre de maintenance du cutover (trafic fermé) la couvre largement.
+
+### 8.1 UPG-PERF-1 — lectures sous RLS
+
+Requêtes d'écran mesurées sous RLS (médiane de 3, avant / après, mêmes conditions) : **≈ ×2 à tous les paliers**
+(ex. 5 000 : liste devis 269 → 526 ms ; 100 000 : 3,0 → 6,1 s ; journal 28,5 → 56,2 s). Cause : `est_membre_actif`
+/ `a_permission` (SECURITY DEFINER, évaluées ligne par ligne) font désormais aussi `session_courante_revoquee()`,
+`est_acces_support_actif()` et des contrôles d'abonnement / suspension. Planning d'autrui ×10–×20 (PL-05 :
+`peut_consulter_affectation_employe` par ligne). Non bloquant au sens du harnais (aucune régression > ×3 au-delà
+de 2 s), mais les valeurs absolues à 100 000 lignes par entreprise sont élevées **avant comme après** :
+recommandation hors upgrade — politiques « ensemble » (`entreprise_id in (select …)` évalué une fois par requête)
+plutôt que fonctions par ligne.
 
 ## 9. Phase I — Interruptions
 
@@ -264,9 +287,15 @@ historique modifiée / renommée / absente (manifeste 210) · P5 ledger non pré
 pour une reprise) · P6 migrations inattendues (absentes du plan qualifié pour ce SHA) · P7 Production non attestée
 (ref, empreinte du ledger, lecture seule, préconditions `bloquant_*` et préconditions du plan) · P8 sauvegarde
 absente / > 24 h / autre projet / restauration jamais testée ou testée sur Production/Preview · P0 option de
-connexion. Tests : `npm run test:production-v9x-preflight` → **29/29**. Données d'entrée Production : sonde
+connexion ; un plan qualifié **avec ponts** est refusé tant que chaque pont n'est pas dans l'arbre de la cible à l'octet
+près. Tests : `npm run test:production-v9x-preflight` → **32/32**. Données d'entrée Production : sonde
 **lecture seule** `scripts/upgrade/sql/production_readonly_probe.sql` (transaction READ ONLY, SELECT uniquement),
-exécutée par l'opérateur hors de ce dépôt.
+exécutée par l'opérateur hors de ce dépôt ; gabarits d'attestation dans `scripts/upgrade/attestations/`.
+
+**Démonstration sur la vraie tête V9.1** (`--depot` = checkout local de `24a0c2e9`, attestations **simulées**,
+référence de projet fictive) : P1 ✅ P2 ✅ P3 ✅ P4 ✅ (210 migrations historiques identiques) P5 ✅ (ledger 210 =
+source + préfixe 0/181) **P6 ❌ « plan qualifié AVEC ponts absents de la cible »** P7 ✅ P8 ✅ → `PREFLIGHT REFUSÉ` :
+c'est l'état exact d'aujourd'hui (témoin `witnesses/…/preflight-demo-v91/`).
 
 ## 13. Recommandations à l'équipe V9.1
 
