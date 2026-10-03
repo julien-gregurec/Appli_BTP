@@ -4,6 +4,9 @@
 -- tables parentes à N/10 (devis, factures, clients) ou N/20 (chantiers). 100 % synthétique.
 -- Tous les triggers métier restent ACTIFS (numérotation, recalcul, synchronisation) : les devis/factures
 -- naissent « brouillon », reçoivent leurs lignes, puis changent de statut — chemin applicatif réel.
+-- Fidélité 210 : next_reference() y TRONQUE le numéro au-delà de 999 (lpad, largeur 3 ; corrigé par
+-- 20260921000299 pendant l'upgrade) — une entreprise 210 ne peut donc pas porter plus de 999 devis ni
+-- 999 factures numérotés. Au-delà de 900 documents, les suivants restent en BROUILLON (non numérotés).
 \set ON_ERROR_STOP 1
 begin;
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
@@ -51,7 +54,7 @@ insert into public.lignes_devis (devis_id, designation, type, quantite, unite, p
 select vd.id, 'Ouvrage ' || k, (array['main_oeuvre', 'fourniture', 'sous_traitance', 'deplacement', 'forfait'])[1 + k % 5],
        1 + k % 7, 'u', 12.5 * k, 20, k
   from vd, generate_series(1, 10) k;
-update public.devis set statut = 'accepte' where id in (select id from vd where g % 2 = 0);
+update public.devis set statut = 'accepte' where id in (select id from vd where g % 2 = 0 and g <= 1800);
 
 -- Factures (N/10) : brouillon → lignes (N) → envoyée / payée ; paiements sur les payées.
 create temp table vf as
@@ -64,20 +67,10 @@ select id, substr(notes_internes, 9)::int as g from ins;
 insert into public.lignes_factures (facture_id, designation, type, quantite, unite, prix_unitaire_ht, taux_tva, ordre)
 select vf.id, 'Prestation ' || k, 'forfait', 1, 'u', 10 * k + vf.g % 13, 20, k
   from vf, generate_series(1, 10) k;
-update public.factures set statut = 'envoyee' where id in (select id from vf);
+update public.factures set statut = 'envoyee' where id in (select id from vf where g <= 900);
 insert into public.paiements (facture_id, montant, date, mode, reference)
 select f.id, f.montant_ttc, f.date_emission + 20, 'virement', 'VOL-PAY-' || vf.g
-  from vf join public.factures f on f.id = vf.id where vf.g % 3 = 0 and f.montant_ttc > 0;
-
--- Planning / pointage (N chacun) : 50 employés × jours ouvrés, un chantier par jour.
-insert into public.affectations (entreprise_id, chantier_id, employe_id, date, heures, type_activite)
-select v.ent, ch.id, em.id, current_date - (g / 50), 7.5, 'chantier'
-  from v, generate_series(0, v.n - 1) g
-  join lateral (select id from public.employes where entreprise_id = (select ent from v) and reference_interne = 'VOL-EMP-' || lpad((1 + g % 50)::text, 4, '0')) em on true
-  join lateral (select id from public.chantiers where entreprise_id = (select ent from v) and reference_interne = 'VOL-CHA-' || lpad((1 + (g / 50) % greatest((select n from v) / 20, 1))::text, 6, '0')) ch on true;
-insert into public.pointages (entreprise_id, employe_id, chantier_id, date, heures_normales, heures_supplementaires, pause_minutes, affectation_id)
-select a.entreprise_id, a.employe_id, a.chantier_id, a.date, 7, (a.date - current_date) % 2 * -0.5, 60, a.id
-  from public.affectations a where a.entreprise_id = (select ent from v);
+  from vf join public.factures f on f.id = vf.id where vf.g % 3 = 0 and vf.g <= 900 and f.montant_ttc > 0;
 
 insert into public.journal_activite (entreprise_id, utilisateur_id, action, ressource, ressource_id, description, created_at)
 select v.ent, 'a2100000-0000-0000-0000-000000000003', (array['creation', 'modification', 'envoi'])[1 + g % 3], 'devis', null,
@@ -88,3 +81,24 @@ select v.ent, ch.id, 'photo-' || g || '.jpg', 'photo_pendant', v.ent::text || '/
   from v, generate_series(1, greatest(v.n / 10, 1)) g
   join lateral (select id from public.chantiers where entreprise_id = (select ent from v) order by reference_interne limit 1) ch on true;
 commit;
+
+-- Planning / pointage (N chacun) : 50 employés × jours, un chantier par jour. Par LOTS de 2 000 lignes, chacun
+-- dans sa propre transaction (\gexec, autocommit) : trg_verifier_heures_affectation prend un verrou consultatif
+-- PAR LIGNE ; 20 000 lignes dans une seule transaction dépasseraient max_locks_per_transaction (comme en réel,
+-- où les affectations naissent une à une).
+select format($f$
+insert into public.affectations (entreprise_id, chantier_id, employe_id, date, heures, type_activite)
+select v.ent, ch.id, em.id, current_date - (g / 50), 7.5, 'chantier'
+  from v, generate_series(%1$s, %2$s) g
+  join lateral (select id from public.employes where entreprise_id = (select ent from v) and reference_interne = 'VOL-EMP-' || lpad((1 + g %% 50)::text, 4, '0')) em on true
+  join lateral (select id from public.chantiers where entreprise_id = (select ent from v) and reference_interne = 'VOL-CHA-' || lpad((1 + (g / 50) %% greatest((select n from v) / 20, 1))::text, 6, '0')) ch on true
+ where g < (select n from v)$f$, b, b + 1999)
+  from generate_series(0, (select n - 1 from v), 2000) b
+\gexec
+select format($f$
+insert into public.pointages (entreprise_id, employe_id, chantier_id, date, heures_normales, heures_supplementaires, pause_minutes, affectation_id)
+select a.entreprise_id, a.employe_id, a.chantier_id, a.date, 7, (a.date - current_date) %% 2 * -0.5, 60, a.id
+  from public.affectations a where a.entreprise_id = (select ent from v) and a.date between current_date - %1$s and current_date - %2$s$f$,
+  d + 39, d)
+  from generate_series(0, (select n / 50 + 1 from v), 40) d
+\gexec
