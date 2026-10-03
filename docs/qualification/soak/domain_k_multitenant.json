@@ -1,0 +1,65 @@
+{
+ "total": 1500,
+ "concurrence": 8,
+ "global": {
+  "n": 1500,
+  "p50": 869.5,
+  "p95": 16708.1,
+  "max": 19723.4,
+  "errors": 0,
+  "avgBytes": 16698
+ },
+ "violations_cloisonnement": 0,
+ "reponses_5xx_indisponibles": 0,
+ "exemples": [],
+ "par": {
+  "chantiers_options": {
+   "n": 249,
+   "p50": 19.8,
+   "p95": 46.3,
+   "max": 198.7,
+   "errors": 0,
+   "avgBytes": 46610
+  },
+  "clients_tenant": {
+   "n": 252,
+   "p50": 774.1,
+   "p95": 1270.5,
+   "max": 1448.8,
+   "errors": 0,
+   "avgBytes": 16291
+  },
+  "devis_200": {
+   "n": 249,
+   "p50": 1034.5,
+   "p95": 1560.3,
+   "max": 1712.1,
+   "errors": 0,
+   "avgBytes": 20798
+  },
+  "croise_rpc_dashboard": {
+   "n": 249,
+   "p50": 13.5,
+   "p95": 31.7,
+   "max": 139,
+   "errors": 0,
+   "avgBytes": 203
+  },
+  "croise_devis": {
+   "n": 249,
+   "p50": 13043.5,
+   "p95": 18753.9,
+   "max": 19723.4,
+   "errors": 0,
+   "avgBytes": 2
+  },
+  "clients_sans_filtre": {
+   "n": 252,
+   "p50": 13548,
+   "p95": 15276.6,
+   "max": 16031.9,
+   "errors": 0,
+   "avgBytes": 16291
+  }
+ }
+}
