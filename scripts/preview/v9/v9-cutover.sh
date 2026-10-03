@@ -89,19 +89,24 @@ node "$V9/cutover-step.mjs" report-set "$RAPPORT" sha_deploye "\"$SHA_HEAD\"" >/
 echo "ELSATIA V9 — cutover Preview → train local (HEAD $SHA_HEAD) — mode $MODE$([ "$HARNESS" = 1 ] && echo ' (BANC LOCAL)') — sorties : $OUT"
 
 # ── Accès base (lecture seule forcée) et CLI Supabase ─────────────────────────────────────────
+# Lecture seule : le pooler Supabase IGNORE PGOPTIONS (default_transaction_read_only reste off). Chaque
+# appel psql_ro ouvre donc une transaction EXPLICITE `begin transaction read only` dans sa session,
+# vérifie transaction_read_only = on (sinon exception → ON_ERROR_STOP → arrêt, fail-closed), exécute
+# les requêtes demandées dans cette même transaction puis l'annule. PGOPTIONS reste en défense en profondeur.
+RO_ASSERT="do \$elsatia_ro\$ begin if current_setting('transaction_read_only') <> 'on' then raise exception 'ELSATIA_READ_ONLY_NON_EFFECTIF'; end if; end \$elsatia_ro\$"
 if [ "$HARNESS" = 1 ]; then
   DB_HARNESS="${ELSATIA_V9_HARNESS_DB:-}"
   case "$DB_HARNESS" in elsatia_v9_harness_*) ;; *) refus "--local-harness exige ELSATIA_V9_HARNESS_DB=elsatia_v9_harness_<nom> (base locale jetable)" ;; esac
   [ -n "${ELSATIA_PREVIEW_DB_URL:-}" ] && refus "--local-harness : ELSATIA_PREVIEW_DB_URL doit être vide (aucune base distante)"
   SUPABASE_BIN="$V9/harness/supabase-sim.sh"
-  psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' psql -X -At -v ON_ERROR_STOP=1 -d "$DB_HARNESS" "$@"; }
+  psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' psql -X -At -q -v ON_ERROR_STOP=1 -d "$DB_HARNESS" -c "begin transaction read only" -c "$RO_ASSERT" "$@" -c "rollback"; }
   DB_VERIFY_URL="postgresql://localhost/$DB_HARNESS?host=/var/run/postgresql"
   # Banc neuf : ni propriétaire plateforme ni clé d'attestation (STEP 7 du runbook V3) → les 2
   # anomalies documentées de db-verify --before-owner sont tolérées. JAMAIS sur la Preview réelle.
   DB_VERIFY_ARGS=(--local-harness --before-owner)
 else
   SUPABASE_BIN="${SUPABASE_BIN:-npx supabase}"
-  psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' PGCONNECT_TIMEOUT=15 psql "$ELSATIA_PREVIEW_DB_URL" -X -At -v ON_ERROR_STOP=1 "$@"; }
+  psql_ro() { PGOPTIONS='-c default_transaction_read_only=on' PGCONNECT_TIMEOUT=15 psql "$ELSATIA_PREVIEW_DB_URL" -X -At -q -v ON_ERROR_STOP=1 -c "begin transaction read only" -c "$RO_ASSERT" "$@" -c "rollback"; }
   DB_VERIFY_URL="${ELSATIA_PREVIEW_DB_URL:-}"
   DB_VERIFY_ARGS=()
 fi

@@ -39,8 +39,11 @@ npx supabase db dump --linked --data-only --schema auth -f "$B/preview-auth-data
 npx supabase db dump --linked --data-only --schema supabase_migrations -f "$B/preview-migrations-data.sql"
 npx supabase db dump --linked --role-only -f "$B/preview-roles.sql"
 npx supabase db dump --linked --data-only --schema storage -f "$B/preview-storage-data.sql"
-PGOPTIONS='-c default_transaction_read_only=on' psql "$ELSATIA_PREVIEW_DB_URL" -X -At -v ON_ERROR_STOP=1 \
-  -f docs/runbooks/sql/ELSATIA_V9_LEDGER_EXPORT.sql > "$B/ledger-brut.json"
+# Lecture seule par transaction EXPLICITE : le pooler Supabase ignore PGOPTIONS (off|off observé).
+psql "$ELSATIA_PREVIEW_DB_URL" -X -At -q -v ON_ERROR_STOP=1 \
+  -c "begin transaction read only" \
+  -c "do \$\$ begin if current_setting('transaction_read_only') <> 'on' then raise exception 'ELSATIA_READ_ONLY_NON_EFFECTIF'; end if; end \$\$" \
+  -f docs/runbooks/sql/ELSATIA_V9_LEDGER_EXPORT.sql -c "rollback" > "$B/ledger-brut.json"
 node scripts/preview/v9/cutover-step.mjs ledger-tag pgvvpqyjziyapbbkydmc "$B/ledger-brut.json" "$B/ledger-avant.json"
 node scripts/preview/v9/backup-manifest.mjs --dir "$B"
 node scripts/preview/v9/backup-check.mjs "$B/manifest.json"

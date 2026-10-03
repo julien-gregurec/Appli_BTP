@@ -2,8 +2,11 @@
 /**
  * ELSATIA — Pack Preview : vérification de la base Supabase Preview (lecture seule).
  *
- * Enchaîne, dans des sessions psql forcées en lecture seule
- * (PGOPTIONS=-c default_transaction_read_only=on) :
+ * Enchaîne, chaque contrôle dans une session psql ouverte par une transaction EXPLICITE
+ * `begin transaction read only`, vérifiée (`transaction_read_only = on`, sinon arrêt) puis
+ * annulée (`rollback`). PGOPTIONS=-c default_transaction_read_only=on est conservé en défense en
+ * profondeur, mais le pooler Supabase l'ignore (off|off observé) : il ne suffit jamais seul.
+ * Contrôles :
  *   1. garde de cible : la référence extraite de l'URL doit être la Preview attendue, jamais
  *      la Production (exhvuzegsefmoguxoiak) ;
  *   2. registre des migrations : supabase_migrations.schema_migrations comparé aux fichiers
@@ -164,9 +167,45 @@ export function sqlSondeRls(utilisateurId) {
   ].join("\n");
 }
 
-function psql(url, args, input) {
-  const r = spawnSync("psql", [url, "-X", "-v", "ON_ERROR_STOP=1", ...args], {
-    input,
+/** Erreur levée par le préambule si la transaction n'est pas effectivement en lecture seule. */
+export const ERREUR_LECTURE_SEULE = "ELSATIA_READ_ONLY_NON_EFFECTIF";
+
+// Lignes de contrôle transactionnel propres aux fichiers SQL officiels (`begin transaction read
+// only;` … `rollback;`) : retirées, la transaction est portée par le préambule ci-dessous. Tout autre
+// contrôle transactionnel (commit, read write, nouvelle transaction…) est REFUSÉ : il ferait sortir
+// les contrôles suivants de la transaction READ ONLY vérifiée.
+const TX_AUTORISEE = /^\s*(begin\s+transaction\s+read\s+only|rollback)\s*;\s*$/gim;
+const TX_INTERDITE = /(?:^|;)\s*(commit|abort|rollback|end\s*;|end\s+(transaction|work)\b|start\s+transaction\b|begin\s*;|begin\s+(transaction|work|isolation)\b|set\s+(session\s+characteristics|transaction)\b[^;]*read\s+write|\\)/im;
+/** Pour le contrôle seulement : corps des blocs $tag$…$tag$ (plpgsql : begin/end;) et commentaires retirés. */
+const horsBlocs = (sql) => sql.replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, "").replace(/--[^\n]*/g, "");
+
+/**
+ * Pure : script psql exécuté dans UNE session, à l'intérieur d'une transaction explicite READ ONLY.
+ * Le préambule vérifie `transaction_read_only = on` et lève une exception sinon (fail-closed :
+ * ON_ERROR_STOP arrête psql, la session se ferme et le serveur annule la transaction). Le corps est
+ * exécuté dans cette même transaction ; le `rollback` final l'annule ; aucun `commit` n'est émis.
+ */
+export function scriptLectureSeule(corps) {
+  const net = corps.replace(TX_AUTORISEE, "").trim();
+  if (!net) throw new Refus("contrôle db-verify vide");
+  const interdit = horsBlocs(net).match(TX_INTERDITE);
+  if (interdit) throw new Refus(`contrôle transactionnel ou méta-commande interdit dans db-verify : « ${interdit[0].trim()} »`);
+  return [
+    "begin transaction read only;",
+    `do $elsatia_ro$ begin if current_setting('transaction_read_only') <> 'on' then raise exception '${ERREUR_LECTURE_SEULE}'; end if; end $elsatia_ro$;`,
+    net.replace(/;?\s*$/, ";"),
+    "rollback;",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Exécute `corps` (SQL, fichiers officiels inclus en texte) via l'entrée standard, dans une transaction READ ONLY
+ * vérifiée. `options` : options de format psql (-At, -F '|'…). `-q` masque BEGIN/ROLLBACK.
+ */
+function psql(url, options, corps) {
+  const r = spawnSync("psql", [url, "-X", "-q", "-v", "ON_ERROR_STOP=1", ...options], {
+    input: scriptLectureSeule(corps),
     encoding: "utf8",
     env: { ...process.env, PGOPTIONS: "-c default_transaction_read_only=on", PGCONNECT_TIMEOUT: "15" },
   });
@@ -193,14 +232,15 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   log("ELSATIA — db-verify Preview (lecture seule, URL masquée)\n");
 
   // 0. Connexion + mode lecture seule effectif.
-  const c = psql(url, ["-At", "-c", "select current_setting('transaction_read_only'), current_setting('server_version_num')"]);
+  const c = psql(url, ["-At"], "select current_setting('transaction_read_only'), current_setting('server_version_num')");
+  if (c.code !== 0 && c.stderr.includes(ERREUR_LECTURE_SEULE)) { ko("DB-READONLY", "session", "transaction READ ONLY non effective : arrêt"); return SORTIE.NO_GO; }
   if (c.code !== 0) { ko("DB-CONNECT", "connexion", c.stderr.trim().split("\n").at(-1)); return SORTIE.NO_GO; }
   const [ro, version] = c.stdout.trim().split("|");
   if (ro !== "on") { ko("DB-READONLY", "session", "lecture seule non effective : arrêt"); return SORTIE.NO_GO; }
-  log(ligne("ok", "DB-CONNECT", "connexion", `PostgreSQL ${version}, session en lecture seule`));
+  log(ligne("ok", "DB-CONNECT", "connexion", `PostgreSQL ${version}, transaction explicite READ ONLY vérifiée`));
 
   // 1. Registre des migrations.
-  const m = psql(url, ["-At", "-c", "select version from supabase_migrations.schema_migrations order by 1"]);
+  const m = psql(url, ["-At"], "select version from supabase_migrations.schema_migrations order by 1");
   if (m.code !== 0 && bancLocal) log(ligne("warn", "DB-MIGRATIONS", "registre", "absent du banc local (normal : pas de CLI Supabase)"));
   else if (m.code !== 0) ko("DB-MIGRATIONS", "registre", "supabase_migrations.schema_migrations illisible");
   else {
@@ -214,7 +254,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
 
   // 2. Vérification Preview (nombre de contrôles lu dans le SQL).
   const nbControles = compterControles(readFileSync(VERIFY_SQL, "utf8"));
-  const v = psql(url, ["-At", "-F", "|", "-f", VERIFY_SQL]);
+  const v = psql(url, ["-At", "-F", "|"], readFileSync(VERIFY_SQL, "utf8"));
   if (v.code !== 0) ko("DB-VERIFY", "ELSATIA_PREVIEW_DB_VERIFY_V1.sql", v.stderr.trim().split("\n").at(-1));
   else {
     const lignes = analyserVerify(v.stdout);
@@ -227,7 +267,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   }
 
   // 3. Préflight sécurité plateforme, mode preview.
-  const p = psql(url, ["-q"], `set elsatia.preflight_environment = 'preview';\n\\i ${PREFLIGHT_SQL}\n`);
+  const p = psql(url, [], `set local elsatia.preflight_environment = 'preview';\n${readFileSync(PREFLIGHT_SQL, "utf8")}`);
   if (p.code !== 0) ko("DB-PREFLIGHT", "PLATFORM_SECURITY_PREFLIGHT.sql", p.stderr.trim().split("\n").at(-1));
   else {
     const res = analyserPreflight(p.stderr + p.stdout);
@@ -242,7 +282,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   }
 
   // 4. RLS smoke structurel.
-  const r = psql(url, ["-At", "-F", "|", "-c", SQL_RLS_SMOKE]);
+  const r = psql(url, ["-At", "-F", "|"], SQL_RLS_SMOKE);
   if (r.code !== 0) ko("DB-RLS", "smoke structurel", r.stderr.trim().split("\n").at(-1));
   else {
     const mesures = Object.fromEntries(r.stdout.trim().split("\n").map((s) => s.split("|")).map(([k, n]) => [k, Number(n)]));
@@ -256,7 +296,7 @@ export function executer({ url, refAttendue = REF_PREVIEW_AUTORISEE, autoriserEn
   }
 
   // 4 bis. RPC réservées à la clé de service.
-  const sv = psql(url, ["-At", "-F", "|", "-c", sqlServiceSeulement()]);
+  const sv = psql(url, ["-At", "-F", "|"], sqlServiceSeulement());
   if (sv.code !== 0) ko("DB-SERVICE-ONLY", "RPC techniques", sv.stderr.trim().split("\n").at(-1));
   else {
     const res = evaluerServiceSeulement(sv.stdout);

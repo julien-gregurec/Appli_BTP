@@ -1,7 +1,7 @@
 // Tests hors réseau du pack d'exécution Preview (scripts/preview/*).
 // Lancer : node --test scripts/preview/preview-pack.test.mjs   (npm run test:preview-pack)
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,7 +11,7 @@ import { test } from "node:test";
 import * as garde from "./lib/preview-guard.mjs";
 import { inventaire, resume, classer } from "./env-inventory.mjs";
 import { controlesCroises, executer as envCheck } from "./env-check.mjs";
-import { comparerMigrations, analyserVerify, analyserPreflight, sqlSondeRls, versionsLocales, estBancLocal, evaluerServiceSeulement, RPC_SERVICE_SEULEMENT, sqlServiceSeulement } from "./db-verify.mjs";
+import { comparerMigrations, analyserVerify, analyserPreflight, sqlSondeRls, versionsLocales, estBancLocal, evaluerServiceSeulement, RPC_SERVICE_SEULEMENT, sqlServiceSeulement, scriptLectureSeule, ERREUR_LECTURE_SEULE, SQL_RLS_SMOKE, executer as dbVerify } from "./db-verify.mjs";
 import { attentes, evaluer as evaluerHttp, executer as httpSmoke } from "./http-smoke.mjs";
 import { ENDPOINTS, evaluerEndpoints, evaluerPortail, evaluerPrix, executer as stripeVerify } from "./stripe-test-verify.mjs";
 import { EXPECTED_BUCKETS, evaluerBuckets, executer as storageSmoke } from "./storage-smoke.mjs";
@@ -421,4 +421,95 @@ test("env inventory : le fichier généré du dépôt correspond au manifeste co
   assert.equal(r.status, 0);
   const fichier = readFileSync(resolve(racine, "docs/qualification/preview-pack/ENV_INVENTORY_PREVIEW_V1.generated.md"), "utf8");
   assert.equal(r.stdout, fichier, "régénérer : npm run -s preview:env-inventory > docs/qualification/preview-pack/ENV_INVENTORY_PREVIEW_V1.generated.md");
+});
+
+// ── db-verify : lecture seule par transaction explicite (pooler Supabase qui ignore PGOPTIONS) ──
+
+test("db-verify : script READ ONLY — préambule vérifié, rollback final, fichiers officiels acceptés", () => {
+  const sc = scriptLectureSeule("select 1");
+  assert.match(sc, /^begin transaction read only;\n/);
+  assert.match(sc, new RegExp(`current_setting\\('transaction_read_only'\\) <> 'on' then raise exception '${ERREUR_LECTURE_SEULE}'`));
+  assert.match(sc, /\nselect 1;\nrollback;\n$/);
+  assert.doesNotMatch(sc, /commit/i);
+  for (const f of ["docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql", "docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql"]) {
+    const s = scriptLectureSeule(readFileSync(join(ROOT, f), "utf8"));
+    // Les begin/rollback propres au fichier sont retirés : une seule transaction, la nôtre, jusqu'au bout.
+    assert.equal((s.match(/^\s*begin transaction read only;/gim) ?? []).length, 1, f);
+    assert.equal((s.match(/^\s*rollback;/gim) ?? []).length, 1, f);
+    assert.match(s, /\nrollback;\n$/, f);
+  }
+  for (const sql of [SQL_RLS_SMOKE, sqlServiceSeulement(), sqlSondeRls("00000000-0000-4000-8000-000000000001")]) assert.ok(scriptLectureSeule(sql));
+});
+
+test("db-verify : tout contrôle transactionnel ou méta-commande est refusé (fail-closed)", () => {
+  for (const sql of ["select 1; commit;", "select 1;commit", "select 1;\nend;", "abort;", "begin;\nselect 1", "begin transaction read write;", "start transaction;", "set transaction read write;", "set session characteristics as transaction read write;", "\\! id", "rollback to savepoint s;", ""]) {
+    assert.throws(() => scriptLectureSeule(sql), garde.Refus, JSON.stringify(sql));
+  }
+});
+
+/** Faux psql : ignore PGOPTIONS comme le pooler Supabase ; journalise chaque appel (args + stdin). */
+function fauxPsql(mode) {
+  const dir = mkdtempSync(join(tmpdir(), "elsatia-faux-psql-"));
+  writeFileSync(join(dir, "psql"), `#!${process.execPath}
+const fs = require("node:fs");
+const stdin = fs.readFileSync(0, "utf8");
+fs.writeFileSync(${JSON.stringify(dir)} + "/appel-" + Date.now() + "-" + Math.random() + ".json", JSON.stringify({ args: process.argv.slice(2), stdin }));
+// Pooler : default_transaction_read_only reste « off » (PGOPTIONS ignoré) ; seule une transaction explicite est en lecture seule.
+const enTx = /^begin transaction read only;/.test(stdin);
+const ro = ${JSON.stringify(mode)} === "pooler" && enTx ? "on" : "off";
+if (stdin.includes(${JSON.stringify(ERREUR_LECTURE_SEULE)}) && ro !== "on") { process.stderr.write("ERROR:  ${ERREUR_LECTURE_SEULE}\\n"); process.exit(3); }
+if (stdin.includes("server_version_num")) { process.stdout.write(ro + "|170006\\n"); process.exit(0); }
+process.stderr.write("ERROR:  hors périmètre du faux psql\\n"); process.exit(3);
+`);
+  chmodSync(join(dir, "psql"), 0o755);
+  const appels = () => readdirSync(dir).filter((f) => f.startsWith("appel-")).map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")));
+  return { dir, appels };
+}
+
+function avecPath(dir, fn) {
+  const avant = process.env.PATH;
+  process.env.PATH = `${dir}:${avant}`;
+  try { return fn(); } finally { process.env.PATH = avant; }
+}
+
+const URL_POOLER = `postgresql://postgres.${REF}@aws-0-eu-west-3.pooler.supabase.com:5432/postgres`;
+
+test("db-verify : pooler qui ignore PGOPTIONS — la transaction explicite READ ONLY est vérifiée, plus de faux DB-READONLY", () => {
+  const f = fauxPsql("pooler");
+  const lignes = [];
+  avecPath(f.dir, () => dbVerify({ url: URL_POOLER }, (l) => lignes.push(l)));
+  assert.ok(lignes.some((l) => /✓ \[DB-CONNECT\].*transaction explicite READ ONLY vérifiée/.test(l)), lignes.join("\n"));
+  assert.ok(!lignes.some((l) => l.includes("[DB-READONLY]")));
+  const appels = f.appels();
+  assert.ok(appels.length >= 2);
+  for (const a of appels) {
+    assert.ok(a.args.includes("-q") && a.args.includes("ON_ERROR_STOP=1"));
+    assert.ok(!a.args.includes("-c") && !a.args.includes("-f"), "le SQL passe par stdin, dans la transaction");
+    assert.match(a.stdin, /^begin transaction read only;\ndo \$elsatia_ro\$/);
+    assert.match(a.stdin, /\nrollback;\n$/);
+    assert.doesNotMatch(a.stdin, /^\s*commit/im);
+  }
+});
+
+test("db-verify : transaction non effectivement READ ONLY → DB-READONLY, NO-GO, arrêt immédiat", () => {
+  const f = fauxPsql("casse");
+  const lignes = [];
+  const code = avecPath(f.dir, () => dbVerify({ url: URL_POOLER }, (l) => lignes.push(l)));
+  assert.equal(code, garde.SORTIE.NO_GO);
+  assert.ok(lignes.some((l) => /✖ \[DB-READONLY\]/.test(l)), lignes.join("\n"));
+  assert.equal(f.appels().length, 1, "aucun contrôle après l'échec de la garde lecture seule");
+});
+
+test("db-verify : la Production reste refusée avant toute connexion", () => {
+  const f = fauxPsql("pooler");
+  assert.throws(() => avecPath(f.dir, () => dbVerify({ url: `postgresql://postgres.${PROD}@aws-0-eu-west-3.pooler.supabase.com:5432/postgres` }, silence)), garde.Refus);
+  assert.equal(f.appels().length, 0);
+});
+
+test("v9-cutover.sh : psql_ro ouvre une transaction READ ONLY vérifiée et l'annule", () => {
+  const sh = readFileSync(join(ROOT, "scripts/preview/v9/v9-cutover.sh"), "utf8");
+  const defs = sh.split("\n").filter((l) => /^\s*psql_ro\(\)/.test(l));
+  assert.equal(defs.length, 2);
+  for (const d of defs) assert.match(d, /-q -v ON_ERROR_STOP=1 .*-c "begin transaction read only" -c "\$RO_ASSERT" "\$@" -c "rollback"; \}$/);
+  assert.match(sh, /RO_ASSERT="do .*transaction_read_only'\) <> 'on' then raise exception 'ELSATIA_READ_ONLY_NON_EFFECTIF'/);
 });
