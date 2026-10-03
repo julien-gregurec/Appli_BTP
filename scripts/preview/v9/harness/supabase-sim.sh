@@ -16,7 +16,7 @@ DB="${ELSATIA_V9_HARNESS_DB:-}"
 case "$DB" in elsatia_v9_harness_*) ;; *) echo "supabase-sim : ELSATIA_V9_HARNESS_DB=elsatia_v9_harness_* requis" >&2; exit 2 ;; esac
 q() { psql -X -At -v ON_ERROR_STOP=1 -d "$DB" -c "$1"; }
 
-if [ "${1:-}" = "--version" ]; then echo "supabase-sim (banc local V9)"; exit 0; fi
+if [ "${1:-}" = "--version" ]; then echo "supabase-sim (banc local du pack Preview)"; exit 0; fi
 [ "${1:-}" = "db" ] && [ "${2:-}" = "push" ] || { echo "supabase-sim : seule « db push » est simulée" >&2; exit 2; }
 shift 2
 DRY=0

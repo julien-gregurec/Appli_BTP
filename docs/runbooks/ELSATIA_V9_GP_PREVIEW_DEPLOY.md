@@ -2,19 +2,20 @@
 
 | | |
 |---|---|
-| Commit exact à déployer | **`6392131aa02cecc9991358915963068de8292d24`** (branche `integration/elsatia-canonical-train-v9-final`) |
-| Pourquoi pas le commit du pack | la branche du pack (`claude/zen-clarke-qchnnt`) n'ajoute que `scripts/preview/v9/`, des documents et des scripts npm ; `cutover-step.mjs git-check` prouve que le code déployable et `supabase/migrations` sont **identiques** à `6392131` |
+| Commit exact à déployer | **HEAD du train porteur du pack** (V9.2 : branche `integration/elsatia-canonical-train-v9.2`) — le pack vit DANS le train ; `cutover-step.mjs git-check` prouve que la base publiée V9.1 `24a0c2e993ec0836b492ea72f27ed7dc347a20fa` est ancêtre de HEAD, branche autorisée, worktree propre |
+| SHA consigné | `sha_deploye` du rapport de cutover (= `git rev-parse HEAD` au moment du cutover) ; la porte code refuse un rapport dont le SHA ≠ HEAD |
 | Projet Vercel | **`elsatia-preview`** (GP, Root Directory `.`) — runbook d'exécution V3, STEP 8 |
 | Environnement | **Preview** uniquement. Jamais `vercel deploy --prod` sur ce projet (il possède son propre environnement « Production » : `VERCEL_ENV=production` sur une Preview) |
-| Base | Supabase `pgvvpqyjziyapbbkydmc`, **déjà en 389** (porte `CODE_DEPLOY_ALLOWED=true`) |
-| Code servi avant | `de50245a` (V8 + 813) — **noter l'URL de son déploiement** : c'est le retour arrière |
+| Base | Supabase `pgvvpqyjziyapbbkydmc`, **déjà au train complet** (`CURRENT_LEDGER` = `TARGET_LEDGER`, `PENDING_MIGRATIONS=0` ; porte `CODE_DEPLOY_ALLOWED=true`) |
+| Code servi avant | le déploiement Preview en cours (historique : `de50245a`, V8 + 813) — **noter l'URL de son déploiement** : c'est le retour arrière |
 | Interdit | Production `exhvuzegsefmoguxoiak`, Stripe Live, tout jeton dans un fichier du dépôt |
 
 ## 1. Pourquoi la base AVANT le code (rappel)
 
-Le code V9 appelle `consulter_rate_limit` (1113) à chaque connexion et refuse la connexion si
-l'appel échoue : code V9 sur base 372 = plus personne ne se connecte. Il appelle aussi les RPC de
-901 (onboarding légal) et 1101-1112. Le code V8 reste compatible avec la base 389. Ordre imposé :
+Le code du train appelle `consulter_rate_limit` (1113) à chaque connexion et refuse la connexion si
+l'appel échoue : code récent sur base en retard = plus personne ne se connecte. Il appelle aussi les
+RPC des migrations en attente (onboarding légal 901, agrégats et garde-fous GP). Le code servi avant
+reste compatible avec la base à jour. Ordre imposé :
 `v9-cutover.sh --apply-preview` → `CODE_DEPLOY_ALLOWED=true` → déploiement.
 
 Attention aux **déploiements automatiques de branche** : si l'intégration Git de Vercel est active,
@@ -49,16 +50,16 @@ acceptés) et `IBAN_K1_READY`. Points obligatoires :
 
 | # | Action | Commande | Attendu |
 |---|---|---|---|
-| 1 | Base en 389 (déjà fait) | `scripts/preview/v9/v9-cutover.sh … --apply-preview --confirm-ref pgvvpqyjziyapbbkydmc` | `CODE_DEPLOY_ALLOWED=true` |
-| 2 | Consigner le déploiement V8 servi | `vercel ls elsatia-preview` / tableau de bord : URL du déploiement aliasé | URL notée dans le rapport |
+| 1 | Base au train complet (déjà fait) | `scripts/preview/v9/v9-cutover.sh … --apply-preview --confirm-ref pgvvpqyjziyapbbkydmc` | `CODE_DEPLOY_ALLOWED=true` |
+| 2 | Consigner le déploiement servi | `vercel ls elsatia-preview` / tableau de bord : URL du déploiement aliasé | URL notée dans le rapport |
 | 3 | Porte, juste avant | `npm run preview:v9:code-gate -- --report ../elsatia-v9-run/cutover-report.json --ledger ../elsatia-v9-run/ledger-apres.json` | `CODE_DEPLOY_ALLOWED=true` (sinon **STOP**) |
-| 4 | Arbre exact du commit | `git worktree add ../elsatia-v9-deploy 6392131aa02cecc9991358915963068de8292d24` | worktree détaché sur `6392131` |
+| 4 | Arbre exact du commit | `git worktree add ../elsatia-v9-deploy <sha_deploye du rapport>` | worktree détaché sur le SHA de HEAD consigné |
 | 5 | (facultatif) build local | `cd ../elsatia-v9-deploy && npm ci && npm run typecheck` | 0 erreur (le build réel se fait chez Vercel) |
 | 6 | Lier le projet | `cd ../elsatia-v9-deploy && vercel link --project elsatia-preview` | projet `elsatia-preview` |
 | 7 | Déployer en Preview | `vercel deploy` (**sans** `--prod`) | URL `https://…vercel.app` ; log de build : `[env-manifest] cible preview : mode enforce.` puis `GO : aucune erreur.` (commande de build du projet : `npm run build:gestion-pro`) |
-| 8 | Commit réellement servi | `vercel inspect <url>` (source / commit) ; après connexion : `/parametres/version` | commit `6392131…` |
+| 8 | Commit réellement servi | `vercel inspect <url>` (source / commit) ; après connexion : `/parametres/version` | commit = `sha_deploye` du rapport |
 | 9 | Smoke anonyme | `npm run preview:http-smoke -- --gp <url>` puis `npm run preview:v9:post-check -- --gp-url <url> --ledger … --v9-checks … --report …` | `GO` ; `POST_CUTOVER_AUTO_GO` |
-| 10 | Alias stable | `vercel alias set <url> <alias Preview GP>` | l'alias sert V9 |
+| 10 | Alias stable | `vercel alias set <url> <alias Preview GP>` | l'alias sert le nouveau code |
 | 11 | Recette guidée | liste imprimée par `post-cutover-check.mjs` (pilote `pilote.karim.haddad@example.test`) | toutes les cases cochées |
 
 Deployment Protection : si active, exporter `VERCEL_AUTOMATION_BYPASS_SECRET` dans le shell (jamais
@@ -66,8 +67,8 @@ dans un fichier) pour les smokes ; le régénérer après la campagne.
 
 ## 4. Retour arrière du code
 
-`vercel alias set <URL du déploiement V8 notée à l'étape 2> <alias Preview GP>` — immédiat, sans
-rebuild, **sans toucher la base** (compatible 389). Puis `npm run preview:http-smoke -- --gp <alias>`.
+`vercel alias set <URL du déploiement notée à l'étape 2> <alias Preview GP>` — immédiat, sans
+rebuild, **sans toucher la base** (compatible). Puis `npm run preview:http-smoke -- --gp <alias>`.
 Détails et cas : `ELSATIA_V9_PREVIEW_ROLLBACK.md` (cas B / C).
 
 ## 5. Ce que ce runbook n'inclut jamais

@@ -4,8 +4,9 @@
  *
  * Aucun nombre de migrations, aucune « dernière version » ni aucun nombre de contrôles DB
  * n'est maintenu à la main dans l'outillage Preview. Ce script les calcule et les écrit :
- *   - docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql : CTE `attendu_train(nb, derniere)`
- *     entre les marqueurs `[train-expectations]` ;
+ *   - docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql et
+ *     docs/runbooks/sql/ELSATIA_V9_POST_CUTOVER_CHECKS.sql (pack opérateur V9, contrôle 1) :
+ *     CTE `attendu_train(nb, derniere)` entre les marqueurs `[train-expectations]` ;
  *   - tout fichier Markdown de docs/ qui porte des marqueurs en ligne :
  *       <!--train:nb-->N<!--/train:nb-->                 nombre de migrations
  *       <!--train:derniere-->V<!--/train:derniere-->     dernière version
@@ -25,6 +26,10 @@ export { compterControles };
 
 const ROOT = resolve(import.meta.dirname, "../..");
 export const VERIFY_SQL = resolve(ROOT, "docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql");
+/** SQL post-cutover du pack opérateur V9 : même bloc `attendu_train`, synchronisé ici. */
+export const V9_CHECKS_SQL = resolve(ROOT, "docs/runbooks/sql/ELSATIA_V9_POST_CUTOVER_CHECKS.sql");
+/** Fichiers SQL qui portent le bloc `[train-expectations]`. */
+export const SQL_SYNCHRONISES = Object.freeze([VERIFY_SQL, V9_CHECKS_SQL]);
 const DOCS = resolve(ROOT, "docs");
 
 export function attendus(dir = resolve(ROOT, "supabase/migrations"), sql = readFileSync(VERIFY_SQL, "utf8")) {
@@ -67,10 +72,13 @@ export function synchroniser({ ecrire = false } = {}) {
   const sql = readFileSync(VERIFY_SQL, "utf8");
   const a = attendus(undefined, sql);
   const changes = [];
-  const sqlNeuf = appliquerSql(sql, a);
-  if (sqlNeuf !== sql) {
-    changes.push(relative(ROOT, VERIFY_SQL));
-    if (ecrire) writeFileSync(VERIFY_SQL, sqlNeuf);
+  for (const fichier of SQL_SYNCHRONISES) {
+    const actuel = fichier === VERIFY_SQL ? sql : readFileSync(fichier, "utf8");
+    const sqlNeuf = appliquerSql(actuel, a);
+    if (sqlNeuf !== actuel) {
+      changes.push(relative(ROOT, fichier));
+      if (ecrire) writeFileSync(fichier, sqlNeuf);
+    }
   }
   for (const f of fichiersMarkdown(DOCS)) {
     const md = readFileSync(f, "utf8");

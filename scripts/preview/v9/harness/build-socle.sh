@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # ELSATIA — Pack opérateur V9 : construit une base LOCALE jetable dans l'état de la Preview
-# (socle 372 : V8 + 813 originale), avec un ledger façon Supabase, pour éprouver v9-cutover.sh.
+# (par défaut : socle V8 = train jusqu'à 20261002000813 ORIGINALE, rang CALCULÉ depuis le train),
+# avec un ledger façon Supabase, pour éprouver v9-cutover.sh.
 #
-# Usage : scripts/preview/v9/harness/build-socle.sh elsatia_v9_harness_<nom> [nb=372]
+# Usage : scripts/preview/v9/harness/build-socle.sh elsatia_v9_harness_<nom> [nb]
+#   nb : nombre de migrations à appliquer (défaut : rang de 20261002000813 dans supabase/migrations).
 # Prérequis : PostgreSQL 16 local, rôle superutilisateur pour l'utilisateur courant (peer).
 # Réutilise scripts/local-postgres-bootstrap/pg_bootstrap.sql (substituts d'infrastructure Supabase).
 set -uo pipefail
 DB="${1:?usage: build-socle.sh elsatia_v9_harness_<nom> [nb]}"
-NB="${2:-372}"
 case "$DB" in elsatia_v9_harness_*) ;; *) echo "nom de base refusé (préfixe elsatia_v9_harness_ exigé)" >&2; exit 2 ;; esac
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+VERSION_SOCLE="20261002000813"
+RANG_SOCLE="$(ls "$REPO"/supabase/migrations/*.sql | grep -n "/${VERSION_SOCLE}_" | cut -d: -f1)"
+[ -n "$RANG_SOCLE" ] || { echo "$VERSION_SOCLE absente du train local" >&2; exit 2; }
+NB="${2:-$RANG_SOCLE}"
+case "$NB" in ""|*[!0-9]*) echo "nb doit être un entier" >&2; exit 2 ;; esac
 BOOT="$REPO/scripts/local-postgres-bootstrap"
 
 psql -X -q -d postgres -c "drop database if exists \"$DB\"" -c "create database \"$DB\"" || exit 1

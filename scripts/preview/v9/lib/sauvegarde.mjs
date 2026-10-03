@@ -7,7 +7,7 @@
 //   - projet = Preview, date récente et non future ;
 //   - chaque artefact REQUIRED présent, hors du dépôt, non vide, taille / sha256 conformes si
 //     déclarés, et contenant le marqueur attendu (p. ex. `auth.users` dans le dump Auth) ;
-//   - l'export de ledger joint = exactement le socle 372.
+//   - l'export de ledger joint = un préfixe exact du train avec migrations en attente (CURRENT_LEDGER).
 // Ne lit et n'affiche aucune donnée : uniquement des tailles, des sommes et des présences.
 
 import { createHash } from "node:crypto";
@@ -22,7 +22,7 @@ export const ARTEFACTS = Object.freeze({
   data: { niveau: "REQUIRED", marqueur: /(COPY|INSERT INTO) "?public"?\./i, libelle: "données public (db dump --data-only)" },
   auth: { niveau: "REQUIRED", marqueur: /"?auth"?\."?users"?/i, libelle: "utilisateurs Auth (db dump --data-only --schema auth)" },
   migrations_data: { niveau: "REQUIRED", marqueur: /supabase_migrations"?\."?schema_migrations/i, libelle: "table du ledger (db dump --data-only --schema supabase_migrations) : sans elle, une base restaurée rejouerait tout le train" },
-  ledger: { niveau: "REQUIRED", marqueur: null, libelle: "ledger des migrations (export JSON, preuve du socle 372)" },
+  ledger: { niveau: "REQUIRED", marqueur: null, libelle: "ledger des migrations (export JSON, preuve de CURRENT_LEDGER)" },
   roles: { niveau: "RECOMMENDED", marqueur: /CREATE ROLE|ALTER ROLE/i, libelle: "rôles (db dump --role-only)" },
   storage_metadata: { niveau: "RECOMMENDED", marqueur: /"?storage"?\."?(objects|buckets)"?/i, libelle: "métadonnées Storage (db dump --data-only --schema storage)" },
   storage_files: { niveau: "OPTIONAL", marqueur: null, libelle: "fichiers Storage (copie des objets) — non couverts par db dump" },
@@ -77,13 +77,15 @@ export function verifierSauvegarde(manifeste, { racineDepot, local, maintenant =
     if (a.bytes !== undefined && a.bytes !== null && Number(a.bytes) !== st.size) problemes.push(`taille ${st.size} ≠ déclarée ${a.bytes}`);
     if (a.sha256 && st.size && sha256Fichier(chemin) !== a.sha256) problemes.push("sha256 ≠ déclaré");
     if (def.marqueur && st.size && !contientMarqueur(chemin, def.marqueur)) problemes.push("contenu attendu introuvable");
+    let info = "";
     if (kind === "ledger" && st.size) {
       try {
         const an = analyserLedger(lireLedger(readFileSync(chemin, "utf8")), local, { attente: "pre" });
         if (!an.conforme) problemes.push(`ledger sauvegardé non conforme (${an.verdict})`);
+        else info = `, CURRENT_LEDGER=${an.courant.nb} (dernière ${an.courant.derniere}), PENDING_MIGRATIONS=${an.enAttente.length}`;
       } catch (e) { problemes.push(`ledger illisible (${e.message})`); }
     }
-    c(problemes.length === 0, `BACKUP-${kind.toUpperCase()}`, problemes.length ? `${def.libelle} : ${problemes.join(", ")}` : `${def.libelle} : ${st.size} octets${a.sha256 ? ", sha256 conforme" : ""}`, def.niveau);
+    c(problemes.length === 0, `BACKUP-${kind.toUpperCase()}`, problemes.length ? `${def.libelle} : ${problemes.join(", ")}` : `${def.libelle} : ${st.size} octets${a.sha256 ? ", sha256 conforme" : ""}${info}`, def.niveau);
   }
   c(Boolean(manifeste?.dashboard_backup_id), "BACKUP-PITR", manifeste?.dashboard_backup_id ? "identifiant de sauvegarde Supabase consigné" : "aucun identifiant de sauvegarde Supabase consigné (plan sans PITR : les dumps sont la seule restauration)", "OPTIONAL");
 

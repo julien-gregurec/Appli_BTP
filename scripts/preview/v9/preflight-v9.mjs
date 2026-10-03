@@ -5,7 +5,9 @@
  *   npm run preview:v9:preflight [-- --ledger <export>] [--env-inventory <export Vercel>]
  *        [--backup-manifest <manifeste>] [--bank-keys-status <json>] [--json]
  *
- * Agrège tout ce qui se vérifie SANS réseau : SHA / branche / worktree, train local, migrations
+ * Pack GÉNÉRIQUE : CURRENT_LEDGER (ledger fourni), TARGET_LEDGER (train local de HEAD) et
+ * PENDING_MIGRATIONS (train − ledger) sont calculés, jamais codés.
+ * Agrège tout ce qui se vérifie SANS réseau : base V9.1 / branche / worktree, train local, migrations
  * (verify:migrations), attendus du train, fixtures et auto-tests du ledger, plan de migration,
  * manifeste d'environnement, scan de secrets, configuration de build, garde Production,
  * préparation du rollback (runbooks + classement). Les entrées facultatives (exports réels) sont
@@ -25,14 +27,14 @@ import { loadJson, MANIFEST_PATH } from "../../lib/env-manifest-core.mjs";
 import { synchroniser } from "../train-expectations.mjs";
 import { classementV9 } from "./classify-migrations-v9.mjs";
 import { evaluerCible } from "./lib/cible.mjs";
-import { NB_A_APPLIQUER, REF_PREVIEW_AUTORISEE, REF_PRODUCTION_CONNUE, VERDICT } from "./lib/constantes.mjs";
+import { REF_PREVIEW_AUTORISEE, REF_PRODUCTION_CONNUE, VERDICT, VERSION_SOCLE, VERSION_V9_1 } from "./lib/constantes.mjs";
 import { lireInventaire, comparerInventaire } from "./lib/env-scope.mjs";
 import { collecterEtatGit, evaluerGit } from "./lib/git.mjs";
 import { evaluerIban } from "./lib/iban.mjs";
-import { analyserDryRun, analyserLedger, lireLedger, planMigration } from "./lib/ledger.mjs";
+import { analyserDryRun, analyserLedger, lignesTrain, lireLedger, planMigration } from "./lib/ledger.mjs";
 import { verifierSauvegarde } from "./lib/sauvegarde.mjs";
-import { ROOT, trainLocal, verifierTrainLocal } from "./lib/train.mjs";
-import { fixtures } from "./fixtures/generate-fixtures.mjs";
+import { cibleTrain, rangDe, ROOT, trainLocal, verifierTrainLocal } from "./lib/train.mjs";
+import { fixtures, orphelines } from "./fixtures/generate-fixtures.mjs";
 import { documentPlan, DOC_PLAN } from "./migration-plan-v9.mjs";
 
 const FIX = resolve(import.meta.dirname, "fixtures");
@@ -66,30 +68,42 @@ export function controlesHorsLigne({ git = collecterEtatGit(ROOT), local = train
   const vt = node(["scripts/verify-migration-targets.mjs"]);
   c("migrations", vt.code === 0, "VERIFY-MIGRATION-TARGETS", vt.code === 0 ? "verify-migration-targets.mjs : OK" : "verify-migration-targets.mjs en échec");
   const te = synchroniser({ ecrire: false });
-  c("migrations", te.changes.length === 0 && te.attendus.nb === 389, "TRAIN-EXPECTATIONS", te.changes.length ? `attendus dérivés : ${te.changes.join(", ")}` : `attendus : ${te.attendus.nb} / ${te.attendus.derniere} / ${te.attendus.controles} contrôles DB verify`);
+  const cible = cibleTrain(local);
+  c("migrations", te.changes.length === 0 && te.attendus.nb === cible.nb && te.attendus.derniere === cible.derniere, "TRAIN-EXPECTATIONS", te.changes.length ? `attendus dérivés : ${te.changes.join(", ")}` : `attendus générés = train local : ${te.attendus.nb} / ${te.attendus.derniere} (DB verify ${te.attendus.controles} contrôles, SQL post-cutover synchronisé)`);
 
-  // Ledger : fixtures à jour + auto-tests (positif et négatifs)
-  const derives = Object.entries(fixtures(local)).filter(([n, contenu]) => !existsSync(resolve(FIX, n)) || lire(resolve(FIX, n)) !== contenu).map(([n]) => n);
-  c("ledger", derives.length === 0, "FIXTURES", derives.length ? `fixtures dérivées : ${derives.join(", ")}` : "fixtures à jour");
+  // Ledger : fixtures à jour (aucune orpheline) + auto-tests (positifs et négatifs)
+  const attendues = fixtures(local);
+  const derives = Object.entries(attendues).filter(([n, contenu]) => !existsSync(resolve(FIX, n)) || lire(resolve(FIX, n)) !== contenu).map(([n]) => n);
+  const orph = orphelines(attendues, FIX);
+  c("ledger", derives.length === 0 && orph.length === 0, "FIXTURES", derives.length || orph.length ? `fixtures dérivées ou orphelines : ${[...derives, ...orph].join(", ")} (relancer generate-fixtures.mjs)` : `${Object.keys(attendues).length} fixtures à jour, générées depuis le train local`);
   const an = (f, o = {}) => analyserLedger(lireLedger(lire(resolve(FIX, f))), local, o);
-  const ok372 = an("ledger-372-ok.json", { exigerPreuve813: true });
-  c("ledger", ok372.verdict === VERDICT.LEDGER_PREFIXE_OK && ok372.enAttente.length === NB_A_APPLIQUER, "LEDGER-372", `${ok372.verdict} ; PENDING_MIGRATIONS=${ok372.enAttente.length}`);
-  const negatifs = ["ledger-372-813-non-originale.json", "ledger-373-etrangere.json", "ledger-372-ordre-incorrect.json", "ledger-371-manquante.json", "ledger-372-ref-production.json"];
+  for (const [code, f, version] of [["LEDGER-SOCLE-V8", "ledger-socle-v8-ok.json", VERSION_SOCLE], ["LEDGER-V9-1", "ledger-v9-1-ok.json", VERSION_V9_1]]) {
+    const a = an(f, { exigerPreuve813: true });
+    const attendu = cible.nb - rangDe(local, version);
+    c("ledger", a.conforme && a.verdict === VERDICT.LEDGER_PREFIXE_OK && a.enAttente.length === attendu && attendu >= 1, code, `${a.verdict} ; ${lignesTrain(a).join(" ; ")}`);
+  }
+  const negatifs = ["ledger-813-non-originale.json", "ledger-etrangere.json", "ledger-ordre-incorrect.json", "ledger-version-manquante.json", "ledger-ref-production.json", "ledger-sans-300-production.json"];
   const fuites = negatifs.filter((f) => an(f).verdict !== VERDICT.LEDGER_DIVERGENCE);
-  c("ledger", fuites.length === 0, "LEDGER-NEGATIFS", fuites.length ? `divergence NON détectée : ${fuites.join(", ")}` : `${negatifs.length} ledgers divergents tous refusés`);
-  c("ledger", an("ledger-389-v9.json", { attente: "post", exigerPreuve813: true }).verdict === VERDICT.LEDGER_V9_COMPLET, "LEDGER-389", "ledger 389 reconnu comme V9 complet (refusé en --expect pre)");
+  c("ledger", fuites.length === 0, "LEDGER-NEGATIFS", fuites.length ? `divergence NON détectée : ${fuites.join(", ")}` : `${negatifs.length} ledgers divergents tous refusés (813 non originale, étrangère, ordre, trou, Production, sans 300)`);
+  const p0 = an("ledger-sans-300-production.json");
+  c("ledger", p0.divergences.some((d) => d.code === "LEDGER-PHASE0-PRODUCTION"), "LEDGER-PHASE0", "ledger sans 20260921000300 : phase 0 refusée (historique de type Production, hors pack Preview)");
+  const complet = an("ledger-complet.json", { attente: "post", exigerPreuve813: true });
+  c("ledger", complet.verdict === VERDICT.LEDGER_V9_COMPLET && complet.conforme && !an("ledger-complet.json").conforme, "LEDGER-COMPLET", `ledger = train complet reconnu (${complet.courant.nb}/${cible.nb}, PENDING_MIGRATIONS=0) ; refusé en --expect pre`);
 
-  // Plan
+  // Plan (depuis le socle V8 et depuis V9.1)
   let plan = null;
-  try { plan = planMigration(lireLedger(lire(resolve(FIX, "ledger-372-ok.json"))), local, { exigerPreuve813: true }); } catch { /* signalé ci-dessous */ }
-  c("plan", Boolean(plan), "PLAN", plan ? `${plan.aAppliquer.length} migrations, ${plan.aAppliquer[0].version} → ${plan.aAppliquer.at(-1).version} ; ${plan.preuves.length} preuves vertes` : "plan impossible depuis le socle 372");
+  try { plan = planMigration(lireLedger(lire(resolve(FIX, "ledger-socle-v8-ok.json"))), local, { exigerPreuve813: true }); } catch { /* signalé ci-dessous */ }
+  c("plan", Boolean(plan), "PLAN", plan ? `depuis le socle V8 : ${lignesTrain(plan).join(" ; ")} ; ${plan.preuves.length} preuves vertes${plan.phase0.length ? ` ; phase 0 no-op (${plan.phase0.join(", ")})` : ""}` : "plan impossible depuis le socle V8");
+  let planV91 = null;
+  try { planV91 = planMigration(lireLedger(lire(resolve(FIX, "ledger-v9-1-ok.json"))), local, { exigerPreuve813: true }); } catch { /* ci-dessous */ }
+  c("plan", Boolean(planV91), "PLAN-V9-1", planV91 ? `depuis V9.1 : ${lignesTrain(planV91).join(" ; ")}` : "plan impossible depuis V9.1");
   if (plan) {
-    const dry = ["dry-run-17.txt", "dry-run-16.txt", "dry-run-18.txt", "dry-run-include-all.txt"].map((f) => [f, analyserDryRun(lire(resolve(FIX, f)), plan).ok]);
-    c("plan", dry[0][1] && dry.slice(1).every(([, ok]) => !ok), "PLAN-DRY-RUN", "dry-run : 17 accepté ; 16, 18 et --include-all refusés");
+    const dry = ["dry-run-exact.txt", "dry-run-une-de-moins.txt", "dry-run-une-de-plus.txt", "dry-run-include-all.txt"].map((f) => [f, analyserDryRun(lire(resolve(FIX, f)), plan).ok]);
+    c("plan", dry[0][1] && dry.slice(1).every(([, ok]) => !ok), "PLAN-DRY-RUN", `dry-run : exactement les ${plan.aAppliquer.length} PENDING accepté ; une de moins, une de plus et --include-all refusés`);
   }
   let doc = null;
   try { doc = documentPlan(local); } catch { /* ci-dessous */ }
-  c("plan", existsSync(DOC_PLAN) && doc === lire(DOC_PLAN), "PLAN-DOC", "docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md à jour");
+  c("plan", existsSync(DOC_PLAN) && doc === lire(DOC_PLAN), "PLAN-DOC", "docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md à jour (socle V8 et V9.1)");
 
   // Environnement et secrets (dépôt)
   const em = node(["scripts/check-env-manifest.mjs"]);
@@ -117,11 +131,14 @@ export function controlesHorsLigne({ git = collecterEtatGit(ROOT), local = train
   c("rollback", manquants.length === 0, "DOCS", manquants.length ? `documents manquants : ${manquants.join(", ")}` : `${Object.keys(DOCS_PACK).length} documents du pack présents`);
   if (existsSync(resolve(ROOT, DOCS_PACK.rollback))) {
     const rb = lire(resolve(ROOT, DOCS_PACK.rollback));
-    const classes = classementV9();
-    const absentes = classes.filter((m) => !new RegExp(`${m.version}\`?\\s*\\|[^\\n]*\\b${m.classe}\\b`).test(rb)).map((m) => m.version);
-    c("rollback", ["Cas A", "Cas B", "Cas C"].every((s) => rb.includes(s)), "ROLLBACK-CAS", "runbook de rollback : cas A, B et C");
-    c("rollback", absentes.length === 0, "ROLLBACK-CLASSEMENT", absentes.length ? `classement du runbook ≠ SQL pour : ${absentes.join(", ")}` : `les 17 migrations classées dans le runbook = classement depuis le SQL (${classes.filter((m) => m.classe === "RESTORE_REQUIRED").length} RESTORE_REQUIRED)`);
+    c("rollback", ["Cas A", "Cas B", "Cas C"].every((x) => rb.includes(x)), "ROLLBACK-CAS", "runbook de rollback : cas A, B et C");
+    c("rollback", rb.includes("V9_MIGRATION_PLAN.generated.md"), "ROLLBACK-RENVOI", "runbook de rollback : renvoie au plan généré (classement par migration)");
   }
+  // Classement : chaque migration en attente depuis le socle V8 a sa classe dans le plan généré.
+  const docPlan = existsSync(DOC_PLAN) ? lire(DOC_PLAN) : "";
+  const classes = classementV9({ local });
+  const absentes = classes.filter((m) => !new RegExp(`\\| \`${m.version}\` \\|[^\\n]*\\| ${m.classe} \\|`).test(docPlan)).map((m) => m.version);
+  c("rollback", classes.length > 0 && absentes.length === 0, "ROLLBACK-CLASSEMENT", absentes.length ? `classement absent du plan généré ou ≠ SQL pour : ${absentes.join(", ")}` : `les ${classes.length} migrations en attente depuis le socle V8 classées dans le plan généré (${classes.filter((m) => m.classe === "RESTORE_REQUIRED").length} RESTORE_REQUIRED)`);
   return res;
 }
 
@@ -132,7 +149,7 @@ export function controlesEntrees({ ledger, envInventory, backupManifest, bankKey
   if (ledger) {
     try {
       const a = analyserLedger(lireLedger(lire(ledger)), local, { exigerPreuve813: true });
-      c("entrées", a.conforme, "INPUT-LEDGER", `${a.verdict}${a.conforme ? ` ; PENDING_MIGRATIONS=${a.enAttente.length}` : ` : ${a.divergences.map((d) => d.code).join(", ")}`}`);
+      c("entrées", a.conforme, "INPUT-LEDGER", `${a.verdict} ; ${lignesTrain(a).join(" ; ")}${a.conforme ? "" : ` : ${a.divergences.map((d) => d.code).join(", ") || "rien à appliquer"}`}`);
     } catch { c("entrées", false, "INPUT-LEDGER", "ledger illisible"); }
   }
   let inv = null;

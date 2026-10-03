@@ -378,5 +378,15 @@
 {"version":"20261002001101","name":"finance_exports_agregats_exactitude_v1"},
 {"version":"20261002001102","name":"pointage_planning_lecture_complete_v1"},
 {"version":"20261002001103","name":"fiche_chantier_lecture_complete_v1"},
-{"version":"20261002001104","name":"journal_ia_consommation_exacte_v1"}
+{"version":"20261002001104","name":"journal_ia_consommation_exacte_v1"},
+{"version":"20261002001105","name":"pointages_gestion_totaux_mois_v1"},
+{"version":"20261002001106","name":"modifier_facture_brouillon_sans_recalc_direct_v1"},
+{"version":"20261002001107","name":"rentabilite_agregats_chantiers_v1"},
+{"version":"20261002001108","name":"gp_fiches_agregats_v1"},
+{"version":"20261002001109","name":"gp_pilotage_agregats_v1"},
+{"version":"20261002001110","name":"plateforme_agregats_par_tenant_v1"},
+{"version":"20261002001111","name":"gp_options_selecteurs_v1"},
+{"version":"20261002001112","name":"banking_encryption_key_rotation_v1"},
+{"version":"20261002001113","name":"rate_limit_consultation_connexion_v1"},
+{"version":"20261002001301","name":"post_v9_service_role_fonctions_manquantes_v1"}
 ]}

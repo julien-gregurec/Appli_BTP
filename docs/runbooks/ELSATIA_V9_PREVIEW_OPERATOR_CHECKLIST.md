@@ -1,14 +1,15 @@
-# ELSATIA V9 — Checklist opérateur : Preview 372 → 389
+# ELSATIA V9 — Checklist opérateur : cutover Preview générique (train V9.2+)
 
-Cible : **`pgvvpqyjziyapbbkydmc`** · Code : **`6392131`** · Retour code : **`de50245a`** · Production `exhvuzegsefmoguxoiak` : **interdite**.
+Cible : **`pgvvpqyjziyapbbkydmc`** · Code : **HEAD du train** (`sha_deploye`) · Retour code : **déploiement servi avant** (consigné) · Production `exhvuzegsefmoguxoiak` : **interdite**.
+Nombres **calculés**, jamais codés : `CURRENT_LEDGER` (ledger exporté), `TARGET_LEDGER` (train local), `PENDING_MIGRATIONS` (train − ledger).
 Dossier de travail **hors dépôt** : `R=../elsatia-v9-run` · Sauvegarde : `B=../elsatia-v9-backup-<date>`.
 
 ## STOP IMMÉDIAT SI…
 
 - une commande affiche `exhvuzegsefmoguxoiak`, `TARGET_REJECTED` ou `environment=production` ;
-- `PREVIEW_LEDGER_DIVERGENCE` (ledger ≠ socle 372) ;
+- `PREVIEW_LEDGER_DIVERGENCE` (ledger ≠ préfixe exact du train, plancher 813 absent, ou `LEDGER-PHASE0-PRODUCTION` : pas de `20260921000300`) ;
 - `LEDGER-813-NON-ORIGINALE` ou `LEDGER-813-NON-PROUVEE` (813 différente) ;
-- `PENDING_MIGRATIONS` ≠ 17, ou `DRY_RUN_REJECTED` (16, 18, `--include-all`, `migration repair`) ;
+- `PENDING_MIGRATIONS` ≠ `TARGET_LEDGER` − `CURRENT_LEDGER` (ou ≠ attendu avec `--attendu-courant`), ou `DRY_RUN_REJECTED` (une de moins, une de plus, `--include-all`, `migration repair`) ;
 - `BACKUP_MISSING` ;
 - DB verify `NO-GO` (une ligne ✖ bloquante) ou `V9_CHECKS_NO_GO` ;
 - `IBAN_K1_MISSING` / `BLOCKER_IBAN_KEY` (k1 requise mais absente) ;
@@ -20,8 +21,8 @@ Dossier de travail **hors dépôt** : `R=../elsatia-v9-run` · Sauvegarde : `B=.
 
 **ÉTAPE 0 — poste**
 ```bash
-git fetch origin claude/zen-clarke-qchnnt integration/elsatia-canonical-train-v9-final
-git switch claude/zen-clarke-qchnnt && git pull --ff-only && npm ci
+git fetch origin integration/elsatia-canonical-train-v9.2
+git switch integration/elsatia-canonical-train-v9.2 && git pull --ff-only && npm ci
 npm run preview:v9:preflight
 ```
 RÉSULTAT ATTENDU : `PREVIEW_V9_OPERATOR_PACK_READY`
@@ -62,15 +63,15 @@ RÉSULTAT ATTENDU : `ENV_SCOPE_OK` ou `ENV_SCOPE_PARTIAL` (avertissements lus) �
 ```bash
 scripts/preview/v9/v9-cutover.sh --out "$R/dry" --backup-manifest "$B/manifest.json"
 ```
-RÉSULTAT ATTENDU : `PREVIEW_LEDGER_PREFIX_OK` · `PENDING_MIGRATIONS=17` · `BACKUP_DECLARED_OK` · `DRY_RUN_MATCHES_PLAN` · `DRY-RUN TERMINÉ` · `CODE_DEPLOY_ALLOWED=false`
+RÉSULTAT ATTENDU : `PREVIEW_LEDGER_PREFIX_OK` · `CURRENT_LEDGER=…` / `TARGET_LEDGER=…` / `PENDING_MIGRATIONS=…` (consignés, clé `train` du rapport ; phase 0 signalée « no-op en Preview ») · `BACKUP_DECLARED_OK` · `DRY_RUN_MATCHES_PLAN` · `DRY-RUN TERMINÉ` · `CODE_DEPLOY_ALLOWED=false`
 
-**ÉTAPE 6 — application (17 migrations)**
+**ÉTAPE 6 — application (les `PENDING_MIGRATIONS` du plan)**
 ```bash
 scripts/preview/v9/v9-cutover.sh --out "$R/apply" --backup-manifest "$B/manifest.json" \
   --apply-preview --confirm-ref pgvvpqyjziyapbbkydmc
 ```
-RÉSULTAT ATTENDU : `PREVIEW_LEDGER_V9_COMPLETE` (389, …1113) · `GO : base Preview conforme.` · `V9_CHECKS_GO` · `CODE_DEPLOY_ALLOWED=true`
-SI échec à l'étape 11 : cas A du rollback (pas de code V9, pas de restauration).
+RÉSULTAT ATTENDU : `PREVIEW_LEDGER_V9_COMPLETE` (`CURRENT_LEDGER` = `TARGET_LEDGER`, `PENDING_MIGRATIONS=0`) · `GO : base Preview conforme.` · `V9_CHECKS_GO` · `CODE_DEPLOY_ALLOWED=true`
+SI échec à l'étape 11 : cas A du rollback (pas de nouveau code, pas de restauration ; reprise `--resume-partial`).
 SI `DB-PREFLIGHT administrateur_total_actif_absent` / `cle_attestation_active_absente` : STEP 7 du runbook V3, puis `v9-cutover.sh --out "$R/verify" --verify-only`.
 
 **ÉTAPE 7 — k1 au registre (après 1112)**
@@ -83,10 +84,10 @@ RÉSULTAT ATTENDU : `IBAN_K1_READY`, attestation `ATTESTEE` (sinon `npm run bank
 **ÉTAPE 8 — porte code, puis déploiement** (`ELSATIA_V9_GP_PREVIEW_DEPLOY.md` §3)
 ```bash
 npm run preview:v9:code-gate -- --report "$R/apply/cutover-report.json" --ledger "$R/apply/ledger-apres.json"
-git worktree add ../elsatia-v9-deploy 6392131aa02cecc9991358915963068de8292d24
+git worktree add ../elsatia-v9-deploy <sha_deploye du rapport>
 cd ../elsatia-v9-deploy && vercel link --project elsatia-preview && vercel deploy     # JAMAIS --prod
 ```
-RÉSULTAT ATTENDU : `CODE_DEPLOY_ALLOWED=true` puis URL Preview ; log de build `GO : aucune erreur.` ; `vercel inspect <url>` → commit `6392131`
+RÉSULTAT ATTENDU : `CODE_DEPLOY_ALLOWED=true` puis URL Preview ; log de build `GO : aucune erreur.` ; `vercel inspect <url>` → commit = `sha_deploye`
 
 **ÉTAPE 9 — recette post-cutover**
 ```bash
@@ -99,6 +100,6 @@ RÉSULTAT ATTENDU : `GO` · `POST_CUTOVER_AUTO_GO` · puis parcours guidé coch�
 
 **RETOUR CODE (si besoin)**
 ```bash
-vercel alias set <URL du déploiement V8 notée avant l'étape 8> <alias Preview GP>
+vercel alias set <URL du déploiement servi, notée avant l'étape 8> <alias Preview GP>
 ```
-RÉSULTAT ATTENDU : V8 servi ; base 389 inchangée (compatible) ; `npm run preview:http-smoke -- --gp <alias>` → `GO`
+RÉSULTAT ATTENDU : ancien code servi ; base inchangée (compatible) ; `npm run preview:http-smoke -- --gp <alias>` → `GO`

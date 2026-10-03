@@ -1,4 +1,4 @@
 Found local migration files to be inserted before the last migration on remote database.
 
 Rerun the command with --include-all flag to apply these migrations:
- • 20260718000104_roles_predefinis.sql
+ • 20260731000193_rate_limiting_applicatif.sql

@@ -1,17 +1,27 @@
 -- ELSATIA — Pack opérateur V9 : contrôles post-cutover propres à la V9 (LECTURE SEULE).
 --
--- Complète docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql (38 contrôles du train) par ce que
--- le cutover 372 → 389 doit prouver en plus : ledger, 813 ORIGINALE en base, Legal 901,
--- Security 1001, Stripe 1002 / 1003, registre IBAN 1112, limiteur 1113, droits des fonctions V9.
+-- Complète docs/runbooks/sql/ELSATIA_PREVIEW_DB_VERIFY_V1.sql (contrôles du train) par ce que
+-- le cutover Preview doit prouver en plus : ledger = train complet (attendu GÉNÉRÉ, bloc
+-- [train-expectations] ci-dessous), 813 ORIGINALE en base, Legal 901, Security 1001, Stripe
+-- 1002 / 1003, registre IBAN 1112, limiteur 1113, droits des fonctions V9 et V9.2.
 -- Sortie : une ligne `n|contrôle|attendu|observé|ok|bloquant` par contrôle (format DB verify),
--- lue par scripts/preview/v9/post-cutover-check.mjs. N'écrit rien.
+-- lue par scripts/preview/v9/post-cutover-check.mjs (nombre de contrôles compté dans ce fichier).
+-- N'écrit rien.
+--
+-- Attendu du ledger (nombre, dernière version) : calculé depuis supabase/migrations par
+-- `npm run sync:train-expectations` et vérifié en CI (`npm run verify:train-expectations`) ;
+-- aucun nombre de migrations n'est maintenu à la main.
 --
 -- Usage :
 --   PGOPTIONS='-c default_transaction_read_only=on' psql "$ELSATIA_PREVIEW_DB_URL" -X -At -F '|' \
 --     -v ON_ERROR_STOP=1 -f docs/runbooks/sql/ELSATIA_V9_POST_CUTOVER_CHECKS.sql
 
 with
--- Fonctions définies par les 17 migrations V9 (liste vérifiée contre le SQL par le test du pack).
+-- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
+attendu_train(nb, derniere) as (values (408, '20261003001504')),
+-- [/train-expectations]
+-- Fonctions des migrations V9 (liste vérifiée contre le train par le test du pack : chacune est
+-- définie par une migration de supabase/migrations).
 fonctions_v9(nom) as (select unnest(array[
     'platform._document_legal_en_vigueur', 'platform._document_legal_seuil_validite',
     'platform._documents_legaux_immuables', 'platform._est_membre_statut_actif',
@@ -46,7 +56,10 @@ fonctions_v9(nom) as (select unnest(array[
     'public.pointages_gestion_compteurs_mois', 'public.pointages_gestion_totaux_mois',
     'public.rentabilite_chantier', 'public.rentabilite_chantiers_calcul',
     'public.rentabilite_chantiers_page', 'public.rentabilite_chantiers_totaux',
-    'public.synchroniser_abonnement_stripe_service', 'public.tresorerie_donnees'
+    'public.synchroniser_abonnement_stripe_service', 'public.tresorerie_donnees',
+    -- Train V9.2 (fonctions clés, droits vérifiés par les contrôles 12 à 14).
+    'public.plateforme_definir_url_preview_application', 'public.pointages_couts_appliques',
+    'public.push_reserver_lot_service'
   ])),
 f813 as (
   select p.* from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = 'plateforme_annuaire_entreprises'
@@ -69,10 +82,25 @@ ledger_max(v) as (
   select case when to_regclass('supabase_migrations.schema_migrations') is null then null
     else (xpath('/row/v/text()', query_to_xml('select max(version) as v from supabase_migrations.schema_migrations', false, true, '')))[1]::text end
 ),
+-- Droits EXECUTE des fonctions clés du train V9.2 (toutes surcharges confondues).
+droits_v92(nom, anon, auth, svc, observe) as (
+  select p.proname::text,
+    bool_or(has_function_privilege('anon', p.oid, 'execute')),
+    bool_or(has_function_privilege('authenticated', p.oid, 'execute')),
+    bool_or(has_function_privilege('service_role', p.oid, 'execute')),
+    'anon=' || bool_or(has_function_privilege('anon', p.oid, 'execute'))::text
+      || ' authenticated=' || bool_or(has_function_privilege('authenticated', p.oid, 'execute'))::text
+      || ' service_role=' || bool_or(has_function_privilege('service_role', p.oid, 'execute'))::text
+  from pg_proc p
+  where p.pronamespace = 'public'::regnamespace
+    and p.proname in ('push_reserver_lot_service', 'pointages_couts_appliques', 'plateforme_definir_url_preview_application')
+  group by p.proname
+),
 controles(n, controle, attendu, observe, ok, bloquant) as (
-  select 1, 'V9 ledger : 389 migrations, dernière 20261002001113', '389 / 20261002001113',
+  select 1, 'Ledger = train complet (TARGET_LEDGER généré : nombre / dernière version)',
+    (select nb::text || ' / ' || derniere from attendu_train),
     (select n::text from compte where nom = 'ledger_nb') || ' / ' || coalesce((select v from ledger_max), '—'),
-    (select n from compte where nom = 'ledger_nb') = 389 and (select v from ledger_max) = '20261002001113', true
+    (select n from compte where nom = 'ledger_nb') = (select nb from attendu_train) and (select v from ledger_max) = (select derniere from attendu_train), true
   union all
   select 2, '813 ORIGINALE déployée (plateforme_annuaire_entreprises)', 'marqueur original présent, « HOTFIX 813 » absent',
     coalesce((select bool_or(prosrc like '%abonnement_statut_effectif%')::text || ' / ' || bool_or(prosrc like '%HOTFIX 813%')::text from f813), 'fonction absente'),
@@ -132,5 +160,17 @@ controles(n, controle, attendu, observe, ok, bloquant) as (
   select 11, 'RLS : aucune table public sans RLS', '0',
     (select count(*) from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity)::text,
     (select count(*) from pg_class c join pg_namespace s on s.oid = c.relnamespace where s.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity) = 0, true
+  union all
+  select 12, 'V9.2 file push 1501 : push_reserver_lot_service réservé à service_role', 'anon=false authenticated=false service_role=true',
+    coalesce((select observe from droits_v92 where nom = 'push_reserver_lot_service'), 'fonction absente'),
+    coalesce((select not anon and not auth and svc from droits_v92 where nom = 'push_reserver_lot_service'), false), true
+  union all
+  select 13, 'V9.2 coût horaire 1407 : pointages_couts_appliques réservé à authenticated', 'anon=false authenticated=true service_role=false',
+    coalesce((select observe from droits_v92 where nom = 'pointages_couts_appliques'), 'fonction absente'),
+    coalesce((select not anon and auth and not svc from droits_v92 where nom = 'pointages_couts_appliques'), false), true
+  union all
+  select 14, 'V9.2 URL Preview 102 : plateforme_definir_url_preview_application réservée à authenticated', 'anon=false authenticated=true service_role=false',
+    coalesce((select observe from droits_v92 where nom = 'plateforme_definir_url_preview_application'), 'fonction absente'),
+    coalesce((select not anon and auth and not svc from droits_v92 where nom = 'plateforme_definir_url_preview_application'), false), true
 )
 select n, controle, attendu, observe, ok, bloquant from controles order by n;

@@ -1,48 +1,62 @@
 #!/usr/bin/env node
 /**
- * ELSATIA — Pack opérateur V9 : plan de migration lisible (Phase D) et contrôle du dry-run.
+ * ELSATIA — Pack opérateur V9 : plan de migration lisible (Phase D) et contrôle du dry-run, GÉNÉRIQUE.
  *
  * Usage :
- *   node scripts/preview/v9/migration-plan-v9.mjs <ledger> [--json] [--require-813-proof]
- *        → Preview actuelle → les 17 migrations dans l'ordre exact → état final 389 / …1113,
- *          avec les preuves (aucune ≤ 813, pas de --include-all, historique intact).
+ *   node scripts/preview/v9/migration-plan-v9.mjs <ledger> [--json] [--require-813-proof] [--attendu-courant <n>]
+ *        → CURRENT_LEDGER → PENDING_MIGRATIONS dans l'ordre exact → TARGET_LEDGER (calculés depuis le
+ *          ledger fourni et le train local), avec les preuves (toutes postérieures au ledger, pas de
+ *          --include-all, historique intact, plancher 813, phase 0 no-op).
  *   node scripts/preview/v9/migration-plan-v9.mjs <ledger> --dry-run <sortie de db push --dry-run>
- *        → vérifie que le dry-run annonce EXACTEMENT ces 17 migrations, dans cet ordre, sans
+ *        → vérifie que le dry-run annonce EXACTEMENT les PENDING_MIGRATIONS, dans cet ordre, sans
  *          suggestion --include-all ni `migration repair`.
  *   node scripts/preview/v9/migration-plan-v9.mjs --write-doc
- *        → régénère docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md depuis la
- *          fixture du socle 372 (--check : 1 si le document dérive).
- *   --resume : plan de REPRISE depuis un préfixe V9 partiel (373 → 388) laissé par un push interrompu.
- * Échoue (1) si le ledger n'est pas exactement le socle 372 (préfixe exact). Usage : 2.
+ *        → régénère docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md : plan depuis le
+ *          socle V8 ET depuis V9.1, avec classe de réversibilité, note et marqueur phase 0
+ *          (--check : 1 si le document dérive).
+ *   --resume : reprise d'un push interrompu (même contrôle que le plan normal, gardé pour compatibilité).
+ * Échoue (1) si le ledger n'est pas un préfixe exact du train avec au moins une migration en attente. Usage : 2.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { estPointEntree, lireOptions } from "../lib/preview-guard.mjs";
-import { classerTrain } from "./lib/classement.mjs";
+import { classerMigrations } from "./classify-migrations-v9.mjs";
+import { VERSION_SOCLE, VERSION_V9_1 } from "./lib/constantes.mjs";
 import { analyserDryRun, ErreurLedger, lireLedger, planMarkdown, planMigration } from "./lib/ledger.mjs";
 import { ROOT, trainLocal } from "./lib/train.mjs";
 
 export const DOC_PLAN = resolve(ROOT, "docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md");
-const FIXTURE_SOCLE = resolve(import.meta.dirname, "fixtures/ledger-372-ok.json");
+const FIX = resolve(import.meta.dirname, "fixtures");
+export const DEPARTS_DOC = Object.freeze([
+  { titre: `Depuis le socle V8 (plancher Preview ${VERSION_SOCLE}, 813 ORIGINALE)`, fixture: "ledger-socle-v8-ok.json" },
+  { titre: `Depuis la base publiée V9.1 (dernière ${VERSION_V9_1})`, fixture: "ledger-v9-1-ok.json" },
+]);
 
 export function documentPlan(local = trainLocal()) {
-  const plan = planMigration(lireLedger(readFileSync(FIXTURE_SOCLE, "utf8")), local, { exigerPreuve813: true });
-  const classes = new Map(classerTrain(plan.aAppliquer.map((m) => ({ version: m.version, name: m.name, sql: readFileSync(resolve(ROOT, "supabase/migrations", m.fichier), "utf8") }))).map((c) => [c.version, c]));
+  const sections = [];
+  for (const { titre, fixture } of DEPARTS_DOC) {
+    const plan = planMigration(lireLedger(readFileSync(resolve(FIX, fixture), "utf8")), local, { exigerPreuve813: true });
+    const classes = new Map(classerMigrations(plan.aAppliquer).map((c) => [c.version, c]));
+    const k = {};
+    for (const c of classes.values()) k[c.classe] = (k[c.classe] ?? 0) + 1;
+    sections.push(
+      `## ${titre}`,
+      "",
+      `Fixture : \`scripts/preview/v9/fixtures/${fixture}\`. Réversibilité déterminée depuis le SQL (\`classify-migrations-v9.mjs\`) : ${Object.entries(k).map(([a, b]) => `${a}=${b}`).join(", ")}.`,
+      "",
+      planMarkdown(plan, classes),
+      "",
+    );
+  }
   return [
-    "# ELSATIA V9 — Plan de migration Preview 372 → 389 (généré)",
+    "# ELSATIA V9 — Plan de migration Preview (généré)",
     "",
-    "> Généré par `node scripts/preview/v9/migration-plan-v9.mjs --write-doc` depuis le train local et la",
-    "> fixture du socle Preview (`scripts/preview/v9/fixtures/ledger-372-ok.json`). Ne pas éditer à la main.",
+    "> Généré par `node scripts/preview/v9/migration-plan-v9.mjs --write-doc` depuis le train local et les",
+    "> fixtures de ledger (`scripts/preview/v9/fixtures/`). Ne pas éditer à la main. Aucun nombre n'est",
+    "> maintenu à la main : CURRENT_LEDGER, TARGET_LEDGER et PENDING_MIGRATIONS sont calculés.",
     "> Le plan RÉEL est recalculé par `v9-cutover.sh` depuis le ledger exporté de la Preview.",
     "",
-    planMarkdown(plan),
-    "",
-    "## Réversibilité (déterminée depuis le SQL, `classify-migrations-v9.mjs`)",
-    "",
-    "| Rang | Version | Classe | Note |",
-    "|---|---|---|---|",
-    ...plan.aAppliquer.map((m) => `| ${m.rang} | \`${m.version}\` | ${classes.get(m.version).classe} | ${classes.get(m.version).note} |`),
-    "",
+    ...sections,
   ].join("\n");
 }
 
@@ -57,11 +71,15 @@ export function executer(argv, { local = trainLocal(), log = console.log } = {})
     log(actuel === doc ? "déjà à jour" : `écrit : ${DOC_PLAN}`);
     return 0;
   }
-  const fichier = argv.find((a, i) => !a.startsWith("--") && argv[i - 1] !== "--dry-run");
-  if (!fichier) { log("usage : migration-plan-v9.mjs <ledger> [--json] [--dry-run <fichier>] [--require-813-proof]"); return 2; }
+  const fichier = argv.find((a, i) => !a.startsWith("--") && !["--dry-run", "--attendu-courant"].includes(argv[i - 1]));
+  if (!fichier) { log("usage : migration-plan-v9.mjs <ledger> [--json] [--dry-run <fichier>] [--require-813-proof] [--attendu-courant <n>]"); return 2; }
   let plan;
   try {
-    plan = planMigration(lireLedger(readFileSync(fichier, "utf8")), local, { exigerPreuve813: Boolean(o["require-813-proof"]), reprise: Boolean(o.resume) });
+    plan = planMigration(lireLedger(readFileSync(fichier, "utf8")), local, {
+      exigerPreuve813: Boolean(o["require-813-proof"]),
+      reprise: Boolean(o.resume),
+      attenduCourant: typeof o["attendu-courant"] === "string" ? o["attendu-courant"] : null,
+    });
   } catch (e) {
     if (!(e instanceof ErreurLedger) && e.code !== "ENOENT") throw e;
     log(`PLAN_REFUSED\n  ✖ ${e instanceof ErreurLedger ? e.message : "ledger introuvable"}`);
@@ -71,7 +89,7 @@ export function executer(argv, { local = trainLocal(), log = console.log } = {})
     let texte;
     try { texte = readFileSync(o["dry-run"], "utf8"); } catch { log("DRY_RUN_REJECTED\n  ✖ sortie du dry-run introuvable"); return 1; }
     const d = analyserDryRun(texte, plan);
-    log(d.ok ? `DRY_RUN_MATCHES_PLAN\n  ${d.annoncees.length} migration(s) annoncée(s), identiques au plan, dans l'ordre` : "DRY_RUN_REJECTED");
+    log(d.ok ? `DRY_RUN_MATCHES_PLAN\n  ${d.annoncees.length} migration(s) annoncée(s) = PENDING_MIGRATIONS=${plan.aAppliquer.length}, dans l'ordre` : `DRY_RUN_REJECTED (PENDING_MIGRATIONS=${plan.aAppliquer.length})`);
     for (const m of d.motifs) log(`  ✖ ${m}`);
     return d.ok ? 0 : 1;
   }

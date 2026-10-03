@@ -1,4 +1,14 @@
-// ELSATIA — Pack opérateur V9 : ledger distant vs train local (Phases C et D).
+// ELSATIA — Pack opérateur V9 : ledger distant vs train local (Phases C et D), GÉNÉRIQUE.
+//
+// Aucun compteur codé : CURRENT_LEDGER vient du ledger fourni, TARGET_LEDGER du train local,
+// PENDING_MIGRATIONS = train − ledger (dans l'ordre). Règles fail-closed :
+//   - ledger = préfixe EXACT du train (ordre strict, pas de trou, pas de version étrangère,
+//     noms identiques, sha256 identiques si fournis) ;
+//   - plancher historique : le ledger contient 813 ORIGINALE (invariant Preview) ;
+//   - toutes les PENDING sont postérieures à la dernière version du ledger → `db push` sans
+//     --include-all ;
+//   - ponts phase 0 (marqueur `-- elsatia:upgrade-phase0`) : no-op si 300 est au ledger, sinon
+//     refus (historique de type Production, hors périmètre du pack Preview).
 //
 // Le ledger distant est TOUJOURS un fichier fourni (export local) : ce module ne se connecte à
 // rien. Formats acceptés (détection automatique) :
@@ -13,9 +23,10 @@
 // ledger et dans pg_proc par l'export SQL.
 
 import {
-  DERNIERE_FINALE, NB_A_APPLIQUER, NB_FINAL, NB_SOCLE, NOM_SOCLE, REF_PREVIEW_AUTORISEE, REF_PRODUCTION_CONNUE,
-  SHA256_813_NON_ORIGINAL, COMMIT_813_NON_ORIGINAL, VERDICT, VERSION_SOCLE,
+  NOM_SOCLE, OUTIL_PHASE0_PRODUCTION, REF_PREVIEW_AUTORISEE, REF_PRODUCTION_CONNUE,
+  SHA256_813_NON_ORIGINAL, COMMIT_813_NON_ORIGINAL, VERDICT, VERSION_PREREQUIS_PHASE0, VERSION_SOCLE,
 } from "./constantes.mjs";
+import { cibleTrain } from "./train.mjs";
 
 const VERSION = /^\d{14}$/;
 
@@ -70,19 +81,25 @@ export function lireLedger(texte) {
   return { format: "psql", projectRef: null, fonction813: null, entries };
 }
 
+
 /**
  * Compare le ledger distant au train local.
  * @param {ReturnType<typeof lireLedger>} ledger
- * @param {{version: string, name: string, sha256: string}[]} local
- * @param {{ attente?: "pre"|"post", exigerPreuve813?: boolean }} opts
+ * @param {{version: string, name: string, sha256: string, phase0?: boolean}[]} local
+ * @param {{ attente?: "pre"|"post"|"reprise", exigerPreuve813?: boolean, attenduCourant?: number|string|null }} opts
+ *   pre      : préfixe exact avec PENDING_MIGRATIONS ≥ 1 ;
+ *   reprise  : push interrompu — en générique, le MÊME contrôle que pre (option gardée) ;
+ *   post     : ledger = train complet (PENDING_MIGRATIONS = 0) ;
+ *   attenduCourant : exige en plus CURRENT_LEDGER = cette valeur.
  */
-export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813 = false } = {}) {
+export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813 = false, attenduCourant = null } = {}) {
   const divergences = [];
   const avertissements = [];
   const d = (code, detail) => divergences.push({ code, detail });
   const distant = ledger.entries;
   const versionsLocales = local.map((m) => m.version);
   const parVersion = new Map(local.map((m) => [m.version, m]));
+  const cible = cibleTrain(local);
 
   if (ledger.projectRef !== null && ledger.projectRef !== undefined) {
     if (ledger.projectRef === REF_PRODUCTION_CONNUE) d("LEDGER-REF-PRODUCTION", `ledger exporté depuis la PRODUCTION (${REF_PRODUCTION_CONNUE}) : refus`);
@@ -105,7 +122,7 @@ export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813
 
   // Versions étrangères (absentes du dépôt).
   const etrangeres = distant.filter((e) => VERSION.test(e.version) && !parVersion.has(e.version)).map((e) => e.version);
-  if (etrangeres.length) d("LEDGER-ETRANGERE", `${etrangeres.length} version(s) absente(s) du train V9 : ${etrangeres.slice(0, 8).join(", ")}${etrangeres.length > 8 ? "…" : ""}`);
+  if (etrangeres.length) d("LEDGER-ETRANGERE", `${etrangeres.length} version(s) absente(s) du train local : ${etrangeres.slice(0, 8).join(", ")}${etrangeres.length > 8 ? "…" : ""}`);
 
   // Noms et sommes, version par version.
   for (const e of distant) {
@@ -130,9 +147,9 @@ export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813
     d("LEDGER-PREFIXE", `le ledger (${n}) n'est pas un préfixe exact du train local`);
   }
 
-  // 813 : présence, nom, preuve de contenu.
+  // Plancher historique : 813 ORIGINALE présente, nom, preuve de contenu.
   const e813 = distant.find((e) => e.version === VERSION_SOCLE);
-  if (!e813) d("LEDGER-813-ABSENTE", `${VERSION_SOCLE}_${NOM_SOCLE} absente du ledger`);
+  if (!e813) d("LEDGER-813-ABSENTE", `${VERSION_SOCLE}_${NOM_SOCLE} absente du ledger : plancher historique de la Preview non atteint`);
   else {
     const preuves = [];
     if (e813.marqueur813 === false) d("LEDGER-813-NON-ORIGINALE", "statements de 813 au ledger sans le marqueur de l'originale");
@@ -149,84 +166,117 @@ export function analyserLedger(ledger, local, { attente = "pre", exigerPreuve813
     }
   }
 
+  // Ponts phase 0 : no-op seulement si le prérequis 300 est déjà au ledger.
+  const phase0NonAppliques = local.filter((m) => m.phase0 && !ensembleDistant.has(m.version));
+  if (phase0NonAppliques.length && !ensembleDistant.has(VERSION_PREREQUIS_PHASE0)) {
+    d("LEDGER-PHASE0-PRODUCTION", `${VERSION_PREREQUIS_PHASE0} absente du ledger : historique de type Production, les ponts phase 0 (${phase0NonAppliques.map((m) => m.version).join(", ")}) n'y sont pas des no-op — hors périmètre du pack Preview (utiliser ${OUTIL_PHASE0_PRODUCTION})`);
+  }
+
   const enAttente = prefixeExact ? local.slice(n) : [];
+  const courant = { nb: n, derniere: derniereDistante };
+  if (attenduCourant !== null && attenduCourant !== undefined && Number(attenduCourant) !== n) {
+    d("LEDGER-COURANT-ATTENDU", `CURRENT_LEDGER=${n} ≠ valeur exigée par --attendu-courant (${attenduCourant})`);
+  }
   let verdict;
   if (divergences.length) verdict = VERDICT.LEDGER_DIVERGENCE;
-  else if (n === NB_SOCLE) verdict = VERDICT.LEDGER_PREFIXE_OK;
-  else if (n === NB_FINAL) verdict = VERDICT.LEDGER_V9_COMPLET;
-  else if (n > NB_SOCLE && n < NB_FINAL) verdict = VERDICT.LEDGER_V9_PARTIEL;
-  else { verdict = VERDICT.LEDGER_DIVERGENCE; d("LEDGER-SOCLE", `ledger de ${n} migrations : ni le socle ${NB_SOCLE}, ni le train ${NB_FINAL}`); }
+  else if (enAttente.length === 0) verdict = VERDICT.LEDGER_V9_COMPLET;
+  else verdict = VERDICT.LEDGER_PREFIXE_OK;
 
-  // Attente : « pre » n'admet que le socle 372 ; « post » n'admet que 389 ; « reprise » n'admet
-  // qu'un préfixe V9 partiel (373 → 388) laissé par un `db push` interrompu (rollback, cas A).
-  let conforme;
-  if (attente === "post") conforme = verdict === VERDICT.LEDGER_V9_COMPLET;
-  else if (attente === "reprise") conforme = verdict === VERDICT.LEDGER_V9_PARTIEL && enAttente.length === NB_FINAL - n;
-  else conforme = verdict === VERDICT.LEDGER_PREFIXE_OK && enAttente.length === NB_A_APPLIQUER;
-  if (verdict === VERDICT.LEDGER_PREFIXE_OK && enAttente.length !== NB_A_APPLIQUER) {
-    d("LEDGER-PENDING", `${enAttente.length} migration(s) en attente (attendu ${NB_A_APPLIQUER})`);
-    verdict = VERDICT.LEDGER_DIVERGENCE;
-    conforme = false;
-  }
+  const conforme = attente === "post" ? verdict === VERDICT.LEDGER_V9_COMPLET : verdict === VERDICT.LEDGER_PREFIXE_OK && enAttente.length >= 1;
   return {
     verdict,
     conforme,
     attente,
+    courant,
+    cible,
     nbDistantes: n,
     derniereDistante,
     enAttente,
+    phase0EnAttente: enAttente.filter((m) => m.phase0),
     divergences,
     avertissements,
   };
 }
 
+/** Lignes CURRENT_LEDGER / TARGET_LEDGER / PENDING_MIGRATIONS (format stable, lu par l'opérateur et les tests). */
+export function lignesTrain(a) {
+  const pending = a.enAttente ?? a.aAppliquer ?? [];
+  return [
+    `CURRENT_LEDGER=${a.courant.nb} (dernière ${a.courant.derniere ?? "—"})`,
+    `TARGET_LEDGER=${a.cible.nb} (dernière ${a.cible.derniere ?? "—"})`,
+    `PENDING_MIGRATIONS=${pending.length}${pending.length ? ` (${pending[0].version} → ${pending.at(-1).version})` : ""}`,
+  ];
+}
+
+/** Note phase 0 (no-op en Preview) pour les sorties ; null si aucun pont n'est en attente. */
+export function notePhase0(liste) {
+  if (!liste.length) return null;
+  return `phase 0 : no-op en Preview, ${VERSION_PREREQUIS_PHASE0.slice(-3)} déjà au ledger — ${liste.map((m) => m.version).join(", ")} appliquée(s) dans l'ordre lexical normal, sans procédure spéciale`;
+}
+
 /**
- * Plan de migration (Phase D) : Preview actuelle → migrations à appliquer → état final.
- * Lève ErreurLedger si le ledger n'est pas EXACTEMENT le socle 372 (préfixe exact) — ou, avec
- * `reprise`, un préfixe V9 partiel 373 → 388 (push interrompu, rollback cas A).
+ * Plan de migration (Phase D) : CURRENT_LEDGER → PENDING_MIGRATIONS → TARGET_LEDGER.
+ * Lève ErreurLedger si le ledger n'est pas un préfixe exact du train avec au moins une
+ * migration en attente (`reprise` : même contrôle, gardé pour compatibilité).
  */
 export function planMigration(ledger, local, { reprise = false, ...opts } = {}) {
   const a = analyserLedger(ledger, local, { ...opts, attente: reprise ? "reprise" : "pre" });
   if (!a.conforme) {
-    const detail = a.divergences.map((x) => `${x.code} ${x.detail}`).join(" ; ") || a.verdict;
+    const detail = a.divergences.map((x) => `${x.code} ${x.detail}`).join(" ; ") || (a.verdict === VERDICT.LEDGER_V9_COMPLET ? "ledger déjà au train complet, rien à appliquer" : a.verdict);
     throw new ErreurLedger(`plan impossible : ${a.verdict} — ${detail}`);
   }
   const derniereLedger = a.derniereDistante;
   const anterieures = a.enAttente.filter((m) => m.version <= derniereLedger);
+  const a300 = ledger.entries.some((e) => e.version === VERSION_PREREQUIS_PHASE0);
   const preuves = [
-    { code: "PLAN-POSTERIEURES", ok: anterieures.length === 0, message: `aucune migration à appliquer antérieure ou égale à ${derniereLedger}${reprise ? "" : " (813)"}` },
+    { code: "PLAN-POSTERIEURES", ok: anterieures.length === 0, message: `aucune migration à appliquer antérieure ou égale à ${derniereLedger} (dernière du ledger)` },
     { code: "PLAN-SANS-INCLUDE-ALL", ok: anterieures.length === 0, message: "`supabase db push` sans --include-all (toutes les versions en attente sont postérieures au ledger)" },
-    { code: "PLAN-HISTORIQUE-INTACT", ok: (reprise ? a.nbDistantes > NB_SOCLE && a.nbDistantes < NB_FINAL : a.nbDistantes === NB_SOCLE) && a.divergences.length === 0, message: `historique distant = ${a.nbDistantes} premières versions du train${reprise ? " (reprise d'un push interrompu)" : ""}, aucune réécriture ni réparation de ledger` },
-    { code: "PLAN-NB", ok: a.enAttente.length === (reprise ? NB_FINAL - a.nbDistantes : NB_A_APPLIQUER), message: `${a.enAttente.length} migration(s) à appliquer (attendu ${reprise ? NB_FINAL - a.nbDistantes : NB_A_APPLIQUER})` },
-    { code: "PLAN-DERNIERE", ok: a.enAttente.at(-1)?.version === DERNIERE_FINALE, message: `dernière migration finale = ${a.enAttente.at(-1)?.version} (attendu ${DERNIERE_FINALE})` },
-    { code: "PLAN-TOTAL", ok: a.nbDistantes + a.enAttente.length === NB_FINAL, message: `total final = ${a.nbDistantes + a.enAttente.length} (attendu ${NB_FINAL})` },
+    { code: "PLAN-HISTORIQUE-INTACT", ok: a.divergences.length === 0, message: `historique distant = ${a.courant.nb} premières versions du train${reprise ? " (reprise d'un push interrompu)" : ""}, aucune réécriture ni réparation de ledger` },
+    { code: "PLAN-PLANCHER", ok: a.enAttente.every((m) => m.version > VERSION_SOCLE), message: `plancher historique ${VERSION_SOCLE} (813 ORIGINALE) au ledger` },
+    { code: "PLAN-NB", ok: a.enAttente.length >= 1 && a.enAttente.length === a.cible.nb - a.courant.nb, message: `PENDING_MIGRATIONS=${a.enAttente.length} = TARGET_LEDGER ${a.cible.nb} − CURRENT_LEDGER ${a.courant.nb}` },
+    { code: "PLAN-DERNIERE", ok: a.enAttente.at(-1)?.version === a.cible.derniere, message: `dernière migration appliquée = ${a.enAttente.at(-1)?.version} (dernière du train ${a.cible.derniere})` },
+    { code: "PLAN-PHASE0", ok: a.phase0EnAttente.length === 0 || a300, message: notePhase0(a.phase0EnAttente) ?? "aucun pont phase 0 en attente" },
   ];
   if (!preuves.every((p) => p.ok)) throw new ErreurLedger(`plan non prouvé : ${preuves.filter((p) => !p.ok).map((p) => p.code).join(", ")}`);
   return {
-    depart: { nb: a.nbDistantes, derniere: derniereLedger },
-    aAppliquer: a.enAttente.map((m, i) => ({ rang: a.nbDistantes + i + 1, version: m.version, name: m.name, fichier: m.fichier })),
-    final: { nb: NB_FINAL, derniere: DERNIERE_FINALE },
+    courant: a.courant,
+    cible: a.cible,
+    aAppliquer: a.enAttente.map((m, i) => ({ rang: a.courant.nb + i + 1, version: m.version, name: m.name, fichier: m.fichier, phase0: Boolean(m.phase0) })),
+    phase0: a.phase0EnAttente.map((m) => m.version),
     preuves,
     avertissements: a.avertissements,
   };
 }
 
-/** Plan en Markdown (lisible par l'opérateur). */
-export function planMarkdown(plan) {
-  const out = [
-    `Preview actuelle : ${plan.depart.nb} migrations, dernière ${plan.depart.derniere}`,
-    `→ ${plan.aAppliquer.length} migrations à appliquer, dans cet ordre :`,
+/**
+ * Plan en Markdown (lisible par l'opérateur).
+ * @param {object} plan
+ * @param {Map<string, {classe: string, note: string}>|null} [classes]  colonnes de réversibilité (plan généré)
+ */
+export function planMarkdown(plan, classes = null) {
+  const entete = classes ? ["| Rang | Version | Nom | Classe | Phase 0 | Note |", "|---|---|---|---|---|---|"] : ["| Rang | Version | Nom | Phase 0 |", "|---|---|---|---|"];
+  const ligne = (m) => {
+    const p0 = m.phase0 ? "oui (no-op en Preview)" : "";
+    if (!classes) return `| ${m.rang} | \`${m.version}\` | ${m.name} | ${p0} |`;
+    const c = classes.get(m.version) ?? { classe: "?", note: "" };
+    return `| ${m.rang} | \`${m.version}\` | ${m.name} | ${c.classe} | ${p0} | ${c.note} |`;
+  };
+  const p0 = notePhase0(plan.aAppliquer.filter((m) => m.phase0));
+  return [
+    ...lignesTrain(plan),
     "",
-    "| Rang | Version | Nom |",
-    "|---|---|---|",
-    ...plan.aAppliquer.map((m) => `| ${m.rang} | \`${m.version}\` | ${m.name} |`),
+    `Preview actuelle : ${plan.courant.nb} migrations, dernière ${plan.courant.derniere}`,
+    `→ ${plan.aAppliquer.length} migration(s) à appliquer, dans cet ordre (\`supabase db push\`, jamais --include-all) :`,
     "",
-    `→ état final : ${plan.final.nb} migrations, dernière ${plan.final.derniere}`,
+    ...entete,
+    ...plan.aAppliquer.map(ligne),
+    "",
+    `→ état final : ${plan.cible.nb} migrations, dernière ${plan.cible.derniere}`,
+    ...(p0 ? ["", `> ${p0}.`] : []),
     "",
     "Preuves :",
     ...plan.preuves.map((p) => `- ${p.ok ? "✓" : "✖"} [${p.code}] ${p.message}`),
-  ];
-  return out.join("\n");
+  ].join("\n");
 }
 
 /**

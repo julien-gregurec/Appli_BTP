@@ -1,4 +1,4 @@
-# ELSATIA V9 — Sauvegarde et restauration de la Preview avant cutover 372 → 389
+# ELSATIA V9 — Sauvegarde et restauration de la Preview avant cutover (pack générique)
 
 | | |
 |---|---|
@@ -14,8 +14,8 @@
 | Schéma | **REQUIRED** | `preview-schema.sql` | tables, fonctions, policies, droits des schémas applicatifs | données |
 | Données applicatives | **REQUIRED** | `preview-data.sql` | lignes des schémas applicatifs (`public`, `platform`…) | Auth, Storage, ledger (schémas gérés par Supabase, exclus par défaut) |
 | Utilisateurs Auth | **REQUIRED** | `preview-auth-data.sql` | `auth.users`, identités, facteurs MFA | mots de passe en clair (n'existent pas) ; configuration Auth du tableau de bord (SMTP, URL de redirection) → noter à la main |
-| Table du ledger | **REQUIRED** | `preview-migrations-data.sql` | `supabase_migrations.schema_migrations` (372 lignes) | — **Sans elle, une base restaurée a un ledger vide et `db push` rejouerait tout le train** (constaté sur le banc local) |
-| Export du ledger | **REQUIRED** | `ledger-avant.json` | preuve du socle 372 + 813 originale (contrôlée par `backup-check`) | — |
+| Table du ledger | **REQUIRED** | `preview-migrations-data.sql` | `supabase_migrations.schema_migrations` (`CURRENT_LEDGER` lignes) | — **Sans elle, une base restaurée a un ledger vide et `db push` rejouerait tout le train** (constaté sur le banc local) |
+| Export du ledger | **REQUIRED** | `ledger-avant.json` | préfixe exact du train (`CURRENT_LEDGER`) + 813 originale (contrôlée par `backup-check`) | — |
 | Rôles | RECOMMENDED | `preview-roles.sql` | rôles et droits personnalisés | rôles gérés par Supabase |
 | Métadonnées Storage | RECOMMENDED | `preview-storage-data.sql` | `storage.buckets`, `storage.objects` (lignes) | **le contenu des fichiers** |
 | Fichiers Storage | OPTIONAL | copie manuelle | objets (logos, pièces jointes de recette) | non requis : la V9 ne modifie aucun bucket |
@@ -65,7 +65,7 @@ artefacts REQUIRED.
 | Intégrité | sha256 = déclaré |
 | Contenu | marqueur attendu présent dans chaque dump |
 | Emplacement | **hors du dépôt** (sinon refus : risque de commit de données) |
-| Ledger | export = socle 372, 813 originale prouvée |
+| Ledger | export = préfixe exact du train avec migrations en attente, 813 originale prouvée ; `CURRENT_LEDGER` consigné |
 
 À consigner dans le rapport d'exécution : chemin du dossier, `manifest.json` (sha256 de chaque
 fichier), identifiant de sauvegarde Supabase s'il existe. Conserver le dossier **au moins jusqu'à
@@ -76,7 +76,7 @@ et les comptes Auth de la Preview).
 
 Prouvé sur le banc local du pack (PostgreSQL 16, dumps `pg_dump` équivalents) : schéma + données +
 Auth + ledger restaurés, puis export du ledger restauré = `PREVIEW_LEDGER_PREFIX_OK` /
-`PENDING_MIGRATIONS=17`.
+les mêmes `CURRENT_LEDGER` / `PENDING_MIGRATIONS` qu'avant le cutover (`check-ledger-v9.mjs --attendu-courant <n>`).
 
 ```bash
 createdb elsatia_v9_restore_test
@@ -99,4 +99,5 @@ dans un projet Supabase jetable (`DECISION_REQUIRED:V9-RESTORE-DRILL-PROJECT`, c
 ## 5. Restauration sur la Preview
 
 Voir `ELSATIA_V9_PREVIEW_ROLLBACK.md` §4 : dernier recours, décision humaine, jamais scriptée par
-le pack. Aucune des 17 migrations V9 n'exige de restauration pour revenir au code V8.
+le pack. Le classement par migration (dont les éventuelles `RESTORE_REQUIRED` et leurs notes) est généré dans
+`docs/qualification/preview-pack/V9_MIGRATION_PLAN.generated.md` ; un retour code n'exige pas de restauration.

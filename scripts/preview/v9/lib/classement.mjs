@@ -65,6 +65,7 @@ const REGLES = [
   ["INDEX", /^(create|drop|alter)\s+statistics\b/], // statistiques étendues du planificateur
   ["DROITS", /^(grant|revoke|alter\s+default\s+privileges)\b/],
   ["META", /^(comment\s+on|notify|set|reset|begin|commit|analyze|do)\b/],
+  ["META", /^lock\s+table\b/], // verrou de transaction : n'écrit rien (libéré au COMMIT / ROLLBACK)
 ];
 
 /** Instructions de premier niveau, typées. */
@@ -122,6 +123,13 @@ export const NOTES_RETOUR = Object.freeze({
   "20261002001112": "Registre des clés + garde d'écriture : le code V8 écrit en v1 (k1), accepté par la garde ; laisser en place.",
   "20261002001113": "Limiteur de connexion : requis par le code V9 (login fail-closed sans lui) ; sans effet sur le code V8.",
   "20261002000901": "Preuves d'acceptation légale (append-only) : ne jamais supprimer, même en rollback.",
+  "20261003000103": "Données de référence LOCALES (url_locale de Réserves) mises à jour seulement si encore à la valeur d'origine ; sans effet sur l'accès : laisser en place.",
+  "20261003001406": "Recalcul unique du cache du tableau de bord (donnée dérivée, idempotent) : aucune restauration nécessaire, laisser en place.",
+  "20261003000201": "Pont d'upgrade PRODUCTION (phase 0) : no-op en Preview (20260921000300 déjà au ledger) ; aucun retour à prévoir.",
+  "20261003000202": "Pont d'upgrade PRODUCTION (contrôle final) : no-op en Preview si les lignes sont conformes, échec propre sinon ; aucun retour à prévoir.",
+  "20261003001407": "Confidentialité du coût horaire : ne JAMAIS rouvrir la colonne (ni grant, ni retour arrière), même en rollback code.",
+  "20261003001501": "File push durable : retour arrière scripts/perf/hardening/rollback/rollback_20261003001501.sql (décision humaine).",
+  "20261003001503": "RLS 13 tables : verrous ACCESS EXCLUSIVE pris d'un coup (lock_timeout 10 s) — un échec est propre (transaction annulée, ledger inchangé) et rejouable ; retour arrière scripts/perf/hardening/rollback/rollback_20261003001503.sql.",
 });
 
 /** Classement de la liste de migrations { version, name, sql }. */
