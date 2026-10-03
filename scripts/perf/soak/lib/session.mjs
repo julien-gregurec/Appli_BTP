@@ -25,7 +25,10 @@ export function processus() {
   let chromium = 0, rssChromium = 0, rssNext = 0;
   for (const l of lignes) {
     const m = l.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/); if (!m) continue;
-    if (/chrom|headless_shell/i.test(m[3]) && !/ps -eo/.test(m[3])) { chromium++; rssChromium += Number(m[2]); }
+    // Exécutable Chromium uniquement (1er mot de la ligne de commande) : sinon tout
+    // processus dont les arguments contiennent « chromium » (node -e …) serait compté.
+    const exe = m[3].split(/\s+/)[0];
+    if (/(chromium|chrome|headless_shell)$/i.test(exe)) { chromium++; rssChromium += Number(m[2]); }
     if (/next\/dist\/bin\/next start -p 3100|next-server/.test(m[3])) rssNext += Number(m[2]);
   }
   return { chromium, rssChromiumMo: Math.round(rssChromium / 1024), rssNextMo: Math.round(rssNext / 1024) };

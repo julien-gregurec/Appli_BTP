@@ -6,7 +6,9 @@ set -euo pipefail
 OUT="${1:?dossier}"; shift || true
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO"
-for p in $(pgrep -f "next/dist/bin/next start -p 3100" || true); do kill "$p" 2>/dev/null || true; done
+# Le processus se renomme « next-server (vX) » : on cible les deux formes.
+for p in $(pgrep -f "next/dist/bin/next start -p 3100" || true) $(pgrep -f "^next-server" || true); do kill "$p" 2>/dev/null || true; done
+for _ in $(seq 1 20); do curl -s -o /dev/null -m 1 localhost:3100/login || break; sleep 0.5; done
 sleep 1
 mkdir -p "$OUT"
 set -a; . ./.env.local; set +a
