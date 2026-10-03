@@ -16,7 +16,7 @@ const NOTIFICATION = {
   lien: "/lien",
   niveau: "information",
   preference_active: null,
-  abonnements: [{ id: "abo-1", endpoint: "https://push.invalid/1", p256dh: "p", auth: "a" }],
+  abonnements: [{ id: "abo-1", endpoint: "https://fcm.googleapis.com/fcm/send/test-1", p256dh: "p", auth: "a" }],
 };
 
 function adminFactice(preparation: { data: unknown; error: unknown }, reservation: { data: unknown; error: unknown } = { data: true, error: null }) {
@@ -47,11 +47,19 @@ describe("traiterNotificationPush (chemin de service)", () => {
     const { client, rpc, from } = adminFactice({ data: NOTIFICATION, error: null });
     await traiterNotificationPush(client, "notif-1");
     expect(webpush.sendNotification).toHaveBeenCalledWith(
-      { endpoint: "https://push.invalid/1", keys: { p256dh: "p", auth: "a" } },
+      { endpoint: "https://fcm.googleapis.com/fcm/send/test-1", keys: { p256dh: "p", auth: "a" } },
       JSON.stringify({ titre: "Titre", message: "Message", lien: "/lien", niveau: "information" }),
     );
     expect(rpc).toHaveBeenCalledWith("push_marquer_notification_envoyee_service", { p_notification_id: "notif-1" });
     expect(from).not.toHaveBeenCalled();
+  });
+
+  it("n'émet jamais vers un endpoint hors des services push reconnus (SSRF)", async () => {
+    webpush.sendNotification.mockResolvedValue({});
+    const interne = { ...NOTIFICATION, abonnements: [{ id: "abo-x", endpoint: "https://169.254.169.254/latest/meta-data", p256dh: "p", auth: "a" }] };
+    const { client } = adminFactice({ data: interne, error: null });
+    await traiterNotificationPush(client, "notif-1");
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
   });
 
   it("respecte une préférence désactivée mais marque tout de même la notification", async () => {
@@ -109,7 +117,7 @@ describe("traiterNotificationPush (chemin de service)", () => {
     webpush.sendNotification
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(Object.assign(new Error("Timeout"), { statusCode: 503 }));
-    const deuxAppareils = { ...NOTIFICATION, abonnements: [...NOTIFICATION.abonnements, { id: "abo-2", endpoint: "https://push.invalid/2", p256dh: "p", auth: "a" }] };
+    const deuxAppareils = { ...NOTIFICATION, abonnements: [...NOTIFICATION.abonnements, { id: "abo-2", endpoint: "https://fcm.googleapis.com/fcm/send/test-2", p256dh: "p", auth: "a" }] };
     const { client, rpc } = adminFactice({ data: deuxAppareils, error: null });
     expect(await traiterNotificationPush(client, "notif-1")).toBe("envoyee");
     expect(rpc).toHaveBeenCalledWith("push_marquer_notification_envoyee_service", { p_notification_id: "notif-1" });
