@@ -1,5 +1,10 @@
--- Retour arrière de 20261003000301_rls_ensembles_entreprises_autorisees_v1 : expressions V9.1 d'origine.
+-- Retour arrière de 20261003000301_rls_ensembles_entreprises_autorisees_v1 : expressions V9.1 d'origine (générées depuis policies_v91.json).
 begin;
+set local lock_timeout = '10s';
+lock table public.affectations, public.chantiers, public.clients, public.devis, public.documents_chantier,
+  public.factures, public.lignes_devis, public.lignes_factures, public.notifications_utilisateurs,
+  public.paiements, public.pointages, public.sessions_pointage, public.taches
+  in access exclusive mode;
 ALTER POLICY "membres affectations" ON public.affectations
   USING (est_membre_actif(entreprise_id))
   WITH CHECK (est_membre_actif(entreprise_id));
@@ -254,5 +259,9 @@ ALTER POLICY "role_gestion_update" ON public.taches
 drop function if exists public.entreprises_membre_actif();
 drop function if exists public.entreprises_avec_permission(text);
 drop function if exists public.entreprises_avec_une_permission(text[]);
+drop function if exists public.chantiers_assignes_consultables();
+drop function if exists public.employes_du_compte_pointage_consultables();
+drop function if exists public.employes_du_compte_affectation_consultables();
+drop function if exists public.chantiers_equipes_du_compte();
 notify pgrst, 'reload schema';
 commit;

@@ -50,6 +50,7 @@ CONTEXTES = [
     ("membre_f_suspension_globale", "50000000-0000-0000-0000-000000000003"),
     ("membre_g_suspension_future", "50000000-0000-0000-0000-000000000004"),
     ("membre_a_en_pause", "50000000-0000-0000-0000-000000000005"),
+    ("ancien_salarie_a", "60000000-0000-0000-0000-000000000001"),
     ("admin_a_session_revoquee", "10000000-0000-0000-0000-000000000001"),
     ("anonyme", None),
 ]
@@ -75,7 +76,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 """)
-w(f"select plan({len(CONTEXTES) * 2 + 14});")
+w(f"select plan({len(CONTEXTES) * 2 + 16});")
 w(r"""
 \ir fixtures/isolation_multitenant.inc
 
@@ -89,7 +90,8 @@ from (values ('40000000-0000-0000-0000-000000000001', 'multi@invalid.local'),
              ('50000000-0000-0000-0000-000000000002', 'membre-e@invalid.local'),
              ('50000000-0000-0000-0000-000000000003', 'membre-f@invalid.local'),
              ('50000000-0000-0000-0000-000000000004', 'membre-g@invalid.local'),
-             ('50000000-0000-0000-0000-000000000005', 'pause-a@invalid.local')) v(u, e)
+             ('50000000-0000-0000-0000-000000000005', 'pause-a@invalid.local'),
+             ('60000000-0000-0000-0000-000000000001', 'sorti-a@invalid.local')) v(u, e)
 on conflict (id) do nothing;
 
 -- Entreprises : C sans membre, D suspendue, E essai expiré, F suspension globale passée,
@@ -120,7 +122,8 @@ insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, post
   ('50000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000001', '9e000000-0000-0000-0000-000000000001', 'actif'),
   ('50000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001', '9f000000-0000-0000-0000-000000000001', 'actif'),
   ('50000000-0000-0000-0000-000000000004', 'f1000000-0000-0000-0000-000000000001', '9f100000-0000-0000-0000-000000000001', 'actif'),
-  ('50000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000001', 'pause');
+  ('50000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000001', 'pause'),
+  ('60000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000002', 'actif');
 
 -- Support : S1 accès actif à A et accès terminé à C ; S2 accès expiré (non terminé) à B.
 insert into public.plateforme_admins (email, role, utilisateur_id, actif, statut_identite, activation_at)
@@ -167,6 +170,27 @@ select e.entreprise_id, e.id, (select c.id from public.chantiers c where c.entre
 from public.employes e where e.id in ('a2000000-0000-0000-0000-000000000002', 'b2000000-0000-0000-0000-000000000002');
 insert into public.notifications_utilisateurs (entreprise_id, utilisateur_id, type, titre)
 select ue.entreprise_id, ue.utilisateur_id, 'contre_epreuve', 'N' from public.utilisateurs_entreprises ue;
+-- Branches fines des fonctions par ligne : affectation du JOUR (chantier non assigné en équipe),
+-- équipe échue (date_fin passée : candidate mais refusée par la fonction d'origine), document
+-- réservé à l'encadrement, fiche salarié sortie.
+insert into public.affectations (entreprise_id, employe_id, chantier_id, date) values
+  ('b0000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000002', 'b4000000-0000-0000-0000-000000000002', current_date);
+insert into public.equipes_chantiers (entreprise_id, chantier_id, employe_id, role_chantier, date_debut, date_fin) values
+  ('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002', 'a2000000-0000-0000-0000-000000000002', 'ouvrier', current_date - 30, current_date - 1);
+insert into public.documents_chantier (entreprise_id, chantier_id, nom, storage_path, mime_type, taille_octets, audience) values
+  ('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'Encadrement A',
+   'a0000000-0000-0000-0000-000000000001/a4000000-0000-0000-0000-000000000001/encadrement.pdf', 'application/pdf', 10, 'encadrement');
+-- Ancien salarié (fiche « sortie ») encore membre actif : ni chantier assigné, ni ses pointages.
+insert into public.employes (id, entreprise_id, utilisateur_id, prenom, nom, numero_inscription, identifiant_interne, statut)
+values ('a2000000-0000-0000-0000-0000000000f1', 'a0000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001',
+        'Sorti', 'A', 'ISO-A-00F1', 'A00F1', 'actif');
+insert into public.equipes_chantiers (entreprise_id, chantier_id, employe_id, role_chantier) values
+  ('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-0000000000f1', 'ouvrier');
+insert into public.pointages (entreprise_id, employe_id, chantier_id, date, heures_normales, heures_supplementaires, verification_statut) values
+  ('a0000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-0000000000f1', 'a4000000-0000-0000-0000-000000000001', current_date - 40, 7, 0, 'valide');
+insert into public.affectations (entreprise_id, employe_id, chantier_id, date) values
+  ('a0000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-0000000000f1', 'a4000000-0000-0000-0000-000000000002', current_date);
+update public.employes set statut = 'sorti' where id = 'a2000000-0000-0000-0000-0000000000f1';
 
 -- ── Contextes ───────────────────────────────────────────────────────────────────────
 create temp table ctx (nom text primary key, sub uuid, session uuid);
@@ -265,6 +289,10 @@ select is((select coalesce(sum(nb), 0)::int from vu where phase = 'apres' and ct
            'membre_e_essai_expire', 'membre_f_suspension_globale', 'admin_a_session_revoquee', 'membre_a_en_pause', 'support_b_expire') and nb > 0), 0,
   'E3e plateforme sans accès, support expiré, suspendue, essai expiré, suspension globale, session révoquée, membre en pause : aucune ligne');
 select ok(pg_temp.nb('membre_g_suspension_future', 'devis') = 1, 'E3f suspension seulement PRÉVUE : l''entreprise reste accessible');
+select ok(pg_temp.nb('ouvrier_b', 'chantiers') = 2 and pg_temp.nb('chef_equipe_a', 'documents_chantier') = pg_temp.nb('ouvrier_a', 'documents_chantier') + 1,
+  'E3j branches fines : affectation du jour ouvre le chantier (ouvrier B), document d''encadrement réservé au chef d''équipe');
+select ok(pg_temp.nb('ancien_salarie_a', 'chantiers') = 0 and pg_temp.nb('ancien_salarie_a', 'pointages') = 0 and pg_temp.nb('ancien_salarie_a', 'affectations') = 0,
+  'E3k fiche salarié sortie : aucun chantier, pointage ni affectation malgré équipe et affectation du jour');
 select is((select count(*)::int from vu where phase = 'apres' and ctx = 'anonyme' and nb > 0), 0, 'E3g anonyme : aucune ligne');
 select ok(pg_temp.nb('support_a_actif_c_termine', 'devis') = (select count(*)::int from devis where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
   'E3h support : exactement les devis de A (accès actif), rien de C (accès terminé)');

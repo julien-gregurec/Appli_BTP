@@ -7,14 +7,17 @@ ARG = r"([a-z_]+\.)?[a-z_]+"
 def rw(e):
     if e is None: return None
     o = e
+    # Fonctions par ligne : ensembles candidats issus des seules lignes de l'utilisateur (ses fiches
+    # salarié, ses équipes, ses affectations), filtrés par la fonction d'origine — exact, sans repli
+    # ligne à ligne (sauf documents : repli limité aux documents des chantiers de ses équipes).
     e = re.sub(r"\bpeut_consulter_chantier\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} = ANY {M}) AND (({m.group(1)} = ANY {U(['acces_chantiers','gerer_chantiers'])}) OR peut_consulter_chantier({m.group(1)}, {m.group(3)})))", e)
+        lambda m: f"(({m.group(1)} = ANY {M}) AND (({m.group(1)} = ANY {U(['acces_chantiers','gerer_chantiers'])}) OR (({m.group(1)}, {m.group(3)}) IN ( SELECT x.entreprise_id, x.chantier_id FROM public.chantiers_assignes_consultables() x))))", e)
     e = re.sub(r"\bpeut_consulter_pointage_employe\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} = ANY {U(['voir_pointages_equipe','gerer_pointage','valider_pointages'])}) OR peut_consulter_pointage_employe({m.group(1)}, {m.group(3)}))", e)
+        lambda m: f"(({m.group(1)} = ANY {U(['voir_pointages_equipe','gerer_pointage','valider_pointages'])}) OR (({m.group(1)}, {m.group(3)}) IN ( SELECT x.entreprise_id, x.employe_id FROM public.employes_du_compte_pointage_consultables() x)))", e)
     e = re.sub(r"\bpeut_consulter_affectation_employe\((%s), (%s)\)" % (ARG, ARG),
-        lambda m: f"(({m.group(1)} = ANY {U(['gerer_planning','voir_pointages_equipe','voir_heures_chantiers'])}) OR peut_consulter_affectation_employe({m.group(1)}, {m.group(3)}))", e)
+        lambda m: f"(({m.group(1)} = ANY {U(['gerer_planning','voir_pointages_equipe','voir_heures_chantiers'])}) OR (({m.group(1)}, {m.group(3)}) IN ( SELECT x.entreprise_id, x.employe_id FROM public.employes_du_compte_affectation_consultables() x)))", e)
     e = re.sub(r"\bpeut_voir_document_chantier\(id\)",
-        f"((entreprise_id = ANY {M}) AND ((entreprise_id = ANY {S(chr(39)+'gerer_chantiers'+chr(39)+'::text')}) OR peut_voir_document_chantier(id)))", e)
+        f"((entreprise_id = ANY {M}) AND ((entreprise_id = ANY {S(chr(39)+'gerer_chantiers'+chr(39)+'::text')}) OR ((chantier_id = ANY (ARRAY( SELECT public.chantiers_equipes_du_compte()))) AND peut_voir_document_chantier(id))))", e)
     e = re.sub(r"\best_membre_actif\((%s)\)" % ARG, lambda m: f"({m.group(1)} = ANY {M})", e)
     e = re.sub(r"\ba_permission\((%s), ('[a-z_]+'::text)\)" % ARG, lambda m: f"({m.group(1)} = ANY {S(m.group(3))})", e)
     e = re.sub(r"(?<![.\w])auth\.uid\(\)", "( SELECT auth.uid() AS uid)", e)
