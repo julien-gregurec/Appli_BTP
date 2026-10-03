@@ -32,6 +32,10 @@ Base : `integration/elsatia-post-v9-hardening-v1` @ `877a4b9f284150e5d4f06fd6825
 - [ ] 4. Rapport final
 
 ## Constats provisoires
+- H PDF : file bornée (2 Chromium, file 10, 503+Retry-After), 0 orphelin même après abandon en plein rendu ; P2 : le PDF consomme le quota /imprimer (30/min) → 502 au lieu de 429, Chromium lancé pour rien. `docs/qualification/soak/domain_h_pdf.json`.
+- I mémoire : /dashboard T14 (24 859 factures + 12 129 devis en alerte) p50 16 s à 10 VU, ELU 1, RSS ~1 Go après GC (heap 95 Mo) — coût CPU linéaire du centre d'alertes (construireAlertes sur ~37 k éléments).
+- /employes 500 salariés = 32 Mo HTML (droits rendus inline, 100 permissions/poste dans la fixture) ; /planning 500 salariés = 7,9 Mo.
+- RLS lectures PostgREST directes : a_permission + est_membre_actif par ligne ≈ 1 ms/ligne (1 403 factures → 1,37 s) ; les pages passent par des RPC paginées.
 - F : cron push plafonné à 200, ordre physique, fenêtre 25 h → perte définitive (N=201 → 1 perdue, 300 → 100, 1000 → 800).
 - G : `relances_auto_candidats_service` même motif (LIMIT 200 sans ORDER BY) → famine prouvée.
 - D : numérotation, paiements, avoirs, acomptes, transformations : PASS sous 32 concurrents.

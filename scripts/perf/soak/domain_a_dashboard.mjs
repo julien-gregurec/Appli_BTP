@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { jwt, rpc, call, stats } from "./lib/bench.mjs";
 
 const REPS = Number(process.argv[2] ?? 15);
-const TENANTS = [11, 12, 13, 14, 15, 16].map((k) => ({ k, ent: `e0000000-0000-4000-e000-0000000000${k}`, user: `facc0000-0000-4000-e000-0000000000${k}` }));
+const TENANTS = (process.argv[3] ? process.argv[3].split(",").map(Number) : [11, 12, 13, 14, 15, 16]).map((k) => ({ k, ent: `e0000000-0000-4000-e000-0000000000${k}`, user: `facc0000-0000-4000-e000-0000000000${k}` }));
 const AUJ = new Date().toISOString().slice(0, 10);
 const sql = (q) => execFileSync("su", ["postgres", "-c", `psql -X -At -d soak -c "${q.replace(/"/g, '\\"')}"`]).toString().trim();
 
@@ -31,8 +31,14 @@ for (const t of TENANTS) {
     gp_dashboard_chantiers: () => rpc(tok, "gp_dashboard_chantiers", { p_entreprise_id: t.ent, p_aujourdhui: AUJ, p_limite: 6 }),
     gp_options_chantiers: () => rpc(tok, "gp_options_chantiers", { p_entreprise_id: t.ent, p_statuts_exclus: ["archive", "annule"], p_client_id: null, p_tri: "nom" }),
     notifications_8: () => call(tok, `/notifications_utilisateurs?select=id,titre,message,lien,niveau,created_at&entreprise_id=eq.${t.ent}&lue_at=is.null&order=created_at.desc&limit=8`),
-    devis_liste_page1: () => call(tok, `/devis?select=id,numero,statut,montant_ttc,date_emission,client:clients(nom,societe)&entreprise_id=eq.${t.ent}&order=created_at.desc&limit=50`, { headers: { prefer: "count=exact" } }),
-    devis_liste_offset_profond: () => call(tok, `/devis?select=id,numero&entreprise_id=eq.${t.ent}&order=created_at.desc&limit=50&offset=${Math.max(0, n - 60)}`),
+    // Chemin réel de /devis et /factures (RPC paginées SECURITY DEFINER, TAILLE_PAGE de l'UI = 25).
+    devis_liste_paginee_p1: () => rpc(tok, "devis_liste_paginee", { p_entreprise_id: t.ent, p_recherche: "", p_statut: "", p_page: 1, p_taille: 25 }),
+    devis_liste_paginee_derniere: () => rpc(tok, "devis_liste_paginee", { p_entreprise_id: t.ent, p_recherche: "", p_statut: "", p_page: Math.max(1, Math.ceil(n / 25)), p_taille: 25 }),
+    devis_recherche_texte: () => rpc(tok, "devis_liste_paginee", { p_entreprise_id: t.ent, p_recherche: "Client1", p_statut: "", p_page: 1, p_taille: 25 }),
+    factures_liste_paginee_p1: () => rpc(tok, "factures_liste_paginee", { p_entreprise_id: t.ent, p_recherche: "", p_statut: "", p_page: 1, p_taille: 25 }),
+    factures_impayees_p1: () => rpc(tok, "factures_liste_paginee", { p_entreprise_id: t.ent, p_recherche: "", p_statut: "en_retard", p_page: 1, p_taille: 25 }),
+    // Lecture PostgREST DIRECTE (RLS évaluée ligne à ligne) : indicateur du coût RLS, pas un chemin de page.
+    devis_direct_offset_profond: () => call(tok, `/devis?select=id,numero&entreprise_id=eq.${t.ent}&order=created_at.desc&limit=50&offset=${Math.max(0, Math.min(n, 1000) - 60)}`),
     factures_sans_limite: () => call(tok, `/factures?select=id&entreprise_id=eq.${t.ent}`, { headers: { prefer: "count=exact" } }),
     taches_a_faire: () => call(tok, `/taches?select=id,libelle,echeance,chantier:chantiers!inner(entreprise_id)&chantier.entreprise_id=eq.${t.ent}&statut=eq.a_faire&order=echeance&limit=50`),
     documents_page: () => call(tok, `/documents_chantier?select=id,nom&entreprise_id=eq.${t.ent}&order=created_at.desc&limit=50`),
@@ -55,12 +61,14 @@ for (const t of TENANTS) {
       st.exact = Object.values(st.exactitude).every(([a, b]) => Math.abs(a - b) < 0.005);
     }
     if (nom === "gp_options_chantiers" && last.status === 200) st.lignes = [JSON.parse(last.text).length, verite.chantiers];
+    if (nom === "devis_liste_paginee_p1" && last.status === 200) { const j = JSON.parse(last.text); st.total_api = j.total; st.exact_total = j.total === n; }
     if (nom === "factures_sans_limite") {
       st.lignes = [JSON.parse(last.text).length, n];
       st.troncature_max_rows = JSON.parse(last.text).length < n;
     }
     if (last.status >= 400) st.erreur = last.text.slice(0, 200);
     row.flux[nom] = st;
+    console.error(`  ${t.k} ${nom} p50=${st.p50} p95=${st.p95} max=${st.max} err=${st.errors} octets=${st.avgBytes}`);
   }
   results.push(row);
   console.error(`tenant ${t.k} (${n}) ok`);
