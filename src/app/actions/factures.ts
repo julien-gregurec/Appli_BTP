@@ -71,6 +71,12 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
 
 export async function creerFactureDepuisDevisAction(devisId: string, type: string = "simple") {
   const ctx = await getContexteEntreprise();
+  // La RPC (SECURITY DEFINER) ne vérifie que l'appartenance : le droit de facturer
+  // est exigé ici, comme pour l'envoi de facture.
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_factures")) {
+    redirect(`/devis/${devisId}?error=${encodeURIComponent("Votre poste ne permet pas de créer des factures.")}`);
+  }
   const supabase = await createClient();
 
   const { data: devis } = await supabase.from("devis").select("id").eq("id", devisId).eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").single();
