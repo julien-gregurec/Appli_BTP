@@ -28,16 +28,16 @@ PUBLIC_SECRET_EXPOSURE=NO
 FIXES_APPLIED=17
 FIXES_DEFERRED=39
 
-TYPECHECK=__TYPECHECK__
-LINT=__LINT__
-TESTS=__TESTS__
-BUILDS=__BUILDS__
+TYPECHECK=PASS (4 apps)
+LINT=PASS (4 apps)
+TESTS=PASS 5 813 (référence 5 799 + 14 tests sécurité ajoutés ; 0 échec)
+BUILDS=4/4 PASS (local)
 
 PRODUCTION_TOUCHED=NO
 DATABASE_TOUCHED=NO
 DEPLOYMENT_PERFORMED=NO
 
-VERDICT=__VERDICT__
+VERDICT=ELSATIA_V9_2_SECURITY_GO_WITH_RESERVATIONS
 ```
 
 ## 1. Périmètre, base et méthode
@@ -195,8 +195,8 @@ une allowlist MIME, et les chemins sont contrôlés par tenant (`foldername[1]`)
   service importent `server-only`. Seules les variables publiques attendues sont des
   `NEXT_PUBLIC_*` (URL, clé publishable/anon, DSN Sentry, mentions légales).
 - **Bundles** : `.next/static` des 4 builds (GP, Réserves, Colors) et l'export statique de
-  Tools (`out/`) ont été scannés sur les mêmes motifs. Résultat : __BUNDLE_SCAN__.
-- **Sourcemaps** : __SOURCEMAPS__.
+  Tools (`out/`) ont été scannés sur les mêmes motifs. Résultat : **aucun secret**. Sur 80 (GP), 90 (Tools), 21 (Réserves) et 16 (Colors) fichiers : aucune clé privée, `sk_`/`rk_`/`whsec_`/`sb_secret_`/`sbp_`/`sk-`/`gh*_`, URL DB avec mot de passe, JWT `service_role`, ni même le **nom** d'une variable secrète (`SUPABASE_SERVICE_ROLE_KEY`, `BANK_DATA_ENCRYPTION_KEY`, `STRIPE_SECRET_KEY`, `CRON_SECRET`, `VAPID_PRIVATE_KEY`, `PAYROLL_IMPORT_SECRET`). Limite : les builds locaux sont faits sans les valeurs hébergées ; le contrôle porte donc sur l'absence de référence client à ces variables, ce qui suffit, puisque Next n'inline que les `NEXT_PUBLIC_*`.
+- **Sourcemaps** : **0 fichier `.map`** dans les 4 `.next/static`. Côté Sentry, `deleteSourcemapsAfterUpload` est actif par défaut ; le fixer explicitement dans `next.config.ts` et ajouter un contrôle CI « aucun .map servi » sont recommandés (W-I).
 
 `PUBLIC_SECRET_EXPOSURE=NO`.
 
@@ -360,10 +360,10 @@ Mises à jour mineures recommandées dans un lot dédié :
 
 | Contrôle | Référence | Après correctifs |
 |---|---|---|
-| typecheck (4 apps) | PASS | __TYPECHECK__ |
-| lint (4 apps) | PASS | __LINT__ |
-| tests | 5 799 (2 950 + 2 174 + 239 + 436) | __TESTS_DETAIL__ |
-| builds | 4/4 | __BUILDS_DETAIL__ |
+| typecheck (4 apps) | PASS | **PASS** |
+| lint (4 apps) | PASS | **PASS** |
+| tests | 5 799 (2 950 + 2 174 + 239 + 436) | **5 813 PASS** (GP 2 964 + Tools 2 174 + Réserves 239 + Colors 436 ; 1 échec attendu et 194 ignorés côté GP, inchangés) |
+| builds | 4/4 | **4/4 PASS** : GP (`build:gestion-pro`), Tools (`NEXT_PUBLIC_TOOLS_ENV=local`), Réserves et Colors (`ELSATIA_APPLICATION_ENV=local`). Sans ces variables, les 3 satellites refusent volontairement de builder (garde fail-closed vérifiée). |
 | tests sécurité ciblés ajoutés | — | `url-impression`, `cron-auth`, `push-endpoint`, `storage-path`, CSV formule (`metre.test.ts`), push SSRF (`push.test.ts`) |
 
 La baseline a été rejouée avant les correctifs sur la même base : 2 950 + 2 174 + 239 + 436
@@ -444,7 +444,20 @@ Aucun correctif ne touche aux migrations, à Stripe (version d'API, prix, flux),
 
 ## 14. Verdict
 
-__VERDICT_TEXT__
+**`ELSATIA_V9_2_SECURITY_GO_WITH_RESERVATIONS`**
+
+- **Recette hébergée (Preview) : GO sécurité.** La revue ne trouve aucun CRITICAL ni HIGH, y
+  compris sur le SHA GP déployé `73d2abf8`. Les correctifs de cette revue n'y sont pas
+  encore : ils durcissent, ils ne débloquent rien. `PUBLIC_SECRET_EXPOSURE=NO`. L'IA est
+  neutralisée par `FEATURE_AI_ENABLED=false`. Les crons sont inertes en Preview (pas de
+  `CRON_SECRET`, pas de cron Vercel). Stripe est en mode TEST, en échec fermé.
+- **Réserves avant toute ouverture commerciale en production** :
+  1. Intégrer au train les 4 commits de cette revue.
+  2. Mission migration dédiée pour les volets SQL : R-M1, R-M2, R-M3, M-M2, A-M2, et le
+     volet SQL de M-M1, F-M1 et F-M2.
+  3. Limiteur de connexion partagé pour Colors et Réserves (A-M1).
+  4. Décision produit sur les essais multiples (B-M1).
+  5. Fermer `depassement_facture` (B-M2) **avant** toute activation de l'IA.
 
 ## 15. Garanties d'exécution
 
