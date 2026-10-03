@@ -18,7 +18,7 @@
 
 with
 -- [train-expectations] généré — ne pas modifier à la main (npm run sync:train-expectations)
-attendu_train(nb, derniere) as (values (408, '20261003001504')),
+attendu_train(nb, derniere) as (values (409, '20261003001601')),
 -- [/train-expectations]
 -- Fonctions des migrations V9 (liste vérifiée contre le train par le test du pack : chacune est
 -- définie par une migration de supabase/migrations).

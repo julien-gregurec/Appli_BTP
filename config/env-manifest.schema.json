@@ -10,7 +10,7 @@
       "enum": [
         "supabase_public", "supabase_service_role", "auth", "env_indicator", "url", "email", "security",
         "cron", "push", "encryption", "banking", "payments", "billing_price", "tools_billing", "ai",
-        "mobile_iap", "observability", "feature_flag", "build_metadata", "legal", "media", "tooling", "ci"
+        "mobile_iap", "observability", "feature_flag", "build_metadata", "legal", "media", "tooling", "ci", "social"
       ]
     },
     "url_class": { "enum": ["app_base", "auth_callback", "stripe_return", "api_endpoint", "provider_base", "cross_app_link", "origin_list"] },

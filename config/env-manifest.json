@@ -248,6 +248,10 @@
       {
         "path": "scripts/incident/",
         "justification": "Drill d'incident LOCAL (npm run incident:drill, INCIDENT RESPONSE & SAFE MODE V1) : pile jetable GoTrue/PostgREST/Redis/mocks Stripe-Brevo sur 127.0.0.1, secrets générés pour le drill. Ses variables (PORT, NOM, INCIDENT_DRILL_*) sont propres au banc ; jamais déployé ni lu par une application."
+      },
+      {
+        "path": "scripts/recette-elsatia-social/",
+        "justification": "Banc de recette locale d'ELSATIA Social (navigateur piloté, faux serveur IA) : RECETTE_*, CHROMIUM_PATH ne désignent que la machine de recette. Jamais déployé ni lu par une application."
       }
     ],
     "literal_prefixes": [
@@ -385,6 +389,10 @@
       {
         "path": "scripts/dr/v2/garde-cible.mjs",
         "justification": "Garde-fou DR V2 : lit, dans l'environnement reçu en paramètre, une liste fermée d'indicateurs de Production (VERCEL_ENV, ELSATIA_ENV, APP_ENV, NODE_ENV, NEXT_PUBLIC_SUPABASE_URL, DATABASE_URL) pour REFUSER une cible ; testé par garde-cible.test.mjs."
+      },
+      {
+        "path": "src/lib/social/configuration.ts",
+        "justification": "Assistant de configuration ELSATIA Social : lit par leur nom les variables Social listées dans ce fichier (toutes déclarées au manifeste, catégorie social) pour n'afficher que présence et format, jamais la valeur."
       }
     ]
   },
@@ -1596,7 +1604,7 @@
       "build_time": false,
       "runtime": true,
       "category": "cron",
-      "description": "Secret Bearer des tâches planifiées Vercel (Gestion Pro : abonnements et notifications push ; Réserves : notifications). Absent : 503. Même valeur dans Gestion Pro et Réserves par conception.",
+      "description": "Secret Bearer des tâches planifiées Vercel (Gestion Pro : abonnements, notifications push et planificateur ELSATIA Social /api/social/cron ; Réserves : notifications). Absent : 503. Même valeur dans Gestion Pro et Réserves par conception.",
       "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
@@ -7748,6 +7756,322 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false
+    },
+    {
+      "name": "SOCIAL_TOKEN_ENCRYPTION_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : clé AES-256-GCM des jetons OAuth Meta/LinkedIn (32 octets, hexadécimal : openssl rand -hex 32). Dérive aussi la signature HMAC de l'état OAuth anti-CSRF. Absente : connexion de comptes refusée, aucun jeton lisible. Valeur distincte par environnement, jamais dans Git.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès qu'ELSATIA Social (/plateforme/social) est utilisé",
+      "value_pattern": "^[0-9a-fA-F]{64}$",
+      "dr_note": "Perdue : les jetons chiffrés deviennent illisibles ; il suffit de reconnecter les comptes Meta et LinkedIn (aucune donnée métier perdue).",
+      "feature": "social"
+    },
+    {
+      "name": "SOCIAL_TOKEN_ENCRYPTION_KEY_PREVIOUS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : ancienne clé pendant une rotation, le temps d'exécuter « Rechiffrer les jetons » dans /plateforme/social/comptes, puis à retirer.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "uniquement pendant une rotation de SOCIAL_TOKEN_ENCRYPTION_KEY",
+      "feature": "social"
+    },
+    {
+      "name": "SOCIAL_DRY_RUN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "ELSATIA Social : mode simulation. FAIL-CLOSED : toute valeur autre qu'exactement « false » = simulation (aucune publication, réponse ni message envoyé à Meta/LinkedIn). Même à « false », l'envoi réel exige en plus VERCEL_ENV=production. Ne passer à « false » que sur accord explicite de Julien.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Julien — ELSATIA Social",
+        "criticality": "high",
+        "expected": {
+          "local": "true",
+          "preview": "true",
+          "production": "true"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "feature": "social"
+    },
+    {
+      "name": "META_APP_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : identifiant de l'application Meta (type Business, Facebook Login for Business). Absent : connexion Meta indisponible.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès qu'ELSATIA Social (/plateforme/social) est utilisé avec Facebook/Instagram",
+      "value_pattern": "^[0-9]+$",
+      "feature": "social"
+    },
+    {
+      "name": "META_APP_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : clé secrète de l'application Meta (échange OAuth, appsecret_proof, vérification X-Hub-Signature-256 des webhooks). Absente : connexion et webhooks Meta refusés.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès qu'ELSATIA Social (/plateforme/social) est utilisé avec Facebook/Instagram",
+      "feature": "social"
+    },
+    {
+      "name": "META_GRAPH_API_VERSION",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : version de la Graph API Meta. Absente : v26.0 (défaut du code).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^v[0-9]+\\.[0-9]+$",
+      "feature": "social"
+    },
+    {
+      "name": "META_LOGIN_CONFIG_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : identifiant de configuration Facebook Login for Business (facultatif). Absent : demande de scopes classique.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "feature": "social"
+    },
+    {
+      "name": "META_WEBHOOK_VERIFY_TOKEN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : jeton aléatoire du défi GET des webhooks Meta, saisi aussi dans l'application Meta. Absent : vérification du webhook refusée (403).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les webhooks Meta sont abonnés",
+      "feature": "social"
+    },
+    {
+      "name": "LINKEDIN_CLIENT_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : Client ID de l'application LinkedIn dédiée (Community Management API). Absent : connexion LinkedIn indisponible.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès qu'ELSATIA Social (/plateforme/social) est utilisé avec LinkedIn",
+      "feature": "social"
+    },
+    {
+      "name": "LINKEDIN_CLIENT_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : Client Secret LinkedIn (échange OAuth, renouvellement, signature X-LI-Signature des webhooks). Absent : connexion et webhooks LinkedIn refusés.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès qu'ELSATIA Social (/plateforme/social) est utilisé avec LinkedIn",
+      "feature": "social"
+    },
+    {
+      "name": "LINKEDIN_API_VERSION",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : en-tête LinkedIn-Version (AAAAMM). Absente : 202609. À mettre à jour au moins une fois par an.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^[0-9]{6}$",
+      "feature": "social"
+    },
+    {
+      "name": "LINKEDIN_ORGANIZATION_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "social",
+      "description": "ELSATIA Social : identifiant numérique de la Page Entreprise LinkedIn ELSATIA, affiché par l'assistant de configuration pour contrôle. Facultatif : l'organisation est choisie lors de la connexion OAuth.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^[0-9]+$",
+      "feature": "social"
     }
   ]
 }

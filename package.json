@@ -19,6 +19,7 @@
     "verify:migrations": "node scripts/verify-migrations.mjs && node scripts/verify-migration-targets.mjs",
     "test:migration-targets": "node --test scripts/verify-migration-targets.test.mjs",
     "verify:secrets": "node scripts/verify-secrets.mjs",
+    "elsatia:logo": "node scripts/elsatia-logo.mjs",
     "verify:stripe-prices": "node scripts/verify-stripe-prices.mjs",
     "verify:env-manifest": "node scripts/check-env-manifest.mjs",
     "test:env-manifest": "node --test scripts/check-env-manifest.test.mjs",

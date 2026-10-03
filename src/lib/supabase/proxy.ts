@@ -18,7 +18,7 @@ import {
   estCulDeSacInformatif,
 } from "@/lib/supabase/routage-proxy";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/tools/monetization", "/identity", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/tools/monetization", "/identity", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health", "/api/social/webhooks", "/api/social/cron"];
 
 type LigneAbonnementSocle = {
   abonnement_offre?: string | null;
@@ -105,6 +105,9 @@ export async function updateSession(request: NextRequest) {
   // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
   const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/cookies", "/guides", "/videos", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
                                 "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health",
+                                // ELSATIA Social : webhooks signés (Meta/LinkedIn, signature vérifiée par la route) et
+                                // planificateur protégé par CRON_SECRET — jamais par cookie.
+                                "/api/social/webhooks", "/api/social/cron",
                                 // API de facturation Tools : appelée depuis l'origine Tools avec un jeton Bearer (vérifié par
                                 // authenticatedToolsUser) ou par Stripe (signature vérifiée par la route) — jamais par cookie.
                                 // Barre finale : le test par préfixe ci-dessous n'a pas de frontière de segment.

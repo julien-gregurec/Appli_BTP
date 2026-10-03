@@ -8,6 +8,16 @@
   --elsatia-gold: #c9a24a;
   --elsatia-white: #ffffff;
   --elsatia-gray-clair: #e6e6e6;
+
+  /* Famille bleu / cyan / blanc du nouveau logo ELSATIA (module ELSATIA Social).
+     Valeurs provisoires à recaler sur public/elsatia/logo-officiel.svg : source
+     unique src/lib/elsatia/marque.ts (npm run elsatia:logo affiche les dominantes). */
+  --elsatia-nuit: #071a3d;
+  --elsatia-profond: #0b3d91;
+  --elsatia-electrique: #1e6bff;
+  --elsatia-cyan: #18c8e8;
+  --elsatia-argent: #c7d2de;
+  --elsatia-blanc: #ffffff;
 }
 
 @theme inline {
@@ -22,6 +32,12 @@
   --color-elsatia-gold: var(--elsatia-gold);
   --color-elsatia-white: var(--elsatia-white);
   --color-elsatia-gray-clair: var(--elsatia-gray-clair);
+  --color-elsatia-nuit: var(--elsatia-nuit);
+  --color-elsatia-profond: var(--elsatia-profond);
+  --color-elsatia-electrique: var(--elsatia-electrique);
+  --color-elsatia-cyan: var(--elsatia-cyan);
+  --color-elsatia-argent: var(--elsatia-argent);
+  --color-elsatia-blanc: var(--elsatia-blanc);
 }
 
 @theme {

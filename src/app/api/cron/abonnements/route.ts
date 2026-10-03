@@ -5,6 +5,7 @@ import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
 import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
 import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
 import { rapprocherAbonnementsStripe } from "@/lib/stripe-abonnement-rapprochement";
+import { executerTachesSociales } from "@/lib/social/taches";
 import { creerPortPurgeSupabase, lireConfigPlanificateurPurge, planifierPurgesRgpd } from "@/lib/rgpd-purge-planificateur";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
@@ -134,7 +135,16 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   // (choix conservateur, double verrou). Activation soumise à décision propriétaire :
   // voir docs/qualification/ELSATIA_DATA_RETENTION_BACKUP_CONSISTENCY_V1.md.
   const purgeRgpd = await planifierPurgesRgpd(creerPortPurgeSupabase(admin), lireConfigPlanificateurPurge(process.env), new Date());
-  return { traitees: resultats.length, resultats, rapprochement, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes, purgeRgpd };
+  // Rattrapage quotidien ELSATIA Social (même raison : limite de crons du plan Hobby).
+  // La programmation à l'heure près exige l'appel fréquent de /api/social/cron. Toute
+  // écriture vers Meta/LinkedIn reste soumise au mode simulation (SOCIAL_DRY_RUN).
+  let elsatiaSocial: Awaited<ReturnType<typeof executerTachesSociales>> | { erreur: string };
+  try {
+    elsatiaSocial = await executerTachesSociales(admin, { synchroniser: true });
+  } catch (erreur) {
+    elsatiaSocial = { erreur: erreur instanceof Error ? erreur.message : "Tâches ELSATIA Social impossibles" };
+  }
+  return { traitees: resultats.length, resultats, rapprochement, optionIA, paiePeriodes, alertesPointage, capacite, suspensionsImpayes, purgeRgpd, elsatiaSocial };
 }
 
 export async function GET(request: Request) {
