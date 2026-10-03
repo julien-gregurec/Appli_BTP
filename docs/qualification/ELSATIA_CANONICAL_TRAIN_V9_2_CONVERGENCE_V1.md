@@ -12,7 +12,7 @@ ZERO_DATA_LOSS=OUI (V9.1 → V9.2 : 283 tables comparées ligne à ligne ×4 bas
 PGTAP=172/181 suites propres, 9 161 ok — les 9 non propres sont exactement celles déjà non propres sur V9.1 (environnement : Studio dédié ×7, pgsodium réel, Tools cloud sync)
 VITEST=GP 2 950 ✓ (1 échec attendu SEC-6, identique V9.1) · Tools 2 174 ✓ · Réserves 239 ✓ · Colors 436 ✓ · Studio non requis (aucun package partagé importé par Studio touché)
 PLAYWRIGHT=GP métier 13/13 (matrice 6 rôles) · satellites/cross-app 16/16 (local 10, Preview simulée 4, Production simulée 2)
-PERFORMANCE=@@PERFORMANCE@@
+PERFORMANCE=OK — push 10 000 × 4 workers 0 perte / 0 doublon ; relances 10 000 factures 0 famine ; RLS 1k/20k/50k/100k (lecture croisée 1–6 ms) ; multi-tenant 3 000 requêtes 0 fuite ; endurance PostgREST 15 min 422 371 requêtes 0 erreur 0 fuite ; migration RLS 1503 : 0 deadlock, échecs propres et rejouables sous lecture lente
 BUSINESS=17 défauts V9.1 corrigés + 3 nouveaux (N1 rentabilité avec avoir, N2 situations avec remise globale, N3 course du pointage oublié) conservés ; sondes PostgREST 42/42 ; endurance concurrente 0 écart ; B10/B22/B23 = DECISION_REQUIRED_PRODUCT
 SATELLITES=fixture pilote 23/23, GP actif, Drone bientot fermé, publishable key Réserves, URLs environment-aware, Réserves → GP, Réserves :3040, url_preview propriétaire + AAL2, Tools env strict (3 builds + 2 refus) — pgTAP 45/45, Playwright 16/16
 PRODUCTION_HARNESS=PRODUCTION_UPGRADE_HARNESS_LOCALLY_QUALIFIED sur V9.2 (sans --bridge) ; preflight 39/39 ; plan qualifié publié `scripts/upgrade/manifests/target-3fa52210.json`
@@ -21,9 +21,18 @@ PRODUCTION_HARNESS=PRODUCTION_UPGRADE_HARNESS_LOCALLY_QUALIFIED sur V9.2 (sans -
 
 ## Verdict
 
-# `@@VERDICT@@`
+# `ELSATIA_CANONICAL_TRAIN_V9_2_LOCALLY_QUALIFIED`
 
-@@VERDICT_TEXTE@@
+Les trois lots convergent en un train unique de **408 migrations** : 391 de V9.1 inchangées à l'octet, 17 ajouts
+tracés (4 renumérotés, corps identiques). La composition est **prouvée** : catalogue V9.2 = V9.1 + union exacte des trois
+deltas, 0 conflit. Toutes les exigences techniques locales des phases 1 à 14 sont vertes : fresh, 4 upgrades V9.1, Production 210
+sans `--bridge`, pgTAP, PostgREST, Playwright, performance, pack Preview générique. Quatre défauts de convergence ont été trouvés et corrigés (CONV-1 à
+CONV-4).
+
+Pourquoi `LOCALLY_QUALIFIED` et non `PARTIALLY_QUALIFIED` : les points ouverts sont **tous** des décisions
+(`DECISION_REQUIRED_PRODUCT` B10/B22/B23, `DECISION_REQUIRED_PRODUCTION`) que la mission interdit de trancher. Le code reste
+fail-closed (bêta inchangée, preflight bloquant). Ils bloquent les gates **COMMERCIAL** et **PRODUCTION**, pas le gate
+**LOCAL**. Restent NOT_PROVEN comme dans les lots : Supabase CLI réel (Docker absent), WebKit, PostgreSQL 17.
 
 Qualification **locale uniquement**. Aucune Preview réelle, aucune Production, aucun Stripe (Test ou Live), aucun secret
 réel (secrets de banc générés aléatoirement, jamais versionnés), aucun merge `main`, aucune modification des 391
@@ -140,7 +149,7 @@ Base : V9.1 + `generate_fixture.sql` + tenants volumétriques **1k (k=11), 20k (
 | **Relances** cron réel (`traiterRelancesAutomatiques`, PostgREST, JWT service_role) | 10 000 documents, 0 famine | 10 000 factures / 5 tenants : **2 000/2 000 dues atteintes** en 2 passages, 0 doublon, 0 dépassement du maximum ([json](canonical-train-v9-2/relances_charge_10k.json)) |
 | **RLS** `bench_explain.sh` 1k / 20k / 50k / 100k | — | lecture propre 1 000 lignes 6–9 ms ; liste RLS seule 7–31 ms ; page au milieu 6–60 ms ; comptages 6–29 ms ; **lecture croisée vide 1–6 ms, 0 ligne, constante** ; seule exception connue : `taches` own_count ≈ 0,35 s (pas d'`entreprise_id`, limite du lot) ([csv](canonical-train-v9-2/perf/rls_explain_v92.csv)) |
 | **Multi-tenant** PostgREST | ≥ 3 000 requêtes, 0 fuite | **3 000 requêtes** entrelacées 4 tenants (1k → 100k), 10 clients : 0 erreur, **0 fuite**, 0 lecture croisée non vide, p50 14 ms / p95 74 ms / max 318 ms ([json](canonical-train-v9-2/perf/pgrst_multitenant_3000.json)) |
-| **Endurance** PostgREST | ≥ 15 min | @@ENDURANCE@@ |
+| **Endurance** PostgREST | ≥ 15 min | **15 min**, 10 clients, 4 tenants : **422 371 requêtes**, 469 req/s, 0 erreur, **0 fuite**, 0 lecture croisée non vide, p50 13 ms / p95 69 ms / max 410 ms, stables minute par minute ([json](canonical-train-v9-2/perf/pgrst_endurance_15min.json)) |
 | Upgrade volumétrique | — | 17 migrations, chacune < 0,7 s (`…1503` 105 ms, `…1504` 182 ms, `…0202` 617 ms) |
 
 **Migration RLS `…1503` sous trafic** (`scripts/qualification/v9-2/rls-verrous-sous-trafic.sh`, base V9.1 volumétrique amenée
@@ -290,7 +299,7 @@ D01-D14 + S12 ; **CA net** d'avoirs : pgTAP N1, S10.
 | Gate | État | Preuve / reste |
 |---|---|---|
 | **CODE_GATE** | ✅ **PASSED** | intégrité du train, composition, typecheck, lint, Vitest, builds, verify:* |
-| **LOCAL_GATE** | @@LOCAL_GATE@@ | fresh, 4 upgrades, Production 210, pgTAP, PostgREST, Playwright, performance |
+| **LOCAL_GATE** | ✅ **PASSED** | fresh, 4 upgrades, Production 210, pgTAP, PostgREST, Playwright, performance |
 | **PREVIEW_GATE** | ⛔ **NOT_RUN** | pack opérateur READY hors ligne ; exige : export du ledger réel, sauvegarde, `db push --dry-run` réel, inventaire Vercel, attestation k1, recette HTTP / pilote (EXTERNAL_CONFIGURATION_REQUIRED) |
 | **PRODUCTION_GATE** | ⛔ **BLOCKED** | décisions Production ouvertes (UPG-P0-2, troncature, UPG-P1-1, UPG-SEC-1) ; aucune preuve hébergée ; preflight fail-closed |
 | **COMMERCIAL_GATE** | ⛔ **BLOCKED** | B10 / B22 / B23 (DECISION_REQUIRED_PRODUCT), Stripe Live non configuré / non testé, logout |
