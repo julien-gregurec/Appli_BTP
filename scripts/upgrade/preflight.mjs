@@ -192,7 +192,7 @@ export function evaluer(o, d) {
         ...((o.phase ?? "principale") === "principale" ? (o.targetPlan?.preconditions_phase_principale ?? []) : [])];
       for (const k of preconditionsPlan) {
         if (!(k in pre)) pb.push(`précondition ${k} non mesurée`);
-        else if (Number(pre[k]) !== 0) pb.push(`précondition ${k} = ${pre[k]} (bloquante pour ce plan)`);
+        else if (Number(pre[k]) !== 0 && !(k.startsWith("bloquant_") && !differees.has(k))) pb.push(`précondition ${k} = ${pre[k]} (bloquante pour ce plan)`);
       }
     }
     verif("P7", pb.length === 0, pb.length ? pb.join(" ; ") : `Production ${att.project_ref} attestée par ${att.exported_by} (${att.exported_at}), préconditions de données à 0`);

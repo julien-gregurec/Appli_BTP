@@ -1,5 +1,9 @@
 # ELSATIA — PRODUCTION UPGRADE HARNESS V1 (ancienne Production 210 → tête V9.x)
 
+> **Suite** : [`ELSATIA_PLATFORM_READINESS_V9_1.md`](ELSATIA_PLATFORM_READINESS_V9_1.md) — les ponts v1/v2 proposés ci-dessous
+> (versions 298 / 399, antérieures à des migrations appliquées en Preview) ne sont **pas** intégrés ; ils sont remplacés
+> par les ponts post-V9.1 du train (`20261003000201` phase 0, `20261003000202`). Le harnais y est qualifié sans `--bridge`.
+
 ```
 SOURCE_LEDGER_ASSUMED=5777abbcb94fb899ed14a3e7e5213be8f3abb0e7 (dernière 20260824000231 ; rapporté, NON vérifié en direct)
 SOURCE_MIGRATION_COUNT=210

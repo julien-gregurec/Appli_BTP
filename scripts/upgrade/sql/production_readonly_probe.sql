@@ -53,8 +53,8 @@ select count(*) as info_essai_expire_coupe_en_base
   from public.entreprises where abonnement_statut = 'essai' and abonnement_essai_fin < current_date;
 
 -- 3. UPG-P0-1 — 20260921000300 backfille lignes_factures.entreprise_id par UPDATE, bloqué par le trigger
---    lignes_factures_brouillon_only dès qu'une facture ÉMISE a des lignes. Bloquant SANS le pont
---    scripts/upgrade/bridges/20260921000298 + 399 (le preflight lit la présence du pont dans le plan qualifié).
+--    lignes_factures_brouillon_only dès qu'une facture ÉMISE a des lignes. Couvert depuis V9.1 readiness par le pont
+--    DU TRAIN 20261003000201 (phase 0) ; les ponts proposés scripts/upgrade/bridges/ (298 / 399) ne sont plus à intégrer.
 select count(*) as lignes_factures_emises
   from public.lignes_factures lf join public.factures f on f.id = lf.facture_id where f.statut <> 'brouillon';
 

@@ -1,0 +1,146 @@
+[
+ {
+  "qui": "moyenne",
+  "requete": "liste_devis",
+  "avant_ms": 3967.98,
+  "apres_ms": 7456.65,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "liste_factures",
+  "avant_ms": 3911.69,
+  "apres_ms": 7622.81,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "lignes_un_devis",
+  "avant_ms": 4243.74,
+  "apres_ms": 7763.89,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "lignes_une_facture",
+  "avant_ms": 4108.11,
+  "apres_ms": 7462.44,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "pointages_mois",
+  "avant_ms": 2672.39,
+  "apres_ms": 4613.98,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "planning_semaine",
+  "avant_ms": 55.05,
+  "apres_ms": 1104.2,
+  "regression": true,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "clients_recherche",
+  "avant_ms": 3881.47,
+  "apres_ms": 7325.76,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "journal_recent",
+  "avant_ms": 38093.83,
+  "apres_ms": 71991.62,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "moyenne",
+  "requete": "documents_chantier",
+  "avant_ms": 3259.24,
+  "apres_ms": 4680.4,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "liste_devis",
+  "avant_ms": 5486.07,
+  "apres_ms": 10210.03,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "liste_factures",
+  "avant_ms": 5593.84,
+  "apres_ms": 10082.5,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "lignes_un_devis",
+  "avant_ms": 5565.46,
+  "apres_ms": 10273.8,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "lignes_une_facture",
+  "avant_ms": 5715.33,
+  "apres_ms": 10153.63,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "pointages_mois",
+  "avant_ms": 1466.14,
+  "apres_ms": 2470.55,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "planning_semaine",
+  "avant_ms": 60.23,
+  "apres_ms": 559.28,
+  "regression": true,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "clients_recherche",
+  "avant_ms": 85.55,
+  "apres_ms": 163.94,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "journal_recent",
+  "avant_ms": 54399.28,
+  "apres_ms": 103805.3,
+  "regression": false,
+  "bloquant": false
+ },
+ {
+  "qui": "volumetrique",
+  "requete": "documents_chantier",
+  "avant_ms": 8528.18,
+  "apres_ms": 14511.78,
+  "regression": false,
+  "bloquant": false
+ }
+]

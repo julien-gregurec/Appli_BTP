@@ -1,0 +1,27 @@
+== S1 : coupure entre deux migrations (après 20260902000255) puis reprise ==
+  ✅ S1a : arrêt propre (code 75), ledger 254 = 210 + préfixe jusqu'à 20260902000255
+  ✅ S1b : reprise --resume : upgrade complet qualifié (ledger 396)
+== S2 : panne DANS la transaction de 20260921000300 ==
+  ✅ S2a : panne → code 76, transaction annulée : schéma + ACL + ledger identiques à l'état d'avant (empreinte f438d8e25ae2)
+  ✅ S2b : reprise après panne : upgrade complet qualifié
+== S3 : ledger EN RETARD (migration appliquée sans sa ligne de ledger) ==
+NOTICE:  database "upg_s3_naif" does not exist, skipping
+  ✅ S3a : reprise naïve : 20260921000300 rejouée sans erreur (idempotente) — état final qualifié
+  ✅ S3b : réparation : état prouvé égal à la référence, version inscrite à la main, reprise qualifiée
+== S4 : ledger EN AVANCE (version inscrite, migration jamais appliquée) ==
+  ✅ S4 : migration sautée DÉTECTÉE par le harnais (verdict KO : ❌ upgrade interrompu par une panne sur 20261003000202_pont_upgrade_prod_controle_lignes_v1.sql — reprise : même commande + --resume ) → restauration
+== S5 : restauration du dump d'avant upgrade ==
+NOTICE:  database "upg_s5" does not exist, skipping
+  ✅ S5 : restauration : 153 tables / 56188 lignes identiques, ACL/RLS identiques (0 ligne), ledger 210 ; erreurs pg_restore : 0
+== S6 : idempotence (chaque migration rejouée une 2e fois, transaction annulée) ==
+  ✅ S6 : 131 migrations idempotentes, 55 non idempotentes (liste : s6.tsv) — la reprise s'appuie sur le ledger, jamais sur l'idempotence
+
+S1a|OK|arrêt propre (code 75), ledger 254 = 210 + préfixe jusqu'à 20260902000255
+S1b|OK|reprise --resume : upgrade complet qualifié (ledger 396)
+S2a|OK|panne → code 76, transaction annulée : schéma + ACL + ledger identiques à l'état d'avant (empreinte f438d8e25ae2)
+S2b|OK|reprise après panne : upgrade complet qualifié
+S3a|OK|reprise naïve : 20260921000300 rejouée sans erreur (idempotente) — état final qualifié
+S3b|OK|réparation : état prouvé égal à la référence, version inscrite à la main, reprise qualifiée
+S4|OK|migration sautée DÉTECTÉE par le harnais (verdict KO : ❌ upgrade interrompu par une panne sur 20261003000202_pont_upgrade_prod_controle_lignes_v1.sql — reprise : même commande + --resume ) → restauration
+S5|OK|restauration : 153 tables / 56188 lignes identiques, ACL/RLS identiques (0 ligne), ledger 210 ; erreurs pg_restore : 0
+S6|OK|131 migrations idempotentes, 55 non idempotentes (liste : s6.tsv) — la reprise s'appuie sur le ledger, jamais sur l'idempotence
