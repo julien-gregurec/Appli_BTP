@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Sondes API réelles (PostgREST officiel, JWT HS256 par utilisateur) de
 // GP BUSINESS HARDENING V9.1 — phases C (données financières), D (confidentialité
-// salariés) et I (anon / service_role). Base préparée par preparer-banc.sh.
+// salariés) et I (anon / service_role). Base préparée par preparer-banc-postgrest.sh.
 //
 // Usage : SONDE_URL=http://127.0.0.1:3001 SONDE_SECRET=<secret JWT> SONDE_BASE=<base> \
-//         node scripts/qualification/gp-business-hardening-v9-1/sondes-postgrest.mjs
+//         node tests/e2e/gp-business-hardening-pile-locale/sondes-postgrest.mjs
 // Sortie : une ligne JSON par sonde ({ id, attendu, http, code, obtenu, verdict }).
 // Refuse toute URL non locale.
 import { createHmac } from "node:crypto";

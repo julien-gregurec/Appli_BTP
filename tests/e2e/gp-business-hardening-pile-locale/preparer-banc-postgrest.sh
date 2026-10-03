@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prépare une base de sondes PostgREST : copie d'une base migrée + décor, rôle
-# authenticator avec mot de passe local. Usage : preparer-banc.sh <modèle> <base> <mdp>
+# authenticator avec mot de passe local. Usage : preparer-banc-postgrest.sh <modèle> <base> <mdp>
 set -euo pipefail
 MODELE="${1:?modèle}"; BASE="${2:?base}"; MDP="${3:?mot de passe local}"
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
