@@ -25,8 +25,9 @@ La qualification est **partielle** pour quatre raisons, toutes documentées plus
 3. **Limites de capacité** au-delà de la cible PME 20–40 salariés : `/employes` (32 Mo HTML à 500 salariés,
    RSS serveur 2,7 Go), `/planning` (8 Mo), `/dashboard` CPU-bound au-delà de ~10 000 alertes ouvertes.
 4. **Volumétrie 250 000 non atteinte** pour devis/factures (génération interrompue après 7 101 s, § 2) ;
-   le palier **100 000** est atteint et mesuré (exactitude PASS, dashboard 917 ms côté API). Les mesures ont été prises sur un conteneur 4 vCPU **partagé** avec les
-   générateurs : les latences sont pessimistes (signalé à chaque fois qu'un chiffre en dépend).
+   le palier **100 000** est atteint et mesuré (exactitude PASS, dashboard 917 ms côté API).
+   Une partie des mesures a été prise sur un conteneur 4 vCPU **partagé** avec les générateurs : ces
+   latences sont pessimistes (signalé à chaque fois ; la série dashboard 1k → 100k a été refaite au repos).
 
 ---
 
@@ -77,8 +78,9 @@ Totaux base `soak` : 298 939 pointages, 233 739 tâches, 183 312 devis (434 874 
 
 Le coût d'écriture est dominé par les triggers des lignes de documents : **une seule ligne de devis
 insérée coûte 13–25 ms** (`EXPLAIN ANALYZE` : `recalc_devis_apres_insertion_lignes` 18,9 ms, dont la mise à
-jour imbriquée du devis et ses propres triggers). Linéaire (1k → 20k : ×38 de durée pour ×20 de volume),
-mais 500 000 lignes représentent plusieurs heures sur ce conteneur. Le palier 250 000 a été arrêté pour
+jour imbriquée du devis et ses propres triggers). Coût par document à peu près constant au repos (1k → 20k : ×38 de durée pour ×20 de volume) ; les paliers
+50k et 100k (2 865 s, 13 070 s) ont été générés en concurrence avec les autres mesures (durées non comparables) ;
+500 000 lignes de devis + 500 000 lignes de factures représentent plusieurs heures sur ce conteneur. Le palier 250 000 a été arrêté pour
 libérer la machine avant le long run. Ce n'est **pas** un défaut applicatif (l'éditeur enregistre quelques
 dizaines de lignes par appel), mais c'est la cause du constat J6 (création d'un devis de 50 000 lignes :
 135 s).
@@ -161,8 +163,9 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
   `peut_consulter_affectation_employe` **et** `peut_consulter_pointage_employe` pour chacun des 500
   salariés (≈ 1 ms/appel). À 20 lecteurs simultanés : p50 10 s, **85 / 200 réponses 504** (pool
   PostgREST de 10 saturé) → FAIL à cette échelle (**P2-3**). Conflits : le trigger
-  `trg_verifier_heures_affectation` (verrou consultatif par salarié/jour, plafond 24 h) a correctement
-  sérialisé les insertions concurrentes ; aucun deadlock.
+  `trg_verifier_heures_affectation` (verrou consultatif par salarié/jour, plafond 24 h) a été exercé
+  par les insertions en masse (90 000 affectations, aucun dépassement, aucun deadlock) ; les écritures
+  *concurrentes* d'affectations n'ont pas été mises en charge séparément (non couvert).
 
 ### C — Pointages
 
