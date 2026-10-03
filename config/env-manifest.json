@@ -6586,6 +6586,28 @@
       "example_required": false
     },
     {
+      "name": "CHARGE_DELAI_MAX_MS",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Délai client maximal par requête (ms, défaut 120000) du banc de charge PostgREST local de PERFORMANCE HARDENING V9.1 (scripts/perf/hardening/rls/charge_postgrest.mjs). Banc local uniquement, aucune valeur déployée.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "PASSERELLE_HOTE",
       "applications": [
         "e2e"
