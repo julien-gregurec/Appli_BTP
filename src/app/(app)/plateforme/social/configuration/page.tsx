@@ -71,7 +71,7 @@ export default async function ConfigurationPage() {
   const bloquants = controles.filter((c) => c.etat === "manquant" || c.etat === "invalide").length + (erreurMigration ? 1 : 0) + (!bucket ? 1 : 0) + logos.manquants.length;
 
   const etapes: Array<{ titre: string; fait: boolean; detail: string }> = [
-    { titre: "Migration 184 appliquée", fait: !erreurMigration, detail: erreurMigration ? "Tables ELSATIA Social absentes de cette base." : "Tables présentes." },
+    { titre: "Migration ELSATIA Social (20261003001601) appliquée", fait: !erreurMigration, detail: erreurMigration ? "Tables ELSATIA Social absentes de cette base." : "Tables présentes." },
     { titre: "Bucket privé social-medias", fait: Boolean(bucket), detail: bucket ? `Présent${bucket.public ? " — ATTENTION : public" : ", privé"}.` : "Absent." },
     { titre: "Logo officiel ELSATIA", fait: logos.manquants.length === 0, detail: logos.manquants.length ? `Manquant : ${logos.manquants.join(", ")}` : "Présent." },
     { titre: "Variables ELSATIA", fait: controles.filter((c) => c.groupe === "ELSATIA").every((c) => c.etat !== "manquant" && c.etat !== "invalide"), detail: "Clé de chiffrement, CRON_SECRET, URL." },

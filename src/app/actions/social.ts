@@ -365,7 +365,7 @@ export async function finaliserMediaAction(m: SaisieMedia): Promise<Resultat<{ i
       .from("social_medias")
       .insert({
         type,
-        storage_path: chemin,
+        chemin_objet: chemin,
         mime_type: mime,
         nom_original: m.nom.slice(0, 200) || `media.${extension(mime)}`,
         taille_octets: taille,
@@ -388,9 +388,9 @@ export async function lienApercuMediaAction(mediaId: string): Promise<Resultat<{
   return executer(async () => {
     await exigerSocial("consulter");
     const admin = adminSocial();
-    const { data: media } = await admin.from("social_medias").select("storage_path").eq("id", mediaId).maybeSingle();
+    const { data: media } = await admin.from("social_medias").select("chemin_objet").eq("id", mediaId).maybeSingle();
     if (!media) throw new Error("Média introuvable.");
-    const { data } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrl(media.storage_path, 900);
+    const { data } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrl(media.chemin_objet, 900);
     if (!data) throw new Error("Aperçu indisponible.");
     return { ok: true, donnees: { url: data.signedUrl } };
   });

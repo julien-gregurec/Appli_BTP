@@ -77,7 +77,7 @@ export type Publication = {
 export type Media = {
   id: string;
   type: "image" | "video";
-  storage_path: string;
+  chemin_objet: string;
   mime_type: string;
   nom_original: string;
   taille_octets: number;

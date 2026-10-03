@@ -23,7 +23,7 @@ drop function if exists public.social_audit_ajout_seul(), public.social_touch_up
   public.social_consommer_quota(text, integer, integer), public.social_verrouiller_cible(uuid),
   public.social_publications_garde_fou(), public.social_role_courant(), public.social_role_de(uuid),
   public.social_session_courante(), public.social_definir_role(uuid, text),
-  public.social_valider_publication(uuid, text, text);
+  public.social_valider_publication(uuid, text, text), public.social_lister_equipe();
 
 -- Le bucket privé social-medias est conservé : Supabase interdit sa suppression
 -- en SQL (storage.protect_delete). Le supprimer, si besoin, depuis Storage dans le

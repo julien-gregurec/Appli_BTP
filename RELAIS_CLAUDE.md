@@ -1,5 +1,14 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE AUTORITATIVE — 3 octobre 2026, ELSATIA Social intégré au train canonique V9.2
+
+- Branche `integration/elsatia-social-v1`, créée depuis `integration/elsatia-canonical-train-v9.2` (`dfb59cc`). Report contrôlé des fichiers Social, sans fusion de l'ancien `main`. Pas de PR, pas de merge dans le train final, pas de Preview, pas de Production.
+- Migration `20261003001601_elsatia_social.sql` (ex-`184`). Train : **409 migrations**. Modèle canonique : `auth.uid()` → `plateforme_admins.utilisateur_id` → `actif` ; AAL2 via `plateforme_exiger_session_aal2()` (rôles, validation) et garde serveur `exigerSocial()` ; garde du mode sûr incident posée.
+- `SOCIAL_DRY_RUN` reste en simulation partout : aucune publication réelle possible sans accord explicite de Julien.
+- Source unique du logo : `public/elsatia/` (`logo-officiel.svg`, `symbole.svg`, `logo-officiel-blanc.svg`) ; `public/branding/` interdit (test).
+- Page publique `/suppression-donnees` (URL à déclarer chez Meta/LinkedIn), non publiée en Production.
+- Ledger Preview lu le 03/10/2026 : 372 versions (dernière `20261002000813`), 37 en attente. Plan, Meta, LinkedIn : `docs/ELSATIA_SOCIAL_PREPRODUCTION.md`. Recette : `docs/ELSATIA_SOCIAL_RECETTE.md`.
+
 ## REPRISE AUTORITATIVE — 18 juillet 2026, coût client et appareils déplacés dans Abonnement
 
 - L’avertissement de dépassement d’appareils a été retiré du tableau de bord : aucune information de facturation SaaS n’encombre désormais l’accueil opérationnel.

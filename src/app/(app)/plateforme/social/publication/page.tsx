@@ -29,7 +29,7 @@ export default async function PublicationPage({ searchParams }: { searchParams: 
 
   const urls = new Map<string, string>();
   if (p?.medias.length) {
-    const { data } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrls(p.medias.map((m) => m.storage_path), 900);
+    const { data } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrls(p.medias.map((m) => m.chemin_objet), 900);
     for (const [i, m] of p.medias.entries()) if (data?.[i]?.signedUrl) urls.set(m.id, data[i].signedUrl);
   }
 

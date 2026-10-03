@@ -33,7 +33,7 @@ async function preparerMedias(admin: SupabaseClient, medias: Media[]): Promise<M
   const resultat: MediaAPublier[] = [];
   for (const m of medias) {
     // Lien signé d'une heure : la plateforme télécharge le média, le bucket reste privé.
-    const { data, error } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrl(m.storage_path, 3600);
+    const { data, error } = await admin.storage.from(BUCKET_SOCIAL).createSignedUrl(m.chemin_objet, 3600);
     if (error || !data) throw new ErreurSocial("transitoire", "Lien temporaire du média impossible à créer");
     resultat.push({
       type: m.type,
@@ -45,7 +45,7 @@ async function preparerMedias(admin: SupabaseClient, medias: Media[]): Promise<M
       dureeSecondes: m.duree_secondes === null ? null : Number(m.duree_secondes),
       texteAlternatif: m.texte_alternatif,
       lireOctets: async () => {
-        const telechargement = await admin.storage.from(BUCKET_SOCIAL).download(m.storage_path);
+        const telechargement = await admin.storage.from(BUCKET_SOCIAL).download(m.chemin_objet);
         if (telechargement.error || !telechargement.data) throw new ErreurSocial("transitoire", "Lecture du média impossible");
         return telechargement.data.arrayBuffer();
       },

@@ -24,6 +24,25 @@ const TABLES_OUVERTES_A_SERVICE_ROLE = new Set([
   "journal_activite", // INSERT seulement
   "periodes_paie", // SELECT (id, entreprise_id, statut), UPDATE (date_export, updated_at)
   "lots_virements", // SELECT (id, entreprise_id, provider_payment_id)
+  // ELSATIA Social (20261003001601) : GRANT explicites au service_role, révoqués puis
+  // accordés table par table, prouvés par supabase/tests/elsatia_social_v1.test.sql
+  // (social_audit : SELECT + INSERT seulement ; aucune autre table hors social_*).
+  "social_membres",
+  "social_parametres",
+  "social_comptes",
+  "social_identifiants",
+  "social_connexions_en_attente",
+  "social_medias",
+  "social_publications",
+  "social_publication_medias",
+  "social_publication_cibles",
+  "social_statistiques",
+  "social_abonnes",
+  "social_commentaires",
+  "social_messages",
+  "social_webhook_evenements",
+  "social_quotas",
+  "social_audit",
 ]);
 
 const RACINE = join(process.cwd(), "src");

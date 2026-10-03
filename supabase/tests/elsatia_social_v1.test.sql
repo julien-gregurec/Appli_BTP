@@ -8,7 +8,7 @@
 --   6. Verrou anti-doublon, quotas, journal en ajout seul, bucket privé.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(66);
+select plan(74);
 
 -- ─── Fixtures ─────────────────────────────────────────────────────────
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at) values
@@ -87,6 +87,7 @@ select throws_ok($$ update public.social_publications set titre = 'piraté' $$, 
 select is((select role from public.social_session_courante()), 'lecture', 'session : rôle social résolu par UID');
 select ok((select aal2 from public.social_session_courante()), 'session : AAL2 lu dans le claim du JWT');
 select is((select count(*)::int from public.social_audit), 0, 'Lecture seule : journal non visible (droit voir_journal)');
+select is((select count(*)::int from public.social_lister_equipe() where email like 'social-%@invalid.local'), 3, 'équipe : seules les identités plateforme actives sont listées');
 reset role;
 
 select pg_temp.agir_en('c0000000-0000-4000-8000-000000000002', 'aal1');
@@ -104,11 +105,13 @@ select pg_temp.agir_en('c0000000-0000-4000-8000-000000000004', 'aal2');
 set local role authenticated;
 select is((select count(*)::int from public.social_publications), 0, 'client authentifié hors plateforme : aucune ligne');
 select throws_ok($$ select public.social_definir_role('c0000000-0000-4000-8000-000000000004', 'administrateur') $$, 'P0001', null, 'client hors plateforme : ne peut pas s''attribuer un rôle');
+select throws_ok($$ select * from public.social_lister_equipe() $$, 'P0001', 'Accès ELSATIA Social refusé', 'client hors plateforme : équipe non listable');
 reset role;
 
 set local role anon;
 select throws_ok($$ select * from public.social_publications $$, '42501', null, 'anonyme : publications refusées');
 select throws_ok($$ select public.social_session_courante() $$, '42501', null, 'anonyme : RPC de session refusée');
+select throws_ok($$ select * from public.social_lister_equipe() $$, '42501', null, 'anonyme : RPC d''équipe refusée');
 reset role;
 
 -- ─── 4. AAL2 : rôles ──────────────────────────────────────────────────
@@ -178,6 +181,30 @@ select throws_ok($$ update public.social_audit set action = 'efface' $$, '42501'
 select throws_ok($$ delete from public.social_audit $$, '42501', null, 'journal : suppression refusée au service_role');
 reset role;
 select throws_ok($$ update public.social_audit set action = 'efface' $$, 'P0001', 'Le journal ELSATIA Social est en ajout seul', 'journal : même le propriétaire ne peut pas réécrire');
+
+-- ─── 9 bis. Stockage : bucket privé, aucune policy pour les rôles de l'API ───
+insert into storage.objects (bucket_id, name) values ('social-medias', 'medias/2026-10/recette.jpg');
+-- Objets visibles par le rôle courant ; un refus de privilège compte comme « aucun ».
+create or replace function pg_temp.objets_social_visibles() returns integer language plpgsql as $$
+begin
+  return (select count(*)::int from storage.objects where bucket_id = 'social-medias');
+exception when insufficient_privilege then
+  return 0;
+end;
+$$;
+grant execute on function pg_temp.objets_social_visibles() to authenticated, anon;
+select pg_temp.agir_en('c0000000-0000-4000-8000-000000000001', 'aal2');
+set local role authenticated;
+select is(pg_temp.objets_social_visibles(), 0, 'stockage : un administrateur aal2 ne liste pas les objets Social (URL signées serveur uniquement)');
+select throws_ok($$ insert into storage.objects (bucket_id, name) values ('social-medias', 'televersements/pirate.jpg') $$, '42501', null, 'stockage : aucun dépôt direct authentifié dans social-medias');
+reset role;
+set local role anon;
+select is(pg_temp.objets_social_visibles(), 0, 'stockage : anonyme ne voit aucun objet Social');
+reset role;
+
+-- ─── 9. Non-régression RGPD multi-entreprise ─────────────────────────
+select is((select count(*)::int from information_schema.columns where table_schema = 'public' and table_name like 'social\_%' and column_name ilike '%storage_path%'), 0, 'aucune colonne *storage_path* Social (hors périmètre des purges entreprise)');
+select lives_ok($$ select * from public.verifier_storage_entreprise('a0000000-0000-4000-8000-0000000000ff') $$, 'verifier_storage_entreprise fonctionne avec les tables Social présentes');
 
 select * from finish();
 rollback;

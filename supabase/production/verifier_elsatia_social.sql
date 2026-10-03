@@ -39,7 +39,7 @@ select p.oid::regprocedure as fonction, has_function_privilege('service_role', p
        has_function_privilege('anon', p.oid, 'execute') as anon
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname like 'social\_%' order by 1;
 -- attendu : authenticated uniquement sur social_role_courant, social_session_courante,
--- social_definir_role, social_valider_publication ; anon nulle part.
+-- social_lister_equipe, social_definir_role, social_valider_publication ; anon nulle part.
 
 -- 6. Bucket privé
 select id, public, file_size_limit from storage.buckets where id='social-medias';

@@ -190,7 +190,12 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 create table public.social_medias (
   id uuid primary key default gen_random_uuid(),
   type text not null check (type in ('image','video')),
-  storage_path text not null unique check (btrim(storage_path) <> ''),
+  -- Chemin de l'objet dans le bucket privé social-medias. Volontairement PAS nommé
+  -- « storage_path » : les contrôles RGPD multi-entreprise du train
+  -- (verifier_storage_entreprise, manifestes de purge) parcourent toute colonne
+  -- *storage_path* en supposant un entreprise_id. Les médias Social appartiennent à
+  -- l'éditeur ELSATIA, jamais à une entreprise cliente : ils sont hors de ce périmètre.
+  chemin_objet text not null unique check (btrim(chemin_objet) <> ''),
   mime_type text not null check (mime_type in ('image/jpeg','image/png','image/webp','video/mp4','video/quicktime')),
   nom_original text not null,
   taille_octets bigint not null check (taille_octets > 0),
@@ -646,6 +651,28 @@ end;
 $$;
 revoke all on function public.social_definir_role(uuid, text) from public, anon, authenticated;
 grant execute on function public.social_definir_role(uuid, text) to authenticated;
+
+-- Équipe ELSATIA Social : administrateurs plateforme ACTIFS et leur rôle social.
+-- Lecture sous le JWT de l'utilisateur (le service_role n'a aucun privilège sur
+-- plateforme_admins depuis 20260902000255) ; réservée aux membres Social.
+create or replace function public.social_lister_equipe()
+returns table (utilisateur_id uuid, email text, nom text, role_plateforme text, role_social text, role_explicite boolean)
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if public.social_role_courant() is null then
+    raise exception 'Accès ELSATIA Social refusé';
+  end if;
+  return query
+  select pa.utilisateur_id, pa.email, pa.nom, pa.role,
+         public.social_role_de(pa.utilisateur_id), sm.utilisateur_id is not null
+  from public.plateforme_admins pa
+  left join public.social_membres sm on sm.utilisateur_id = pa.utilisateur_id
+  where pa.actif and pa.utilisateur_id is not null
+  order by pa.email;
+end;
+$$;
+revoke all on function public.social_lister_equipe() from public, anon, authenticated;
+grant execute on function public.social_lister_equipe() to authenticated;
 
 -- Validation d'une publication. Le serveur calcule l'empreinte du contenu
 -- (textes, réseaux, lien, médias) et la transmet ; la base vérifie la session
