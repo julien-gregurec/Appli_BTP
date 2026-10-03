@@ -1,0 +1,24 @@
+{
+ "pertes": [
+  "admin-a@invalid.local perd l'accès à « Entreprise Isolation A »",
+  "chef-equipe-a@invalid.local perd l'accès à « Entreprise Isolation A »",
+  "comptable-a@invalid.local perd l'accès à « Entreprise Isolation A »",
+  "conducteur-a@invalid.local perd l'accès à « Entreprise Isolation A »",
+  "dirigeant-a@invalid.local perd l'accès à « Entreprise Isolation A »",
+  "ouvrier-a@invalid.local perd l'accès à « Entreprise Isolation A »"
+ ],
+ "declarees": [
+  "admin-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).",
+  "chef-equipe-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).",
+  "comptable-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).",
+  "conducteur-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).",
+  "dirigeant-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c).",
+  "ouvrier-a@invalid.local perd l'accès à « Entreprise Isolation A » — essai EXPIRÉ (fin d'essai passée) : l'expiration est désormais appliquée EN BASE (20260928000803 billing_lifecycle_trial_expiry_enforced) ; en 210 l'application redirigeait déjà vers /abonnement-suspendu (getContexteEntreprise, fcdd4e7c)."
+ ],
+ "bloquants": [],
+ "reductions": [
+  "sans-poste@entreprise-test.invalid / affectations : 7800 → 0"
+ ],
+ "hausses": [],
+ "membres": 19
+}

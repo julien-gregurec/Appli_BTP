@@ -297,6 +297,13 @@ référence de projet fictive) : P1 ✅ P2 ✅ P3 ✅ P4 ✅ (210 migrations his
 source + préfixe 0/181) **P6 ❌ « plan qualifié AVEC ponts absents de la cible »** P7 ✅ P8 ✅ → `PREFLIGHT REFUSÉ` :
 c'est l'état exact d'aujourd'hui (témoin `witnesses/…/preflight-demo-v91/`).
 
+## 12 bis. Plan qualifié publié
+
+`scripts/upgrade/manifests/target-24a0c2e9.json` (lu par le preflight, P6/P7) : 183 migrations à appliquer depuis
+210 + 2 ponts v2 (sha256), classées — verrous mesurés au palier 100 000 avec pont v2 : **SAFE 84 · CAUTION 98 ·
+MAINTENANCE_WINDOW_REQUIRED 1 (`300`, 3,6 s)** ; réversibilité : **REVERSIBLE 52 · FORWARD_ONLY 80 ·
+RESTORE_REQUIRED 51** ; préconditions bloquantes `bloquant_essai_hors_fenetre`, `bloquant_essai_perpetuel`.
+
 ## 13. Recommandations à l'équipe V9.1
 
 1. Intégrer le **pont v2** (`bridges/v2/20260921000298…`, `…399…`) au train V9.1 (versions libres, gardées par le
@@ -312,7 +319,26 @@ c'est l'état exact d'aujourd'hui (témoin `witnesses/…/preflight-demo-v91/`).
 - PostgreSQL 16 local (Production : 17) ; pas de GoTrue / PostgREST / Storage réels ; `pgsodium` simulé.
 - Durées mesurées sur une VM locale (4 vCPU) : ordres de grandeur, pas une promesse de durée Production.
 
-## 15. Fichiers
+## 15. Reproduire
+
+```bash
+service postgresql start
+# Production 210 reconstruite + jeu historique (+ remédiation UPG-P1-1 simulée sur la copie locale)
+scripts/upgrade/build-source.sh h210_v500_rem --vol 500 --remediation scripts/upgrade/sql/remediation_essai_perpetuel_PROPOSITION.sql
+# Upgrade qualifié vers n'importe quelle tête (ici V9.1 + pont v2)
+scripts/upgrade/production-to-v9x.sh --target-sha 24a0c2e993ec0836b492ea72f27ed7dc347a20fa --target-migration-count 391 \
+  --source-db h210_v500_rem --bridge scripts/upgrade/bridges/v2/20260921000298_pont_upgrade_backfill_lignes_avant.sql \
+  --bridge scripts/upgrade/bridges/v2/20260921000399_pont_upgrade_backfill_lignes_apres.sql --out /tmp/upg
+# Paliers 500 → 100 000, interruptions S1–S6, fenêtre de l'ancien code
+UPG_PONTS="<pont 298> <pont 399>" scripts/upgrade/volumetrie.sh <sha> <n> /tmp/vol 5000 20000 100000
+scripts/upgrade/interruption.sh h210_v500_rem <sha> <n> /tmp/inter --bridge <298> --bridge <399>
+scripts/upgrade/old-code-window.sh h210_v500_rem <sha> /tmp/fenetre --bridge <298> --bridge <399>
+# Preflight (lecture seule) et ses tests
+npm run test:production-v9x-preflight
+npm run production:v9x:preflight -- --target-sha <sha> --target-migration-count <n> --ledger … --production-attestation … --backup-attestation …
+```
+
+## 16. Fichiers
 
 `scripts/upgrade/` : `production-to-v9x.sh`, `build-source.sh`, `volumetrie.sh`, `interruption.sh`,
 `old-code-window.sh`, `preflight.mjs` (+ test), `expected-changes.json`, `lib/` (common, fingerprint,

@@ -41,6 +41,17 @@ révoqués / supprimés). Le détail par migration est dans le plan qualifié `s
 > En pratique, **dès la 1ʳᵉ migration FORWARD_ONLY / RESTORE_REQUIRED appliquée (la 1ʳᵉ du plan,
 > `20260815000200`, modifie déjà `plans_abonnement`)**, le seul retour arrière fiable est la **restauration**.
 
+### 1.1 Durée et verrous attendus (mesurés, VM locale 4 vCPU)
+
+| Volume (lignes / table critique) | Sans pont v2 | Avec pont v2 |
+|---|---|---|
+| 500 | 19 s | ~15 s |
+| 20 000 | 85 s (dont `300` : 65 s) | — |
+| 100 000 | **1 287 s** (dont `300` : 1 266 s sous ACCESS EXCLUSIVE devis / factures / lignes) | **23 s** (`300` : 3,6 s, lignes seulement) |
+
+Seule `20260921000300` exige la fenêtre de maintenance ; les 98–99 CAUTION prennent un verrou fort bref sur des
+tables 210 : appliquer trafic fermé, `lock_timeout` positionné.
+
 ## 2. Prérequis (avant toute migration)
 
 | # | Exigence | Preuve attendue |

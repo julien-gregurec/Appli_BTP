@@ -1,0 +1,25 @@
+NOTICE:  database "h210_vol100000_v2" does not exist, skipping
+NOTICE:  database "h210_vol100000_v2_dry" does not exist, skipping
+	Command being timed: "scripts/upgrade/production-to-v9x.sh --target-sha 24a0c2e993ec0836b492ea72f27ed7dc347a20fa --target-migration-count 391 --source-db h210_vol100000 --work-db h210_vol100000_v2 --sans-sonde --bridge /home/user/Appli_BTP/scripts/upgrade/bridges/v2/20260921000298_pont_upgrade_backfill_lignes_avant.sql --bridge /home/user/Appli_BTP/scripts/upgrade/bridges/v2/20260921000399_pont_upgrade_backfill_lignes_apres.sql --out /tmp/claude-0/-home-user-Appli-BTP/cc4688d7-b9fb-58d9-9144-e5843ce93d18/scratchpad/vol/run_100000_v2"
+	User time (seconds): 100.88
+	System time (seconds): 30.31
+	Percent of CPU this job got: 11%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 19:11.38
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 133356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 9694175
+	Voluntary context switches: 88113
+	Involuntary context switches: 3139
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 213944
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

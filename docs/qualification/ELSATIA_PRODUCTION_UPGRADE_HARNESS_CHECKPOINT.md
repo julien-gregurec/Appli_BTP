@@ -1,25 +1,29 @@
-# ELSATIA — Production upgrade harness — CHECKPOINT
+# ELSATIA — Production upgrade harness — CHECKPOINT (FINAL)
 
-Branche : `claude/zen-ramanujan-pku73u` (base `integration/elsatia-post-v9-hardening-v1` @ `877a4b9f`, 391 migrations).
+Branche : `claude/zen-ramanujan-pku73u` (base `integration/elsatia-post-v9-hardening-v1` @ `877a4b9f`).
 
-## État (mis à jour à chaque jalon)
-- Étapes terminées : A (inventaire, point 210 = `5777abb`), B (reconstruction), C (jeu historique), D (harnais
-  `scripts/upgrade/production-to-v9x.sh`), E (zéro perte colonne par colonne), F (anciennes offres 24/24),
-  G (sécurité fermée = fresh), L (preflight + 29 tests).
-- Constats : UPG-P0-1 (300 bloquée par factures émises → ponts `scripts/upgrade/bridges/`), UPG-P0-2 (204
-  contrainte essai), UPG-P1-1 (essai perpétuel coupé), UPG-P2-1, UPG-P3-1, UPG-SEC-1.
-- Terminé aussi : I (interruptions 9/9), J (runbook `docs/runbooks/ELSATIA_PRODUCTION_V9X_ROLLBACK.md`), K (ancien code :
-  37 accès cassés, fenêtre ≤ #2), H paliers 5 000 / 20 000 (OK) ; 100 000 : `300` = 1 266 s sous ACCESS EXCLUSIVE.
-- En cours : fin du palier 100 000, runs de preuve A (sans pont → échec 300), B (brut + pont → UPG-P1-1),
-  D (pont v2), E (tête V9.1 24a0c2e9 + pont v2), puis pont v2 au palier 100 000 ; rapport final (placeholders ⟨…⟩).
-- Bases locales : `h210_v500` (source brute), `h210_v500_rem` (remédiée), `*_v9x` (upgradées), `fresh_877a4b9f_p2_sb`.
+## État : TOUTES LES PHASES A → M TERMINÉES
+
+Verdict : **PRODUCTION_UPGRADE_HARNESS_PARTIALLY_QUALIFIED** — harnais complet et vert localement (avec pont v2 +
+régularisation UPG-P1-1) jusqu'à 100 000 lignes, sur `877a4b9f` et sur la tête V9.1 `24a0c2e9` ; partiel parce que
+le train ne passe PAS tel quel sur une Production réelle (UPG-P0-1 : ponts à intégrer à V9.1 ; UPG-P1-1 : décision).
+Rapport : `docs/qualification/ELSATIA_PRODUCTION_UPGRADE_HARNESS_V1.md` ; runbook : `docs/runbooks/ELSATIA_PRODUCTION_V9X_ROLLBACK.md`.
+
+## Tests terminés
+- Upgrade 210 → 391 : paliers 500 / 5 000 / 20 000 / 100 000 (OK) ; pont v2 à 500 et 100 000 (OK) ; V9.1 24a0c2e9 (OK).
+- Preuves négatives : A (sans pont → échec 300), B (sans régularisation → perte d'accès détectée).
+- Interruptions S1–S6 : 9/9 ; ancien code : 37 accès cassés, fenêtre ≤ #2 ; preflight 32/32 + démo V9.1 (refus P6).
+
+## Tests restant à faire (hors mission locale)
+- Quand l'équipe V9.1 aura intégré (ou rejeté) les ponts : relancer le harnais sur la tête V9.1 finale SANS `--bridge`,
+  `--publish-plan`, puis le preflight avec les vraies attestations le jour J.
+
+## Bases locales (jetables)
+`h210_v500`, `h210_v500_rem`, `h210_vol5000|20000|100000` (+ `_v9x`, `_v2`), `fresh_877a4b9f_p2_sb`, `fresh_24a0c2e9_p2_sb`, `h210_nodata`.
 
 ## Reprise
 ```
 service postgresql start
 cd /home/user/Appli_BTP && git pull origin claude/zen-ramanujan-pku73u
-scripts/upgrade/build-source.sh h210_v500_rem --vol 500 --remediation scripts/upgrade/sql/remediation_essai_perpetuel_PROPOSITION.sql
-scripts/upgrade/production-to-v9x.sh --target-sha 877a4b9f284150e5d4f06fd68250f3ea19ff62a1 --target-migration-count 391 \
-  --source-db h210_v500_rem --bridge scripts/upgrade/bridges/20260921000298_pont_upgrade_lignes_factures_emises_avant_backfill.sql \
-  --bridge scripts/upgrade/bridges/20260921000399_pont_upgrade_lignes_factures_emises_apres_backfill.sql --out /tmp/upg_run
+# voir §15 « Reproduire » du rapport
 ```

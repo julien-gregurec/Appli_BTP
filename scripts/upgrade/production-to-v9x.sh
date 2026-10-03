@@ -267,18 +267,21 @@ python3 "$HERE/lib/fingerprint.py" compare "$OUT/avant" "$OUT/apres" "$ATTENDUS"
 etape "17. Performance sanity"
 python3 "$HERE/lib/perf_sanity.py" "$SRC_DB" "$WORK_DB" "$OUT/perf.json" | sed 's/^/  /'
 [ "${PIPESTATUS[0]}" = 0 ] || ko "performance : régression > seuil"
-python3 "$HERE/lib/classify.py" risques "$OUT/mesures.jsonl" "$MIG" "$OUT/classification.json" --fonctions-source "$OUT/securite_avant/functions.txt" | tail -6 | sed 's/^/  /'
+python3 "$HERE/lib/classify.py" risques "$OUT/mesures.jsonl" "$MIG" "$OUT/classification.json" --source-securite "$OUT/securite_avant" | tail -6 | sed 's/^/  /'
 
 # Plan qualifié pour ce SHA (lu par le preflight, P6/P7) : migrations en attente classées + préconditions.
 python3 - "$OUT" "$TARGET_SHA" "$TARGET_N" "$MANIFESTE" "$VERDICT_KO" "${PONTS[@]}" <<'PY'
 import json, os, sys
-out, sha, n, man, ko, ponts = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], [os.path.basename(p) for p in sys.argv[6:]]
+import hashlib
+out, sha, n, man, ko, chemins = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6:]
+ponts = [{"fichier": os.path.basename(p), "sha256": hashlib.sha256(open(p, "rb").read()).hexdigest()} for p in chemins]
 cl = json.load(open(os.path.join(out, "classification.json")))
-noms_ponts = {p.split("_")[0] for p in ponts}
+noms_ponts = {p["fichier"].split("_")[0] for p in ponts}
 pre = ["bloquant_essai_hors_fenetre", "bloquant_essai_perpetuel"] + ([] if "20260921000298" in noms_ponts else ["lignes_factures_emises"])
 plan = {"target_sha": sha, "target_migration_count": n, "source_manifest": os.path.basename(man), "ponts": ponts,
         "qualifie": ko == "0", "preconditions_bloquantes": pre,
-        "migrations": [{k: m[k] for k in ("migration", "verrou", "rollback", "ms", "motifs")} for m in cl]}
+        "qualifie_avec_ponts": bool(ponts),
+        "migrations": [{k: m.get(k) for k in ("migration", "verrou", "rollback", "ms", "motifs", "motifs_rollback")} for m in cl]}
 p = os.path.join(out, f"target-{sha[:8]}.json")
 json.dump(plan, open(p, "w"), indent=1, ensure_ascii=False)
 print(f"  plan qualifié écrit : {p} ({len(plan['migrations'])} migrations, préconditions bloquantes {pre})")
