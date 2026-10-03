@@ -34,15 +34,16 @@ const requetes = [
   { nom: "croise_devis", f: (t, autre) => call(t.tok, `/devis?select=id&entreprise_id=eq.${autre.ent}&limit=50`), check: (t, rows) => rows.length === 0 },
   { nom: "croise_rpc_dashboard", f: (t, autre) => rpc(t.tok, "dashboard_indicateurs", { p_entreprise_id: autre.ent, p_aujourdhui: "2026-10-02" }), check: (t, rows, r) => r.status >= 400 || (rows && rows.factures_total == null && (rows.factures_alertes == null) && (rows.devis_alertes == null)) },
 ];
-const par = {}; let fuites = 0; const exemples = [];
+const par = {}; let fuites = 0, indisponibles = 0; const exemples = [];
 const res = await load(TOTAL, CONC, async (i) => {
   const t = T[i % 3], autre = T[(i + 1) % 3], q = requetes[Math.floor(i / 3) % requetes.length];
   const r = await q.f(t, autre);
   let rows = null; try { rows = JSON.parse(r.text); } catch {}
-  const ok = (r.status < 400 || q.nom.startsWith("croise")) && q.check(t, rows, r);
-  if (!ok) { fuites++; if (exemples.length < 5) exemples.push({ q: q.nom, tenant: t.nom, status: r.status, extrait: r.text.slice(0, 200) }); }
+  // Une 5xx (pool saturé, délai) n'expose aucune donnée : comptée à part, jamais comme fuite.
+  if (r.err || r.status >= 500) { indisponibles++; }
+  else if (!q.check(t, rows ?? [], r)) { fuites++; if (exemples.length < 5) exemples.push({ q: q.nom, tenant: t.nom, status: r.status, extrait: r.text.slice(0, 200) }); }
   (par[q.nom] ??= []).push(r);
   return r;
 });
-const out = { total: TOTAL, concurrence: CONC, global: stats(res), violations: fuites, exemples, par: Object.fromEntries(Object.entries(par).map(([k, v]) => [k, stats(v)])) };
+const out = { total: TOTAL, concurrence: CONC, global: stats(res), violations_cloisonnement: fuites, reponses_5xx_indisponibles: indisponibles, exemples, par: Object.fromEntries(Object.entries(par).map(([k, v]) => [k, stats(v)])) };
 console.log(JSON.stringify(out, null, 1));
