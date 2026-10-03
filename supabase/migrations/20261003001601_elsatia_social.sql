@@ -697,6 +697,8 @@ grant execute on function public.social_valider_publication(uuid, text, text) to
 --   * authenticated : lecture seule, filtrée par la RLS ;
 --   * service_role  : lecture/écriture (le serveur, après contrôle du rôle et d'AAL2) ;
 --   * anon          : rien.
+-- Tout est d'abord révoqué, service_role compris : les privilèges par défaut
+-- ne doivent jamais lui laisser TRUNCATE ni UPDATE/DELETE sur le journal.
 -- ─────────────────────────────────────────────────────────────
 revoke all on
   public.social_membres, public.social_parametres, public.social_comptes, public.social_identifiants,
@@ -704,7 +706,7 @@ revoke all on
   public.social_publication_medias, public.social_publication_cibles, public.social_statistiques,
   public.social_abonnes, public.social_commentaires, public.social_messages,
   public.social_webhook_evenements, public.social_quotas, public.social_audit
-from public, anon, authenticated;
+from public, anon, authenticated, service_role;
 
 grant select on
   public.social_membres, public.social_parametres, public.social_comptes, public.social_medias,

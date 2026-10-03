@@ -18,7 +18,7 @@ import {
   estCulDeSacInformatif,
 } from "@/lib/supabase/routage-proxy";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/tools/monetization", "/identity", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health", "/api/social/webhooks", "/api/social/cron"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/suppression-donnees", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/tools/monetization", "/identity", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health", "/api/social/webhooks", "/api/social/cron"];
 
 type LigneAbonnementSocle = {
   abonnement_offre?: string | null;
@@ -103,7 +103,7 @@ export async function updateSession(request: NextRequest) {
   // vérifier le jeton auprès de Supabase, ce qui coûtait un aller-retour
   // réseau pour servir un PDF ou une vidéo. La page d'accueil vérifie elle-même
   // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
-  const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/cookies", "/guides", "/videos", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
+  const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/dpa", "/confidentialite", "/suppression-donnees", "/cookies", "/guides", "/videos", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
                                 "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/elsatia-identity", "/api/cron/elsatia-identity", "/api/health",
                                 // ELSATIA Social : webhooks signés (Meta/LinkedIn, signature vérifiée par la route) et
                                 // planificateur protégé par CRON_SECRET — jamais par cookie.
