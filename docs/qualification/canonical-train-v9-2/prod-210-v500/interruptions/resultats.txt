@@ -1,0 +1,9 @@
+S1a|OK|arrêt propre (code 75), ledger 254 = 210 + préfixe jusqu'à 20260902000255
+S1b|OK|reprise --resume : upgrade complet qualifié (ledger 408)
+S2a|OK|panne → code 76, transaction annulée : schéma + ACL + ledger identiques à l'état d'avant (empreinte f438d8e25ae2)
+S2b|OK|reprise après panne : upgrade complet qualifié
+S3a|OK|reprise naïve : 20260921000300 rejouée sans erreur (idempotente) — état final qualifié
+S3b|OK|réparation : état prouvé égal à la référence, version inscrite à la main, reprise qualifiée
+S4|OK|migration sautée DÉTECTÉE par le harnais (verdict KO : ❌ upgrade interrompu par une panne sur 20261003000202_pont_upgrade_prod_controle_lignes_v1.sql — reprise : même commande + --resume ) → restauration
+S5|OK|restauration : 153 tables / 56188 lignes identiques, ACL/RLS identiques (0 ligne), ledger 210 ; erreurs pg_restore : 0
+S6|OK|141 migrations idempotentes, 57 non idempotentes (liste : s6.tsv) — la reprise s'appuie sur le ledger, jamais sur l'idempotence

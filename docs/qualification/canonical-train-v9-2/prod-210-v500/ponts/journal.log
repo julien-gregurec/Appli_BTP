@@ -1,0 +1,20 @@
+== PS1 fresh sans ledger Supabase (rebuild_db.sh) ==
+NOTICE:  database "ps1_fresh" does not exist, skipping
+  ✅ PS1 base sans ledger : 408/408 migrations appliquées, ponts compris
+== PS2 V9.1 peuplée (forme Preview) → post-V9.1 ==
+NOTICE:  database "ps2_v91" does not exist, skipping
+  données : seed_entreprise_pilote_btp
+  données : seed_entreprise_test_5_ans non chargé (voir <sortie>/ps/ps2_seed_entreprise_test_5_ans.log)
+  triggers préexistants retirés ou modifiés : aucun ; ajoutés par le train : factures.facture_emise_non_annulable:O 
+  ledger 391 → 408 ; lignes de factures émises : 9 ; pont phase 0 : 20260921000300 déjà au ledger — aucune action 
+  ✅ PS2 empreinte lignes / devis / factures identique (124501c36f35adbc0fe84fa0f31f18ed), triggers préexistants identiques
+== PS3 idempotence phase 0 sur Production 210 (h210_v500_rem) ==
+NOTICE:  database "ps3_210" does not exist, skipping
+  1er passage : 1400 ligne(s) de devis et 1040 ligne(s) de factures ; 2e passage : 0 ligne(s) de devis et 0 ligne(s) de factures
+  ✅ PS3 phase 0 idempotente
+  ✅ PS3 reprise du plan après phase 0 : 197 migrations, 0 trigger désactivé
+== PS4 contrôle final 202 ==
+  ✅ PS4 trigger désactivé à la main réactivé par 202
+  ✅ PS4 202 refuse une base incohérente (transaction annulée)
+
+PONTS : ✅ PS1–PS4 conformes

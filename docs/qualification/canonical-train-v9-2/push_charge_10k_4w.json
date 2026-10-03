@@ -1,0 +1,1 @@
+{"mode" : "apres", "N" : 10000, "workers" : 4, "secondes" : 6.4, "envoyees" : 9900, "perdues_ou_bloquees" : 0, "poisons" : 100, "poisons_abandonnes" : 100, "saines_traitees_plus_d_une_fois" : 0, "traitements_doublons" : 0, "traitements_total" : 10400, "workers_actifs" : 4, "tenants_servis" : 6, "debit_par_s" : 1629}
