@@ -37,11 +37,17 @@ declare
   v_desactives text[] := '{}';
   v_devis bigint := 0;
   v_factures bigint := 0;
+  v_au_ledger boolean := false;
 begin
-  if to_regclass('supabase_migrations.schema_migrations') is not null
-     and exists (select 1 from supabase_migrations.schema_migrations where version = '20260921000300') then
-    raise notice 'pont phase 0 : 20260921000300 déjà au ledger — aucune action';
-    return;
+  -- Ledger lu en SQL dynamique : une base sans ledger Supabase (rejeu psql local) ne doit pas échouer à la
+  -- préparation de la requête (PL/pgSQL prépare toute l'expression, même si to_regclass est nul).
+  if to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute 'select exists (select 1 from supabase_migrations.schema_migrations where version = $1)'
+      into v_au_ledger using '20260921000300';
+    if v_au_ledger then
+      raise notice 'pont phase 0 : 20260921000300 déjà au ledger — aucune action';
+      return;
+    end if;
   end if;
   if to_regclass('public.lignes_devis') is null or to_regclass('public.lignes_factures') is null then
     raise notice 'pont phase 0 : tables de lignes absentes — aucune action';
