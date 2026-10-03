@@ -28,7 +28,8 @@ const noter = (flux, r) => {
   const ko = !metier && (r.err || r.status >= 400 || r.status === 0);
   if (metier) { b.metier = (b.metier ?? 0) + 1; }
   b.n++; b.lat.push(r.ms); if (ko) { b.err++; if (erreursEx.length < 30) erreursEx.push({ m, flux, status: r.status, err: r.err, extrait: r.text?.slice?.(0, 120) }); }
-  const f = (b.flux[flux] ??= { n: 0, err: 0 }); f.n++; if (ko) f.err++;
+  const f = (b.flux[flux] ??= { n: 0, err: 0, statuts: {} }); f.n++; if (ko) f.err++;
+  f.statuts[r.status || r.err] = (f.statuts[r.status || r.err] ?? 0) + 1; // 3xx visibles (redirections de session)
 };
 const rpcU = async (token, nom, args) => {
   const t0 = performance.now(); let status = 0, text = "", err = null;
@@ -47,7 +48,7 @@ async function vu(i) {
     const jour = new Date(Date.UTC(2026, 8, 5 + ((jourSeq++) % 26))).toISOString().slice(0, 10);
     const h = 6 + (it % 10);
     noter("pointage", await rpcU(s.session.access_token, "creer_pointage_regularisation", { p_entreprise_id: ENT, p_employe_id: emps[(i * 7 + it) % emps.length], p_chantier_id: ch[it % ch.length], p_date: jour, p_arrivee: `${String(h).padStart(2, "0")}:00`, p_depart: `${String(h).padStart(2, "0")}:30`, p_pause_minutes: 0, p_motif: "SOAK L" }));
-    noter("devis", await rpcU(s.session.access_token, "creer_devis_brouillon", { p_entreprise_id: ENT, p_devis: { client_id: cli[it % cli.length], chantier_id: null, date_emission: "2026-10-02", date_validite: "2026-12-01", notes_internes: "SOAK L", remise_globale: 0 }, p_lignes: [{ designation: "L", type: "fourniture", quantite: 2, unite: "u", prix_unitaire_ht: 100, remise_ligne: 0, taux_tva: 20 }] }));
+    noter("devis", await rpcU(s.session.access_token, "creer_devis_brouillon", { p_entreprise_id: ENT, p_devis: { client_id: cli[it % cli.length], chantier_id: null, date_emission: "2026-10-02", date_validite: "2026-12-01", notes_internes: "SOAK L", remise_globale: 0 }, p_lignes: [{ designation: "L", type: "fourniture", quantite: 2, unite: "u", prix_unitaire_ht: 100, remise_ligne: 0, taux_tva: 20, ordre: 1 }] }));
     if (it % 10 === i % 10) noter("pdf", await page(s.cookie, `/api/documents/devis/${devisPdf[it % devisPdf.length]}/pdf`));
     it++;
     if (it % 40 === 0) sql("truncate rate_limits_applicatifs"); // le banc mesure l'endurance, pas les quotas (domaine J)
