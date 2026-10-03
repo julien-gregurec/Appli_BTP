@@ -5,6 +5,8 @@
 -- B12 : refuser une seconde déclaration de pointage oublié pour le même salarié,
 --       le même jour et le même chantier (rejetés exclus).
 -- B35 : refuser une déclaration qui porterait le total du jour au-delà de 24 h.
+-- Les déclarations d'un même salarié sont sérialisées (verrou transactionnel
+-- consultatif) pour que ces deux contrôles tiennent sous concurrence.
 -- Saisie live et régularisation par un responsable : inchangées (règle produit
 -- non tranchée, voir rapport).
 
@@ -21,6 +23,10 @@ begin
  if v_employe is null then raise exception '%',('Compte salari'||chr(233)||' introuvable');end if;
  if p_date>current_date or p_date<current_date-interval '31 days' then raise exception '%',('La r'||chr(233)||'gularisation est limit'||chr(233)||'e aux 31 derniers jours');end if;
  if not exists(select 1 from public.chantiers where id=p_chantier_id and entreprise_id=p_entreprise_id and statut not in('archive','annule')) then raise exception 'Chantier invalide';end if;
+ -- Sérialise les déclarations d'un même salarié (double clic, deux onglets) : sans ce
+ -- verrou, deux déclarations simultanées passaient toutes deux les contrôles ci-dessous
+ -- (mesuré par l'endurance concurrente : 5 doublons sur 6 cycles).
+ perform pg_advisory_xact_lock(hashtextextended('declarer_pointage_oublie:'||v_employe::text, 0));
  -- B12 : une deuxième déclaration le même jour sur le même chantier doublait les
  -- heures ; la correction passe par le responsable. Les rejetés ne bloquent pas.
  if exists(select 1 from public.pointages where entreprise_id=p_entreprise_id and employe_id=v_employe and date=p_date and chantier_id=p_chantier_id and verification_statut is distinct from 'rejete') then
