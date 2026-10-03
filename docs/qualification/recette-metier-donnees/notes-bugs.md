@@ -40,3 +40,8 @@
 - B32 P3 hors ligne: aucun message explicite au pointage (page /offline existe) NON CORRIGÉ
 - B33 P3 devis accepté non facturé supprimable via API (cascade lignes autorisée) NON CORRIGÉ
 - Suppressions liées (client, chantier, employé, fournisseur, facture émise, devis facturé) toutes refusées
+- B34 P1 refacturation illimitée d'un devis par « Créer une facture depuis ce devis » (31 devis facturés 2-3×, ex. 163 825 € pour 54 608 €) CORRIGÉ migr 192 + page devis affiche la facture existante
+- B35 P2 pointages oubliés: 48 h déclarées le même jour sur 6 chantiers CORRIGÉ migr 193 (plafond 24 h/jour)
+- B36 P3 facture brouillon non supprimable (pas d'action UI; cascade bloquée par trigger lignes) → brouillons s'accumulent
+- Données héritées pré-correctifs à auditer en production: factures depuis devis remisés (B16), acomptes encaissés au-delà du net d'avoir (B20), devis refacturés (B34), journées > 24 h (B35)
+- Endurance: 6 cycles = 60 chantiers, 60 devis, 90 factures émises, ~130 paiements, 300 pointages ; invariants sans dérive après correctifs

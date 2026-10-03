@@ -31,7 +31,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: piecesJointes }] = await Promise.all([
+  const [{ data: lignes }, { data: piecesJointes }, { data: facturesDevis }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase
       .from("pieces_jointes_devis")
@@ -39,6 +39,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
       .eq("devis_id", id)
       .eq("entreprise_id", ctx.entrepriseId)
       .order("created_at"),
+    supabase.from("factures").select("id,numero,statut,type").eq("devis_origine_id", id).eq("entreprise_id", ctx.entrepriseId).neq("statut", "annulee").neq("type", "avoir"),
   ]);
 
   const chantiersClient = peutGererDevis
@@ -203,7 +204,14 @@ export default async function DevisDetailPage({ params, searchParams }: { params
         <SignatureDocumentMetier type="devis" documentId={id} />
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
-          {devis.statut === "accepte" ? (
+          {devis.statut === "accepte" && (facturesDevis ?? []).length > 0 ? (
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">
+              Devis facturé :{" "}
+              {(facturesDevis ?? []).map((f, i) => (
+                <span key={f.id}>{i > 0 && ", "}<Link href={`/factures/${f.id}`} className="font-medium underline">{f.numero ?? "facture brouillon"}</Link></span>
+              ))}
+            </p>
+          ) : devis.statut === "accepte" ? (
             <form action={creerFacture}>
               <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
                 Créer une facture depuis ce devis
