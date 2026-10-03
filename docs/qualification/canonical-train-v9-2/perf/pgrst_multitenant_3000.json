@@ -1,0 +1,50 @@
+{
+  "mode": "multitenant",
+  "tenants": [
+    "11",
+    "13",
+    "14",
+    "15"
+  ],
+  "concurrence": 10,
+  "secondes": 7.15,
+  "requetes": 3000,
+  "debit_rps": 419.6,
+  "p50": 14,
+  "p95": 74,
+  "max": 318,
+  "erreurs": 0,
+  "statuts": {
+    "200": 2566,
+    "206": 434
+  },
+  "fuites": 0,
+  "croisees_non_vides": 0,
+  "par_genre": {
+    "liste": {
+      "n": 902,
+      "p50": 19,
+      "p95": 83
+    },
+    "page": {
+      "n": 387,
+      "p50": 14,
+      "p95": 70
+    },
+    "compte": {
+      "n": 434,
+      "p50": 26,
+      "p95": 212
+    },
+    "croise": {
+      "n": 851,
+      "p50": 10,
+      "p95": 23
+    },
+    "filtre": {
+      "n": 426,
+      "p50": 12,
+      "p95": 28
+    }
+  }
+}

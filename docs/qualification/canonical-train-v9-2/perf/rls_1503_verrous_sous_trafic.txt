@@ -1,0 +1,5 @@
+T0_TRAFIC_ABSENT rc=0 duree_ms=86 policies=V9.2 deadlocks=0
+T1_TRAFIC_LEGER rc=0 duree_ms=301 policies=V9.2 deadlocks=0 pgbench=[34208 0 (0.000%)] erreurs_clients=0
+T1B_TRAFIC_LOURD_V91 rc=3 duree_ms=10211 policies=V9.1 erreur="ERROR:  canceling statement due to lock timeout" rejeu_rc=0 rejeu_ms=77 policies_apres_rejeu=V9.2 deadlocks=0 pgbench=[8 0 (0.000%)] erreurs_clients=0
+T2_LECTURE_LENTE rc=3 duree_ms=10043 policies=V9.1 erreur="ERROR:  canceling statement due to lock timeout" rejeu_rc=0 rejeu_ms=88 policies_apres_rejeu=V9.2 deadlocks=0
+T3_LECTURE_LENTE_ET_TRAFIC_LEGER rc=3 duree_ms=10151 policies=V9.1 erreur="ERROR:  canceling statement due to lock timeout" rejeu_rc=0 rejeu_ms=101 policies_apres_rejeu=V9.2 deadlocks=0 pgbench=[2551 0 (0.000%)] erreurs_clients=0

@@ -130,7 +130,35 @@ Intégré tel que qualifié par le lot (aucune règle nouvelle) et **re-prouvé 
 
 ## 5. Phase 5 / 13 — performance
 
-@@PERF_SECTION@@
+Base : V9.1 + `generate_fixture.sql` + tenants volumétriques **1k (k=11), 20k (k=13), 50k (k=14), 100k (k=15)** (176 312 devis,
+174 200 factures, 172 260 notifications ; 1,2 Go), **upgradée en V9.2** par le script d'upgrade (§10). Mesures : conteneur
+4 vCPU partagé, PostgreSQL 16, PostgREST 12.2.3 `db-pool = 10` ; preuves [`canonical-train-v9-2/perf/`](canonical-train-v9-2/perf/).
+
+| Banc | Exigence | Résultat V9.2 |
+|---|---|---|
+| **Push** `charge_file_push.sh … 10000 4 apres` | 10 000 notif., 4 workers, 0 perte, 0 doublon | **0 perdue, 0 traitée deux fois**, 100/100 poisons abandonnés après 5 tentatives, 10 400 traitements, 6,4 s (1 629 notif./s) ([json](canonical-train-v9-2/push_charge_10k_4w.json)) |
+| **Relances** cron réel (`traiterRelancesAutomatiques`, PostgREST, JWT service_role) | 10 000 documents, 0 famine | 10 000 factures / 5 tenants : **2 000/2 000 dues atteintes** en 2 passages, 0 doublon, 0 dépassement du maximum ([json](canonical-train-v9-2/relances_charge_10k.json)) |
+| **RLS** `bench_explain.sh` 1k / 20k / 50k / 100k | — | lecture propre 1 000 lignes 6–9 ms ; liste RLS seule 7–31 ms ; page au milieu 6–60 ms ; comptages 6–29 ms ; **lecture croisée vide 1–6 ms, 0 ligne, constante** ; seule exception connue : `taches` own_count ≈ 0,35 s (pas d'`entreprise_id`, limite du lot) ([csv](canonical-train-v9-2/perf/rls_explain_v92.csv)) |
+| **Multi-tenant** PostgREST | ≥ 3 000 requêtes, 0 fuite | **3 000 requêtes** entrelacées 4 tenants (1k → 100k), 10 clients : 0 erreur, **0 fuite**, 0 lecture croisée non vide, p50 14 ms / p95 74 ms / max 318 ms ([json](canonical-train-v9-2/perf/pgrst_multitenant_3000.json)) |
+| **Endurance** PostgREST | ≥ 15 min | @@ENDURANCE@@ |
+| Upgrade volumétrique | — | 17 migrations, chacune < 0,7 s (`…1503` 105 ms, `…1504` 182 ms, `…0202` 617 ms) |
+
+**Migration RLS `…1503` sous trafic** (`scripts/qualification/v9-2/rls-verrous-sous-trafic.sh`, base V9.1 volumétrique amenée
+juste avant `…1503`, 13 verrous ACCESS EXCLUSIVE pris d'un coup, `lock_timeout` 10 s) — [résultats](canonical-train-v9-2/perf/rls_1503_verrous_sous_trafic.txt) :
+
+| Scénario | 1503 | Durée | Policies après | Rejeu après la fin du trafic | Deadlocks | Clients |
+|---|---|---:|---|---|---:|---|
+| T0 trafic absent | ✅ | 86 ms | V9.2 | — | 0 | — |
+| T1 trafic léger (8 clients, lectures filtrées par entreprise) | ✅ | 301 ms | V9.2 | — | 0 | 34 208 transactions, 0 erreur |
+| T1B trafic lourd V9.1 (listes / comptages non filtrés, ce que 1503 corrige) | ❌ propre (`lock timeout`) | 10,2 s | **V9.1 intactes** | ✅ 77 ms | 0 | 0 erreur |
+| T2 lecture lente (transaction de lecture + `pg_sleep(30)`) | ❌ propre (`lock timeout`) | 10,0 s | **V9.1 intactes** | ✅ 88 ms | 0 | — |
+| T3 lecture lente + trafic léger | ❌ propre (`lock timeout`) | 10,2 s | **V9.1 intactes** | ✅ 101 ms | 0 | 2 551 transactions, 0 erreur |
+
+Conclusion : jamais d'interblocage ni d'attente infinie ; tout échec est **propre** (transaction annulée, policies V9.1 à
+l'identique) et **rejouable**. Sous lectures longues (précisément celles que la RLS V9.1 rend lentes), l'application
+demande une fenêtre creuse ou un trafic fermé → `DECISION_REQUIRED_PRODUCTION` / runbook (`RLS_1503_FENETRE`).
+Premier passage du banc : trafic léger mal nommé (pgbench sans script : aucun trafic réel) — détecté, corrigé, garde
+`BANC_INVALIDE` ajoutée ; le passage archivé est le second.
 
 ## 6. Phase 6 — satellites
 
