@@ -57,6 +57,14 @@ function tirage(ks) {
 
 async function multitenant({ total, duree, concurrence, ks }) {
   const res = { requetes: 0, erreurs: 0, fuites: 0, croisees_non_vides: 0, par_genre: {}, statuts: {}, ms: [] };
+  // Fenêtres d'une minute (endurance) : détecter une dérive de latence ou d'erreurs dans le temps.
+  const fenetres = [];
+  let fenetre = { debut: Date.now(), ms: [], erreurs: 0, fuites: 0 };
+  const clore = () => {
+    if (!fenetre.ms.length) return;
+    fenetres.push({ minute: fenetres.length + 1, n: fenetre.ms.length, p50: Math.round(centile(fenetre.ms, 50)), p95: Math.round(centile(fenetre.ms, 95)), erreurs: fenetre.erreurs, fuites: fenetre.fuites });
+    fenetre = { debut: Date.now(), ms: [], erreurs: 0, fuites: 0 };
+  };
   const fin = duree ? Date.now() + duree * 1000 : Infinity;
   let restantes = total ?? Infinity;
   async function vu() {
@@ -65,21 +73,25 @@ async function multitenant({ total, duree, concurrence, ks }) {
       const r = await requete(q.k, q.chemin, { headers: q.headers });
       res.requetes++;
       res.ms.push(r.ms);
+      if (duree && Date.now() - fenetre.debut >= 60_000) clore();
+      fenetre.ms.push(r.ms);
       (res.par_genre[q.genre] ??= []).push(r.ms);
       res.statuts[r.statut] = (res.statuts[r.statut] ?? 0) + 1;
-      if (r.statut >= 300) { res.erreurs++; continue; }
+      if (r.statut >= 300) { res.erreurs++; fenetre.erreurs++; continue; }
       const lignes = JSON.parse(r.corps);
-      for (const l of lignes) if (l.entreprise_id && l.entreprise_id !== ent(q.k)) res.fuites++;
+      for (const l of lignes) if (l.entreprise_id && l.entreprise_id !== ent(q.k)) { res.fuites++; fenetre.fuites++; }
       if (q.genre === "croise" && lignes.length) res.croisees_non_vides++;
     }
   }
   const debut = Date.now();
   await Promise.all(Array.from({ length: concurrence }, vu));
   const secondes = (Date.now() - debut) / 1000;
+  if (duree) clore();
   const par_genre = Object.fromEntries(Object.entries(res.par_genre).map(([g, v]) => [g, { n: v.length, p50: Math.round(centile(v, 50)), p95: Math.round(centile(v, 95)) }]));
   return { mode: duree ? "endurance" : "multitenant", tenants: ks, concurrence, secondes, requetes: res.requetes, debit_rps: +(res.requetes / secondes).toFixed(1),
-    p50: Math.round(centile(res.ms, 50)), p95: Math.round(centile(res.ms, 95)), max: Math.round(Math.max(...res.ms)),
-    erreurs: res.erreurs, statuts: res.statuts, fuites: res.fuites, croisees_non_vides: res.croisees_non_vides, par_genre };
+    p50: Math.round(centile(res.ms, 50)), p95: Math.round(centile(res.ms, 95)), max: Math.round(res.ms.reduce((a, b) => (b > a ? b : a), 0)),
+    erreurs: res.erreurs, statuts: res.statuts, fuites: res.fuites, croisees_non_vides: res.croisees_non_vides, par_genre,
+    ...(duree ? { fenetres } : {}) };
 }
 
 async function lecteurs({ k, secondes, vus }) {
