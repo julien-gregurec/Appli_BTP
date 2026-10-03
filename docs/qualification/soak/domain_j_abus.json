@@ -1,0 +1,135 @@
+{
+ "J1_page_partage_jetons_invalides_x300": {
+  "n": 300,
+  "p50": 315.8,
+  "p95": 2116.7,
+  "max": 2752.5,
+  "errors": 300,
+  "avgBytes": 10284,
+  "codes": {
+   "404": 300
+  }
+ },
+ "J1b_media_partage_jetons_invalides_x60": {
+  "n": 60,
+  "p50": 65.3,
+  "p95": 77.9,
+  "max": 87.1,
+  "errors": 60,
+  "avgBytes": 57,
+  "codes": {
+   "404": 60
+  }
+ },
+ "J2_export_periode_extreme_T14_50k": [
+  {
+   "type": "ventes",
+   "status": 200,
+   "ms": 2894,
+   "ko": 5570
+  },
+  {
+   "type": "encaissements",
+   "status": 400,
+   "ms": 92,
+   "ko": 0
+  },
+  {
+   "type": "tva_collectee",
+   "status": 400,
+   "ms": 98,
+   "ko": 0
+  }
+ ],
+ "J2b_export_quota_x14": {
+  "n": 14,
+  "p50": 203,
+  "p95": 271.1,
+  "max": 271.1,
+  "errors": 4,
+  "avgBytes": 3811,
+  "codes": {
+   "200": 10,
+   "429": 4
+  }
+ },
+ "J3_codes_adhesion_aleatoires_x500": {
+  "n": 500,
+  "p50": 26.7,
+  "p95": 51,
+  "max": 127.4,
+  "errors": 500,
+  "avgBytes": 80,
+  "codes": {
+   "400": 500
+  },
+  "debit_par_s": 693
+ },
+ "J4_jetons_invalides": {
+  "signature_autre_cle": {
+   "status": 401,
+   "lignes": null
+  },
+  "alg_none": {
+   "status": 401,
+   "lignes": null
+  },
+  "expire": {
+   "status": 401,
+   "lignes": null
+  },
+  "tronque": {
+   "status": 401,
+   "lignes": null
+  }
+ },
+ "J4b_cookie_forge_dashboard": {
+  "status": 307
+ },
+ "J5_pagination": {
+  "postgrest_limit_1M": {
+   "status": 206,
+   "lignes": 1000,
+   "ms": 96629
+  },
+  "postgrest_offset_1e9": {
+   "status": 200,
+   "ms": 46745
+  },
+  "rpc_devis_page_taille_maxint": {
+   "status": 400,
+   "ms": 26,
+   "ko": 0,
+   "extrait": "{\"code\":\"22003\",\"details\":null,\"hint\":null,\"message\":\"integer out of range\"}"
+  },
+  "rpc_factures_taille_1M": {
+   "status": 200,
+   "ms": 186,
+   "ko": 58
+  },
+  "page_devis_page_1e9": {
+   "status": 200,
+   "ms": 368
+  },
+  "page_devis_page_negative": {
+   "status": 200,
+   "ms": 484
+  }
+ },
+ "J6_charges_volumineuses": {
+  "creer_devis_1000_lignes_0Mo": {
+   "status": 200,
+   "ms": 1260
+  },
+  "creer_devis_10000_lignes_3Mo": {
+   "status": 200,
+   "ms": 28175
+  },
+  "creer_devis_50000_lignes_16Mo": {
+   "status": 200,
+   "ms": 134892
+  },
+  "assistant_chat_5Mo": 404,
+  "server_action_3Mo": 404
+ }
+}

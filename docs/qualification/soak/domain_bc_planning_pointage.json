@@ -1,0 +1,351 @@
+{
+ "A40": {
+  "salaries_actifs": 38,
+  "pointages_total": 46650,
+  "affectations_total": 0,
+  "B1_planning_semaine": {
+   "n": 8,
+   "p50": 85.9,
+   "p95": 136.3,
+   "max": 136.3,
+   "errors": 0,
+   "avgBytes": 42537,
+   "affectations_api": 0,
+   "affectations_sql": 0,
+   "exact": true
+  },
+  "B2_planning_mois": {
+   "n": 5,
+   "p50": 93.4,
+   "p95": 102,
+   "max": 102,
+   "errors": 0,
+   "avgBytes": 205282,
+   "statut": 200
+  },
+  "B3_navigation_12_semaines": {
+   "n": 12,
+   "p50": 79.7,
+   "p95": 114.1,
+   "max": 114.1,
+   "errors": 0,
+   "avgBytes": 27496
+  },
+  "B4_options_employes": {
+   "n": 8,
+   "p50": 3.1,
+   "p95": 3.4,
+   "max": 3.4,
+   "errors": 0,
+   "avgBytes": 5264,
+   "lignes": 38,
+   "attendu": 38
+  },
+  "B5_planning_20_simultanes": {
+   "n": 200,
+   "p50": 463.9,
+   "p95": 1048.4,
+   "max": 1576.9,
+   "errors": 0,
+   "avgBytes": 42537
+  },
+  "C1_totaux_mois": {
+   "n": 8,
+   "p50": 45.7,
+   "p95": 83.2,
+   "max": 83.2,
+   "errors": 0,
+   "avgBytes": 7327,
+   "lignes_api": 38,
+   "employes_sql": 38
+  },
+  "C1_compteurs_mois": {
+   "n": 8,
+   "p50": 52.8,
+   "p95": 85.3,
+   "max": 85.3,
+   "errors": 0,
+   "avgBytes": 64
+  },
+  "C1_page1": {
+   "n": 8,
+   "p50": 44,
+   "p95": 66.5,
+   "max": 66.5,
+   "errors": 0,
+   "avgBytes": 2448
+  },
+  "C1_derniere_page": {
+   "n": 8,
+   "p50": 44.6,
+   "p95": 53.7,
+   "max": 53.7,
+   "errors": 0,
+   "avgBytes": 2448,
+   "pointages_mois": 1552
+  },
+  "C2_lecture_periode_mois": {
+   "n": 5,
+   "p50": 351,
+   "p95": 364.8,
+   "max": 364.8,
+   "errors": 0,
+   "avgBytes": 705919,
+   "pointages_api": 1552,
+   "pointages_sql": 1552,
+   "exact": true
+  },
+  "C2_lecture_periode_12_mois": {
+   "n": 3,
+   "p50": 682.3,
+   "p95": 776.6,
+   "max": 776.6,
+   "errors": 0,
+   "avgBytes": 7689123,
+   "statut": 200,
+   "pointages_sql": 16908,
+   "octets": 7689123
+  }
+ },
+ "T21_100sal": {
+  "salaries_actifs": 100,
+  "pointages_total": 87724,
+  "affectations_total": 9000,
+  "B1_planning_semaine": {
+   "n": 8,
+   "p50": 414.8,
+   "p95": 955.7,
+   "max": 955.7,
+   "errors": 0,
+   "avgBytes": 347876,
+   "affectations_api": 500,
+   "affectations_sql": 500,
+   "exact": true
+  },
+  "B2_planning_mois": {
+   "n": 5,
+   "p50": 392.9,
+   "p95": 3248.5,
+   "max": 3248.5,
+   "errors": 0,
+   "avgBytes": 1530058,
+   "statut": 200
+  },
+  "B3_navigation_12_semaines": {
+   "n": 12,
+   "p50": 369,
+   "p95": 865.9,
+   "max": 865.9,
+   "errors": 0,
+   "avgBytes": 272773
+  },
+  "B4_options_employes": {
+   "n": 8,
+   "p50": 3.6,
+   "p95": 7.1,
+   "max": 7.1,
+   "errors": 0,
+   "avgBytes": 12386,
+   "lignes": 100,
+   "attendu": 100
+  },
+  "B5_planning_20_simultanes": {
+   "n": 200,
+   "p50": 5459.9,
+   "p95": 9414.8,
+   "max": 12606.6,
+   "errors": 2,
+   "avgBytes": 344398
+  },
+  "C1_totaux_mois": {
+   "n": 8,
+   "p50": 90.6,
+   "p95": 94,
+   "max": 94,
+   "errors": 0,
+   "avgBytes": 18482,
+   "lignes_api": 100,
+   "employes_sql": 100
+  },
+  "C1_compteurs_mois": {
+   "n": 8,
+   "p50": 99.8,
+   "p95": 130.7,
+   "max": 130.7,
+   "errors": 0,
+   "avgBytes": 64
+  },
+  "C1_page1": {
+   "n": 8,
+   "p50": 90.4,
+   "p95": 96.4,
+   "max": 96.4,
+   "errors": 0,
+   "avgBytes": 2448
+  },
+  "C1_derniere_page": {
+   "n": 8,
+   "p50": 92,
+   "p95": 95.6,
+   "max": 95.6,
+   "errors": 0,
+   "avgBytes": 2448,
+   "pointages_mois": 2933
+  },
+  "C2_lecture_periode_mois": {
+   "n": 5,
+   "p50": 389,
+   "p95": 411.6,
+   "max": 411.6,
+   "errors": 0,
+   "avgBytes": 1275195,
+   "pointages_api": 2933,
+   "pointages_sql": 2933,
+   "exact": true
+  },
+  "C2_lecture_periode_12_mois": {
+   "n": 3,
+   "p50": 1038.5,
+   "p95": 1107.8,
+   "max": 1107.8,
+   "errors": 0,
+   "avgBytes": 13754453,
+   "statut": 200,
+   "pointages_sql": 31638,
+   "octets": 13754453
+  }
+ },
+ "T22_500sal": {
+  "salaries_actifs": 500,
+  "pointages_total": 159321,
+  "affectations_total": 45000,
+  "B1_planning_semaine": {
+   "n": 8,
+   "p50": 4310.8,
+   "p95": 4437.8,
+   "max": 4437.8,
+   "errors": 0,
+   "avgBytes": 1743119,
+   "affectations_api": 2500,
+   "affectations_sql": 2500,
+   "exact": true
+  },
+  "B2_planning_mois": {
+   "n": 5,
+   "p50": 1495.6,
+   "p95": 18122,
+   "max": 18122,
+   "errors": 0,
+   "avgBytes": 7655984,
+   "statut": 200
+  },
+  "B3_navigation_12_semaines": {
+   "n": 12,
+   "p50": 1046.8,
+   "p95": 4357.7,
+   "max": 4357.7,
+   "errors": 0,
+   "avgBytes": 1365327
+  },
+  "B4_options_employes": {
+   "n": 8,
+   "p50": 6.7,
+   "p95": 7.5,
+   "max": 7.5,
+   "errors": 0,
+   "avgBytes": 62786,
+   "lignes": 500,
+   "attendu": 500
+  },
+  "B5_planning_20_simultanes": {
+   "n": 200,
+   "p50": 10019.5,
+   "p95": 22133.2,
+   "max": 24270.4,
+   "errors": 85,
+   "avgBytes": 1002341
+  },
+  "C1_totaux_mois": {
+   "n": 8,
+   "p50": 424.3,
+   "p95": 446.9,
+   "max": 446.9,
+   "errors": 0,
+   "avgBytes": 93278,
+   "lignes_api": 500,
+   "employes_sql": 500
+  },
+  "C1_compteurs_mois": {
+   "n": 8,
+   "p50": 429.7,
+   "p95": 498.1,
+   "max": 498.1,
+   "errors": 0,
+   "avgBytes": 65
+  },
+  "C1_page1": {
+   "n": 8,
+   "p50": 474.5,
+   "p95": 490.4,
+   "max": 490.4,
+   "errors": 0,
+   "avgBytes": 2448
+  },
+  "C1_derniere_page": {
+   "n": 8,
+   "p50": 423.2,
+   "p95": 545,
+   "max": 545,
+   "errors": 0,
+   "avgBytes": 2448,
+   "pointages_mois": 14619
+  },
+  "C2_lecture_periode_mois": {
+   "n": 5,
+   "p50": 1225,
+   "p95": 1231.1,
+   "max": 1231.1,
+   "errors": 0,
+   "avgBytes": 6381106,
+   "pointages_api": 14619,
+   "pointages_sql": 14619,
+   "exact": true
+  },
+  "C2_lecture_periode_12_mois": {
+   "n": 3,
+   "p50": 4944.2,
+   "p95": 5287.5,
+   "max": 5287.5,
+   "errors": 0,
+   "avgBytes": 68959434,
+   "statut": 200,
+   "pointages_sql": 157987,
+   "octets": 68959434
+  }
+ },
+ "C3_creation_concurrente": {
+  "n": 500,
+  "p50": 56.8,
+  "p95": 135.5,
+  "max": 242.4,
+  "errors": 0,
+  "avgBytes": 38,
+  "salaries": 500,
+  "crees": 500,
+  "codes": {
+   "200": 500
+  }
+ },
+ "C4_corrections_chevauchantes": {
+  "n": 16,
+  "p50": 25.8,
+  "p95": 27.3,
+  "max": 27.3,
+  "errors": 0,
+  "avgBytes": 38,
+  "codes": {
+   "200": 16
+  },
+  "pointages_meme_jour": 17
+ }
+}
