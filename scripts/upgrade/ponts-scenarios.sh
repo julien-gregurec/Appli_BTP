@@ -29,7 +29,7 @@ P201=$(ls "$MIG"/20261003000201_*.sql); P202=$(ls "$MIG"/20261003000202_*.sql)
 appliquer() { # <base> <fichier> [ledger=1]
   local b v nom; b=$(basename "$2" .sql); v=${b%%_*}; nom=${b#*_}
   { upg_contenu_migration "$2" | python3 "$HERE/lib/strip_txn.py"; echo
-    [ "${3:-1}" = 1 ] && echo "insert into supabase_migrations.schema_migrations(version, name) values ('$v', '$nom');"; } \
+    if [ "${3:-1}" = 1 ]; then echo "insert into supabase_migrations.schema_migrations(version, name) values ('$v', '$nom');"; fi; } \
     | su postgres -c "psql -X -q -1 -v ON_ERROR_STOP=1 -d $1" > "$OUT/derniere.out" 2>&1
 }
 empreinte() { # <base> : lignes + parents + triggers des tables concernées
@@ -38,7 +38,7 @@ empreinte() { # <base> : lignes + parents + triggers des tables concernées
       select 'lf:'||md5(lf::text) from public.lignes_factures lf union all
       select 'd:'||id||':'||coalesce(updated_at::text,'')||':'||coalesce(montant_ttc::text,'') from public.devis union all
       select 'f:'||id||':'||coalesce(updated_at::text,'')||':'||coalesce(montant_ttc::text,'') from public.factures union all
-      select 't:'||c.relname||'.'||g.tgname||':'||g.tgenabled from pg_trigger g join pg_class c on c.oid = g.tgrelid
+      select 't:'||c.relname||'.'||g.tgname||':'||g.tgenabled::text from pg_trigger g join pg_class c on c.oid = g.tgrelid
        where c.relname in ('lignes_devis','lignes_factures','devis','factures') and not g.tgisinternal) s"
 }
 
@@ -72,7 +72,7 @@ for f in "$MIG"/*.sql; do
 done
 apres=$(empreinte $db)
 echo "  ledger $n91 → $(upg_q $db "select count(*) from supabase_migrations.schema_migrations") ; lignes de factures émises : $emises ;$notices"
-[ "$avant" = "$apres" ] && [ "${emises:-0}" -gt 0 ] && ok "PS2 empreinte lignes / devis / factures / triggers identique ($avant)" \
+[ -n "$avant" ] && [ "$avant" = "$apres" ] && [ "${emises:-0}" -gt 0 ] && ok "PS2 empreinte lignes / devis / factures / triggers identique ($avant)" \
   || ko "PS2 empreinte modifiée ($avant → $apres) ou aucune facture émise ($emises)"
 upg_drop $db
 
