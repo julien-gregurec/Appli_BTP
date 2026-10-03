@@ -1,5 +1,31 @@
 # ELSATIA Social : recette V1 (3 octobre 2026)
 
+## 0. Requalification sur le train canonique V9.2 (branche `integration/elsatia-social-v1`)
+
+Base : HEAD du train `dfb59cc` + migration `20261003001601_elsatia_social.sql`. Aucun appel à Meta ni LinkedIn, `SOCIAL_DRY_RUN` en simulation.
+
+| Contrôle | Résultat |
+|---|---|
+| Application de toutes les migrations sur PostgreSQL 16 vierge (`rebuild_db.sh`) | **409/409**, sans erreur ; noms et horodatages uniques (`verify:migrations`) |
+| Collision | aucune migration `≥ 20261003001505` sur le train ni sur aucune branche distante |
+| Retour arrière Social puis réapplication | 16 → 0 → 16 tables ; objets canoniques intacts |
+| pgTAP Social (`supabase/tests/elsatia_social_v1.test.sql`) | **74/74** : RLS, anon, authenticated, service_role, AAL2, validation, verrou anti-doublon, quotas, audit, stockage, garde incident, RGPD |
+| Suite pgTAP complète du train (182 fichiers, 9 249 assertions) | échecs **identiques** à la base témoin V9.2 sans Social (9 fichiers préexistants : 7 Studio — projet Supabase dédié —, attestation Stripe R72 — vrai `pgsodium` requis —, Tools cloud sync) |
+| PostgREST + GoTrue réels, AAL2 par enrôlement TOTP réel (`postgrest-gotrue.mjs`) | **26/26** |
+| Navigateur, `next dev` sur la pile réelle, ACL canonique conservée (`navigateur-v92.mjs`) | **16/16** : 14 pages × 3 affichages (42 vues) avec bandeau simulation, sans débordement ni erreur JS ; MFA exigé ; validation AAL2 ; publication simulée sans identifiant externe ; rôle modifié et journalisé ; identité révoquée coupée ; `/suppression-donnees` publique |
+
+Défauts trouvés par cette requalification et corrigés avant tout déploiement :
+1. **Garde du mode sûr incident** absente des 16 tables (règle du train) : `incident_installer_gardes()` ajoutée.
+2. **Purge RGPD de toute entreprise cassée** : `verifier_storage_entreprise()` parcourt toute colonne `*storage_path*` en supposant un `entreprise_id` ; colonne Social renommée `chemin_objet` (10 suites pgTAP Tools/RGPD repassées).
+3. **Page Équipe vide en conditions réelles** : le `service_role` n'a plus de droit sur `plateforme_admins` (réconciliation ACL 255). Le banc GoTrue historique masquait le défaut en accordant tout au `service_role` ; nouvelle RPC `social_lister_equipe()` sous JWT, recette refaite avec l'ACL canonique.
+4. Privilèges par défaut : TRUNCATE/UPDATE/DELETE retirés explicitement au `service_role` sur le journal.
+
+Non couvert localement : téléversement réel par URL signée (le stockage simulé du banc ne gère pas `upload/sign` ; couvert par la recette initiale sur Supabase complet), IA réelle, Meta et LinkedIn réels.
+
+---
+
+_Recette initiale, réalisée sur l'ancienne base `main` (migration 184), conservée pour l'historique :_
+
 Recette réalisée sur une **stack Supabase locale complète**, avec les vrais services : Postgres 17 Supabase, GoTrue (authentification), Storage, PostgREST. Les 179 migrations du dépôt y sont appliquées, et l'application Next.js est pilotée dans Chromium.
 
 Aucun appel n'a été envoyé à Meta ni à LinkedIn :
@@ -43,7 +69,7 @@ Corrigé pendant la recette :
 - statut brut « connecte » au lieu de « Connecté » ;
 - entrée de menu dorée.
 
-## 3. Base de données (migration 184)
+## 3. Base de données (migration 184, ancienne numérotation)
 
 - Appliquée à la suite des 178 migrations existantes, puis retour arrière (0 table restante) et réapplication (16 tables) : cycle validé.
 - Testé via PostgREST avec les vrais rôles d'API :

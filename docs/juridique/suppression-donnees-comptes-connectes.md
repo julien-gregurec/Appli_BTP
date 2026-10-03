@@ -54,8 +54,8 @@ La suppression dans les outils ELSATIA ne supprime pas un commentaire publié su
 
 ## 4. Retirer l'accès d'ELSATIA à un compte
 
-- **Facebook et Instagram** : Paramètres et confidentialité › Paramètres › Intégrations professionnelles (ou « Apps et sites web »), puis retirer l'application ELSATIA. Meta nous en informe et le compte est déconnecté.
-- **LinkedIn** : Préférences › Confidentialité des données › Autres applications, puis retirer l'application ELSATIA.
+- **Facebook et Instagram** : Paramètres et confidentialité › Paramètres › Intégrations professionnelles (ou « Apps et sites web »), puis retirer l'application ELSATIA. Le jeton cesse aussitôt de fonctionner ; l'outil le constate à sa vérification suivante et marque le compte « à reconnecter ». Pour supprimer aussi les données conservées, suivre la procédure du § 3.
+- **LinkedIn** : Préférences › Confidentialité des données › Autres applications, puis retirer l'application ELSATIA. Même effet que ci-dessus.
 - **Équipe ELSATIA** : la révocation depuis l'outil (Comptes › Révoquer) supprime immédiatement les jetons de nos systèmes et demande leur révocation à la plateforme.
 
 ## 5. Vos droits
