@@ -34,7 +34,7 @@ empreinte_policies() { q "$1" "select md5(string_agg(tablename||policyname||coal
 REF_V91=$(empreinte_policies "$BASE_PRE")
 # Script pgbench : tenant tiré au hasard parmi les tenants volumétriques présents.
 TENANTS=$(q "$BASE_PRE" "select string_agg(right(id::text,2), ' ') from public.entreprises where id::text like 'e0000000-0000-4000-e000-0000000000%'")
-cat > "$OUT/lecture_legere.pgbench" <<SQL
+cat > "$OUT/lecture_leger.pgbench" <<SQL
 \set t random(1, $(echo $TENANTS | wc -w))
 begin;
 set local role authenticated;
@@ -43,7 +43,7 @@ select id, montant_ttc from public.devis where entreprise_id = (array[$(for t in
 select id, statut from public.factures where entreprise_id = (array[$(for t in $TENANTS; do printf "'e0000000-0000-4000-e000-0000000000%s'," $t; done | sed 's/,$//')])[:t]::uuid order by created_at desc limit 20;
 commit;
 SQL
-cat > "$OUT/lecture_lourde.pgbench" <<SQL
+cat > "$OUT/lecture_lourd.pgbench" <<SQL
 \set t random(1, $(echo $TENANTS | wc -w))
 begin;
 set local role authenticated;
@@ -87,6 +87,8 @@ scenario() { # <nom> <trafic 0|leger|lourd> <lecture_lente 0|1>
   [ -n "$pb" ] && wait $pb
   local dl; dl=$(( $(q postgres "select deadlocks from pg_stat_database where datname='$db'") - dl0 ))
   local pbres=""; [ "$trafic" != 0 ] && pbres=" pgbench=[$(grep -E 'number of (transactions actually processed|failed)' "$OUT/${nom}_pgbench.log" | sed 's/.*: //' | tr '\n' ' ' | sed 's/ $//')] erreurs_clients=$(grep -c 'ERROR' "$OUT/${nom}_pgbench.log")"
+  # Garde du banc : un scénario « avec trafic » sans transaction pgbench aboutie n'a rien prouvé.
+  if [ "$trafic" != 0 ] && ! grep -q "number of transactions actually processed" "$OUT/${nom}_pgbench.log"; then pbres="$pbres BANC_INVALIDE(pgbench)"; fi
   echo "$nom $resultat deadlocks=$dl$pbres" | tee -a "$OUT/resultats.txt"
   pg -c "drop database if exists $db" > /dev/null
 }
