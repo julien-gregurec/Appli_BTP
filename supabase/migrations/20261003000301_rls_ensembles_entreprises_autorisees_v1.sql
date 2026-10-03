@@ -43,7 +43,7 @@
 -- Garde : la migration échoue sans rien modifier si une policy ne correspond pas à
 -- l'expression V9.1 attendue.
 --
--- Retour arrière : scripts/perf/hardening/rls/rollback_20261003000301.sql (expressions
+-- Retour arrière : scripts/perf/hardening/rollback/rollback_20261003000301.sql (expressions
 -- V9.1 d'origine), puis drop des trois fonctions.
 
 begin;
