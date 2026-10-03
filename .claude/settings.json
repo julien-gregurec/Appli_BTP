@@ -1,0 +1,12 @@
+{
+  "enabledPlugins": {
+    "claude-code-setup@anthropic-plugin-directory": true,
+    "context7@anthropic-plugin-directory": true,
+    "frontend-design@anthropic-plugin-directory": true,
+    "claude-security@anthropic-plugin-directory": true
+  },
+  "env": {
+    "WATCH_ENGINE": "local",
+    "WATCH_WHISPER_BACKEND": "none"
+  }
+}
