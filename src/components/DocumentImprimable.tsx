@@ -69,6 +69,7 @@ export function DocumentImprimable({
   estFacture,
   signatures = [],
   photos = [],
+  reference = null,
 }: {
   typeDoc: string;
   numero: string;
@@ -84,6 +85,8 @@ export function DocumentImprimable({
   estFacture: boolean;
   signatures?: SignatureImprimable[];
   photos?: Array<{ id: string; nom: string; legende?: string | null }>;
+  /** Mention sous le numéro, par exemple la facture créditée par un avoir. */
+  reference?: string | null;
 }) {
   // Les dates arrivent au format ISO (AAAA-MM-JJ) depuis la base : on les
   // présente au format français sans passer par Date pour éviter tout décalage de fuseau.
@@ -140,6 +143,7 @@ export function DocumentImprimable({
           <div style={{ fontFamily: "monospace", fontSize: "15px" }}>{numero}</div>
           <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateFr(dateEmission)}</div>
           {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateFr(dateSecondaire.valeur)}</div>}
+          {reference && <div style={{ color: "#555" }}>{reference}</div>}
         </div>
       </div>
 

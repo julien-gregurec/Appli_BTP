@@ -19,6 +19,11 @@ export default async function ImprimerFacturePage({ params }: { params: Promise<
 
   if (!facture) notFound();
 
+  // Un avoir doit mentionner la facture qu'il rectifie.
+  const { data: factureOrigine } = facture.facture_origine_id
+    ? await supabase.from("factures").select("numero").eq("id", facture.facture_origine_id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+    : { data: null };
+
   const [{ data: lignes }, { data: entreprise }, { data: signatures }] = await Promise.all([
     supabase.from("lignes_factures").select("*").eq("facture_id", id).order("ordre"),
     supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single(),
@@ -58,6 +63,7 @@ export default async function ImprimerFacturePage({ params }: { params: Promise<
         montantTtc={facture.montant_ttc}
         notesClient={facture.notes_client}
         estFacture={true}
+        reference={factureOrigine?.numero ? `Avoir sur facture n° ${factureOrigine.numero}` : null}
         signatures={signatures ?? []}
       />
     </>
