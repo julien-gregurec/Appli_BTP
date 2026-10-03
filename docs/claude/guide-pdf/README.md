@@ -1,8 +1,9 @@
-# Source du guide « ELSATIA — Guide pratique des skills Claude »
+# Source des PDF « ELSATIA — Guide détaillé des skills installés » et « ELSATIA — Aide-mémoire des commandes »
 
 - `skills_data.py` : **source modifiable**. Contient les fiches, les statuts, les connecteurs, les logiciels et les annexes.
-- `build_guide.py` : génère `guide.html`, puis le PDF `../ELSATIA_Guide_pratique_skills_Claude.pdf`.
-- `guide.html` : HTML intermédiaire (régénéré, ne pas modifier à la main).
+- `build_guide.py` : génère `guide.html` et `aide-memoire.html`, puis les PDF `../ELSATIA_Guide_detaille_skills.pdf` et `../ELSATIA_Aide-memoire_commandes.pdf`.
+- `guide.html`, `aide-memoire.html` : HTML intermédiaires (régénérés, ne pas modifier à la main).
+- Résultats des essais de sélection automatique : `ESSAIS_AUTO`. Lignes de l'aide-mémoire : `AIDE_MEMOIRE`. Éléments bloqués : `AIDE_BLOQUES`.
 
 Régénération depuis la racine du dépôt :
 

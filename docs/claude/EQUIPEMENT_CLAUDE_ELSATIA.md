@@ -44,7 +44,7 @@ Statuts :
 
 | Nom exact | Type | Usage ELSATIA | Priorité | Statut vérifié | Version/source | Emplacement | Commande | Déclenchement automatique | Prérequis/coûts | Permissions/données transmises | Résultat du test |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| `claude-code-setup` | Plugin (1 skill) | Recommander hooks, skills et MCP pour le dépôt | Haute | ✅ | 1.0.0, official@d182ca4 | `.claude/settings.json` (projet) | `/claude-code-setup:claude-automation-recommender` | **Non** (`disable-model-invocation: true`), manuel uniquement | Aucun | Lecture du dépôt, rien n'est transmis hors Claude | 3 recommandations pertinentes (hook lint, sous-agent RLS), aucun fichier écrit |
+| `claude-code-setup` | Plugin (1 skill) | Recommander hooks, skills et MCP pour le dépôt | Haute | ✅ | 1.0.0, official@d182ca4 | `.claude/settings.json` (projet) | `/claude-code-setup:claude-automation-recommender` | Oui : sélection automatique possible, prouvée par l'outil Skill qui l'accepte (correction, voir §9) | Aucun | Lecture du dépôt, rien n'est transmis hors Claude | 3 recommandations pertinentes (hook lint, sous-agent RLS), aucun fichier écrit |
 | `context7` | Plugin (MCP HTTP) | Documentation technique à jour (Next 16, Supabase…) | Moyenne | ⚠️ **bloqué par le réseau** | official@d182ca4 → `https://mcp.context7.com/mcp` | `.claude/settings.json` (projet) | Outils MCP `context7` (noms non observables tant que le serveur est injoignable) | Oui, quand il est connecté | Gratuit en anonyme, `CONTEXT7_API_KEY` optionnelle | Les noms de bibliothèques et les questions partent chez Upstash. Ne jamais y mettre de code client ou de secret. | `claude mcp list` : `ERR_PROXY_TUNNEL`. Le proxy refuse `mcp.context7.com` (403). |
 | `frontend-design` | Plugin (1 skill) | Direction artistique des interfaces et pages | Moyenne | ✅ | official@d182ca4 | `.claude/settings.json` (projet) | `/frontend-design:frontend-design` | Oui, sur les demandes d'interface | Aucun | Aucune | Direction visuelle « plan de chantier », palette et typographie, sans code |
 | `claude-security` | Plugin (skill + agents) | Scan de vulnérabilités du dépôt, propositions de correctifs | Haute | ✅ reconnu, **scan non lancé** | 0.11.0, catalogue `c447c32` | `.claude/settings.json` (projet) | `/claude-security:claude-security` | **Non** (`disable-model-invocation`) | Coût en tokens élevé lors d'un scan complet | Lecture du dépôt dans la session | Présent dans l'inventaire de la session (`claude-security:claude-security`, `claude-security:scan`). Le scan n'a pas été lancé, conformément à la mission. |
@@ -132,7 +132,22 @@ Correctifs locaux apportés aux skills tiers (tous listés dans `ELSATIA-SOURCES
 - Skills de la PR #5 : trois répondent conformément en appel explicite. `web-design-guidelines` se charge, mais il doit télécharger ses règles (URL joignable, code 200) : l'outil WebFetch est à autoriser quand Claude le demande.
 - `npm run verify` (nettoyage, typecheck, lint, tests, migrations, secrets, build) : voir le résultat dans la description de la PR.
 
-## 8. Guide pratique
+## 8. Guides PDF
 
-- PDF : `docs/claude/ELSATIA_Guide_pratique_skills_Claude.pdf` (63 skills, connecteurs MCP, logiciels associés, annexes).
-- Source modifiable : `docs/claude/guide-pdf/skills_data.py`. Régénération : `python3 docs/claude/guide-pdf/build_guide.py` (voir `docs/claude/guide-pdf/README.md`).
+- `docs/claude/ELSATIA_Guide_detaille_skills.pdf` : « ELSATIA — Guide détaillé des skills installés » (84 pages, 63 fiches, sommaire paginé, liens internes).
+- `docs/claude/ELSATIA_Aide-memoire_commandes.pdf` : « ELSATIA — Aide-mémoire des commandes » (3 pages).
+- Source modifiable des deux : `docs/claude/guide-pdf/skills_data.py`. Régénération : `python3 docs/claude/guide-pdf/build_guide.py` (voir `docs/claude/guide-pdf/README.md`).
+
+## 9. Vérification finale (3 octobre 2026, vers 13 h 15 UTC)
+
+- **PR** : la PR #6 est ouverte, non fusionnée et sans conflit avec `main`. La PR #5 est fusionnée dans `main` (`4f71317`).
+- **CI** : `verification` est verte. Les Previews Vercel sont en échec « Deployment rate limited — retry in 24 hours » depuis 11 h 05 UTC (quota du plan gratuit). Cette session n'a pas accès à Vercel et ne peut donc pas relancer une Preview précise ; chaque push redéclenche les tentatives automatiquement.
+- **Sélection automatique** : 33 sessions neuves avec des demandes réalistes, sans commande slash.
+  - Observée pour 17 skills.
+  - Non observée pour 14 skills, dont la configuration permet pourtant la sélection automatique : ils restent classés « automatique possible », jamais « manuel ».
+- **Mode manuel** : seul `claude-security:claude-security` est manuel uniquement. Preuve : son en-tête, et le refus de l'outil Skill.
+- **Correction** : `claude-code-setup:claude-automation-recommender` avait été classé à tort « manuel uniquement ». La ligne `disable-model-invocation: true` relevée est un exemple situé dans le corps de son SKILL.md (ligne 188), pas dans l'en-tête. L'outil Skill l'accepte.
+- **`watch`, transcription audio** : essai sur une vidéo fictive parlée (synthèse vocale locale espeak-ng, sans sous-titres).
+  - Avec le réglage du projet, la transcription est désactivée et rien n'est envoyé à l'extérieur.
+  - WhisperX n'a pas pu être installé : `download.pytorch.org` et `huggingface.co` sont refusés (403). La transcription locale n'est **pas validée** dans le cloud ; elle reste installable sur un poste local.
+- **Context7** : `mcp.context7.com` et `context7.com` sont refusés (403) par la passerelle réseau. Une variante locale (`npx @upstash/context7-mcp`) interrogerait le même domaine. Seule solution permise : autoriser ces domaines dans les réglages réseau de l'environnement. La politique réseau n'a pas été contournée.

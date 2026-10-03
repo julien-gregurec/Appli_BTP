@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Source modifiable du guide « ELSATIA — Guide pratique des skills Claude ».
+"""Source modifiable des deux PDF « ELSATIA — Guide détaillé des skills installés » et « ELSATIA — Aide-mémoire des commandes ».
 
 Modifier ce fichier, puis régénérer le guide :
     python3 docs/claude/guide-pdf/build_guide.py
@@ -17,8 +17,12 @@ Valeurs autorisées :
 DATE = "3 octobre 2026"
 ENVIRONNEMENT = (
     "Session Claude Code sur le web (conteneur cloud Linux, Claude Code 2.1.288), dépôt "
-    "julien-gregurec/Appli_BTP, branche claude/stoic-shannon-9ax0mp. Inventaire relevé avec "
-    "l'événement « init » d'une session neuve (claude -p) et avec les fichiers SKILL.md présents sur disque."
+    "julien-gregurec/Appli_BTP, branche claude/stoic-shannon-9ax0mp (PR #6). Inventaire relevé avec "
+    "l'événement « init » de sessions neuves (claude -p) et les en-têtes SKILL.md ; vérifications refaites le 3 octobre 2026 vers 13 h 15 UTC."
+)
+ETAT_PR = (
+    "PR #6 (`claude/stoic-shannon-9ax0mp` → `main`) : ouverte, non fusionnée, sans conflit avec main. "
+    "PR #5 (4 skills React/Next.js, design, Supabase, Stripe) : fusionnée dans main le 3 octobre 2026 à 10 h 50 UTC (commit `4f71317`)."
 )
 
 DOMAINES = [
@@ -211,8 +215,8 @@ SKILLS = [
         nom="claude-code-setup:claude-automation-recommender", origine="plugin", domaine="dev",
         fonction="Analyse du dépôt et recommandations d'automatisations Claude Code.",
         apps=f"{LIRIA} et tout dépôt ELSATIA.",
-        declenchement="manuel", observe="Manuel uniquement (disable-model-invocation: true). Appel explicite testé.",
-        situations="Claude ne le choisit jamais seul.",
+        declenchement="auto", observe="",
+        situations="Demande de recommandations d'automatisation, optimisation de la configuration Claude Code, première configuration d'un projet.",
         commande="/claude-code-setup:claude-automation-recommender", statut="teste",
         resultat_test="3 recommandations (hook lint/typecheck, sous-agent de relecture RLS…), aucun fichier écrit.",
         sert="Proposer des hooks, skills, sous-agents et serveurs MCP adaptés au projet.",
@@ -987,13 +991,13 @@ SKILLS = [
         declenchement="auto", observe="Appel explicite testé ; sélection automatique non testée.",
         situations="« Regarde cette vidéo », analyse d'une vidéo.",
         commande="/watch", statut="teste",
-        resultat_test="Vidéo fictive de 6 s analysée en local : 1 image extraite, transcription désactivée.",
+        resultat_test="Images : vidéo fictive de 6 s analysée en local (1 image extraite). Transcription audio : vidéo fictive parlée (voix de synthèse espeak-ng, 9,6 s, sans sous-titres). Avec le réglage projet, transcription désactivée (« Fallback disabled »). Avec --whisper whisperx : échec « WhisperX executable missing », car l'installation de WhisperX est bloquée par le réseau (download.pytorch.org et huggingface.co refusés, 403). Transcription locale NON validée ici.",
         sert="Permettre à Claude de « voir » une vidéo à partir d'images extraites et de sous-titres.",
         quand="Pour vérifier une démo avant diffusion, ou étudier un format.",
         peut_faire="Télécharger (yt-dlp), extraire des images (ffmpeg), lire les sous-titres, répondre à une question.",
         fournir="Le chemin ou l'URL de la vidéo et la question.",
         resultat="Une analyse fondée sur des images horodatées.",
-        limites="Mode local imposé : aucune transcription audio sans sous-titres. Dans une nouvelle session cloud, réinstaller yt-dlp (uv tool install yt-dlp==2026.8.19).",
+        limites="Mode local imposé : sans sous-titres intégrés, pas de transcription. La transcription locale (WhisperX 3.8.6, modèle small de 464 Mo, environ 1 Go de paquets) est impossible dans cet environnement cloud (réseau). Sur un poste local : python3 .claude/skills/watch/scripts/setup.py --install-whisperx, puis --whisper whisperx. Dans une nouvelle session cloud, réinstaller yt-dlp (uv tool install yt-dlp==2026.8.19).",
         permissions="Exécution locale (python3, ffmpeg, yt-dlp). WATCH_ENGINE=local et WATCH_WHISPER_BACKEND=none, fixés dans .claude/settings.json : rien n'est envoyé à Gemini, Groq ou OpenAI.",
         securite="Ne pas utiliser --cookies-from-browser. Supprimer le dossier watch-* après usage. Seulement des URL publiques.",
         ex1="Vérifier qu'aucune donnée réelle n'apparaît dans une démo.",
@@ -1305,7 +1309,7 @@ SKILLS = SKILLS + PR5
 MCP = [
     dict(nom="context7 (plugin context7)", statut="bloque",
          role="Documentation technique à jour (Upstash).",
-         detail="Installé et activé (.claude/settings.json). Statut « failed » : le proxy de l'environnement cloud refuse mcp.context7.com (403). À débloquer : menu de l'environnement cloud, Edit, Network access, Custom, ajouter mcp.context7.com aux domaines autorisés.",
+         detail="Plugin installé et activé. Le serveur MCP reste en échec (ERR_PROXY_TUNNEL) : la passerelle réseau de l'environnement répond 403 à mcp.context7.com et à context7.com (journal du proxy, 3 octobre 13 h 15 UTC). Une variante locale (npx @upstash/context7-mcp) interrogerait le même domaine : elle serait bloquée aussi. Solution permise : la personne qui gère l'environnement cloud ajoute mcp.context7.com et context7.com aux domaines autorisés (menu de l'environnement, Edit, Network access, Custom). Sur un poste local, aucun blocage attendu (non testé). En attendant : documentation Next.js locale dans node_modules/next/dist/docs/.",
          donnees="Noms de bibliothèques et questions envoyés à Upstash. CONTEXT7_API_KEY optionnelle, non configurée.",
          appel="Pas de commande slash ; demander « Utilise Context7 pour… ». Noms d'outils non vérifiables tant que le serveur est injoignable."),
     dict(nom="github (connecteur de session)", statut="teste",
@@ -1328,6 +1332,12 @@ LOGICIELS = [
     dict(nom="Moteur Remotion 4.0.532", statut="teste", lieu="Dossier de travail temporaire de la session, hors du dépôt",
          detail="252 paquets npm (--ignore-scripts). Rendu d'un MP4 h264 1080×1920 de 2 s avec le headless shell préinstallé. Non conservé : à recréer dans un dossier dédié hors de l'app.",
          local="Projet séparé ; Remotion télécharge son Chrome headless au premier rendu. Licence Remotion à respecter."),
+    dict(nom="WhisperX 3.8.6 (transcription locale de /watch)", statut="bloque", lieu="~/.cache/watch/whisperx-venv (non créé)",
+         detail="Installation refusée par le réseau : download.pytorch.org (PyTorch CPU) et huggingface.co (modèle Whisper small) répondent 403. Aucune solution détournée n'a été employée.",
+         local="python3 .claude/skills/watch/scripts/setup.py --install-whisperx (3 Go disque, 8 Go RAM)"),
+    dict(nom="espeak-ng 1.51 (outil d'essai)", statut="teste", lieu="Paquet Ubuntu du conteneur",
+         detail="Utilisé seulement pour fabriquer une voix fictive de test. Ce n'est pas une dépendance d'un skill.",
+         local="Inutile"),
     dict(nom="python3", statut="teste", lieu="Image cloud", detail="Utilisé par ui-ux-pro-max, ig-reel, ig-caption et watch (bibliothèque standard).",
          local="Python 3.10 ou plus."),
 ]
@@ -1340,8 +1350,10 @@ ANNEXE = {
          "Pentest automatisé, à installer plus tard dans une mission dédiée. Prérequis : démon Docker (absent ici), Python 3.12+, pipx install strix-agent épinglé (pas de curl | bash), STRIX_LLM et LLM_API_KEY, STRIX_TELEMETRY=false. Code local et environnement de test uniquement."),
         ("trailofbits/skills : insecure-defaults, sharp-edges",
          "Utiles pour les secrets et les configurations. À installer seulement après validation de la licence CC-BY-SA-4.0 (partage à l'identique)."),
-        ("Accès réseau à mcp.context7.com",
-         "Le plugin context7 est installé, mais bloqué. Il faut autoriser ce domaine dans les réglages réseau de l'environnement cloud."),
+        ("Accès réseau à mcp.context7.com et context7.com",
+         "Le plugin context7 est installé, mais bloqué (403). Il faut autoriser ces domaines dans les réglages réseau de l'environnement cloud."),
+        ("WhisperX pour la transcription locale de /watch",
+         "À installer sur un poste local, ou dans le cloud après autorisation de download.pytorch.org et huggingface.co : python3 .claude/skills/watch/scripts/setup.py --install-whisperx."),
     ],
     "reportes": [
         ("security-guidance (plugin officiel)",
@@ -1366,3 +1378,147 @@ ANNEXE = {
          "Appels aux API Gemini et autres, lecture de fichiers .env, génération Tailwind 3 : hors besoin."),
     ],
 }
+
+
+# --------------------------------------------------------------------------- ESSAIS DE SÉLECTION AUTOMATIQUE
+# Résultats des sessions neuves (claude -p) avec demandes réalistes, sans commande slash, 3 octobre 2026.
+# "observe" = l'outil Skill a chargé ce skill ; "non_observe" = Claude a répondu sans le charger.
+_OBS = "Sélection automatique observée : le skill a été chargé seul sur une demande réaliste sans commande."
+_ECOM = " (elsatia-communication a aussi été chargé automatiquement en premier)."
+ESSAIS_AUTO = {
+    "elsatia-securite": ("observe", _OBS + " Observé deux fois."),
+    "elsatia-communication": ("observe", _OBS + " Observé sur la plupart des demandes marketing et réseaux sociaux."),
+    "supabase": ("observe", _OBS),
+    "supabase-postgres-best-practices": ("observe", _OBS + " elsatia-securite a été chargé ensuite."),
+    "stripe-best-practices": ("observe", _OBS),
+    "web-design-guidelines": ("observe", _OBS + " Demande formulée « review my UI », comme dans sa description."),
+    "watch": ("observe", _OBS + " Demande : « Regarde la vidéo … »."),
+    "product-marketing": ("observe", _OBS[:-1] + _ECOM),
+    "cro": ("observe", _OBS[:-1] + _ECOM),
+    "launch": ("observe", _OBS[:-1] + _ECOM),
+    "ai-seo": ("observe", _OBS[:-1] + _ECOM),
+    "content-strategy": ("observe", _OBS[:-1] + _ECOM),
+    "ig-reel": ("observe", _OBS[:-1] + _ECOM),
+    "ig-caption": ("observe", _OBS[:-1] + _ECOM),
+    "ig-carousel": ("observe", _OBS[:-1] + _ECOM),
+    "ig-profile": ("observe", _OBS[:-1] + _ECOM),
+    "ig-plan": ("observe", _OBS[:-1] + _ECOM),
+    "copy-editing": ("non_observe", "Non observée : seul elsatia-communication a été chargé, puis Claude a relu le texte lui-même. Configuration compatible avec la sélection automatique."),
+    "copywriting": ("non_observe", "Non observée : seul elsatia-communication a été chargé. Configuration compatible avec la sélection automatique."),
+    "social": ("non_observe", "Non observée : seul elsatia-communication a été chargé (deux essais). Configuration compatible avec la sélection automatique."),
+    "seo-audit": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "marketing-psychology": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "ui-ux-pro-max": ("non_observe", "Non observée (deux essais) : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "frontend-design:frontend-design": ("non_observe", "Non observée (deux essais) : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "vercel-react-best-practices": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "remotion-create": ("non_observe", "Non observée (deux essais) : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "remotion-markup": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "remotion-studio": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "remotion-render": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "remotion-captions": ("non_observe", "Non observée : réponse directe sans skill. Configuration compatible avec la sélection automatique."),
+    "claude-code-setup:claude-automation-recommender": ("non_observe", "Correction : le premier rapport le classait à tort « manuel uniquement ». La ligne « disable-model-invocation: true » relevée est un exemple dans le corps du SKILL.md (ligne 188), pas dans son en-tête. Preuve : l'outil Skill l'a accepté (« Launching skill »). Sélection spontanée non observée."),
+    "claude-security:claude-security": ("manuel", "Manuel uniquement, prouvé : en-tête « disable-model-invocation: true », et l'outil Skill a refusé l'appel (« cannot be used with Skill tool due to disable-model-invocation »)."),
+}
+
+# --------------------------------------------------------------------------- DISPONIBILITÉ PAR ENVIRONNEMENT
+DISPO_ENV = [
+    ("25 skills ajoutés par la PR #6 (.claude/skills/)", "Non", "Oui", "Oui", "Oui si la session est ouverte sur la branche PR #6", "Oui après git checkout de la branche (puis git pull de main après fusion)"),
+    ("4 skills de la PR #5", "Oui", "Oui", "Oui", "Oui", "Oui après git pull"),
+    ("Plugins claude-code-setup, frontend-design, claude-security, context7", "Non (déclarés par la PR #6)", "Déclarés dans .claude/settings.json", "Installés et actifs", "Déclarés ; installation automatique non vérifiée, sinon : claude plugin install <nom> --scope project", "Marketplace possiblement nommé claude-plugins-official (non testé)"),
+    ("Mode local de /watch (WATCH_ENGINE=local, WATCH_WHISPER_BACKEND=none)", "Non", "Oui (.claude/settings.json)", "Actif", "Actif sur la branche", "Actif sur la branche"),
+    ("Skills intégrés et skills du compte", "Sans objet", "Sans objet", "Oui", "Oui", "Oui (synchronisation du compte non vérifiée en local)"),
+    ("Context7", "—", "—", "Bloqué (403)", "Bloqué tant que les domaines ne sont pas autorisés", "Devrait fonctionner (non testé)"),
+    ("yt-dlp (pour /watch)", "—", "—", "Installé (2026.8.19)", "À réinstaller : uv tool install yt-dlp==2026.8.19", "À installer"),
+    ("WhisperX (transcription de /watch)", "—", "—", "Bloqué (403)", "Bloqué", "Installable : setup.py --install-whisperx"),
+    ("Playwright 1.56.1 + Chromium", "—", "—", "Préinstallé", "Préinstallé", "npm i -g playwright@1.56.1 && npx playwright install chromium"),
+    ("Navigateur intégré, Chrome, computer-use", "—", "—", "Indisponibles", "Indisponibles", "Avec l'app Claude de bureau ou l'extension Chrome"),
+]
+
+PLUGINS = [
+    dict(nom="claude-code-setup", version="1.0.0 · commit d182ca4 · Apache-2.0", contenu="1 skill : claude-code-setup:claude-automation-recommender. Aucun hook, aucun MCP.", dispo="Branche PR #6 (.claude/settings.json)"),
+    dict(nom="frontend-design", version="commit d182ca4 · Apache-2.0", contenu="1 skill : frontend-design:frontend-design.", dispo="Branche PR #6"),
+    dict(nom="claude-security", version="0.11.0 · c447c32 · licence Anthropic", contenu="Skills claude-security:claude-security (menu, manuel) et claude-security:scan (pipeline interne) ; 8 agents ; hooks locaux (bannière, compteurs).", dispo="Branche PR #6"),
+    dict(nom="context7", version="commit d182ca4", contenu="Connecteur MCP HTTP vers mcp.context7.com. Aucun skill.", dispo="Branche PR #6 ; bloqué par le réseau"),
+]
+
+VERIFICATIONS = [
+    ("État des PR (3 octobre 2026, 13 h 15 UTC)", [
+        "PR #6 : ouverte, non fusionnée ; tête `15ea5a1` avant l'ajout de ces PDF ; aucun conflit avec main (`git merge-tree`).",
+        "PR #5 : fusionnée dans main par le commit `4f71317` (10 h 50 UTC).",
+        "CI `verification` (npm ci && npm run verify) : verte sur `15ea5a1`.",
+        "Vercel : statuts `liria-concept-gestion-btp`, `elsatia-studio-preview` et `elsatia-preview` en échec « Deployment rate limited — retry in 24 hours » depuis 11 h 05 UTC (quota du plan gratuit, rétablissement annoncé après 24 h). `elsatia-production` : déploiement Preview de la branche réussi (pas une mise en production). Aucun accès Vercel dans cette session : impossible de relancer une Preview précise ; le push des PDF déclenche automatiquement une nouvelle tentative.",
+    ]),
+    ("Inventaire et déclenchement", [
+        "Inventaire : événement « init » de sessions neuves (skills, commandes slash, plugins, serveurs MCP) et en-têtes SKILL.md.",
+        "Sélection automatique : 33 sessions neuves avec des demandes réalistes, sans commande slash. Le skill est dit « observé » quand l'appel de l'outil Skill figure dans le journal. Essais antérieurs : 40 sessions (questions courtes et appels explicites).",
+        "Mode manuel : prouvé seulement quand l'outil Skill refuse l'appel (claude-security:claude-security). claude-code-setup:claude-automation-recommender a été reclassé « automatique possible » après preuve.",
+        "Aucune écriture dans le dépôt pendant les essais : en mode non interactif, les écritures et commandes non autorisées sont refusées.",
+    ]),
+    ("Vidéo", [
+        "watch, images : vidéo fictive de 6 s, 1 image extraite en local.",
+        "watch, transcription audio : vidéo fictive parlée en français (synthèse vocale locale espeak-ng). Réglage projet : transcription désactivée, aucun envoi externe. Transcription locale WhisperX : installation bloquée (download.pytorch.org et huggingface.co refusés, 403). Non validée dans cet environnement.",
+        "Remotion 4.0.532 : rendu MP4 h264 1080×1920 de 2 s, contrôlé visuellement (hors dépôt).",
+        "Playwright 1.56.1 : page fictive ouverte et capture 390×844.",
+    ]),
+    ("Réseau", [
+        "Domaines refusés (403) d'après le journal du proxy : mcp.context7.com, context7.com, download.pytorch.org, huggingface.co. La politique réseau n'a pas été contournée.",
+        "Domaines utilisés avec succès : github.com, pypi.org (yt-dlp), registry.npmjs.org (essai Remotion), raw.githubusercontent.com (règles de web-design-guidelines, code 200).",
+    ]),
+]
+
+# --------------------------------------------------------------------------- AIDE-MÉMOIRE
+AIDE_DOMAINES = [("securite", "Sécurité"), ("dev", "Développement et tests"), ("interfaces", "Interfaces"),
+                 ("marketing", "Marketing"), ("social", "Réseaux sociaux"), ("video", "Vidéo")]
+AIDE_MEMOIRE = [
+    ("securite", "Auditer un fichier, une PR ou une migration selon les règles ELSATIA", "elsatia-securite", "/elsatia-securite Audite la dernière migration, lecture seule."),
+    ("securite", "Revue sécurité des changements de la branche", "security-review", "/security-review"),
+    ("securite", "Scan approfondi du dépôt ou d'une diff", "claude-security:claude-security", "/claude-security:claude-security puis « scan changes »"),
+    ("securite", "Auth, RLS, Storage, erreurs Supabase", "supabase", "/supabase Diagnostique un « permission denied » sur la table devis."),
+    ("securite", "Migration, index, policies RLS", "supabase-postgres-best-practices", "/supabase-postgres-best-practices Relis la dernière migration."),
+    ("securite", "Webhooks et abonnements Stripe", "stripe-best-practices", "/stripe-best-practices Relis le webhook d'abonnement."),
+    ("dev", "Chercher les bugs d'une diff ou d'une PR", "code-review", "/code-review high"),
+    ("dev", "Simplifier le code modifié", "simplify", "/simplify"),
+    ("dev", "Lancer l'app et faire une capture", "run", "/run Capture mobile de la page de connexion."),
+    ("dev", "Performance React / Next.js", "vercel-react-best-practices", "/vercel-react-best-practices Relis la page tableau de bord."),
+    ("dev", "Recommandations d'automatisation Claude Code", "claude-code-setup:claude-automation-recommender", "/claude-code-setup:claude-automation-recommender"),
+    ("dev", "Créer une procédure ELSATIA réutilisable", "anthropic-skills:skill-creator", "/anthropic-skills:skill-creator Crée « elsatia-demo »."),
+    ("dev", "Hook de démarrage des sessions cloud", "session-start-hook", "/session-start-hook npm ci + yt-dlp épinglé."),
+    ("interfaces", "Design system, palettes, typographies", "ui-ux-pro-max", "/ui-ux-pro-max Tableau de bord chantier dense."),
+    ("interfaces", "Direction artistique d'une page", "frontend-design:frontend-design", "/frontend-design:frontend-design Page d'accueil publique."),
+    ("interfaces", "Audit d'accessibilité et d'UX", "web-design-guidelines", "/web-design-guidelines src/app/(app)/devis/**/*.tsx"),
+    ("interfaces", "Graphique ou indicateur", "dataviz", "/dataviz Marge prévue / réelle sur 8 chantiers fictifs."),
+    ("marketing", "Règles et choix du bon skill", "elsatia-communication", "/elsatia-communication Quel skill pour un post Facebook ?"),
+    ("marketing", "Positionnement et contexte produit", "product-marketing", "/product-marketing Contexte de Liria Gestion Pro."),
+    ("marketing", "Texte de page de vente", "copywriting", "/copywriting Bloc héros de la page Devis."),
+    ("marketing", "Rendre un texte naturel (humaniseur unique)", "copy-editing", "/copy-editing <texte à relire>"),
+    ("marketing", "Améliorer la conversion d'une page", "cro", "/cro Page d'essai gratuit."),
+    ("marketing", "Plan de lancement", "launch", "/launch Module Pointage chantier."),
+    ("marketing", "SEO du site vitrine", "seo-audit", "/seo-audit Check-list du site vitrine."),
+    ("marketing", "Être cité par les assistants IA", "ai-seo", "/ai-seo « logiciel gestion chantier »."),
+    ("marketing", "Piliers et calendrier de contenus", "content-strategy", "/content-strategy 4 semaines."),
+    ("marketing", "Leviers de persuasion éthiques", "marketing-psychology", "/marketing-psychology Essai → abonnement."),
+    ("social", "Post LinkedIn ou Facebook", "social", "/social Post LinkedIn signature des devis."),
+    ("social", "Script de Reel Instagram", "ig-reel", "/ig-reel Pointage en 10 secondes."),
+    ("social", "Légende et hashtags Instagram", "ig-caption", "/ig-caption Carrousel « 3 erreurs de devis »."),
+    ("social", "Carrousel Instagram 1080×1350", "ig-carousel", "/ig-carousel 6 slides, texte seulement."),
+    ("social", "Bio et profil Instagram", "ig-profile", "/ig-profile <bio actuelle>"),
+    ("social", "Planning Instagram de la semaine", "ig-plan", "/ig-plan Semaine du 12 octobre."),
+    ("video", "Créer un projet vidéo (démo, Reel 9:16)", "remotion-create", "/remotion-create Reel 15 s, dossier séparé."),
+    ("video", "Animer textes et transitions", "remotion-markup", "/remotion-markup Lignes de devis animées."),
+    ("video", "Prévisualiser la vidéo", "remotion-studio", "/remotion-studio"),
+    ("video", "Exporter en MP4", "remotion-render", "/remotion-render Composition DemoReel."),
+    ("video", "Sous-titres", "remotion-captions", "/remotion-captions Importer un SRT."),
+    ("video", "Analyser une vidéo (images, sous-titres)", "watch", "/watch ./demo.mp4 \"Données bien fictives ?\""),
+]
+AIDE_BLOQUES = [
+    ("Context7 (connecteur MCP)", "Bloqué", "Réseau : mcp.context7.com et context7.com refusés (403). À autoriser dans les réglages de l'environnement cloud."),
+    ("Transcription audio locale de /watch (WhisperX)", "Bloqué", "Réseau : download.pytorch.org et huggingface.co refusés (403). Installable sur un poste local."),
+    ("anthropic-skills:built-in-browser, chrome-browser, computer-use, google-workspace", "Bloqué ici", "Nécessitent l'app de bureau, l'extension Chrome ou le connecteur Google, absents de cette session."),
+    ("Previews Vercel", "Bloqué", "Quota du plan gratuit atteint (« retry in 24 hours »)."),
+    ("Strix (pentest)", "À installer", "Démon Docker absent ; mission dédiée requise."),
+    ("trailofbits insecure-defaults, sharp-edges", "À installer", "Licence CC-BY-SA-4.0 à valider."),
+    ("security-guidance, OmniRoute, ClaudeMem, Headroom, Task Observer, Claude Squad", "Reportés", "Décision de mission."),
+    ("Meta Ads, Windsor.ai, publication automatique", "Non activés", "Interdit dans cette mission."),
+    ("Skill Facebook dédié, linkedin-skills, ig-human et autres ig-*, ad-creative, video", "Non retenus", "Source non fiable, publication automatique ou doublon : voir l'annexe A du guide."),
+    ("/design, /slides, /design-sync, /verify, /debug, /batch, /doctor, /run-skill-generator", "Non confirmé", "Commandes intégrées sans description vérifiée."),
+]
