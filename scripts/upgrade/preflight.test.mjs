@@ -42,7 +42,7 @@ const refus = (r) => r.filter((x) => !x.ok).map((x) => x.id);
 test("cas nominal : tout est conforme", () => {
   const r = evaluer(base(), { git: fauxGit() });
   assert.deepEqual(refus(r), [], JSON.stringify(r, null, 1));
-  assert.equal(r.length, 8);
+  assert.equal(r.length, 9);
 });
 test("P1 mauvaise branche", () => assert.deepEqual(refus(evaluer(base(), { git: fauxGit({ branche: () => "main" }) })), ["P1"]));
 test("P2 SHA inconnu", () => assert.ok(refus(evaluer(base({ targetSha: "deadbeef" }), { git: fauxGit() })).includes("P2")));
@@ -160,4 +160,48 @@ test("P6 pont présent mais modifié → refus", () => {
   const p = { ...plan, ponts: [{ fichier: pont, sha256: "f".repeat(64) }],
               migrations: [...plan.migrations, { migration: pont, verrou: "SAFE", rollback: "REVERSIBLE" }] };
   assert.deepEqual(refus(evaluer(base({ targetPlan: p, targetMigrationCount: "7" }), { git: g })), ["P6"]);
+});
+
+// ── Phase 0 : ponts d'upgrade du train (versions postérieures au train, appliqués en premier) ──
+const pont0 = "20260101000009_pont_upgrade_phase0.sql";
+const planP0 = { ...plan, phase0: [pont0], preconditions_phase_principale: ["bloquant_lignes_factures_emises_non_preparees"],
+  migrations: [{ migration: pont0, verrou: "SAFE" }, ...plan.migrations] };
+const gitP0 = () => fauxGit({ migrations: () => [...histo, ...nouvelles, pont0] });
+function avecLedger(t, pre = {}, extra = {}) {
+  const b = base();
+  return base({ targetPlan: planP0, targetMigrationCount: "7", ledger: lireLedger(t), ledgerTexte: t,
+    productionAttestation: { ...b.productionAttestation, ledger_sha256: sha256(t), data_preconditions: { ...b.productionAttestation.data_preconditions, ...pre } }, ...extra });
+}
+test("P9 phase 0 autorisée sur le ledger source", () => {
+  const r = evaluer(avecLedger(ledgerTexte, { bloquant_lignes_factures_emises_non_preparees: 12 }, { phase: "0" }), { git: gitP0() });
+  assert.deepEqual(refus(r), [], JSON.stringify(r, null, 1));
+});
+test("P9 phase principale refusée tant que la phase 0 n'est pas au ledger", () => {
+  const r = evaluer(avecLedger(ledgerTexte, { bloquant_lignes_factures_emises_non_preparees: 0 }), { git: gitP0() });
+  assert.deepEqual(refus(r), ["P9"]);
+});
+test("P9 phase principale autorisée après la phase 0 (ledger = source + pont, P5 préfixe)", () => {
+  const t = ledgerTexte + "20260101000009\n";
+  const r = evaluer(avecLedger(t, { bloquant_lignes_factures_emises_non_preparees: 0 }), { git: gitP0() });
+  assert.deepEqual(refus(r), [], JSON.stringify(r, null, 1));
+});
+test("P7 phase principale : lignes de factures émises non préparées → refus", () => {
+  const t = ledgerTexte + "20260101000009\n";
+  const r = evaluer(avecLedger(t, { bloquant_lignes_factures_emises_non_preparees: 3 }), { git: gitP0() });
+  assert.deepEqual(refus(r), ["P7"]);
+});
+test("P9 phase 0 refusée si la phase principale a commencé", () => {
+  const t = ledgerTexte + "20260101000009\n20260101000003\n";
+  const r = evaluer(avecLedger(t, {}, { phase: "0" }), { git: gitP0() });
+  assert.ok(refus(r).includes("P9"));
+});
+test("P5 reprise de la phase principale : source + pont de phase 0 + préfixe lexical", () => {
+  const t = ledgerTexte + "20260101000009\n20260101000003\n20260101000006\n";
+  const r = evaluer(avecLedger(t, { bloquant_lignes_factures_emises_non_preparees: 0 }), { git: gitP0() });
+  assert.deepEqual(refus(r), []);
+});
+test("P5 pont de phase 0 sauté (phase principale commencée sans lui) → refus", () => {
+  const t = ledgerTexte + "20260101000003\n";
+  const r = evaluer(avecLedger(t, { bloquant_lignes_factures_emises_non_preparees: 0 }), { git: gitP0() });
+  assert.ok(refus(r).includes("P5") && refus(r).includes("P9"));
 });

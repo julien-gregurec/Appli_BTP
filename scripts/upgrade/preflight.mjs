@@ -16,6 +16,8 @@
  *   P6 migrations inattendues      en attente ≠ plan qualifié par le harnais pour ce SHA (manifests/target-*.json)
  *   P7 Production non attestée     attestation absente / ref ≠ attendue / empreinte du ledger ≠ / non lecture seule
  *                                   / préconditions de données bloquantes (sonde production_readonly_probe.sql)
+ *   P9 phase du cutover            plan avec ponts de phase 0 : --phase 0 (ponts seuls) puis --phase principale
+ *                                   (ponts de phase 0 au ledger, préconditions de phase principale à 0)
  *   P8 backup absent               attestation de sauvegarde absente, trop ancienne, d'un autre projet,
  *                                   ou restauration jamais testée hors Production
  *
@@ -23,7 +25,7 @@
  *   npm run production:v9x:preflight -- --target-sha <sha> --target-migration-count <n> \
  *     --ledger <export.txt> --production-attestation <prod.json> --backup-attestation <backup.json> \
  *     [--target-plan scripts/upgrade/manifests/target-<sha8>.json] [--source-manifest …] [--allow-branch <regex>] \
- *     [--expected-project-ref <ref>] [--max-backup-age-hours 24] [--now <ISO>] [--depot <checkout de release>]
+ *     [--phase 0|principale] [--expected-project-ref <ref>] [--max-backup-age-hours 24] [--now <ISO>] [--depot <checkout de release>]
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -112,7 +114,9 @@ export function evaluer(o, d) {
     const inconnues = ledger.versions.filter((v) => !parVersion.has(v));
     const source = Object.keys(manif?.migrations ?? {}).sort();
     const manquantesSource = source.filter((v) => !lset.has(v));
-    const attente = versions.filter((v) => !source.includes(v)).sort();
+    // Ordre d'application du plan : ponts de phase 0 (versions postérieures au train) d'abord, puis l'ordre lexical.
+    const phase0 = (o.targetPlan?.phase0 ?? []).map((f) => f.split("_")[0]).filter((v) => versions.includes(v));
+    const attente = [...phase0, ...versions.filter((v) => !source.includes(v) && !phase0.includes(v)).sort()];
     let k = 0;
     while (k < attente.length && lset.has(attente[k])) k += 1;
     const horsPrefixe = attente.slice(k).filter((v) => lset.has(v));
@@ -145,6 +149,27 @@ export function evaluer(o, d) {
     }
   }
 
+  // P9 — phase du cutover. Un plan avec ponts de phase 0 s'exécute en DEUX temps : « --phase 0 » (uniquement les
+  // ponts de phase 0, ledger = source), puis « --phase principale » (défaut : ponts de phase 0 déjà au ledger et
+  // précondition de phase principale à 0, mesurée par la sonde APRÈS la phase 0).
+  {
+    const phase = o.phase ?? "principale";
+    const p0 = (o.targetPlan?.phase0 ?? []).map((f) => f.split("_")[0]);
+    const lv = new Set(o.ledger?.versions ?? []);
+    const source = Object.keys(manif?.migrations ?? {});
+    if (!["0", "principale"].includes(phase)) verif("P9", false, `phase inconnue : ${phase} (0 | principale)`);
+    else if (!p0.length) verif("P9", phase === "principale", phase === "principale" ? "plan sans phase 0" : "--phase 0 demandée mais le plan n'a pas de pont de phase 0");
+    else if (phase === "0") {
+      const autres = [...lv].filter((v) => !source.includes(v) && !p0.includes(v));
+      verif("P9", autres.length === 0, autres.length ? `phase 0 refusée : la phase principale a déjà commencé (${autres.slice(0, 3).join(", ")})`
+        : `phase 0 autorisée : appliquer UNIQUEMENT ${(o.targetPlan.phase0).join(", ")} (déjà au ledger : ${p0.filter((v) => lv.has(v)).length}/${p0.length})`);
+    } else {
+      const manquants = p0.filter((v) => !lv.has(v));
+      verif("P9", manquants.length === 0, manquants.length ? `phase principale refusée : pont(s) de phase 0 absent(s) du ledger Production (${manquants.join(", ")}) — exécuter d'abord la phase 0`
+        : `phase 0 au ledger (${p0.length} pont(s)) : phase principale autorisée`);
+    }
+  }
+
   // P7 — Production attestée (export lecture seule) + préconditions de données
   const att = o.productionAttestation;
   const refAttendue = o.expectedProjectRef ?? REF_PRODUCTION_ATTENDUE;
@@ -159,9 +184,13 @@ export function evaluer(o, d) {
     const pre = att.data_preconditions;
     if (!pre) pb.push("préconditions de données absentes (scripts/upgrade/sql/production_readonly_probe.sql)");
     else {
-      for (const [k, v] of Object.entries(pre)) if (k.startsWith("bloquant_") && Number(v) !== 0) pb.push(`précondition ${k} = ${v}`);
+      // En phase 0, les préconditions de phase principale (mesurées avant que la phase 0 ne les remette à 0) sont attendues non nulles.
+      const differees = (o.phase ?? "principale") === "0" ? new Set(o.targetPlan?.preconditions_phase_principale ?? []) : new Set();
+      for (const [k, v] of Object.entries(pre)) if (k.startsWith("bloquant_") && !differees.has(k) && Number(v) !== 0) pb.push(`précondition ${k} = ${v}`);
       // Préconditions que le PLAN QUALIFIÉ déclare bloquantes pour ce SHA (ex. lignes_factures_emises sans pont 298/399).
-      for (const k of o.targetPlan?.preconditions_bloquantes ?? []) {
+      const preconditionsPlan = [...(o.targetPlan?.preconditions_bloquantes ?? []),
+        ...((o.phase ?? "principale") === "principale" ? (o.targetPlan?.preconditions_phase_principale ?? []) : [])];
+      for (const k of preconditionsPlan) {
         if (!(k in pre)) pb.push(`précondition ${k} non mesurée`);
         else if (Number(pre[k]) !== 0) pb.push(`précondition ${k} = ${pre[k]} (bloquante pour ce plan)`);
       }
@@ -201,7 +230,7 @@ export function main(argv = process.argv.slice(2), depot = DEPOT) {
   const o = {
     argv, targetSha, targetMigrationCount: option(argv, "--target-migration-count"),
     allowBranch: option(argv, "--allow-branch"), expectedProjectRef: option(argv, "--expected-project-ref"),
-    maxBackupAgeHours: option(argv, "--max-backup-age-hours"), now: option(argv, "--now"),
+    maxBackupAgeHours: option(argv, "--max-backup-age-hours"), now: option(argv, "--now"), phase: option(argv, "--phase"),
     sourceManifest: json(option(argv, "--source-manifest") ?? manifeste("source-prod-210-5777abb.json")),
     targetPlan: json(planP), ledger: ledgerTexte ? lireLedger(ledgerTexte) : undefined, ledgerTexte,
     productionAttestation: json(option(argv, "--production-attestation")), backupAttestation: json(option(argv, "--backup-attestation")),

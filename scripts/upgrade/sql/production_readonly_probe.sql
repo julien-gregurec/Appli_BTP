@@ -52,6 +52,30 @@ select count(*) as info_essai_expire_coupe_en_base
 select count(*) as lignes_factures_emises
   from public.lignes_factures lf join public.factures f on f.id = lf.facture_id where f.statut <> 'brouillon';
 
+-- 3 bis. Phase 0 (pont du train 20261003000201, versions postérieures à V9.1) : après la phase 0, toutes les
+--    lignes de factures émises doivent porter l'entreprise_id de leur facture, sinon 300 retoucherait ces lignes
+--    (trigger brouillon_only → échec). Lecture tolérante à l'absence de la colonne (to_jsonb : clé absente = NULL).
+--    AVANT la phase 0 : = lignes_factures_emises (attendu) ; AVANT la phase principale : DOIT valoir 0.
+select count(*) as bloquant_lignes_factures_emises_non_preparees
+  from public.lignes_factures lf join public.factures f on f.id = lf.facture_id
+ where f.statut <> 'brouillon' and (to_jsonb(lf) ->> 'entreprise_id') is distinct from f.entreprise_id::text;
+select count(*) as info_lignes_devis_non_preparees
+  from public.lignes_devis ld join public.devis d on d.id = ld.devis_id
+ where (to_jsonb(ld) ->> 'entreprise_id') is distinct from d.entreprise_id::text;
+select version as phase0_au_ledger from supabase_migrations.schema_migrations where version = '20261003000201';
+
+-- 3 ter. UPG-P0-2 détaillé (matrice : statut × dates d'essai) — aucune régularisation automatique.
+select abonnement_statut,
+       case when abonnement_essai_debut is null and abonnement_essai_fin is null then 'sans_dates'
+            when abonnement_essai_debut is null then 'debut_null'
+            when abonnement_essai_fin is null then 'fin_null'
+            when abonnement_essai_fin < abonnement_essai_debut then 'fin_avant_debut'
+            when abonnement_essai_fin > abonnement_essai_debut + 30 then 'fin_hors_fenetre'
+            else 'dans_fenetre' end as forme_dates,
+       (abonnement_essai_fin < current_date) as fin_passee,
+       count(*)
+  from public.entreprises group by 1, 2, 3 order by 1, 2, 3;
+
 -- 4. Volumétrie (dimensionnement de la fenêtre : comparer aux paliers qualifiés 500 → 100 000).
 select relname, n_live_tup from pg_stat_user_tables where schemaname = 'public' order by n_live_tup desc limit 15;
 
