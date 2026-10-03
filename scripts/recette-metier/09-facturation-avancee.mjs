@@ -53,7 +53,7 @@ await check(P, "Situation n°1 à 60 % (retenue de garantie 5 %) puis facturatio
   const s = await q1("select id, montant_marche_ht, montant_cumule_ht, montant_periode_ht, montant_retenue from situations_travaux where devis_id=$1 order by numero desc limit 1", [etat.d5]);
   if (!s) return `situation non créée ${page.url()}`;
   await page.goto("/facturation-avancee");
-  const b = page.getByRole("button", { name: /Facturer/ }).first();
+  const b = page.locator("article", { hasText: etat.d5num }).getByRole("button", { name: "Créer la facture" }).first();
   await Promise.all([page.waitForURL(/\/factures\/[0-9a-f-]{36}|error=/), b.click()]);
   etat.situation = page.url().split("/").pop().split("?")[0]; sauver();
   const fx = await fac(etat.situation);
@@ -65,8 +65,8 @@ await check(P, "Situation : l'acompte déjà facturé est déduit", async () => 
   const attendu = r2(d.montant_ht * 0.6 - a.montant_ht);
   return { ok: eq2(s.montant_ht, attendu, 0.05), detail: `situation HT ${s.montant_ht} ; 60 % marché − acompte = ${attendu}` };
 });
-await check(P, "Garde-fou : acompte 50 % supplémentaire dépassant le devis refusé", async () => {
-  const r = await avancee("acompte", 50);
+await check(P, "Garde-fou : acompte 80 % supplémentaire (30 + 60 + 80 > 100 %) refusé", async () => {
+  const r = await avancee("acompte", 80);
   return { ok: !!r.erreur, detail: r.erreur ?? `accepté (${r.id})` };
 });
 await check(P, "Avoir 10 % sur l'acompte : montant négatif, lié à la facture créditée", async () => {

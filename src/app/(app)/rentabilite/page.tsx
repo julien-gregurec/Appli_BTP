@@ -29,7 +29,7 @@ export default async function RentabilitePage() {
   const notesFrais = (donneesNotesFrais ?? []) as { chantier_id: string; montant_ttc: number }[];
   const lignes = (chantiers ?? []).map((chantier) => {
     const budgetHt = (devis ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0);
-    const factureHt = (factures ?? []).filter((item) => item.chantier_id === chantier.id && !["annulee", "avoir_emis"].includes(item.statut)).reduce((s, item) => s + Number(item.montant_ht), 0);
+    const factureHt = (factures ?? []).filter((item) => item.chantier_id === chantier.id && !["brouillon", "annulee", "avoir_emis"].includes(item.statut)).reduce((s, item) => s + Number(item.montant_ht), 0);
     let heures = 0; let coutMainOeuvre = 0; let coutHoraireManquant = false;
     for (const pointage of pointages.filter((item) => item.chantier_id === chantier.id)) {
       const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);

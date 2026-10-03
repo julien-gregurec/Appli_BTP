@@ -118,7 +118,7 @@ export default async function DashboardPage() {
   };
 
   for (const facture of factures ?? []) {
-    if (facture.date_echeance && !["payee", "annulee", "avoir_emis"].includes(facture.statut)) {
+    if (facture.date_echeance && !["brouillon", "payee", "annulee", "avoir_emis"].includes(facture.statut) && Number(facture.montant_ttc ?? 0) > 0) {
       const client = un(facture.client);
       ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
     }

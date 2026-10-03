@@ -37,7 +37,7 @@ export async function calculerRentabiliteChantiers(supabase: SupabaseClient, ent
   return (chantiers ?? []).map((chantier) => {
     const budgetHt = (devis ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0);
     const factureHt = (factures ?? [])
-      .filter((item) => item.chantier_id === chantier.id && !["annulee", "avoir_emis"].includes(item.statut) && item.type !== "avoir")
+      .filter((item) => item.chantier_id === chantier.id && !["brouillon", "annulee", "avoir_emis"].includes(item.statut))
       .reduce((s, item) => s + Number(item.montant_ht), 0);
 
     let heures = 0;

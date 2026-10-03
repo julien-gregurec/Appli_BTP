@@ -22,3 +22,11 @@
 - B16 P1 facture depuis devis ignore la remise globale (+238,93 € facturés) CORRIGÉ migr 187 (vérifié 5 % au centime)
 - B17 P1 double clic paiement → 2 paiements (6 000 € au lieu de 3 000 €) CORRIGÉ migr 188 (verrou facture + anti-doublon 30 s + plafond reste dû; Stripe exempté)
 - B18 P2 pas de passage automatique en retard quand échéance dépassée (statut manuel) ; relances uniquement CRM bêta
+- B19 P1 bêta: acompte/avoir/situation ignorent la remise globale CORRIGÉ migr 189
+- B20 P2 encaissement au-delà du reste net d'avoir (acompte crédité encaissé en totalité) CORRIGÉ migr 189
+- B21 P2 avoir imprimé sans n° de facture rectifiée CORRIGÉ (prop reference)
+- B22 P1 bêta NON CORRIGÉ: situation ne déduit pas les acomptes (30 % + 60 % = 90 % facturés pour 60 % d'avancement) ; aucun plafond sur facturer_situation_travaux
+- B23 P1 bêta NON CORRIGÉ: retenue de garantie ni imprimée ni déduite du net à payer de la facture de situation
+- B24 P1 facture émise annulable sans avoir (FAC-2026-008) CORRIGÉ transitions + migr 190 (FAC-2026-008 remise en envoyée)
+- B25 P2 rentabilité/IA/copilote comptent les factures brouillon dans le CA (39 801 € affichés vs 19 504 € émis); copilote ignorait les avoirs; alertes "à encaisser" sur brouillons/avoirs CORRIGÉ
+- B26 P3 chantier "terminé" sans date de fin réelle renseignée
