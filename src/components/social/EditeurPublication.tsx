@@ -49,12 +49,14 @@ export function EditeurPublication({
   peutRediger,
   comptes,
   logo,
+  logosManquants,
 }: {
   initial: ValeursEditeur;
   modifiable: boolean;
   peutRediger: boolean;
   comptes: Partial<Record<Reseau, string>>;
   logo: string | null;
+  logosManquants: string[];
 }) {
   const router = useRouter();
   const [v, setV] = useState<ValeursEditeur>(initial);
@@ -63,6 +65,8 @@ export function EditeurPublication({
   const [enCours, demarrer] = useTransition();
   const [altTexte, setAltTexte] = useState("");
   const actif = modifiable && peutRediger;
+  // Pas d'erreur affichée sur un formulaire encore vierge.
+  const commence = Boolean(v.contenu_principal.trim() || v.contenu_facebook.trim() || v.contenu_instagram.trim() || v.contenu_linkedin.trim() || v.medias.length);
 
   const maj = <K extends keyof ValeursEditeur>(cle: K, valeur: ValeursEditeur[K]) => setV((p) => ({ ...p, [cle]: valeur }));
   const texteReseau = (r: Reseau) => (v[CHAMP_RESEAU[r]].trim() ? v[CHAMP_RESEAU[r]] : v.contenu_principal);
@@ -234,7 +238,7 @@ export function EditeurPublication({
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Versions par réseau</h2>
-            <button type="button" onClick={genererVariantes} className="rounded-md bg-[#c9a24a] px-3 py-1.5 text-sm font-semibold text-[#0d1b2a] disabled:opacity-50" disabled={!v.contenu_principal.trim()}>
+            <button type="button" onClick={genererVariantes} className="rounded-md bg-elsatia-cyan px-3 py-1.5 text-sm font-semibold text-elsatia-nuit disabled:opacity-50" disabled={!v.contenu_principal.trim()}>
               ✦ Adapter par réseau (Assistant Social)
             </button>
           </div>
@@ -258,12 +262,12 @@ export function EditeurPublication({
                     </button>
                   ))}
                 </div>
-                {ctrl.erreurs.map((e) => <p key={e} className="text-xs text-red-700 dark:text-red-400">✕ {e}</p>)}
+                {commence && ctrl.erreurs.map((e) => <p key={e} className="text-xs text-red-700 dark:text-red-400">✕ {e}</p>)}
                 {ctrl.avertissements.map((e) => <p key={e} className="text-xs text-amber-700 dark:text-amber-400">! {e}</p>)}
               </div>
             );
           })}
-          {v.reseaux.length >= 2 && RESEAUX.filter((r) => v.reseaux.includes(r)).every((r, _i, t) => texteReseau(r) === texteReseau(t[0])) && (
+          {commence && v.reseaux.length >= 2 && RESEAUX.filter((r) => v.reseaux.includes(r)).every((r, _i, t) => texteReseau(r) === texteReseau(t[0])) && (
             <p className="text-xs text-amber-700">Les textes sont identiques sur tous les réseaux : les adapter (bouton Assistant Social) est recommandé.</p>
           )}
         </section>
@@ -274,7 +278,7 @@ export function EditeurPublication({
           <button type="button" onClick={() => enregistrer(false)} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700">
             {enCours ? "…" : "Enregistrer en brouillon"}
           </button>
-          <button type="button" onClick={() => enregistrer(true)} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white dark:bg-[#c9a24a] dark:text-[#0d1b2a]">
+          <button type="button" onClick={() => enregistrer(true)} className="rounded-md bg-elsatia-electrique px-4 py-2 text-sm font-semibold text-white hover:bg-elsatia-profond dark:bg-elsatia-cyan dark:text-elsatia-nuit">
             Soumettre à validation
           </button>
         </div>
@@ -284,14 +288,14 @@ export function EditeurPublication({
       <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
         <div role="tablist" aria-label="Prévisualisation" className="flex gap-1">
           {RESEAUX.map((r) => (
-            <button key={r} role="tab" aria-selected={apercu === r} type="button" onClick={() => setApercu(r)} className={`rounded-md px-3 py-1 text-sm ${apercu === r ? "bg-[#0d1b2a] text-white dark:bg-[#c9a24a] dark:text-[#0d1b2a]" : "border border-neutral-300 dark:border-neutral-700"}`}>
+            <button key={r} role="tab" aria-selected={apercu === r} type="button" onClick={() => setApercu(r)} className={`rounded-md px-3 py-1 text-sm ${apercu === r ? "bg-elsatia-electrique text-white hover:bg-elsatia-profond dark:bg-elsatia-cyan dark:text-elsatia-nuit" : "border border-neutral-300 dark:border-neutral-700"}`}>
               {LIBELLE_RESEAU[r]}
             </button>
           ))}
         </div>
         {!v.reseaux.includes(apercu) && <p className="text-xs text-amber-700">{LIBELLE_RESEAU[apercu]} n’est pas coché : aperçu seulement.</p>}
         <ApercuReseau reseau={apercu} texte={texteReseau(apercu)} lien={v.lien_url} medias={v.medias} nomCompte={comptes[apercu] ?? "ELSATIA"} logo={logo} />
-        {!logo && <p className="text-xs text-amber-700">Logo officiel ELSATIA absent du dépôt (public/elsatia/logo-officiel.svg) : pastille provisoire affichée.</p>}
+        {logosManquants.length > 0 && <p role="alert" className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">Logo officiel ELSATIA manquant : {logosManquants.join(", ")}. Aucune publication réelle ne doit partir sans lui.</p>}
       </aside>
     </div>
   );

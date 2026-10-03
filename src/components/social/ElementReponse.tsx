@@ -47,7 +47,7 @@ export function ElementReponse({
       <textarea aria-label="Réponse" className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" rows={3} value={texte} onChange={(e) => setTexte(e.target.value)} placeholder="Rédiger une réponse…" maxLength={2000} />
       {brouillonIA && texte === (brouillon ?? "") && texte && <p className="text-[11px] text-amber-700">Brouillon proposé par l’Assistant Social : à relire.</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={enCours} onClick={() => lancer(() => preparerReponseIAAction(type, id))} className="rounded-md bg-[#c9a24a] px-3 py-1 text-xs font-semibold text-[#0d1b2a] disabled:opacity-50">✦ Proposer une réponse</button>
+        <button type="button" disabled={enCours} onClick={() => lancer(() => preparerReponseIAAction(type, id))} className="rounded-md bg-elsatia-cyan px-3 py-1 text-xs font-semibold text-elsatia-nuit disabled:opacity-50">✦ Proposer une réponse</button>
         <button type="button" disabled={enCours} onClick={() => lancer(() => enregistrerBrouillonReponseAction(type, id, texte))} className="rounded-md border border-neutral-300 px-3 py-1 text-xs dark:border-neutral-700">Enregistrer le brouillon</button>
         <button type="button" disabled={enCours} onClick={() => lancer(() => ignorerAction(type, id))} className="rounded-md border border-neutral-300 px-3 py-1 text-xs dark:border-neutral-700">Ignorer</button>
       </div>
@@ -57,7 +57,7 @@ export function ElementReponse({
             <input type="checkbox" checked={confirme} onChange={(e) => setConfirme(e.target.checked)} />
             J’ai relu cette réponse et je valide son envoi {type === "commentaire" ? "public" : "privé"} au nom d’ELSATIA.
           </label>
-          <button type="button" disabled={enCours || !confirme || !texte.trim()} onClick={() => lancer(() => envoyerReponseAction(type, id, texte, confirme))} className="rounded-md bg-[#0d1b2a] px-3 py-1 font-semibold text-white disabled:opacity-50 dark:bg-[#c9a24a] dark:text-[#0d1b2a]">
+          <button type="button" disabled={enCours || !confirme || !texte.trim()} onClick={() => lancer(() => envoyerReponseAction(type, id, texte, confirme))} className="rounded-md bg-elsatia-electrique px-3 py-1 font-semibold text-white hover:bg-elsatia-profond disabled:opacity-50 dark:bg-elsatia-cyan dark:text-elsatia-nuit">
             Valider et envoyer
           </button>
         </div>

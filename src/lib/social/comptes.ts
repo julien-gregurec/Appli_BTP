@@ -6,7 +6,7 @@ import { LinkedInConnector, rafraichirJetonLinkedIn } from "@/lib/social/linkedi
 import { journaliser } from "@/lib/social/audit";
 import type { CompteSocial, Reseau } from "@/lib/social/types";
 
-const COLONNES_COMPTE = "id,fournisseur,reseau,nom_compte,external_account_id,external_parent_id,nom_utilisateur,statut,scopes,connected_at,connecte_par,token_expires_at,refresh_expires_at,data_access_expires_at,derniere_verification_at,derniere_erreur";
+const COLONNES_COMPTE = "id,fournisseur,reseau,nom_compte,external_account_id,external_parent_id,nom_utilisateur,statut,scopes,connected_at,connecte_par,token_expires_at,refresh_expires_at,data_access_expires_at,derniere_verification_at,derniere_erreur,dernier_diagnostic";
 
 export async function listerComptes(admin: SupabaseClient): Promise<CompteSocial[]> {
   const { data } = await admin.from("social_comptes").select(COLONNES_COMPTE).neq("statut", "revoque").order("reseau");

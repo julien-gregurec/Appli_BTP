@@ -9,12 +9,21 @@ export const META_GRAPH_VERSION_DEFAUT = "v26.0";
 export const LINKEDIN_VERSION_DEFAUT = "202609";
 
 /**
- * Mode simulation. Activé PAR DÉFAUT : aucune écriture n'est envoyée aux
- * plateformes (publication, réponse, message) tant que SOCIAL_DRY_RUN ne vaut
- * pas exactement "false". Les lectures (statistiques, commentaires) restent réelles.
+ * Mode simulation, règle par défaut. Aucune écriture (publication, réponse,
+ * message) n'est envoyée aux plateformes, sauf si LES DEUX conditions sont réunies :
+ *   1. déploiement Vercel de production (VERCEL_ENV=production) ;
+ *   2. SOCIAL_DRY_RUN vaut exactement "false" (décision explicite de Julien).
+ * En local, en prévisualisation ou au moindre doute : simulation.
+ * Les lectures (identité, statistiques, commentaires) restent réelles.
  */
 export function modeSimulation(): boolean {
-  return process.env.SOCIAL_DRY_RUN?.trim() !== "false";
+  return raisonSimulation() !== null;
+}
+
+export function raisonSimulation(): string | null {
+  if (process.env.SOCIAL_DRY_RUN?.trim() !== "false") return "SOCIAL_DRY_RUN n’est pas égal à « false »";
+  if (process.env.VERCEL_ENV !== "production") return `environnement « ${process.env.VERCEL_ENV || "local"} » (la publication réelle n’est possible qu’en production)`;
+  return null;
 }
 
 export function urlApplication(): string {

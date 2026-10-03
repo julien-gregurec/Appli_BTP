@@ -177,8 +177,16 @@ describe("connecteurs", () => {
     expect(modeSimulation()).toBe(true);
     vi.stubEnv("SOCIAL_DRY_RUN", "0");
     expect(modeSimulation()).toBe(true);
+    // SOCIAL_DRY_RUN=false ne suffit pas hors production (local, prévisualisation).
     vi.stubEnv("SOCIAL_DRY_RUN", "false");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(modeSimulation()).toBe(true);
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(modeSimulation()).toBe(true);
+    vi.stubEnv("VERCEL_ENV", "production");
     expect(modeSimulation()).toBe(false);
+    vi.stubEnv("SOCIAL_DRY_RUN", "true");
+    expect(modeSimulation()).toBe(true);
   });
 
   it("en simulation, aucune requête n'est envoyée aux plateformes", async () => {

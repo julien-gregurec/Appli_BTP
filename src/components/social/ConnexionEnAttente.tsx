@@ -19,7 +19,7 @@ export function ConnexionEnAttente({ attenteId }: { attenteId: string }) {
   if (!etat) return <p className="text-sm text-neutral-500">Chargement des comptes autorisés…</p>;
 
   return (
-    <section className="space-y-3 rounded-md border-2 border-[#c9a24a] p-4">
+    <section className="space-y-3 rounded-md border-2 border-elsatia-cyan p-4">
       <h2 className="font-semibold">{etat.fournisseur === "meta" ? "Choisir la Page Facebook ELSATIA" : "Choisir la Page Entreprise LinkedIn ELSATIA"}</h2>
       <p className="text-xs text-neutral-500">Permissions accordées : {etat.scopes.join(", ") || "non communiquées"}</p>
       {etat.options.length === 0 && <p className="text-sm text-red-700">{etat.fournisseur === "meta" ? "Aucune Page accessible : vérifier que le compte Facebook utilisé administre la Page ELSATIA et que la Page a été cochée lors de l’autorisation." : "Aucune organisation administrée : le compte LinkedIn doit être administrateur de la Page ELSATIA."}</p>}
@@ -30,7 +30,7 @@ export function ConnexionEnAttente({ attenteId }: { attenteId: string }) {
             <button
               type="button"
               disabled={enCours}
-              className="rounded-md bg-[#0d1b2a] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-[#c9a24a] dark:text-[#0d1b2a]"
+              className="rounded-md bg-elsatia-electrique px-3 py-1.5 text-sm font-medium text-white hover:bg-elsatia-profond disabled:opacity-50 dark:bg-elsatia-cyan dark:text-elsatia-nuit"
               onClick={() =>
                 demarrer(async () => {
                   const r = await finaliserConnexionAction(attenteId, o.id);

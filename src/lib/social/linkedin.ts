@@ -43,6 +43,12 @@ function entetes(jeton: string, extra: Record<string, string> = {}) {
   };
 }
 
+/** Lecture REST LinkedIn (GET uniquement) : diagnostic. */
+export async function lectureLinkedIn<T>(chemin: string, jeton: string): Promise<T> {
+  const { corps } = await requete<T>(`${API}/${chemin.replace(/^\//, "")}`, { headers: entetes(jeton), classifier: classifierLinkedIn });
+  return corps;
+}
+
 export const urnOrganisation = (id: string) => `urn:li:organization:${id}`;
 
 // Échappement du « little text format » de LinkedIn. Les hashtags sont

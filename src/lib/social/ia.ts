@@ -28,35 +28,50 @@ async function outilForce<T>(outil: OutilIA, system: string, demande: string, ma
 
 export type Variantes = { facebook: string; instagram: string; linkedin: string; hashtags: string[]; cta: string };
 
+const normaliserTexte = (t: string) => t.toLowerCase().replace(/[#\s\p{P}\p{Extended_Pictographic}]+/gu, " ").trim();
+
+/** Vrai si au moins deux variantes sont identiques (au-delà de la ponctuation et des hashtags). */
+export function variantesIdentiques(v: Pick<Variantes, "facebook" | "instagram" | "linkedin">): boolean {
+  const t = [v.facebook, v.instagram, v.linkedin].map(normaliserTexte);
+  return t[0] === t[1] || t[0] === t[2] || t[1] === t[2];
+}
+
 export async function genererVariantes(params: { texte: string; application: string; lien: string | null; reseaux: Reseau[] }): Promise<Variantes> {
   const texte = params.texte.trim();
   if (!texte) throw new Error("Saisissez d’abord le texte principal.");
-  const resultat = await outilForce<Partial<Variantes>>(
-    {
-      nom: "proposer_variantes",
-      description: "Propose une version distincte du message pour chaque réseau social.",
-      parametres: {
-        type: "object",
-        properties: {
-          facebook: { type: "string", description: STYLE_RESEAU.facebook },
-          instagram: { type: "string", description: STYLE_RESEAU.instagram },
-          linkedin: { type: "string", description: STYLE_RESEAU.linkedin },
-          hashtags: { type: "array", items: { type: "string" }, description: "Hashtags suggérés, sans doublon, avec #" },
-          cta: { type: "string", description: "Appel à l'action court suggéré" },
+  const demander = (insistance: string) =>
+    outilForce<Partial<Variantes>>(
+      {
+        nom: "proposer_variantes",
+        description: "Propose une version distincte du message pour chaque réseau social.",
+        parametres: {
+          type: "object",
+          properties: {
+            facebook: { type: "string", description: STYLE_RESEAU.facebook },
+            instagram: { type: "string", description: STYLE_RESEAU.instagram },
+            linkedin: { type: "string", description: STYLE_RESEAU.linkedin },
+            hashtags: { type: "array", items: { type: "string" }, description: "Hashtags suggérés, sans doublon, avec #" },
+            cta: { type: "string", description: "Appel à l'action court suggéré" },
+          },
+          required: ["facebook", "instagram", "linkedin", "hashtags", "cta"],
         },
-        required: ["facebook", "instagram", "linkedin", "hashtags", "cta"],
       },
-    },
-    "Les trois versions doivent être réellement différentes (longueur, structure, ton), jamais un simple copier-coller. Conserver tous les faits du texte source, n'en ajouter aucun.",
-    `Produit concerné : ${libelleApplication(params.application)}\nLien éventuel : ${params.lien ?? "aucun"}\nRéseaux choisis : ${params.reseaux.map((r) => LIBELLE_RESEAU[r]).join(", ") || "tous"}\n\nTexte principal :\n${texte}`,
-  );
-  return {
+      `Les trois versions doivent être réellement différentes (longueur, structure, ton), jamais un simple copier-coller. Conserver tous les faits du texte source, n'en ajouter aucun.${insistance}`,
+      `Produit concerné : ${libelleApplication(params.application)}\nLien éventuel : ${params.lien ?? "aucun"}\nRéseaux choisis : ${params.reseaux.map((r) => LIBELLE_RESEAU[r]).join(", ") || "tous"}\n\nTexte principal :\n${texte}`,
+    );
+  const nettoyer = (resultat: Partial<Variantes>): Variantes => ({
     facebook: (resultat.facebook ?? "").trim().slice(0, LIMITES.facebook.caracteres),
     instagram: (resultat.instagram ?? "").trim().slice(0, LIMITES.instagram.caracteres),
     linkedin: (resultat.linkedin ?? "").trim().slice(0, LIMITES.linkedin.caracteres),
     hashtags: (resultat.hashtags ?? []).filter((h) => /^#[\p{L}\p{N}_]+$/u.test(h)).slice(0, 15),
     cta: (resultat.cta ?? "").trim(),
-  };
+  });
+  let v = nettoyer(await demander(""));
+  // Exigence : trois textes différents par défaut. Une seconde demande, plus insistante, puis refus.
+  if (variantesIdentiques(v)) v = nettoyer(await demander(" ATTENTION : la proposition précédente contenait des textes identiques. Chaque réseau doit avoir un texte propre."));
+  if (!v.facebook || !v.instagram || !v.linkedin) throw new Error("L’Assistant Social n’a pas produit les trois versions.");
+  if (variantesIdentiques(v)) throw new Error("L’Assistant Social a produit des versions identiques : reformuler le texte principal ou adapter à la main.");
+  return v;
 }
 
 export type OperationTexte = "reformuler" | "raccourcir" | "hashtags" | "cta" | "adapter";

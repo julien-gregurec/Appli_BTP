@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { journaliser } from "@/lib/social/audit";
 import { connecteurPour, signalerErreurCompte } from "@/lib/social/comptes";
 import { modeSimulation } from "@/lib/social/config";
+import { logosElsatia } from "@/lib/social/identite";
 import { texteDuReseau } from "@/lib/social/contenu";
 import { empreinteContenu } from "@/lib/social/empreinte";
 import { delaiReprise, TENTATIVES_MAX } from "@/lib/social/http";
@@ -159,6 +160,9 @@ export async function lancerPublication(admin: SupabaseClient, publicationId: st
   const empreinte = empreinteDe(p);
   const verdict = peutEtrePublie(p.publication, empreinte);
   if (!verdict.ok) throw new Error(verdict.raison);
+  // Identité obligatoire : aucune publication réelle sans le logo officiel ELSATIA dans le dépôt.
+  const logos = logosElsatia();
+  if (!modeSimulation() && logos.manquants.length) throw new Error(`Logo officiel ELSATIA manquant (${logos.manquants.join(", ")}) : publication réelle refusée.`);
 
   await synchroniserCibles(admin, p, empreinte);
   const { error } = await admin.from("social_publications").update({ statut: "publication_en_cours" }).eq("id", publicationId).in("statut", ["valide", "programme", "echec", "partiel"]);

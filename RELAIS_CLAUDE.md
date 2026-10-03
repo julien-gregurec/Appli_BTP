@@ -1,5 +1,16 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE — 3 octobre 2026 (suite), ELSATIA Social qualifié en local, identité ELSATIA
+
+- **Identité** : le nouveau logo ELSATIA bleu / cyan / blanc est la référence de tout l’écosystème. L’or est retiré d’ELSATIA Social. Source unique : `src/lib/elsatia/marque.ts` et `--elsatia-*` dans `globals.css`. Valeurs **provisoires** jusqu’au fichier du logo. Fichiers attendus et déclinaisons : `docs/ELSATIA_IDENTITE.md` ; générateur `npm run elsatia:logo`. Le shell Gestion Pro reste à l’identité Liria en attendant le logo.
+- **Migration 184 corrigée** (non appliquée en production) : GRANT explicites et droit d’exécution pour `service_role`, sans lesquels le module aurait été inutilisable. Testée avec les vrais rôles d’API sur une stack Supabase locale complète. Scripts `supabase/production/verifier_elsatia_social.sql` et `retour_arriere_elsatia_social.sql`.
+- **Simulation renforcée** : un envoi réel exige à la fois `VERCEL_ENV=production` et `SOCIAL_DRY_RUN=false`, plus la présence du logo officiel. Bandeau « MODE SIMULATION — aucune publication réelle ne sera envoyée » sur toutes les pages.
+- Nouveau `/plateforme/social/configuration` (présence et format des variables, jamais leur valeur). Diagnostic de compte en lecture seule, lancé automatiquement après OAuth.
+- Recette : `docs/ELSATIA_SOCIAL_RECETTE.md`. Scénario de bout en bout 10/10, 42 vues navigateur sans anomalie, 141 tests, TypeScript, ESLint et build verts.
+- Bloquants externes : fichier du logo, application Meta, application LinkedIn avec accès Community Management API, variables Vercel, application de la migration sur la base vérifiée.
+
+---
+
 ## REPRISE — 3 octobre 2026, ELSATIA Social (MIGRATION 184 À APPLIQUER)
 
 - Nouveau module interne **ELSATIA Social** dans l’espace plateforme : `/plateforme/social` (menu Communication › Réseaux sociaux). Il gère la Page Facebook, l’Instagram professionnel et la Page LinkedIn ELSATIA. Documentation complète : `docs/ELSATIA_SOCIAL.md`.

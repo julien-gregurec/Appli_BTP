@@ -11,7 +11,7 @@ export function AnalyseIA() {
     <section className="space-y-2 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold">Analyse par l’Assistant Social</h2>
-        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await analyserPerformancesAction(); if (r.ok) { setTexte(r.donnees!.texte); setErreur(null); } else setErreur(r.erreur); })} className="rounded-md bg-[#c9a24a] px-3 py-1.5 text-sm font-semibold text-[#0d1b2a] disabled:opacity-50">
+        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await analyserPerformancesAction(); if (r.ok) { setTexte(r.donnees!.texte); setErreur(null); } else setErreur(r.erreur); })} className="rounded-md bg-elsatia-cyan px-3 py-1.5 text-sm font-semibold text-elsatia-nuit disabled:opacity-50">
           {enCours ? "Analyse…" : "✦ Analyser les performances"}
         </button>
       </div>

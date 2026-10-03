@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { adminSocial, contexteSocial } from "@/lib/social/acces";
 import { listerComptes } from "@/lib/social/comptes";
 import { modeSimulation } from "@/lib/social/config";
-import { logoElsatia } from "@/lib/social/identite";
+import { logosElsatia } from "@/lib/social/identite";
 import { BUCKET_SOCIAL, chargerPublication } from "@/lib/social/publication";
 import { peut } from "@/lib/social/roles";
 import { estModifiable } from "@/lib/social/workflow";
@@ -63,7 +63,7 @@ export default async function PublicationPage({ searchParams }: { searchParams: 
             {p.publication.modifie_par && p.publication.modifie_par !== p.publication.cree_par ? `, modifié par ${p.publication.modifie_par}` : ""}
           </p>
         )}
-        <EditeurPublication key={p?.publication.updated_at ?? "nouvelle"} initial={initial} modifiable={!p || estModifiable(p.publication.statut)} peutRediger={peut(ctx.role, "rediger")} comptes={nomsComptes} logo={logoElsatia()} />
+        <EditeurPublication key={p?.publication.updated_at ?? "nouvelle"} initial={initial} modifiable={!p || estModifiable(p.publication.statut)} peutRediger={peut(ctx.role, "rediger")} comptes={nomsComptes} logo={logosElsatia().avatar} logosManquants={logosElsatia().manquants} />
         {p && (
           <PanneauValidation
             id={p.publication.id}

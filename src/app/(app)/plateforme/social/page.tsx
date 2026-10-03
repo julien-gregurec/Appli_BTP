@@ -44,9 +44,9 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
                 {compte ? (
                   <>
                     <p className="text-neutral-600 dark:text-neutral-400">{compte.nom_compte}</p>
-                    <p className={compte.statut === "connecte" ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                    <p className={compte.statut === "connecte" && (jours === null || jours > 10) ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
                       {compte.statut === "connecte" ? "Connecté" : "À reconnecter"}
-                      {jours !== null && ` · jeton : ${jours} j`}
+                      {jours !== null && (jours > 10 ? ` · jeton : ${jours} j` : ` · jeton expirant dans ${jours} j : reconnecter`)}
                     </p>
                   </>
                 ) : (
@@ -58,16 +58,16 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
         </section>
 
         <section className="flex flex-wrap gap-2 text-sm">
-          <Link href="/plateforme/social" className={`rounded-full border px-3 py-1 ${!statut ? "border-[#0d1b2a] font-semibold dark:border-[#c9a24a]" : "border-neutral-300 dark:border-neutral-700"}`}>Toutes ({compteurs?.length ?? 0})</Link>
+          <Link href="/plateforme/social" className={`rounded-full border px-3 py-1 ${!statut ? "border-elsatia-electrique font-semibold dark:border-elsatia-cyan" : "border-neutral-300 dark:border-neutral-700"}`}>Toutes ({compteurs?.length ?? 0})</Link>
           {STATUTS_PUBLICATION.filter((s) => parStatut.get(s.cle)).map((s) => (
-            <Link key={s.cle} href={`/plateforme/social?statut=${s.cle}`} className={`rounded-full border px-3 py-1 ${statut === s.cle ? "border-[#0d1b2a] font-semibold dark:border-[#c9a24a]" : "border-neutral-300 dark:border-neutral-700"}`}>
+            <Link key={s.cle} href={`/plateforme/social?statut=${s.cle}`} className={`rounded-full border px-3 py-1 ${statut === s.cle ? "border-elsatia-electrique font-semibold dark:border-elsatia-cyan" : "border-neutral-300 dark:border-neutral-700"}`}>
               {s.libelle} ({parStatut.get(s.cle)})
             </Link>
           ))}
-          {(commentairesNouveaux ?? 0) > 0 && <Link href="/plateforme/social/commentaires" className="rounded-full bg-[#c9a24a] px-3 py-1 font-semibold text-[#0d1b2a]">{commentairesNouveaux} commentaire(s) à traiter</Link>}
+          {(commentairesNouveaux ?? 0) > 0 && <Link href="/plateforme/social/commentaires" className="rounded-full bg-elsatia-cyan px-3 py-1 font-semibold text-elsatia-nuit">{commentairesNouveaux} commentaire(s) à traiter</Link>}
         </section>
 
-        <form className="flex gap-2" role="search">
+        <form className="relative flex gap-2" role="search">
           {statut && <input type="hidden" name="statut" value={statut} />}
           <label className="sr-only" htmlFor="recherche-publication">Rechercher une publication</label>
           <input id="recherche-publication" name="q" defaultValue={q ?? ""} placeholder="Rechercher par titre…" className="w-full max-w-sm rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900" />

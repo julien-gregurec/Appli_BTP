@@ -61,7 +61,7 @@ export function PanneauValidation({
         {["Brouillon", "Prévisualisation", "Validation humaine", "Publication"].map((e, i) => {
           const etape = statut === "idee" || statut === "brouillon" ? 1 : statut === "a_valider" ? 2 : ["valide", "programme"].includes(statut) ? 3 : 4;
           return (
-            <li key={e} className={`rounded-full px-2 py-0.5 ${i < etape ? "bg-[#0d1b2a] text-white dark:bg-[#c9a24a] dark:text-[#0d1b2a]" : "bg-neutral-100 dark:bg-neutral-800"}`}>
+            <li key={e} className={`rounded-full px-2 py-0.5 ${i < etape ? "bg-elsatia-electrique text-white hover:bg-elsatia-profond dark:bg-elsatia-cyan dark:text-elsatia-nuit" : "bg-neutral-100 dark:bg-neutral-800"}`}>
               {i + 1}. {e}
             </li>
           );

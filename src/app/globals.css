@@ -8,6 +8,15 @@
   --liria-gold: #c9a24a;
   --liria-white: #ffffff;
   --liria-gray-clair: #e6e6e6;
+
+  /* Identité officielle ELSATIA (nouveau logo bleu / cyan / blanc).
+     Valeurs provisoires à recaler sur le fichier du logo : voir src/lib/elsatia/marque.ts. */
+  --elsatia-nuit: #071a3d;
+  --elsatia-profond: #0b3d91;
+  --elsatia-electrique: #1e6bff;
+  --elsatia-cyan: #18c8e8;
+  --elsatia-argent: #c7d2de;
+  --elsatia-blanc: #ffffff;
 }
 
 @theme inline {
@@ -22,6 +31,14 @@
   --color-liria-gold: var(--liria-gold);
   --color-liria-white: var(--liria-white);
   --color-liria-gray-clair: var(--liria-gray-clair);
+
+  /* Palette ELSATIA : bg-elsatia-nuit, text-elsatia-cyan, border-elsatia-argent… */
+  --color-elsatia-nuit: var(--elsatia-nuit);
+  --color-elsatia-profond: var(--elsatia-profond);
+  --color-elsatia-electrique: var(--elsatia-electrique);
+  --color-elsatia-cyan: var(--elsatia-cyan);
+  --color-elsatia-argent: var(--elsatia-argent);
+  --color-elsatia-blanc: var(--elsatia-blanc);
 }
 
 @theme {

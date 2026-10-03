@@ -94,6 +94,8 @@ create table public.social_comptes (
   data_access_expires_at timestamptz,
   derniere_verification_at timestamptz,
   derniere_erreur text,
+  -- Résultat du dernier diagnostic en lecture seule (identité, permissions, quotas).
+  dernier_diagnostic jsonb,
   updated_at timestamptz not null default now(),
   check ((fournisseur = 'meta' and reseau in ('facebook','instagram')) or (fournisseur = 'linkedin' and reseau = 'linkedin')),
   unique (reseau, external_account_id)
@@ -504,17 +506,44 @@ create trigger social_commentaires_touch before update on public.social_commenta
 create trigger social_messages_touch before update on public.social_messages for each row execute function public.social_touch_updated_at();
 create trigger social_membres_touch before update on public.social_membres for each row execute function public.social_touch_updated_at();
 
--- Toutes les tables restent en lecture seule pour le client, y compris
--- authentifié : les écritures passent par le serveur.
-revoke insert, update, delete, truncate on
-  public.social_membres, public.social_parametres, public.social_comptes, public.social_medias,
-  public.social_publications, public.social_publication_medias, public.social_publication_cibles,
-  public.social_statistiques, public.social_abonnes, public.social_commentaires, public.social_messages,
-  public.social_webhook_evenements, public.social_audit
-from anon, authenticated;
+-- ─────────────────────────────────────────────────────────────
+-- Privilèges explicites. Le projet n'expose plus automatiquement les nouvelles
+-- tables aux rôles de l'API (anon, authenticated, service_role) : sans ces
+-- GRANT, même le serveur (service_role) ne pourrait pas lire ni écrire.
+--   * authenticated : lecture seule, filtrée par la RLS ;
+--   * service_role  : lecture/écriture (le serveur, après contrôle du rôle) ;
+--   * anon          : rien.
+-- ─────────────────────────────────────────────────────────────
 revoke all on
+  public.social_membres, public.social_parametres, public.social_comptes, public.social_identifiants,
+  public.social_connexions_en_attente, public.social_medias, public.social_publications,
+  public.social_publication_medias, public.social_publication_cibles, public.social_statistiques,
+  public.social_abonnes, public.social_commentaires, public.social_messages,
+  public.social_webhook_evenements, public.social_quotas, public.social_audit
+from anon, authenticated;
+
+grant select on
   public.social_membres, public.social_parametres, public.social_comptes, public.social_medias,
   public.social_publications, public.social_publication_medias, public.social_publication_cibles,
   public.social_statistiques, public.social_abonnes, public.social_commentaires, public.social_messages,
   public.social_webhook_evenements, public.social_audit
-from anon;
+to authenticated;
+
+grant select, insert, update, delete on
+  public.social_membres, public.social_parametres, public.social_comptes, public.social_identifiants,
+  public.social_connexions_en_attente, public.social_medias, public.social_publications,
+  public.social_publication_medias, public.social_publication_cibles, public.social_statistiques,
+  public.social_abonnes, public.social_commentaires, public.social_messages,
+  public.social_webhook_evenements, public.social_quotas
+to service_role;
+-- Journal : ajout et lecture uniquement, y compris pour le serveur.
+grant select, insert on public.social_audit to service_role;
+grant usage, select on sequence public.social_statistiques_id_seq, public.social_webhook_evenements_id_seq, public.social_audit_id_seq to service_role;
+
+-- Fonctions appelées par le serveur (service_role) uniquement.
+grant execute on function public.social_verrouiller_cible(uuid) to service_role;
+grant execute on function public.social_consommer_quota(text, integer, integer) to service_role;
+grant execute on function public.social_role_de(text) to service_role;
+grant execute on function public.social_role_courant() to service_role;
+revoke all on function public.social_touch_updated_at() from public, anon, authenticated;
+revoke all on function public.social_audit_ajout_seul() from public, anon, authenticated;

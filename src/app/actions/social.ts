@@ -11,7 +11,8 @@ import { dechiffrerSecret } from "@/lib/social/crypto";
 import * as ia from "@/lib/social/ia";
 import { revoquerLinkedIn, inspecterJetonLinkedIn, type JetonsLinkedIn } from "@/lib/social/linkedin";
 import { extension, typeMedia, validerTeleversement } from "@/lib/social/medias";
-import { abonnerWebhooksPage, inspecterJetonMeta, revoquerMeta, type ResultatOAuthMeta } from "@/lib/social/meta";
+import { abonnerWebhooksPage, inspecterJetonMeta, revoquerMeta, verifierApplicationMeta, type ResultatOAuthMeta } from "@/lib/social/meta";
+import { diagnostiquerCompte } from "@/lib/social/diagnostic";
 import { ErreurSocial, MESSAGE_NON_DISPONIBLE } from "@/lib/social/provider";
 import { BUCKET_SOCIAL, chargerPublication, empreinteDe, lancerPublication, relancerCible } from "@/lib/social/publication";
 import { estRoleSocial, peut } from "@/lib/social/roles";
@@ -614,6 +615,7 @@ export async function finaliserConnexionAction(attenteId: string, choixId: strin
     const admin = adminSocial();
     const { fournisseur, donnees } = await lireAttente(attenteId, ctx.email);
     const connectes: string[] = [];
+    const ids: string[] = [];
     if (fournisseur === "meta") {
       const d = donnees as ResultatOAuthMeta;
       const page = d.pages.find((p) => p.id === choixId);
@@ -621,23 +623,36 @@ export async function finaliserConnexionAction(attenteId: string, choixId: strin
       // Jeton de Page dérivé d'un jeton longue durée : pas d'expiration fixe, mais
       // l'accès aux données expire (data_access_expires_at) sans reconnexion.
       const debug = await inspecterJetonMeta(page.jeton);
-      await enregistrerCompte(admin, { fournisseur: "meta", reseau: "facebook", nom_compte: page.nom, external_account_id: page.id, scopes: debug.scopes.length ? debug.scopes : d.scopes, token_expires_at: debug.expireAt, data_access_expires_at: debug.dataAccessExpireAt ?? d.dataAccessExpireAt, connecte_par: ctx.email }, page.jeton, null);
+      ids.push(await enregistrerCompte(admin, { fournisseur: "meta", reseau: "facebook", nom_compte: page.nom, external_account_id: page.id, scopes: debug.scopes.length ? debug.scopes : d.scopes, token_expires_at: debug.expireAt, data_access_expires_at: debug.dataAccessExpireAt ?? d.dataAccessExpireAt, connecte_par: ctx.email }, page.jeton, null));
       connectes.push(`Facebook « ${page.nom} »`);
       if (page.instagram) {
-        await enregistrerCompte(admin, { fournisseur: "meta", reseau: "instagram", nom_compte: page.instagram.nom ?? page.instagram.username ?? "Instagram", nom_utilisateur: page.instagram.username, external_account_id: page.instagram.id, external_parent_id: page.id, scopes: debug.scopes.length ? debug.scopes : d.scopes, token_expires_at: debug.expireAt, data_access_expires_at: debug.dataAccessExpireAt ?? d.dataAccessExpireAt, connecte_par: ctx.email }, page.jeton, null);
+        ids.push(await enregistrerCompte(admin, { fournisseur: "meta", reseau: "instagram", nom_compte: page.instagram.nom ?? page.instagram.username ?? "Instagram", nom_utilisateur: page.instagram.username, external_account_id: page.instagram.id, external_parent_id: page.id, scopes: debug.scopes.length ? debug.scopes : d.scopes, token_expires_at: debug.expireAt, data_access_expires_at: debug.dataAccessExpireAt ?? d.dataAccessExpireAt, connecte_par: ctx.email }, page.jeton, null));
         connectes.push(`Instagram @${page.instagram.username ?? page.instagram.id}`);
       }
     } else {
       const d = donnees as JetonsLinkedIn & { organisations: Array<{ id: string; nom: string }> };
       const org = d.organisations.find((o) => o.id === choixId);
       if (!org) throw new Error("Organisation introuvable.");
-      await enregistrerCompte(admin, { fournisseur: "linkedin", reseau: "linkedin", nom_compte: org.nom, external_account_id: org.id, scopes: d.scopes, token_expires_at: d.expireAt, refresh_expires_at: d.refreshExpireAt, connecte_par: ctx.email }, d.jeton, d.refresh);
+      ids.push(await enregistrerCompte(admin, { fournisseur: "linkedin", reseau: "linkedin", nom_compte: org.nom, external_account_id: org.id, scopes: d.scopes, token_expires_at: d.expireAt, refresh_expires_at: d.refreshExpireAt, connecte_par: ctx.email }, d.jeton, d.refresh));
       connectes.push(`LinkedIn « ${org.nom} »`);
     }
     await admin.from("social_connexions_en_attente").delete().eq("id", attenteId);
+    // Diagnostic immédiat en lecture seule : identité, ID externe, permissions, expiration.
+    const bilans: string[] = [];
+    for (const id of ids) {
+      const { data: compte } = await admin.from("social_comptes").select("*").eq("id", id).maybeSingle();
+      if (!compte) continue;
+      try {
+        const diagnostic = await diagnostiquerCompte(admin, compte);
+        await admin.from("social_comptes").update({ dernier_diagnostic: diagnostic, derniere_verification_at: diagnostic.date }).eq("id", id);
+        bilans.push(`${LIBELLE_RESEAU[compte.reseau as Reseau]} ${diagnostic.ok ? "✓" : "✕ (voir le diagnostic)"}`);
+      } catch (e) {
+        bilans.push(`${LIBELLE_RESEAU[compte.reseau as Reseau]} : diagnostic impossible (${e instanceof Error ? e.message : "erreur"})`);
+      }
+    }
     await journaliser(admin, { acteur: ctx.email, action: "compte_connecte", reseau: fournisseur, details: { comptes: connectes } });
     rafraichir();
-    return { ok: true, message: `Connecté : ${connectes.join(", ")}.` };
+    return { ok: true, message: `Connecté : ${connectes.join(", ")}. Diagnostic lecture seule : ${bilans.join(" · ") || "non exécuté"}.` };
   });
 }
 
@@ -735,5 +750,43 @@ export async function definirRoleAction(email: string, role: string): Promise<Re
     await journaliser(admin, { acteur: ctx.email, action: "role_modifie", objetId: cible, avant: avant ?? null, apres: { role } });
     rafraichir();
     return { ok: true, message: "Rôle enregistré." };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Diagnostic en lecture seule (aucune écriture chez les plateformes)
+// ─────────────────────────────────────────────────────────────
+
+export async function diagnostiquerCompteAction(compteId: string): Promise<Resultat> {
+  return executer(async () => {
+    const ctx = await exigerSocial("gerer_comptes");
+    if (!(await consommerQuota(`diagnostic:${compteId}`, 10, 3600))) throw new Error("Diagnostic trop fréquent : réessayer plus tard.");
+    const admin = adminSocial();
+    const { data: compte } = await admin.from("social_comptes").select("*").eq("id", compteId).neq("statut", "revoque").maybeSingle();
+    if (!compte) throw new Error("Compte introuvable.");
+    const diagnostic = await diagnostiquerCompte(admin, compte);
+    await admin
+      .from("social_comptes")
+      .update({
+        dernier_diagnostic: diagnostic,
+        derniere_verification_at: diagnostic.date,
+        scopes: diagnostic.permissions.length ? diagnostic.permissions : compte.scopes,
+        token_expires_at: diagnostic.expiration.jeton,
+        ...(compte.fournisseur === "meta" ? { data_access_expires_at: diagnostic.expiration.accesDonnees } : {}),
+        ...(diagnostic.ok ? { statut: "connecte", derniere_erreur: null } : {}),
+      })
+      .eq("id", compteId);
+    await journaliser(admin, { acteur: ctx.email, action: "compte_diagnostique", reseau: compte.reseau, objetId: compteId, details: { ok: diagnostic.ok, etapes: diagnostic.etapes.map((e) => `${e.ok ? "✓" : "✕"} ${e.libelle}`) } });
+    rafraichir();
+    return diagnostic.ok ? { ok: true, message: "Diagnostic réussi (lectures uniquement)." } : { ok: false, erreur: `Diagnostic incomplet : ${diagnostic.etapes.filter((e) => !e.ok).map((e) => `${e.libelle} — ${e.detail}`).join(" ; ")}` };
+  });
+}
+
+export async function testerApplicationMetaAction(): Promise<Resultat> {
+  return executer(async () => {
+    const ctx = await exigerSocial("gerer_comptes");
+    const app = await verifierApplicationMeta();
+    await journaliser(adminSocial(), { acteur: ctx.email, action: "application_meta_testee", reseau: "meta", details: { app: app.name ?? app.id } });
+    return { ok: true, message: `Application Meta reconnue : « ${app.name ?? app.id} ». Identifiant et clé secrète cohérents.` };
   });
 }

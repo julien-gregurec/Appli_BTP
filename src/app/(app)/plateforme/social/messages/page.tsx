@@ -59,7 +59,7 @@ export default async function MessagesPage() {
                 <p className="mb-2 text-xs text-neutral-500">{messages[0].reseau === "facebook" ? "Messenger" : LIBELLE_RESEAU[messages[0].reseau]} · {dernierEntrant?.auteur_nom ?? "Interlocuteur"}</p>
                 <div className="space-y-1">
                   {tri.slice(-10).map((m) => (
-                    <p key={m.id} className={`max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-1.5 ${m.sens === "sortant" ? "ml-auto bg-[#0d1b2a] text-white" : "bg-neutral-100 dark:bg-neutral-800"}`}>{m.contenu}</p>
+                    <p key={m.id} className={`max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-1.5 ${m.sens === "sortant" ? "ml-auto bg-elsatia-electrique text-white hover:bg-elsatia-profond" : "bg-neutral-100 dark:bg-neutral-800"}`}>{m.contenu}</p>
                   ))}
                 </div>
                 {dernierEntrant && (

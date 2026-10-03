@@ -11,11 +11,12 @@ const TRONCATURE: Record<Reseau, number> = { facebook: 480, instagram: 125, link
 function Logo({ logo, taille = 40 }: { logo: string | null; taille?: number }) {
   if (logo) {
     // eslint-disable-next-line @next/next/no-img-element -- logo statique local, dimensions fixées
-    return <img src={logo} alt="ELSATIA" width={taille} height={taille} className="rounded-full border border-neutral-200 bg-white object-contain" />;
+    return <img src={logo} alt="ELSATIA" width={taille} height={taille} className="rounded-full border border-elsatia-argent bg-white object-contain" />;
   }
+  // Aucun logo de substitution : l'absence du fichier officiel est signalée telle quelle.
   return (
-    <span title="Logo officiel ELSATIA à déposer dans public/elsatia/" className="flex items-center justify-center rounded-full bg-[#0d1b2a] text-[10px] font-bold text-[#c9a24a]" style={{ width: taille, height: taille }}>
-      ELS
+    <span role="img" aria-label="Logo officiel ELSATIA manquant" title="Déposer public/elsatia/symbole.svg" className="flex items-center justify-center rounded-full border border-dashed border-red-400 bg-red-50 text-center text-[8px] font-semibold leading-tight text-red-700" style={{ width: taille, height: taille }}>
+      logo manquant
     </span>
   );
 }

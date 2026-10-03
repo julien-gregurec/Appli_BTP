@@ -34,14 +34,14 @@ export function AssistantSocial() {
         <textarea className={champ} value={consigne} onChange={(e) => setConsigne(e.target.value)} placeholder="Ex. : mettre en avant ELSATIA Réserves auprès des conducteurs de travaux" maxLength={1000} />
       </label>
       <div className="flex flex-wrap items-end gap-3">
-        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await proposerSujetsAction(consigne); if (r.ok) recevoir(r.donnees!.map((s) => ({ ...s, date: null }))); else setMessage({ ok: false, texte: r.erreur }); })} className="rounded-md bg-[#c9a24a] px-3 py-2 text-sm font-semibold text-[#0d1b2a] disabled:opacity-50">
+        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await proposerSujetsAction(consigne); if (r.ok) recevoir(r.donnees!.map((s) => ({ ...s, date: null }))); else setMessage({ ok: false, texte: r.erreur }); })} className="rounded-md bg-elsatia-cyan px-3 py-2 text-sm font-semibold text-elsatia-nuit disabled:opacity-50">
           ✦ Proposer des sujets
         </button>
         <span className="text-sm text-neutral-500">ou</span>
         <label className="text-sm">Début<input type="date" className={champ} value={debut} onChange={(e) => setDebut(e.target.value)} /></label>
         <label className="text-sm">Semaines<input type="number" min={1} max={8} className={`${champ} w-20`} value={semaines} onChange={(e) => setSemaines(Number(e.target.value))} /></label>
         <label className="text-sm">Par semaine<input type="number" min={1} max={7} className={`${champ} w-20`} value={parSemaine} onChange={(e) => setParSemaine(Number(e.target.value))} /></label>
-        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await genererCalendrierAction(debut, semaines, parSemaine, consigne); if (r.ok) recevoir(r.donnees!); else setMessage({ ok: false, texte: r.erreur }); })} className="rounded-md bg-[#c9a24a] px-3 py-2 text-sm font-semibold text-[#0d1b2a] disabled:opacity-50">
+        <button type="button" disabled={enCours} onClick={() => demarrer(async () => { const r = await genererCalendrierAction(debut, semaines, parSemaine, consigne); if (r.ok) recevoir(r.donnees!); else setMessage({ ok: false, texte: r.erreur }); })} className="rounded-md bg-elsatia-cyan px-3 py-2 text-sm font-semibold text-elsatia-nuit disabled:opacity-50">
           ✦ Générer un calendrier éditorial
         </button>
       </div>
@@ -60,7 +60,7 @@ export function AssistantSocial() {
               </li>
             ))}
           </ul>
-          <button type="button" disabled={enCours || choisies.size === 0} onClick={() => demarrer(async () => { const r = await ajouterIdeesAction(idees.filter((_, n) => choisies.has(n))); setMessage(r.ok ? { ok: true, texte: r.message ?? "Ajouté." } : { ok: false, texte: r.erreur }); if (r.ok) { setIdees([]); router.refresh(); } })} className="rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-[#c9a24a] dark:text-[#0d1b2a]">
+          <button type="button" disabled={enCours || choisies.size === 0} onClick={() => demarrer(async () => { const r = await ajouterIdeesAction(idees.filter((_, n) => choisies.has(n))); setMessage(r.ok ? { ok: true, texte: r.message ?? "Ajouté." } : { ok: false, texte: r.erreur }); if (r.ok) { setIdees([]); router.refresh(); } })} className="rounded-md bg-elsatia-electrique px-3 py-2 text-sm font-semibold text-white hover:bg-elsatia-profond disabled:opacity-50 dark:bg-elsatia-cyan dark:text-elsatia-nuit">
             Ajouter {choisies.size} idée(s) au calendrier
           </button>
         </section>

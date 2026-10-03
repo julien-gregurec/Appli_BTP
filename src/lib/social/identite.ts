@@ -1,32 +1,34 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { COULEURS_ELSATIA, LOGOS_ELSATIA, TYPOGRAPHIE_ELSATIA } from "@/lib/elsatia/marque";
 
 // Identité ELSATIA appliquée aux aperçus et aux consignes de l'Assistant Social.
-//
-// Le logo officiel ELSATIA n'est pas encore présent dans le dépôt : il doit être
-// déposé dans public/elsatia/ (voir docs/ELSATIA_SOCIAL.md). Tant qu'il est
-// absent, l'interface l'indique au lieu d'utiliser un logo de substitution.
-export const LOGO_ELSATIA_CHEMINS = ["/elsatia/logo-officiel.svg", "/elsatia/logo-officiel.png"] as const;
+// Source unique : src/lib/elsatia/marque.ts (nouveau logo officiel bleu / cyan / blanc).
 
-export function logoElsatia(): string | null {
-  for (const chemin of LOGO_ELSATIA_CHEMINS) {
-    if (existsSync(join(process.cwd(), "public", chemin))) return chemin;
-  }
-  return null;
+function existe(chemin: string) {
+  return existsSync(join(process.cwd(), "public", chemin));
 }
 
-// Palette commune au site et aux applications (variables de globals.css).
-// À confirmer avec la charte officielle ELSATIA ; une seule source à modifier.
+export type LogosDisponibles = {
+  /** Symbole carré (avatar des aperçus), sinon le logo complet. */
+  avatar: string | null;
+  /** Logo complet. */
+  principal: string | null;
+  /** Fichiers obligatoires encore absents de public/elsatia/. */
+  manquants: string[];
+};
+
+export function logosElsatia(): LogosDisponibles {
+  const principal = existe(LOGOS_ELSATIA.principal) ? LOGOS_ELSATIA.principal : existe(LOGOS_ELSATIA.principalPng) ? LOGOS_ELSATIA.principalPng : null;
+  const symbole = existe(LOGOS_ELSATIA.symbole) ? LOGOS_ELSATIA.symbole : null;
+  const manquants = [!existe(LOGOS_ELSATIA.principal) && `public${LOGOS_ELSATIA.principal}`, !symbole && `public${LOGOS_ELSATIA.symbole}`].filter(Boolean) as string[];
+  return { avatar: symbole ?? principal, principal, manquants };
+}
+
 export const IDENTITE_ELSATIA = {
   nom: "ELSATIA",
-  couleurs: {
-    principale: "#0d1b2a",
-    accent: "#c9a24a",
-    anthracite: "#1f2328",
-    clair: "#e6e6e6",
-    blanc: "#ffffff",
-  },
-  typographie: "Arial, Helvetica, sans-serif",
+  couleurs: COULEURS_ELSATIA,
+  typographie: TYPOGRAPHIE_ELSATIA,
   ton: "professionnel, clair, concret, chaleureux sans familiarité ; tutoiement interdit ; pas de superlatifs creux ni de promesses non vérifiables",
 } as const;
 

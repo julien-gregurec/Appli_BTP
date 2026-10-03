@@ -2,7 +2,15 @@
 
 Module interne de l'espace plateforme (`/plateforme/social`, menu **Communication › Réseaux sociaux**). Il gère les comptes officiels ELSATIA : Page Facebook, Instagram professionnel et Page Entreprise LinkedIn.
 
-Workflow V1 imposé : **Brouillon → Prévisualisation → Validation humaine → Publication**. Rien n'est publié ni répondu automatiquement. Le **mode simulation (dry-run) est actif par défaut**.
+Workflow V1 imposé : **Brouillon → Prévisualisation → Validation humaine → Publication**. Rien n'est publié ni répondu automatiquement.
+
+**Mode simulation (dry-run), règle absolue.** Une écriture réelle n'est envoyée que si **les deux** conditions sont remplies :
+1. le déploiement est la production Vercel (`VERCEL_ENV=production`) ;
+2. `SOCIAL_DRY_RUN=false`, sur décision explicite de Julien.
+
+Partout ailleurs (local, prévisualisation, variable absente), le bandeau « MODE SIMULATION — aucune publication réelle ne sera envoyée » s'affiche sur chaque page. Une publication réelle est aussi refusée tant que le logo officiel ELSATIA est absent.
+
+Recette : `docs/ELSATIA_SOCIAL_RECETTE.md`. Identité visuelle : `docs/ELSATIA_IDENTITE.md`.
 
 ## 1. Architecture
 
@@ -133,13 +141,41 @@ Chaque appel serveur porte un `appsecret_proof`. Activer **« Exiger la clé sec
    - Le jeton dure 60 jours.
    - Les jetons de renouvellement (365 jours) ne sont accordés qu'aux partenaires approuvés. Sans eux, il faut **se reconnecter tous les 60 jours**. Une alerte apparaît dans le journal 10 jours avant l'échéance.
 
-## 8. Planificateur
+## 8. Déploiement de la migration 184
+
+1. **Vérifier la cible**. Ouvrir l'éditeur SQL du projet Supabase et contrôler son nom (production ou test). Exécuter `supabase/production/verifier_elsatia_social.sql` : la section 2 (prérequis) doit valoir `true` partout, avec `aucune_collision_avant = true`.
+2. **Ledger**. La section 1 indique la dernière migration enregistrée, qui doit être `20260729000183`. La 184 est la suivante dans l'ordre.
+   - Si les migrations passent par `supabase db push`, le ledger est mis à jour automatiquement.
+   - Si elles passent par l'éditeur SQL, ajouter ensuite `insert into supabase_migrations.schema_migrations(version, name) values ('20261003000184', 'elsatia_social');`
+3. **Appliquer** `supabase/migrations/20261003000184_elsatia_social.sql`, puis relancer `verifier_elsatia_social.sql`. Résultats attendus :
+   - 16 tables avec RLS ;
+   - côté `authenticated`, uniquement des `SELECT` ;
+   - côté `anon`, rien ;
+   - le bucket `social-medias` privé ;
+   - les membres « total » en Administrateur.
+4. **En cas d'échec à mi-parcours**, ou pour retirer le module avant toute donnée réelle, exécuter `supabase/production/retour_arriere_elsatia_social.sql`. Le bucket est conservé (Supabase interdit sa suppression en SQL). Le cycle retour arrière + réapplication a été testé.
+
+## 8 bis. Assistant de configuration et diagnostic
+
+- `/plateforme/social/configuration` (Administrateur) :
+  - contrôle chaque variable (présence et format, **jamais la valeur**), la migration, le bucket et le logo ;
+  - donne les URL à déclarer chez Meta et LinkedIn, et les permissions accordées ;
+  - indique l'état d'accès à la Community Management API ;
+  - bouton « Tester l'application Meta », qui vérifie la paire identifiant / secret sans aucune donnée de compte.
+- **Diagnostic en lecture seule**, lancé automatiquement après chaque connexion OAuth et disponible dans Comptes. Il vérifie :
+  - l'identité, l'ID externe, les permissions (par ressource chez Meta) et l'expiration du jeton et de l'accès aux données ;
+  - le quota de publication Instagram ;
+  - la lecture de 3 publications et du nombre d'abonnés.
+
+  Aucune écriture n'est faite chez les plateformes.
+
+## 9. Planificateur
 
 - `GET /api/social/cron` avec l'en-tête `Authorization: Bearer CRON_SECRET`. Il traite les publications programmées échues, les reprises, les verrous abandonnés (passés en « incertain ») et la file des webhooks. Le paramètre `?synchroniser=1` ajoute la lecture des statistiques, commentaires et messages.
 - **À appeler toutes les 5 minutes** pour respecter l'heure de programmation. Avec le plan Vercel Hobby (crons quotidiens), utiliser Supabase `pg_cron` + `pg_net` ou un planificateur externe.
 - En rattrapage, le cron quotidien existant `/api/cron/abonnements` exécute aussi ces tâches, avec la synchronisation.
 
-## 9. Capacités vérifiées dans les API officielles (octobre 2026)
+## 10. Capacités vérifiées dans les API officielles (octobre 2026)
 
 | Fonction | Facebook Page | Instagram pro | LinkedIn Page |
 |---|---|---|---|
@@ -164,7 +200,7 @@ Sources :
 - Meta : `developers.facebook.com/docs/pages-api`, `/docs/instagram-platform/content-publishing`, `/docs/instagram-platform/insights`, `/blog/post/2025/08/15/page-insights-api-updates`, `/docs/messenger-platform`, `/docs/graph-api/webhooks`.
 - LinkedIn : `learn.microsoft.com/linkedin/marketing/community-management/shares/posts-api`, `.../images-api`, `.../videos-api`, `.../comments-api`, `.../organizations/share-statistics`, `/linkedin/shared/api-guide/webhook-validation`, `/linkedin/marketing/versioning`.
 
-## 10. Limitations connues de la V1
+## 11. Limitations connues de la V1
 
 - Une seule image ou une seule vidéo par publication. Carrousel et multi-images prévus en V2.
 - Les vidéos Facebook sont publiées comme vidéos de Page. L'API Reels de Facebook n'est pas encore utilisée.
@@ -172,5 +208,5 @@ Sources :
 - Une vidéo LinkedIn est téléversée par la fonction serveur, avec une limite de durée d'exécution. Préférer des vidéos de moins de 100 Mo.
 - Le nom des membres LinkedIn qui commentent n'est pas exposé à une Page : affiché « Membre LinkedIn ».
 - Messagerie : lecture et réponse uniquement dans la fenêtre de 24 h. Pas d'étiquette `HUMAN_AGENT` (elle exige un App Review).
-- Le logo officiel ELSATIA n'est pas dans le dépôt : une pastille provisoire « ELS » s'affiche dans les aperçus. Déposer `public/elsatia/logo-officiel.svg` (ou `.png`).
-- Les couleurs et la typographie ELSATIA de `src/lib/social/identite.ts` reprennent celles du site actuel (`globals.css`). À confirmer avec la charte officielle.
+- Logo officiel ELSATIA : à déposer dans `public/elsatia/` (voir `docs/ELSATIA_IDENTITE.md`). En attendant, les aperçus affichent « logo manquant » et la publication réelle est bloquée.
+- Palette ELSATIA bleu / cyan / blanc (`src/lib/elsatia/marque.ts`) : valeurs provisoires, à recaler sur le fichier du logo avec `npm run elsatia:logo`.

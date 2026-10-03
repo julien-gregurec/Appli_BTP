@@ -121,4 +121,5 @@ export type CompteSocial = {
   data_access_expires_at: string | null;
   derniere_verification_at: string | null;
   derniere_erreur: string | null;
+  dernier_diagnostic?: { date: string; ok: boolean; identite: { nom: string | null; idExterne: string; lien: string | null }; permissions: string[]; expiration: { jeton: string | null; accesDonnees: string | null }; etapes: Array<{ libelle: string; ok: boolean; detail: string }> } | null;
 };

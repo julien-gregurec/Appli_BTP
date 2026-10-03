@@ -60,7 +60,7 @@ export default async function StatistiquesPage({ searchParams }: { searchParams:
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-1 text-sm">
             {[7, 30, 90, 365].map((j) => (
-              <Link key={j} href={`/plateforme/social/statistiques?jours=${j}`} className={`rounded-md px-3 py-1 ${jours === j ? "bg-[#0d1b2a] text-white dark:bg-[#c9a24a] dark:text-[#0d1b2a]" : "border border-neutral-300 dark:border-neutral-700"}`}>{j} j</Link>
+              <Link key={j} href={`/plateforme/social/statistiques?jours=${j}`} className={`rounded-md px-3 py-1 ${jours === j ? "bg-elsatia-electrique text-white hover:bg-elsatia-profond dark:bg-elsatia-cyan dark:text-elsatia-nuit" : "border border-neutral-300 dark:border-neutral-700"}`}>{j} j</Link>
             ))}
           </div>
           {peut(ctx.role, "synchroniser") && <BoutonAction libelle="Synchroniser les statistiques" action={synchroniserAction.bind(null, "statistiques")} />}

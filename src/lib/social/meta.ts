@@ -50,7 +50,8 @@ function preuve(jeton: string, secret: string) {
   return createHmac("sha256", secret).update(jeton).digest("hex");
 }
 
-async function graphGet<T>(chemin: string, jeton: string, params: Record<string, string> = {}): Promise<T> {
+/** Lecture Graph API (GET uniquement) : diagnostic et synchronisation. */
+export async function graphGet<T>(chemin: string, jeton: string, params: Record<string, string> = {}): Promise<T> {
   const { version, appSecret } = exigerConfig();
   const url = new URL(`${GRAPH}/${version}/${chemin.replace(/^\//, "")}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -126,14 +127,28 @@ export async function echangerCodeMeta(code: string, redirectUri: string): Promi
 
 export async function inspecterJetonMeta(jeton: string) {
   const { appId, appSecret } = exigerConfig();
-  const donnees = await graphGet<{ data: { is_valid: boolean; expires_at?: number; data_access_expires_at?: number; scopes?: string[] } }>(
+  const donnees = await graphGet<{ data: { is_valid: boolean; type?: string; expires_at?: number; data_access_expires_at?: number; scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } }>(
     "debug_token",
     `${appId}|${appSecret}`,
     { input_token: jeton },
   );
   const d = donnees.data;
   const date = (s?: number) => (s && s > 0 ? new Date(s * 1000).toISOString() : null);
-  return { valide: d.is_valid, expireAt: date(d.expires_at), dataAccessExpireAt: date(d.data_access_expires_at), scopes: d.scopes ?? [] };
+  return {
+    valide: d.is_valid,
+    type: d.type ?? null,
+    expireAt: date(d.expires_at),
+    dataAccessExpireAt: date(d.data_access_expires_at),
+    scopes: d.scopes ?? [],
+    // Permissions accordées par ressource (Page, compte Instagram).
+    scopesParRessource: (d.granular_scopes ?? []).map((g) => ({ scope: g.scope, ressources: g.target_ids ?? [] })),
+  };
+}
+
+/** Vérifie la paire META_APP_ID / META_APP_SECRET sans aucune donnée de compte. */
+export async function verifierApplicationMeta() {
+  const { appId, appSecret } = exigerConfig();
+  return graphGet<{ id: string; name?: string }>(appId, `${appId}|${appSecret}`, { fields: "id,name" });
 }
 
 async function listerPages(jetonUtilisateur: string): Promise<PageMeta[]> {

@@ -100,7 +100,7 @@ export function Sidebar({
               href="/plateforme/social"
               onClick={() => setOuvert(false)}
               className={`block rounded-md px-3 py-2 text-sm ${
-                pathname.startsWith("/plateforme/social") ? "bg-[#c9a24a] font-medium text-[#0d1b2a]" : "text-white/80 hover:bg-white/10"
+                pathname.startsWith("/plateforme/social") ? "bg-elsatia-cyan font-medium text-elsatia-nuit" : "text-white/80 hover:bg-white/10"
               }`}
             >
               Réseaux sociaux

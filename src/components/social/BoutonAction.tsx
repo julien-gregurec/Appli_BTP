@@ -24,7 +24,7 @@ export function BoutonAction({
   const [retour, setRetour] = useState<{ ok: boolean; texte: string } | null>(null);
   const style =
     variante === "principal"
-      ? "bg-[#0d1b2a] text-white hover:bg-[#1f2328] dark:bg-[#c9a24a] dark:text-[#0d1b2a]"
+      ? "bg-elsatia-electrique text-white hover:bg-elsatia-profond hover:bg-elsatia-profond dark:bg-elsatia-cyan dark:text-elsatia-nuit"
       : variante === "danger"
         ? "border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300"
         : "border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900";
