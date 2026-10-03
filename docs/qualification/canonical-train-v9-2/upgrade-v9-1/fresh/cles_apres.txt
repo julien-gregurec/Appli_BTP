@@ -1,0 +1,7 @@
+factures=0 ttc=0 paye=0
+paiements=0 somme=0
+devis=0 ttc=0
+pointages=0 heures=0
+documents_chantier=0
+entreprises=0 abonnement=d41d8cd98f00b204e9800998ecf8427e
+utilisateurs_entreprises=0

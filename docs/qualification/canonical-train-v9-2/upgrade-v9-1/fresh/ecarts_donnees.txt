@@ -1,0 +1,1 @@
+ATTENDU public.applications_elsatia — 20261003000103 : url_locale de Réserves 3020 → 3040 si valeur d'origine (A-10)
