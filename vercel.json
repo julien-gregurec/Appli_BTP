@@ -1,5 +1,10 @@
 {
   "regions": ["fra1"],
+  "git": {
+    "deploymentEnabled": {
+      "integration/elsatia-canonical-train-v9.2": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/abonnements",

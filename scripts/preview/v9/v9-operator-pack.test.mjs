@@ -596,3 +596,12 @@ test("reprise (cas A) : préfixe exact partiel accepté (pre et reprise), plan =
   assert.equal(checkLedgerCli([resolve(FIX, "ledger-partiel.json"), "--expect", "reprise"], { local, log: c.log }), 0);
   assert.match(c.texte(), new RegExp(`^PENDING_MIGRATIONS=${cible.nb - a.courant.nb} `, "m"));
 });
+
+test("vercel.json : aucun déploiement Git automatique du train canonique (code V9 avant la base = connexions refusées)", () => {
+  const vercel = JSON.parse(readFileSync(resolve(ROOT, "vercel.json"), "utf8"));
+  const regles = vercel.git?.deploymentEnabled ?? {};
+  // Le code V9 n'est déployé qu'après CODE_DEPLOY_ALLOWED=true : CLI (runbook ELSATIA_V9_GP_PREVIEW_DEPLOY.md) ou branche gp-preview-v8.
+  for (const b of C.BRANCHES_PACK_AUTORISEES.filter((x) => C.MOTIF_BRANCHE_TRAIN.test(x))) assert.equal(regles[b], false, `${b} doit être exclue des déploiements Git`);
+  assert.ok(Object.values(regles).every((v) => v === false), "le garde ne réactive aucune branche");
+  assert.ok(Array.isArray(vercel.crons), "crons conservés");
+});
