@@ -588,3 +588,5 @@
 {"ts":"2026-10-03T00:28:24.543Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-09 : « Total par employé » (responsable) == base","statut":"PASS","detail":"UI=1224  DB hors rejetés=1224 DB tous=1240"}
 {"ts":"2026-10-03T00:28:25.275Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-10 : « Mes heures » du salarié == base","statut":"PASS","detail":"UI normales=15 sup=1 ; DB hors rejetés=15/1 ; DB rejetés inclus=27/1"}
 {"ts":"2026-10-03T00:28:26.039Z","parcours":"Cohérence UI/DB","nom":"Heures 2026-10 : « Total par employé » (responsable) == base","statut":"PASS","detail":"UI=16  DB hors rejetés=16 DB tous=28"}
+{"ts":"2026-10-03T00:29:02.192Z","parcours":"S2 Prospection/Devis","nom":"Correctif B07 : chantier avec fin prévue avant le début refusé","statut":"PASS","detail":"La date de fin prévue précède la date de début."}
+{"ts":"2026-10-03T00:29:02.515Z","parcours":"S2 Prospection/Devis","nom":"Correctif B06 : dates imprimées au format JJ/MM/AAAA (devis et facture)","statut":"PASS","detail":"Émis le 02/10/2026 | "}
