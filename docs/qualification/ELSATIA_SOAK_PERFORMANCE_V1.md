@@ -123,7 +123,7 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
 | PDF devis 1 / 10 / 50 / 100 (conc. 1/10/25/50) | — | 622 / 2 278 / 1 105 / 2 102 | — / 3 545 / 4 933 / 6 211 | 9 063 | 0 / 0 / 38 × 503 / 88 × 503 (saturation voulue) | Chromium ≤ 2 proc., ≤ 789 Mo | file bornée | PASS |
 | PDF abandon client en plein rendu ×10 | 1 000 lignes | | | | — | **0 orphelin à +1 s** | | PASS |
 | Cloisonnement A/B/C entrelacé | 1 500 req | 870 | 16 708 | 19 723 | **0 fuite, 0 5xx** | | | PASS |
-| Long run 60 min | voir § L | | | | | | | voir § L |
+| Long run 60 min + 15 min, 12 VU | 59 792 req | 366 / 394 | 1 926 / 2 096 | 7 615 | 0 (hors bug de banc devis, § 8) | Next 877 → 1 138 Mo puis 740 Mo au repos ; heap après GC 113–115 Mo | 12–13 connexions, 0 deadlock | PASS |
 
 ---
 
@@ -340,7 +340,7 @@ est évaluée sur chaque ligne de l'autre tenant). Voir **P1-2**.
 
 ### L — Long run
 
-_(complété en § 8)_
+Voir § 8.
 
 ---
 
@@ -444,4 +444,55 @@ l'application, aucun blocage de flux critique.
 
 ## 8. Long run (L)
 
-_(en cours de rédaction — résultats ci-dessous)_
+`scripts/perf/soak/domain_l_longrun.mjs` sur la pile complète (`next start`, GoTrue, PostgREST, Chromium),
+12 utilisateurs virtuels en boucle : reconnexion GoTrue toutes les 25 itérations, `/dashboard`,
+`/planning`, création d'un pointage (RPC `creer_pointage_regularisation`, jeton utilisateur), création d'un
+devis brouillon (RPC `creer_devis_brouillon`), un PDF une boucle sur dix, et un **cron synthétique** chaque
+minute (20 notifications insérées + `GET /api/cron/notifications-push` avec un `CRON_SECRET` local).
+
+| | Run 1 (60 min) | Complément (15 min) |
+|---|---:|---:|
+| Requêtes | 48 434 | 11 358 |
+| p50 / p95 / max | 366 / 1 926 / 7 615 ms | 394 / 2 096 / 6 480 ms |
+| Connexions GoTrue | 472, 0 erreur | 118, 0 erreur |
+| `/dashboard`, `/planning` | 11 684 + 11 684, 0 erreur | 2 738 + 2 738, **100 % 200** |
+| Pointages créés | 11 684, 0 erreur | 2 738, 0 erreur |
+| Devis créés | **0** — bug du banc (`ordre` absent des lignes, l'UI le fournit) | **2 738, 0 erreur** |
+| PDF | 1 171, 0 erreur | 274, 0 erreur |
+| Cron push synthétique | 55 passages, 200 | 14 passages, 200 |
+| Deadlocks | 0 | 0 |
+| Connexions DB (soak_app) | 12–13, stable | 12, stable |
+| RSS Next | 877 → 1 058 (min. 27) → 1 138 Mo (min. 53–60, plateau) | **740** au départ (rendu au repos) → 994 Mo |
+| Heap après GC final | 115 Mo | 113 Mo |
+| Chromium | 0–2 processus, jamais d'accumulation | idem |
+
+Lecture : **pas de dérive** — le heap JS revient à ~115 Mo, le RSS plafonne puis est rendu au système au
+repos (1 138 → 740 Mo entre les deux runs, même processus), aucune accumulation de connexions ni de
+processus Chromium, aucun deadlock, aucune erreur applicative sur 59 792 requêtes. Les 2 réponses `307`
+vues pendant la série I (1 000 requêtes sur une session de plus d'une heure) ne se reproduisent pas avec des
+sessions renouvelées : attribuées à l'expiration du jeton de la session de banc (JWT 3 600 s), non à un
+défaut. **Verdict L : PASS** (sur cette machine, au débit de ~13,5 requêtes/s).
+
+## 9. Livrables
+
+* Rapport : ce document. Checkpoint : `docs/qualification/ELSATIA_SOAK_PERFORMANCE_CHECKPOINT.md`.
+* Scripts réutilisables : `scripts/perf/soak/` (`rebuild.sh`, `stack_app.sh`, `start_next.sh`,
+  `volume_tenant.sql`, `affectations_tenant.sql`, `domain_*.mjs`, `race/`, `index/`, `lib/`).
+* Tests rouges (hors CI) : `scripts/perf/soak/tests/cron_push_red.test.sql` (pgTAP, 9 rouges),
+  `relances_auto_red.test.sql` (2 rouges), `cron-push-route.soak.test.ts` (Vitest, 4 rouges ;
+  `npx vitest run --config scripts/perf/soak/tests/vitest.config.ts`).
+* Correctif isolé : branche `fix/elsatia-soak-files-service-ordre-v1` (`8fba2be3`), non mergé.
+* Preuves : `docs/qualification/soak/*.json|*.log|*.txt`.
+
+## 10. Reprise / rejouer
+
+```bash
+service postgresql start; apt-get install -y postgresql-16-pgtap bc; npm ci
+scripts/perf/soak/rebuild.sh                       # soak_base : migrations + fixture
+su postgres -c "createdb soak -T soak_base"
+su postgres -c "psql -d soak -v k=12 -v n=5000 -v e=20 -v jours=0 -f scripts/perf/soak/volume_tenant.sql"
+POSTGREST_BUILD_DIR=/tmp/pgrst scripts/perf/postgrest_local.sh soak 3000
+su postgres -c "pg_prove -d soak scripts/perf/soak/tests/cron_push_red.test.sql"
+node scripts/perf/soak/domain_d_concurrence.mjs 32
+scripts/perf/soak/stack_app.sh && scripts/perf/soak/start_next.sh /tmp/run   # pile applicative
+```
