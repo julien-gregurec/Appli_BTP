@@ -27,6 +27,12 @@ select count(*) as bloquant_essai_hors_fenetre
 select count(*) as info_essai_tronque
   from public.entreprises
  where abonnement_essai_debut is null and abonnement_essai_fin > created_at::date + 30;
+--    Parmi elles, essais EN COURS chez Stripe que la troncature rend EXPIRÉS (matrice UPG-P0-2, cas A6) : l'accès
+--    est coupé en base à l'upgrade (803) alors que l'essai Stripe court encore. Décision propriétaire requise.
+select count(*) as bloquant_essai_tronque_expire
+  from public.entreprises
+ where abonnement_statut = 'essai' and abonnement_essai_debut is null
+   and abonnement_essai_fin >= current_date and created_at::date + 30 < current_date;
 --    Lignes dont 204 RENSEIGNERA debut / fin (NULL aujourd'hui) — changement déclaré :
 select count(*) as info_essai_renseigne
   from public.entreprises where abonnement_essai_debut is null or abonnement_essai_fin is null;

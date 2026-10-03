@@ -288,7 +288,7 @@ cl = json.load(open(os.path.join(out, "classification.json")))
 noms_ponts = {p["fichier"].split("_")[0] for p in ponts}
 # UPG-P0-1 n'est plus une précondition bloquante quand un pont le couvre : v2 externe (298) ou phase 0 du train.
 couvert = "20260921000298" in noms_ponts or any(p["phase0"] for p in ponts)
-pre = ["bloquant_essai_hors_fenetre", "bloquant_essai_perpetuel"] + ([] if couvert else ["lignes_factures_emises"])
+pre = ["bloquant_essai_hors_fenetre", "bloquant_essai_perpetuel", "bloquant_essai_tronque_expire"] + ([] if couvert else ["lignes_factures_emises"])
 plan = {"target_sha": sha, "target_migration_count": n, "source_manifest": os.path.basename(man), "ponts": ponts,
         "phase0": pl.get("phase0", []),
         "qualifie": ko == "0", "preconditions_bloquantes": pre,
