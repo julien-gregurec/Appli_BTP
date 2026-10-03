@@ -59,7 +59,7 @@ SMOKE_TOOLS=NOT_RUN
 SMOKE_COLORS=NOT_RUN
 SMOKE_RESERVES=NOT_RUN
 
-PACK_BUG_FIXED=YES (commit 9d98c827 sur claude/hopeful-albattani-h8bgnb)
+PACK_BUG_FIXED=YES (9d98c827 point d'entrée ; b165d83e lecture seule par transaction explicite)
 
 PREVIEW_DATABASE_CUTOVER=COMPLETE
 PREVIEW_HOSTED_READINESS=NO
@@ -130,6 +130,34 @@ sortait en `0` sans aucune sortie. Le même appel par le chemin physique donne
 
 D'autres scripts (`smoke-email-preview`, `train-expectations`, `seed-elsatia-preview-year`,
 `fixtures/generate-fixtures`) utilisent le même motif de point d'entrée.
+
+## 1 bis. Second défaut du pack : DB-READONLY sur le pooler Supabase (CORRIGÉ, b165d83e)
+
+Diagnostic opérateur sur Mac (`--verify-only` réel, pack corrigé de 9d98c827) : avec
+`PGOPTIONS='-c default_transaction_read_only=on'`, le pooler renvoie `off|off|170006`, donc
+l'option de démarrage n'est pas appliquée. Avec `begin transaction read only;`, il renvoie
+`on|170006`. db-verify s'arrêtait en `DB-READONLY` ; ce n'est pas un défaut de la base ni du cutover.
+
+Correctif (`scripts/preview/db-verify.mjs`, `psql_ro` de `v9-cutover.sh`, runbook de sauvegarde) :
+
+- chaque contrôle s'exécute dans une session ouverte par `begin transaction read only` ;
+- un bloc `DO` vérifie `transaction_read_only = on`, sinon il lève `ELSATIA_READ_ONLY_NON_EFFECTIF` :
+  arrêt immédiat, `DB-READONLY`, NO-GO ;
+- le contrôle s'exécute dans cette même transaction, puis `rollback` ; aucun `commit` n'est émis ;
+- les `begin`/`rollback` propres aux fichiers SQL officiels sont retirés, pour que tout reste dans
+  la transaction vérifiée ;
+- tout autre contrôle transactionnel ou méta-commande psql est refusé ;
+- PGOPTIONS est conservé en défense en profondeur ; garde Preview et refus Production inchangés.
+
+Validation :
+
+- tests du pack : 39/39 (dont faux psql qui ignore PGOPTIONS) ; `test:preview-v9` : 29/29 ; eslint vert ;
+- PostgreSQL 16 local, train complet (408 migrations), avec un psql qui supprime PGOPTIONS :
+  l'ancien db-verify donne `✖ DB-READONLY`, le nouveau donne `GO` ; une écriture via `psql_ro` est
+  refusée (`cannot execute CREATE TABLE in a read-only transaction`).
+
+Diff par rapport à `1a638855` : `scripts/preview/` et `docs/` uniquement. Aucun code applicatif,
+aucune migration.
 
 ## 2. Preuve post-cutover reconstituée (lecture seule)
 
