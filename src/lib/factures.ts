@@ -12,10 +12,12 @@ export function statutFacture(cle: string) {
   return FACTURE_STATUTS.find((s) => s.cle === cle) ?? FACTURE_STATUTS[0];
 }
 
+// Une facture émise ne s'annule pas : elle se neutralise par un avoir (la base
+// le refuse aussi, migration 20261003001403).
 export const TRANSITIONS_FACTURES: Record<string, string[]> = {
   brouillon: ["envoyee", "annulee"],
-  envoyee: ["en_retard", "annulee"],
-  en_retard: ["envoyee", "annulee"],
+  envoyee: ["en_retard"],
+  en_retard: ["envoyee"],
   payee_partiel: [],
   payee: [],
   annulee: [],

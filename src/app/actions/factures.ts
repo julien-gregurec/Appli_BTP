@@ -43,6 +43,10 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
     ordre,
   }));
   if (!lignes.length) return { error: "Ajoutez au moins une ligne à la facture." };
+  // Recette métier GP (B30) : l'échéance ne précède jamais l'émission.
+  if (payload.date_echeance && payload.date_emission && payload.date_echeance < payload.date_emission) {
+    return { error: "L’échéance ne peut pas précéder la date d’émission." };
+  }
 
   const { error } = await supabase.rpc("modifier_facture_brouillon", {
     p_facture_id: factureId,
@@ -209,10 +213,14 @@ export async function modifierEcheanceFactureAction(factureId: string, formData:
   // significatif (base des pénalités de retard) : une fois la facture émise,
   // elle est figée comme les montants et les lignes (garde-fou dupliqué côté
   // base par verrouiller_facture_emise, qui refuserait de toute façon l'écriture).
-  const { data: facture } = await supabase.from("factures").select("statut").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: facture } = await supabase.from("factures").select("statut, date_emission").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!facture) redirect(`/factures/${factureId}?error=${encodeURIComponent("Facture introuvable")}`);
   if (facture.statut !== "brouillon") {
     redirect(`/factures/${factureId}?error=${encodeURIComponent("Cette facture est déjà émise : sa date d’échéance est figée et ne peut plus être modifiée.")}`);
+  }
+  // Recette métier GP (B30) : l'échéance ne précède jamais l'émission.
+  if (dateEcheance && facture.date_emission && dateEcheance < facture.date_emission) {
+    redirect(`/factures/${factureId}?error=${encodeURIComponent("L’échéance ne peut pas précéder la date d’émission.")}`);
   }
 
   const { error } = await supabase

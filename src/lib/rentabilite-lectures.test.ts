@@ -112,11 +112,11 @@ describe("chargeurs de rentabilité", () => {
     await expect(lireHeuresChantier(f.supabase, "e", "c1")).resolves.toEqual({ heuresPlanifiees: 2000.5, nbAffectations: 300, heuresValidees: 1462.25, nbPointagesValides: 1200 });
   });
 
-  it("copilote : règle historique conservée (CA hors avoirs, marge = CA − MO − achats − sous-traitance), chantiers actifs, plus faibles marges d'abord", async () => {
+  it("copilote : CA = émis net d'avoirs (B25, facture_ht inclut déjà les avoirs émis), marge = CA − MO − achats − sous-traitance, chantiers actifs, plus faibles marges d'abord", async () => {
     const f = faux({
       rentabilite_chantiers_page: (args) => ({
         data: Number(args.p_decalage) > 0 ? [] : [
-          ligne("c1", { facture_ht: 1000, facture_ht_avoirs: 200 }),
+          ligne("c1", { facture_ht: 800, facture_ht_avoirs: -200 }),
           ligne("c2", { facture_ht: 0, cout_main_oeuvre: 0, cout_achats: 0, cout_sous_traitance: 0 }),
           ligne("c3", { facture_ht: 100, cout_main_oeuvre: 500 }),
         ],

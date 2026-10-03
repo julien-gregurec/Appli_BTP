@@ -130,7 +130,9 @@ async function heuresSupplementairesSemaine(supabase: Supabase, entrepriseId: st
     .select("employe_id, heures_supplementaires, employes(nom, prenom)")
     .eq("entreprise_id", entrepriseId)
     .gte("date", lundi.toISOString().slice(0, 10))
-    .gt("heures_supplementaires", 0);
+    .gt("heures_supplementaires", 0)
+    // Un pointage rejeté n'est pas du temps travaillé (recette métier GP, B37).
+    .neq("verification_statut", "rejete");
   const parEmploye = new Map<string, { nom: string; total: number }>();
   for (const p of data ?? []) {
     const employe = p.employes as unknown as { nom: string; prenom: string } | null;

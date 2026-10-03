@@ -6,6 +6,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { ForgottenPointageForm } from "@/components/ForgottenPointageForm";
 import { creerMaFichePointageAdministrateurAction } from "@/app/actions/pointages";
 import { SuiviZoneChantier } from "@/components/SuiviZoneChantier";
+import { totauxHeuresRetenues } from "@/lib/heures-retenues";
 
 const input="rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const AUCUN_ID="00000000-0000-0000-0000-000000000000";
@@ -58,8 +59,8 @@ export default async function PointagePage({searchParams}:{searchParams:Promise<
   const ouvertes=sessions.filter(s=>!s.depart_at);
   const lies=new Set(sessions.map(s=>s.pointage_id).filter(Boolean));
   const anciens=pointages.filter(p=>!lies.has(p.id));
-  const totalNormal=pointages.reduce((s,p)=>s+Number(p.heures_normales),0);
-  const totalSup=pointages.reduce((s,p)=>s+Number(p.heures_supplementaires),0);
+  // Les pointages rejetés par le responsable ne comptent pas (recette métier GP, B37).
+  const {normales:totalNormal,supplementaires:totalSup}=totauxHeuresRetenues(pointages);
   const maSessionOuverte=ouvertes[0];
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">

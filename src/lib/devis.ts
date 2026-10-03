@@ -67,3 +67,22 @@ export function calcTotaux(lignes: LigneDevis[], remiseGlobale: number) {
   tva *= facteur;
   return { ht, tva, ttc: ht + tva };
 }
+
+/**
+ * Garde-fous de saisie d'un devis (recette métier GP, B05) : une quantité
+ * négative, une remise hors 0–100 % ou un total négatif produisaient des devis à
+ * montant négatif. Une ligne à prix unitaire négatif (remise commerciale) reste
+ * possible tant que le total reste positif. La base borne aussi les remises
+ * (20261003001408). Le taux de TVA n'est pas contrôlé ici (liste non tranchée).
+ */
+export function erreurSaisieDevis(remiseGlobale: number, lignes: Pick<LigneDevis, "designation" | "quantite" | "prix_unitaire_ht" | "remise_ligne" | "taux_tva">[]): string | null {
+  const remise = Number(remiseGlobale) || 0;
+  if (remise < 0 || remise > 100) return "La remise globale doit être comprise entre 0 et 100 %.";
+  for (const l of lignes) {
+    if (l.quantite < 0) return `Quantité négative sur la ligne « ${l.designation} ».`;
+    if (l.remise_ligne < 0 || l.remise_ligne > 100) return `La remise de la ligne « ${l.designation} » doit être comprise entre 0 et 100 %.`;
+  }
+  const { ht } = calcTotaux(lignes as LigneDevis[], remise);
+  if (ht < 0) return "Le total du devis ne peut pas être négatif.";
+  return null;
+}

@@ -35,7 +35,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: piecesJointes }, { data: relances }] = await Promise.all([
+  const [{ data: lignes }, { data: piecesJointes }, { data: relances }, { data: facturesDevis }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase
       .from("pieces_jointes_devis")
@@ -45,6 +45,11 @@ export default async function DevisDetailPage({ params, searchParams }: { params
       .order("created_at"),
     peutGererDevis
       ? supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "devis").eq("document_id", id).order("created_at", { ascending: false })
+      : Promise.resolve({ data: null }),
+    // Recette métier GP (B34) : un devis déjà facturé renvoie vers sa facture au
+    // lieu de proposer une nouvelle facture (que la base refuserait).
+    devis.statut === "accepte"
+      ? supabase.from("factures").select("id,numero,statut,type").eq("devis_origine_id", id).eq("entreprise_id", ctx.entrepriseId).neq("statut", "annulee").neq("type", "avoir").order("created_at")
       : Promise.resolve({ data: null }),
   ]);
 
@@ -274,7 +279,14 @@ export default async function DevisDetailPage({ params, searchParams }: { params
         )}
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
-          {devis.statut === "accepte" ? (
+          {devis.statut === "accepte" && (facturesDevis ?? []).length > 0 ? (
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">
+              Devis facturé :{" "}
+              {(facturesDevis ?? []).map((f, i) => (
+                <span key={f.id}>{i > 0 && ", "}<Link href={`/factures/${f.id}`} className="font-medium underline">{f.numero ?? "facture brouillon"}</Link></span>
+              ))}
+            </p>
+          ) : devis.statut === "accepte" ? (
             <form action={creerFacture}>
               <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
                 Créer une facture depuis ce devis
