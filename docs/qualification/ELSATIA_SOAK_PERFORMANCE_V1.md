@@ -144,8 +144,10 @@ dominante observée par `EXPLAIN ANALYZE`. Baseline = palier 1k ou tenant A.
   `repartirAlertes`) traite **toutes** les alertes en Node à chaque rendu avant de n'en envoyer que 30 :
   à 37 000 alertes, la page monopolise le cœur Node (ELU 1, délai de boucle p99 10,8 s) → p50 16 s à
   10 VU. Volume irréaliste pour une PME (24 859 factures impayées), mais la croissance est linéaire sans
-  plafond (**P2-1**). Entre 20k et 50k la RPC passe de 163 à 1 659 ms (×10 pour ×2,5) : mesure prise
-  machine saturée, à re-mesurer à vide (§ 7).
+  plafond (**P2-1**). Entre 20k et 50k la RPC passe de 163 à 1 659 ms via PostgREST (×10 pour ×2,5),
+  mais l'exécution SQL seule (`select dashboard_indicateurs(…)` sous `authenticated`) passe de 173–216 ms à
+  577–675 ms (×3 pour ×2,5) : **linéaire côté base** ; l'excédent vient de la sérialisation des 7,3 Mo et de
+  la machine chargée — pas de multiplication anormale.
 
 ### B — Planning
 
