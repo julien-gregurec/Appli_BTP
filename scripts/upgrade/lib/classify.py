@@ -8,7 +8,7 @@ plan <ledger.txt> <dossier-migrations> <plan.json> [--manifest-source <json>]
       historiques_modifiees (fichier cible ≠ fichier source d'une version appliquée : BLOQUANT, si manifeste).
     Code 1 si un cas bloquant est trouvé.
 
-risques <mesures.jsonl> <dossier-migrations> <classification.json> [--fonctions-source <securite_avant/functions.txt>]
+risques <mesures.jsonl> <dossier-migrations> <classification.json> [--source-securite <securite_avant/>]
     Classe chaque migration appliquée, à partir des MESURES réelles (durée, verrous forts sur tables peuplées,
     réécritures de tables, DML sur lignes existantes) et d'une analyse statique du SQL :
       verrou   : SAFE | CAUTION | MAINTENANCE_WINDOW_REQUIRED
@@ -68,45 +68,82 @@ def sans_commentaires(sql):
     return "\n".join(l.split("--", 1)[0] for l in sql.split("\n"))
 
 
-def statique(sql, fonctions_source):
-    s = sans_commentaires(sql).lower()
+def sans_corps_fonctions(sql):
+    """Retire les corps des CREATE [OR REPLACE] FUNCTION/PROCEDURE (non exécutés par la migration) ;
+    les blocs DO (exécutés) sont conservés."""
+    out, i = [], 0
+    pat = re.compile(r"create\s+(?:or\s+replace\s+)?(?:function|procedure)\b", re.I)
+    while True:
+        m = pat.search(sql, i)
+        if not m:
+            out.append(sql[i:])
+            return "".join(out)
+        d = re.compile(r"\$([a-z_]*)\$", re.I).search(sql, m.end())
+        if not d:
+            out.append(sql[i:])
+            return "".join(out)
+        fin = sql.find(d.group(0), d.end())
+        out.append(sql[i:d.start()] + " $corps$ ")
+        i = (fin + len(d.group(0))) if fin >= 0 else len(sql)
+
+
+def _nom(x):
+    x = x.strip().strip('"').lower()
+    return x if "." in x else "public." + x
+
+
+def statique(sql, existants):
+    """Analyse statique ; existants = noms qualifiés (tables, fonctions) présents dans la base SOURCE (210)."""
+    complet = sans_commentaires(sql).lower()
+    s = sans_corps_fonctions(complet)
     f = {
         "drop_table": bool(re.search(r"\bdrop\s+table\b", s)),
         "drop_column": bool(re.search(r"\bdrop\s+column\b", s)),
-        "drop_function": bool(re.search(r"\bdrop\s+function\b", s)),
-        "drop_policy": bool(re.search(r"\bdrop\s+policy\b", s)),
-        "revoke": len(re.findall(r"\brevoke\b", s)),
-        "grant": len(re.findall(r"\bgrant\b", s)),
-        "delete": bool(re.search(r"\bdelete\s+from\b", s)),
-        "truncate": bool(re.search(r"\btruncate\b", s)),
-        "update": bool(re.search(r"\bupdate\s+(public\.|platform\.|only\s+)?[a-z_]+\s+set\b", s)),
+        # Énoncés exécutés (début d'instruction), pas les mots-clés de GRANT/REVOKE/CREATE TRIGGER.
+        "delete": bool(re.search(r"(?:^|;)\s*delete\s+from\b", s, re.M)),
+        "truncate": bool(re.search(r"(?:^|;)\s*truncate\b", s, re.M)),
+        "update": bool(re.search(r"(?:^|;)\s*update\s+(public\.|platform\.|only\s+)?[a-z_]+\s+set\b", s, re.M)),
         "alter_type": bool(re.search(r"\balter\s+column\s+\S+\s+(set\s+data\s+)?type\b", s)),
         "set_not_null": bool(re.search(r"\bset\s+not\s+null\b", s)),
         "add_constraint_valide": bool(re.search(r"\badd\s+constraint\b(?![^;]*\bnot\s+valid\b)", s)),
         "create_index": len(re.findall(r"\bcreate\s+(unique\s+)?index\b", s)),
         "catalogue_tarifaire": bool(re.search(r"\bplans_abonnement\b", s) and re.search(r"\binsert\s+into\b", s)),
+        "default_privileges": bool(re.search(r"\balter\s+default\s+privileges\b[^;]*\brevoke\b", s)),
     }
+    revoques = set()
+    for m in re.finditer(r"\brevoke\b[^;]*?\bon\s+(?:table\s+|function\s+|sequence\s+)?([a-z_\.\"]+)", s):
+        if "all tables in schema" in m.group(0) or "all functions in schema" in m.group(0):
+            revoques.add("(schéma entier)")
+        else:
+            revoques.add(_nom(m.group(1)))
+    f["revoke_existants"] = sorted(n for n in revoques if n in existants or n == "(schéma entier)")
+    supprimes = set()
+    for m in re.finditer(r"\bdrop\s+(function|table|view|policy\s+if\s+exists\s+[^;]*?\bon|policy\s+[^;]*?\bon)\s+(?:if\s+exists\s+)?([a-z_\.\"]+)", s):
+        supprimes.add(_nom(m.group(2)))
+    f["drop_existants"] = sorted(n for n in supprimes if n in existants)
     remplacees = set()
-    for m in re.finditer(r"create\s+or\s+replace\s+function\s+([a-z_\.]+)\s*\(", s):
-        nom = m.group(1) if "." in m.group(1) else "public." + m.group(1)
-        if nom in fonctions_source:
-            remplacees.add(nom)
+    for m in re.finditer(r"create\s+or\s+replace\s+function\s+([a-z_\.]+)\s*\(", complet):
+        n = _nom(m.group(1))
+        if n in existants:
+            remplacees.add(n)
     f["fonctions_existantes_remplacees"] = sorted(remplacees)
     return f
 
 
-def risques(mesures_p, d, sortie, fonctions_source_p=None):
-    fonctions_source = set()
-    if fonctions_source_p and os.path.exists(fonctions_source_p):
-        for l in open(fonctions_source_p):
-            fonctions_source.add(l.split("(", 1)[0])
+def risques(mesures_p, d, sortie, securite_source=None):
+    existants = set()
+    if securite_source and os.path.isdir(securite_source):
+        for l in open(os.path.join(securite_source, "functions.txt")):
+            existants.add(l.split("(", 1)[0])
+        for l in open(os.path.join(securite_source, "rls.txt")):
+            existants.add(l.split("|", 1)[0])
     par_v = {f.split("_", 1)[0]: f for f in fichiers(d)}
     out = []
     for l in open(mesures_p):
         if not l.strip():
             continue
         m = json.loads(l)
-        st = statique(open(os.path.join(d, par_v[m["version"]])).read(), fonctions_source)
+        st = statique(open(os.path.join(d, par_v[m["version"]])).read(), existants)
         forts = [v for v in m["verrous"] if v["mode"] in VERROUS_FORTS and v["lignes"] and v["lignes"] > 0
                  and not v["rel"].startswith("pg_temp")]
         tables_fortes = sorted({v["rel"] for v in forts if not v["rel"].endswith("_pkey") and "_idx" not in v["rel"]})
@@ -134,15 +171,27 @@ def risques(mesures_p, d, sortie, fonctions_source_p=None):
             verrou = "SAFE"
         # Réversibilité : jamais supposée. RESTORE_REQUIRED dès qu'une information antérieure est perdue
         # (lignes existantes modifiées/supprimées, objets supprimés, privilèges révoqués, type changé).
-        if dml_exist or st["drop_table"] or st["drop_column"] or st["delete"] or st["truncate"] or st["alter_type"] \
-                or st["revoke"] or st["drop_function"] or st["drop_policy"]:
+        motifs_rb = []
+        if dml_exist:
+            motifs_rb.append("lignes existantes modifiées")
+        for k in ("drop_table", "drop_column", "delete", "truncate", "alter_type", "default_privileges"):
+            if st[k]:
+                motifs_rb.append(k)
+        if st["revoke_existants"]:
+            motifs_rb.append("REVOKE sur objets 210 : " + ", ".join(st["revoke_existants"][:3]))
+        if st["drop_existants"]:
+            motifs_rb.append("DROP d'objets 210 : " + ", ".join(st["drop_existants"][:3]))
+        if motifs_rb:
             rollback = "RESTORE_REQUIRED"
         elif st["fonctions_existantes_remplacees"] or forts or st["update"] or st["catalogue_tarifaire"] \
                 or st["set_not_null"] or st["add_constraint_valide"] or [x for x in m["dml"] if x["ins"]]:
             rollback = "FORWARD_ONLY"
         else:
             rollback = "REVERSIBLE"
-        out.append({"migration": par_v[m["version"]], "ms": m["ms"], "verrou": verrou, "rollback": rollback,
+        if rollback != "RESTORE_REQUIRED":
+            motifs_rb = (["remplace des fonctions 210 : " + ", ".join(st["fonctions_existantes_remplacees"][:3])] if st["fonctions_existantes_remplacees"] else []) \
+                + (["verrou fort sur table 210"] if forts else []) + (["insère dans des tables 210"] if [x for x in m["dml"] if x["ins"]] else [])
+        out.append({"migration": par_v[m["version"]], "ms": m["ms"], "verrou": verrou, "rollback": rollback, "motifs_rollback": motifs_rb,
                     "motifs": motifs, "tables_verrou_fort": tables_fortes, "reecritures": reecr, "dml_existant": dml_exist,
                     "memoire_ko": m.get("memoire_ko"), "enveloppe_txn": m.get("enveloppe_txn"), "statique": st})
     json.dump(out, open(sortie, "w"), indent=1, ensure_ascii=False)
@@ -180,7 +229,7 @@ if __name__ == "__main__":
         man = a[a.index("--manifest-source") + 1] if "--manifest-source" in a else os.environ.get("UPG_SOURCE_MANIFEST")
         sys.exit(plan(a[2], a[3], a[4], man))
     if a[1] == "risques":
-        fs = a[a.index("--fonctions-source") + 1] if "--fonctions-source" in a else None
+        fs = a[a.index("--source-securite") + 1] if "--source-securite" in a else None
         sys.exit(risques(a[2], a[3], a[4], fs))
     if a[1] == "manifeste":
         manifeste(a[2], a[3], a[4])

@@ -19,7 +19,9 @@ UTILISATEURS = {"moyenne": "a2100000-0000-0000-0000-000000000001", "volumetrique
 REQUETES = {
     "liste_devis": "select id, numero, statut, montant_ttc from public.devis order by created_at desc limit 50",
     "liste_factures": "select id, numero, statut, montant_ttc, montant_paye from public.factures order by date_emission desc limit 50",
-    "lignes_devis_recents": "select ld.* from public.lignes_devis ld join public.devis d on d.id = ld.devis_id order by d.created_at desc limit 200",
+    # Écran « détail devis » : lignes d'UN devis (motif réel de l'application, par devis_id).
+    "lignes_un_devis": "select ld.* from public.lignes_devis ld where ld.devis_id = (select id from public.devis order by created_at desc limit 1)",
+    "lignes_une_facture": "select lf.* from public.lignes_factures lf where lf.facture_id = (select id from public.factures order by date_emission desc limit 1)",
     "pointages_mois": "select employe_id, sum(heures_normales + heures_supplementaires) from public.pointages where date >= current_date - 31 group by 1",
     "planning_semaine": "select * from public.affectations where date between current_date - 7 and current_date",
     "clients_recherche": "select id, nom from public.clients where nom ilike '%client1%' limit 20",
