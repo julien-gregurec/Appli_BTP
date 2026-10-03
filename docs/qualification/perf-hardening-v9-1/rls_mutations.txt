@@ -1,0 +1,6 @@
+m1 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=44 not_ok=10 erreurs=0 NON_PROPRE
+m2 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=53 not_ok=1 erreurs=0 NON_PROPRE
+m3 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=37 not_ok=17 erreurs=0 NON_PROPRE
+m4 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=48 not_ok=6 erreurs=0 NON_PROPRE
+m5 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=53 not_ok=1 erreurs=0 NON_PROPRE
+m6 rls_ensembles_entreprises_equivalence_v1 plan=54 ok=51 not_ok=3 erreurs=0 NON_PROPRE

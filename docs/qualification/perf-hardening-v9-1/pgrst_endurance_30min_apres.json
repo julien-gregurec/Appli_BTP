@@ -1,0 +1,292 @@
+{
+  "mode": "endurance",
+  "tenants": [
+    "11",
+    "12",
+    "13",
+    "14"
+  ],
+  "concurrence": 10,
+  "secondes": 1800.011,
+  "requetes": 949546,
+  "debit_rps": 527.5,
+  "p50": 15,
+  "p95": 46,
+  "max": 273,
+  "erreurs": 0,
+  "statuts": {
+    "200": 814035,
+    "206": 135511
+  },
+  "fuites": 0,
+  "croisees_non_vides": 0,
+  "par_genre": {
+    "liste": {
+      "n": 271938,
+      "p50": 18,
+      "p95": 53
+    },
+    "page": {
+      "n": 135801,
+      "p50": 15,
+      "p95": 44
+    },
+    "filtre": {
+      "n": 135142,
+      "p50": 14,
+      "p95": 28
+    },
+    "compte": {
+      "n": 135511,
+      "p50": 24,
+      "p95": 84
+    },
+    "croise": {
+      "n": 271154,
+      "p50": 11,
+      "p95": 24
+    }
+  },
+  "fenetres": [
+    {
+      "minute": 1,
+      "n": 31193,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 2,
+      "n": 31572,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 3,
+      "n": 31590,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 4,
+      "n": 32440,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 5,
+      "n": 32279,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 6,
+      "n": 32884,
+      "p50": 14,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 7,
+      "n": 31616,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 8,
+      "n": 31592,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 9,
+      "n": 32562,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 10,
+      "n": 32488,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 11,
+      "n": 30499,
+      "p50": 16,
+      "p95": 48,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 12,
+      "n": 29592,
+      "p50": 16,
+      "p95": 49,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 13,
+      "n": 31382,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 14,
+      "n": 30632,
+      "p50": 16,
+      "p95": 47,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 15,
+      "n": 31222,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 16,
+      "n": 31881,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 17,
+      "n": 31054,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 18,
+      "n": 32062,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 19,
+      "n": 31448,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 20,
+      "n": 31238,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 21,
+      "n": 31704,
+      "p50": 15,
+      "p95": 47,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 22,
+      "n": 32326,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 23,
+      "n": 32733,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 24,
+      "n": 31819,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 25,
+      "n": 30893,
+      "p50": 15,
+      "p95": 47,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 26,
+      "n": 30816,
+      "p50": 16,
+      "p95": 47,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 27,
+      "n": 32018,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 28,
+      "n": 32137,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 29,
+      "n": 31972,
+      "p50": 15,
+      "p95": 46,
+      "erreurs": 0,
+      "fuites": 0
+    },
+    {
+      "minute": 30,
+      "n": 31902,
+      "p50": 15,
+      "p95": 45,
+      "erreurs": 0,
+      "fuites": 0
+    }
+  ]
+}

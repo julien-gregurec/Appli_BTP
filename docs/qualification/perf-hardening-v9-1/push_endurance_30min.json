@@ -1,0 +1,1 @@
+{"secondes" : 1800, "workers_cron" : 3, "webhook" : 1, "produites" : 35690, "envoyees" : 35334, "perdues_ou_bloquees" : 0, "poisons_abandonnes" : 356, "saines_traitees_plus_d_une_fois" : 0, "par_webhook" : 31174, "par_cron" : 5940}

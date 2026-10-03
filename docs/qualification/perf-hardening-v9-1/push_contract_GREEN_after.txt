@@ -1,0 +1,36 @@
+/var/tmp/perf/push_file_contract.test.sql .. 
+1..19
+ok 1 - A1 N=50 : rien de perdu
+ok 2 - A2 N=199 : rien de perdu
+ok 3 - A3 N=200 : rien de perdu
+ok 4 - A4 N=201 : rien de perdu
+ok 5 - A5 N=300 : rien de perdu
+ok 6 - A6 N=1000 : rien de perdu
+ok 7 - A7 N=10000 : rien de perdu
+ok 8 - A8 N=10000 : chaque notification traitée une seule fois
+25
+ok 9 - A9 à budget limité, seules les plus anciennes sont prises (ordre explicite)
+20
+ok 10 - A10 un jour de cron manqué ne perd aucune notification
+27
+ok 11 - A11 un seul lot sert les trois tenants (pas de famine par un tenant volumineux)
+ok 12 - A12 deux workers ne réservent jamais les mêmes notifications
+ok 13 - A13 les deux workers se partagent toute la file (30 + 20)
+250
+200
+200
+ok 14 - A14 200 poisons ne bloquent pas les notifications saines
+200
+200
+0
+ok 15 - A15 un poison sort explicitement de la file après le maximum de tentatives (aucun en attente perpétuelle)
+1
+1
+ok 16 - A16 après un échec transitoire, la notification est retentée et envoyée
+ok 17 - A17 10 000 à budget borné : la file se vide sur plusieurs passages, rien de perdu
+ok 18 - A18 budget borné : aucune notification traitée deux fois
+ok 19 - A19 aucune notification non envoyée sans état explicite
+ok
+All tests successful.
+Files=1, Tests=19, 21 wallclock secs ( 0.03 usr  0.02 sys +  0.03 cusr  0.02 csys =  0.10 CPU)
+Result: PASS

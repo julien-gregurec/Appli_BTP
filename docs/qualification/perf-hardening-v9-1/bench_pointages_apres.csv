@@ -1,0 +1,13 @@
+etiquette,table,scenario,profil,execution_ms,lignes
+apres,pointages,count,gestionnaire,15.7,1
+apres,pointages,mois_filtre,gestionnaire,4.5,500
+apres,pointages,liste_rls_seule_50,gestionnaire,49.1,50
+apres,pointages,affectations_count,gestionnaire,0.1,1
+apres,pointages,count,salarie,42.3,1
+apres,pointages,mois_filtre,salarie,19.8,37
+apres,pointages,liste_rls_seule_50,salarie,42.1,50
+apres,pointages,affectations_count,salarie,0.1,1
+apres,pointages,count,croise,25.4,1
+apres,pointages,mois_filtre,croise,2.4,0
+apres,pointages,liste_rls_seule_50,croise,12.1,0
+apres,pointages,affectations_count,croise,0.1,1

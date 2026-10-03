@@ -1,0 +1,13 @@
+etiquette,table,scenario,profil,execution_ms,lignes
+avant,pointages,count,gestionnaire,erreur,-
+avant,pointages,mois_filtre,gestionnaire,7383.3,500
+avant,pointages,liste_rls_seule_50,gestionnaire,erreur,-
+avant,pointages,affectations_count,gestionnaire,0.0,1
+avant,pointages,count,salarie,erreur,-
+avant,pointages,mois_filtre,salarie,15859.7,37
+avant,pointages,liste_rls_seule_50,salarie,erreur,-
+avant,pointages,affectations_count,salarie,0.0,1
+avant,pointages,count,croise,erreur,-
+avant,pointages,mois_filtre,croise,12732.9,0
+avant,pointages,liste_rls_seule_50,croise,erreur,-
+avant,pointages,affectations_count,croise,0.0,1

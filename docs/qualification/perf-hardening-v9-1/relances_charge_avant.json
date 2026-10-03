@@ -1,0 +1,34 @@
+{
+  "factures": 10000,
+  "tenants": 5,
+  "dues_jamais_relancees": 2000,
+  "passages": [
+    {
+      "passage": 1,
+      "secondes": 5.385,
+      "envoyees": 200,
+      "ignorees": 0,
+      "echecs": 0,
+      "dues_atteintes_cumul": 200
+    },
+    {
+      "passage": 2,
+      "secondes": 2.205,
+      "envoyees": 0,
+      "ignorees": 0,
+      "echecs": 0,
+      "dues_atteintes_cumul": 200
+    },
+    {
+      "passage": 3,
+      "secondes": 2.215,
+      "envoyees": 0,
+      "ignorees": 0,
+      "echecs": 0,
+      "dues_atteintes_cumul": 200
+    }
+  ],
+  "dues_non_atteintes": 1800,
+  "relances_au_dela_du_maximum": 0,
+  "doublons_meme_jour": 0
+}
