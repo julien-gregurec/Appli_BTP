@@ -1,0 +1,71 @@
+> acl_colonne|public.pointages.affectation_id
+> acl_colonne|public.pointages.anomalie_motif
+> acl_colonne|public.pointages.anomalie_niveau
+> acl_colonne|public.pointages.chantier_id
+> acl_colonne|public.pointages.commentaire_verification
+> acl_colonne|public.pointages.commentaire
+> acl_colonne|public.pointages.created_at
+> acl_colonne|public.pointages.date
+> acl_colonne|public.pointages.employe_id
+> acl_colonne|public.pointages.entreprise_id
+> acl_colonne|public.pointages.heures_attendues
+> acl_colonne|public.pointages.heures_normales
+> acl_colonne|public.pointages.heures_supplementaires
+> acl_colonne|public.pointages.id
+> acl_colonne|public.pointages.latitude
+> acl_colonne|public.pointages.longitude
+> acl_colonne|public.pointages.origine_pointage
+> acl_colonne|public.pointages.pause_minutes
+> acl_colonne|public.pointages.photo_storage_path
+> acl_colonne|public.pointages.precision_metres
+> acl_colonne|public.pointages.regularise_par
+> acl_colonne|public.pointages.tache
+> acl_colonne|public.pointages.updated_at
+> acl_colonne|public.pointages.verification_at
+> acl_colonne|public.pointages.verification_par
+> acl_colonne|public.pointages.verification_statut
+> acl_fonction|public.chantiers_assignes_consultables()
+> acl_fonction|public.chantiers_equipes_du_compte()
+> acl_fonction|public.employes_du_compte_affectation_consultables()
+> acl_fonction|public.employes_du_compte_pointage_consultables()
+> acl_fonction|public.entreprises_avec_permission(p_permission text)
+> acl_fonction|public.entreprises_avec_une_permission(p_permissions text[])
+> acl_fonction|public.entreprises_membre_actif()
+> acl_fonction|public.plateforme_definir_url_preview_application(p_code text, p_url text)
+> acl_fonction|public.pointages_couts_appliques(p_entreprise_id uuid, p_debut date, p_fin date)
+> acl_fonction|public.push_echec_notification_service(p_notification_id uuid, p_max_tentatives integer)
+> acl_fonction|public.push_file_etat_service()
+> acl_fonction|public.push_reserver_lot_service(p_limite integer, p_par_entreprise integer, p_bail_secondes integer, p_max_tentatives integer, p_expiration_heures integer)
+> acl_fonction|public.push_reserver_notification_service(p_notification_id uuid, p_bail_secondes integer, p_max_tentatives integer)
+> acl_fonction|public.relances_auto_candidats_selection(p_entreprise_id uuid, p_type_document text, p_limite integer)
+> acl_fonction|public.trg_facture_emise_non_annulable()
+> colonne|public.notifications_utilisateurs.push_abandon_motif
+> colonne|public.notifications_utilisateurs.push_abandonnee_at
+> colonne|public.notifications_utilisateurs.push_reessai_apres
+> colonne|public.notifications_utilisateurs.push_reservee_jusqua
+> colonne|public.notifications_utilisateurs.push_tentatives
+> contrainte|public.chantiers.chantiers_budget_previsionnel_positif_check
+> contrainte|public.chantiers.chantiers_dates_prevues_ordonnees_check
+> contrainte|public.devis.devis_remise_globale_bornee_check
+> contrainte|public.lignes_devis.lignes_devis_remise_ligne_bornee_check
+> contrainte|public.lignes_factures.lignes_factures_remise_ligne_bornee_check
+> contrainte|public.notifications_utilisateurs.notifications_push_abandon_motif_check
+> fonction|public.chantiers_assignes_consultables()
+> fonction|public.chantiers_equipes_du_compte()
+> fonction|public.employes_du_compte_affectation_consultables()
+> fonction|public.employes_du_compte_pointage_consultables()
+> fonction|public.entreprises_avec_permission(p_permission text)
+> fonction|public.entreprises_avec_une_permission(p_permissions text[])
+> fonction|public.entreprises_membre_actif()
+> fonction|public.plateforme_definir_url_preview_application(p_code text, p_url text)
+> fonction|public.pointages_couts_appliques(p_entreprise_id uuid, p_debut date, p_fin date)
+> fonction|public.push_echec_notification_service(p_notification_id uuid, p_max_tentatives integer)
+> fonction|public.push_file_etat_service()
+> fonction|public.push_reserver_lot_service(p_limite integer, p_par_entreprise integer, p_bail_secondes integer, p_max_tentatives integer, p_expiration_heures integer)
+> fonction|public.push_reserver_notification_service(p_notification_id uuid, p_bail_secondes integer, p_max_tentatives integer)
+> fonction|public.relances_auto_candidats_selection(p_entreprise_id uuid, p_type_document text, p_limite integer)
+> fonction|public.trg_facture_emise_non_annulable()
+> index|public.notifications_push_file_idx
+> index|public.relances_documents_document_statut_idx
+> index|public.taches_chantier_created_idx
+> trigger|public.factures.facture_emise_non_annulable

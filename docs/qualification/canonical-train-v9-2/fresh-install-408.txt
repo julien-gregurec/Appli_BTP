@@ -1,0 +1,3 @@
+== migrations ==
+== OK: 408 migrations applied cleanly to v92_fresh ==
+exit=0

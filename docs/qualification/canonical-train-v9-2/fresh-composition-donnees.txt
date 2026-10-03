@@ -1,0 +1,5 @@
+DELTA plateforme: donnees=1
+DELTA gp: 
+DELTA perf: 
+OBJETS v91=281 v92=281 attendu=281 chevauchements=0 conflits=0 ecarts=0
+COMPOSITION=OK

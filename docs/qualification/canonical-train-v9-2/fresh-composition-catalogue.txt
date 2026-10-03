@@ -1,0 +1,5 @@
+DELTA plateforme: acl_fonction=1, fonction=3
+DELTA gp: acl_colonne=26, acl_fonction=2, acl_table=1, contrainte=5, fonction=12, trigger=1
+DELTA perf: acl_fonction=12, colonne=5, contrainte=1, fonction=15, index=3, policy=65
+OBJETS v91=10896 v92=10967 attendu=10967 chevauchements=0 conflits=0 ecarts=0
+COMPOSITION=OK

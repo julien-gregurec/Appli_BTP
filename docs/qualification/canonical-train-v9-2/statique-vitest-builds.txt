@@ -1,0 +1,17 @@
+typecheck: exit=0 
+lint_gp:  exit=0 
+lint_tools: exit=0 
+lint_reserves: exit=0 
+lint_colors: exit=0 
+vitest_gp:  Test Files 237 passed | 16 skipped (253)  Tests 2950 passed | 1 expected fail | 194 skipped (3145) exit=0 
+vitest_tools:  Test Files 187 passed (187)  Tests 2174 passed (2174) exit=0 
+vitest_reserves:  Test Files 18 passed (18)  Tests 239 passed (239) exit=0 
+vitest_colors:  Test Files 40 passed (40)  Tests 436 passed (436) exit=0 
+build_gp: exit=0
+build_reserves: exit=0
+build_colors: exit=0
+build_tools_local: exit=0
+build_tools_preview: exit=0
+build_tools_production: exit=0
+build_tools_refus_staging: exit=1
+build_tools_refus_preview_vers_prod: exit=1
