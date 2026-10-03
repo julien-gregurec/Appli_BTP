@@ -299,6 +299,10 @@
       {
         "name": "EMAIL_EXISTS",
         "justification": "Code d'erreur GoTrue / contrat d'identité, pas une variable."
+      },
+      {
+        "name": "ELSATIA_READ_ONLY_NON_EFFECTIF",
+        "justification": "Code d'erreur levé par le préambule READ ONLY du pack opérateur Preview (scripts/preview/db-verify.mjs), pas une variable."
       }
     ],
     "reference_only": [

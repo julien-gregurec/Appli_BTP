@@ -47,10 +47,10 @@ FEATURE_AI_ENABLED=false (valeur lue au rapport cutover V1 ; non relue ici, cf. 
 FEATURE_AI_DEVIS_ENABLED=PRESENT_VALEUR_ILLISIBLE (sensitive) — inerte, exige FEATURE_AI_ENABLED=true
 FEATURE_RELANCES_AUTO_ENABLED=PRESENT_VALEUR_ILLISIBLE (sensitive) — inerte, CRON_SECRET absente de la Preview GP
 
-TYPECHECK=__TYPECHECK__
-LINT=__LINT__
-TESTS=__TESTS__
-BUILDS=__BUILDS__
+TYPECHECK=PASS (racine + tools + reserves + colors, SHA 73d2abf8)
+LINT=PASS (0 erreur, 15 avertissements préexistants)
+TESTS=PASS 5 799 (GP 2 950 + Tools 2 174 + Réserves 239 + Colors 436) ; test:env-manifest 69/70 sur 73d2abf8 → 70/70 après correctif outillage (§ 8)
+BUILDS=4/4 PASS en local (GP Turbopack, Tools webpack, Réserves, Colors) ; hébergé 1/4 (GP READY), 3/4 non lancés (quota)
 
 PRODUCTION_TOUCHED=NO
 MIGRATIONS_REPLAYED=NO
@@ -155,10 +155,25 @@ Conforme. L'alias GP est inchangé, donc aucune modification nécessaire.
 
 - Bundles hébergés : non téléchargeables (SSO Vercel ; l'API ne fournit pas l'arborescence d'un
   déploiement Git). PUBLIC_SECRET_EXPOSURE est établi sur le code du SHA déployé :
-  __BUNDLE_SCAN__
+  build local des 4 apps du SHA déployé avec des valeurs sentinelles pour
+  `SUPABASE_SERVICE_ROLE_KEY`, `BANK_DATA_ENCRYPTION_KEY`, `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_ABONNEMENT_SECRET`, `OPENAI_API_KEY`, `RATE_LIMIT_HMAC_KEY`,
+  `ELSATIA_IDENTITY_SIGNING_KEYS`, `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` ; scan de
+  `.next/static` (et `apps/tools/public`) : **0 occurrence** des sentinelles, de `sk_test_`/`sk_live_`,
+  `whsec_`, `service_role` ou d'un bloc `PRIVATE KEY`. La sentinelle service_role n'apparaît pas non plus
+  dans `.next/server` (lecture à l'exécution, jamais inlinée). Seul hôte Supabase présent dans les
+  bundles : `pgvvpqyjziyapbbkydmc.supabase.co`. Les littéraux `*.elsatia.fr` présents viennent de
+  `packages/application-access/src/navigation.ts` (constantes servant à **reconnaître et refuser** un
+  hôte de Production, fail-closed) et des replis Tools (`apps/tools/src/lib/site.ts`), surchargés par
+  `NEXT_PUBLIC_TOOLS_URL` en Preview : aucun appel vers la Production. `verify:secrets` : 3 978 fichiers
+  suivis, aucun secret.
 - `src/lib/supabase/admin.ts` : 60 importeurs, aucun composant `"use client"` ; le preflight
   `check-env-manifest` rejette déjà statiquement tout import de ce module depuis un composant client
-  (test dans `scripts/check-env-manifest.test.mjs`). __ADMIN_PATCH__
+  (test dans `scripts/check-env-manifest.test.mjs`). Correctif de défense en profondeur ajouté **sur la branche de
+  qualification, non déployé** (le SHA déployé reste 73d2abf8) : `import "server-only";` en tête de
+  `src/lib/supabase/admin.ts`. Un import client échoue désormais aussi à la compilation Next. Aucun
+  changement métier ; vitest a déjà un alias `server-only` vers un stub. Validation : `tsc` PASS,
+  vitest GP 2 950 PASS, eslint PASS.
 - CSP : nonce + `strict-dynamic` posés par `src/proxy.ts` (GP) et `apps/*/src/proxy.ts`.
   CORS : `TOOLS_ALLOWED_ORIGINS` (liste blanche, `src/lib/tools-monetization.ts`) ; seul
   `/api/elsatia-identity/jwks` est en `*`, ce qui est voulu pour une clé publique. Vérification des
@@ -182,7 +197,29 @@ non déployées. L'architecture reste une session par application.
 
 ## 8. Qualification code (SHA 73d2abf8, conteneur)
 
-__QUALIF__
+| Contrôle | Résultat |
+|---|---|
+| `npm run typecheck` (4 apps) | PASS |
+| `npm run lint` (4 apps) | PASS, 0 erreur, 15 avertissements |
+| `npm test` (4 apps) | PASS : 2 950 + 2 174 + 239 + 436 = **5 799** (1 échec attendu, 194 ignorés côté GP) |
+| builds locaux | 4/4 PASS |
+| `test:preview-pack` | 39/39 |
+| `test:preview-v9` | 29/29 |
+| `test:env-manifest` | **69/70 sur 73d2abf8** → 70/70 après correctif |
+| `verify:env-manifest` | OK, 14 DECISION_REQUIRED non bloquantes |
+| `test:migration-targets` / `verify:migrations` | 7/7 ; 408 migrations partagées |
+| `test:preflight-preview`, `test:seeds`, `test:dr-guard`, `test:bank-keys`, `test:production-v9x-preflight` | 5/5, 48/48, 10/10, 1/1, 39/39 |
+| `verify:secrets` | aucun secret |
+| `verify:stripe-prices` | SKIP (pas de clé Stripe dans le conteneur) |
+
+**Régression trouvée dans 73d2abf8 (outillage seulement)** : le commit b165d83e introduit la constante
+`ELSATIA_READ_ONLY_NON_EFFECTIF` dans `scripts/preview/db-verify.mjs`. Le scanner du manifeste la
+prend pour une variable inconnue (`ENV-UNKNOWN`) et le test « dépôt réel : code, gabarits et manifeste
+concordent » échoue. `npm test` n'exécute pas ce test, ce qui explique les 5 799 PASS. **Impact sur le
+déploiement : aucun.** Le preflight du build Vercel GP est en mode `--auto` (contrôle des variables,
+pas du code) et a rendu « GO : aucune erreur ». Correctif sur la branche de qualification, non
+déployé : ajout du nom aux `scan.ignored_literals` de `config/env-manifest.json`, avec justification,
+comme les autres codes d'erreur déjà listés.
 
 ## 9. Prochaine action
 
