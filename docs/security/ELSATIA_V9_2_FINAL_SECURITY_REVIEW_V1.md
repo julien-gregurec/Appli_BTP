@@ -468,3 +468,49 @@ DEPLOYMENT_PERFORMED=NO
 STRIPE_LIVE_USED=NO      (aucun appel Stripe, test ou live)
 FEATURE_FLAGS_CHANGED=NO
 ```
+
+## 16. Report sur le train canonique `a17da456` (2026-10-04)
+
+Les 5 commits de cette revue ont été écrits sur `73901278`. Ils sont reportés par
+cherry-pick, sans réécriture de branche existante ni fusion de `main`, sur une nouvelle
+branche issue du train canonique distant.
+
+- Branche : `security/elsatia-v9.2-post-audit-v1`.
+- Base : `integration/elsatia-canonical-train-v9.2` = `a17da45686014473da53b96ff1c90a27b627affe`
+  (vérifié après `git fetch --all --prune`).
+- Correspondance des commits :
+
+  | Commit d'origine | Commit reporté |
+  |---|---|
+  | `a1bedd38` | `aa4a42de` |
+  | `cabbb147` | `badc877f` |
+  | `2f627ad9` | `b792f7a8` |
+  | `2d2fd263` | `836e8173` |
+  | `d5f3e621` | `ab486c69` |
+
+  Aucun conflit : entre `73901278` et `a17da456`, seul
+  `docs/qualification/ELSATIA_V9_2_CANONICAL_POST_FIX_QUALIFICATION_V1.md` a été ajouté.
+  Aucun fichier n'est commun avec la revue. Le correctif `server-only` de `admin.ts` est
+  conservé tel quel.
+- `git diff a17da456..HEAD` touche 37 fichiers : code applicatif, tests et ce rapport.
+  `MIGRATION_DIFF=NONE`, `SUPABASE_DB_CHANGE=NONE`, `PRODUCTION_CHANGE=NONE`. Aucun fichier
+  `supabase/`, `vercel.json` ou `config/env-manifest.json` n'est modifié.
+- Requalification sur la branche :
+  - typecheck et lint : PASS ;
+  - tests : **5 813 PASS** (2 964 + 2 174 + 239 + 436) ;
+  - builds : **4/4 PASS** (satellites en mode local, garde d'environnement conservée) ;
+  - `verify:secrets` : 3 988 fichiers, aucun secret ;
+  - bundles (80 / 90 / 21 / 16 fichiers) : aucun secret, **0 sourcemap** ;
+  - tests sécurité ciblés : PASS.
+- Vercel, vérifié en lecture seule avant le push :
+  - `elsatia-preview`, `elsatia-tools-preview`, `elsatia-colors-preview` et `elsatia-reserves`
+    ne buildent que `gp-preview-v8` (Ignored Build Step) ;
+  - `elsatia-production` (branche de production `release/commercialisation-v1`) ignore tout
+    build (`exit 0`) ;
+  - `elsatia-studio-preview` ne builde que sa propre branche ;
+  - `liria-concept-gestion-btp` ignore tout build ;
+  - `elsatia-colors` et `elsatia-tools` ne sont pas liés à Git.
+
+  Le push de cette branche ne peut donc produire que des événements ignorés : aucun build
+  réel, aucune Production.
+- Le train canonique **n'est pas** avancé : l'intégration reste à décider.
